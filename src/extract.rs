@@ -7,30 +7,53 @@ use rust_htslib::{
 };
 use std::str;
 
-pub fn get_mm_tag(record: &bam::Record) {
+pub struct BaseMods {
+    pub base: char,
+    pub strand: char,
+    pub mod_type: char,
+    pub mod_pos: Vec<i64>,
+}
+
+pub fn get_mm_tag(record: &bam::Record) -> Vec<BaseMods> {
     lazy_static! {
         static ref MM_RE: Regex =
-            Regex::new(r"(([ACGTUN][-+]([a-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
+            Regex::new(r"((([ACGTUN])([-+])([a-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
     }
+
+    let mut rtn = vec![];
 
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
         //let read_array = array.iter().collect::<Vec<_>>();
         //log::debug!("MM tag: {:?}", mm_text);
         for cap in MM_RE.captures_iter(mm_text) {
-            let mod_type = cap.get(2).map_or("", |m| m.as_str());
-            let mod_pos_str = cap.get(4).map_or("", |m| m.as_str());
-            let mod_pos: Vec<i32> = mod_pos_str
-                .trim_end_matches(";")
+            let mod_base = cap
+                .get(3)
+                .map(|m| m.as_str().chars().next().unwrap())
+                .unwrap();
+            let mod_strand = cap.get(4).map_or("", |m| m.as_str());
+            let mod_type = cap.get(5).map_or("", |m| m.as_str());
+            let mod_pos_str = cap.get(6).map_or("", |m| m.as_str());
+            let mod_pos: Vec<i64> = mod_pos_str
+                .trim_end_matches(';')
                 .split(',')
-                .map(|s| s.trim()) // (2)
-                .filter(|s| !s.is_empty()) // (3)
-                .map(|s| s.parse().unwrap()) // (4)
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.parse().unwrap())
                 .collect();
-            log::debug!("Mod type: {mod_type}\nMod pos: {mod_pos:?}\n");
+
+            log::trace!("Mod: {mod_base}{mod_strand}{mod_type}\nMod pos: {mod_pos:?}\n");
+            let mods = BaseMods {
+                base: mod_base,
+                strand: mod_strand.chars().next().unwrap(),
+                mod_type: mod_type.chars().next().unwrap(),
+                mod_pos: mod_pos,
+            };
+            rtn.push(mods);
         }
     } else {
         log::debug!("No MM tag found");
     }
+    return rtn;
 }
 
 pub fn extract_from_record(record: &bam::Record, reference: bool) {
