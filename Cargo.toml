@@ -20,7 +20,7 @@ name = "fibertools-rs"
 path = "src/main.rs"
 
 [dependencies]
-bio = "0.39.1"
+bio = "0.41.0"
 bio-types = "0.12.0"
 clap = {version = "3.1.6", features = ["derive"]}
 colored = "2.0.0"
