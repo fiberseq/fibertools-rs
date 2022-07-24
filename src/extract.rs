@@ -9,7 +9,7 @@ use rust_htslib::{
 use std::convert::TryFrom;
 
 pub struct BaseMods {
-    pub base: u8,
+    pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
     pub modified_positions: Vec<i64>,
@@ -70,23 +70,23 @@ pub fn get_mm_tag(record: &bam::Record) -> Vec<BaseMods> {
 
             // add to a struct
             let mods = BaseMods {
-                base: mod_base,
+                modified_base: mod_base,
                 strand: mod_strand.chars().next().unwrap(),
                 modification_type: modification_type.chars().next().unwrap(),
-                modified_positions: modified_positions,
+                modified_positions,
             };
             rtn.push(mods);
         }
     } else {
         log::debug!("No MM tag found");
     }
-    return rtn;
+    rtn
 }
 
 pub fn extract_from_record(record: &bam::Record, reference: bool) {
     let mods = get_mm_tag(record);
     for moda in mods.iter() {
-        if moda.base == b'C' && moda.modification_type == 'm' {
+        if moda.modified_base == b'C' && moda.modification_type == 'm' {
             println!("{:?}", moda.modified_positions);
         }
         // we want to get the bases on the reference sequence when possible
