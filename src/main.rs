@@ -3,9 +3,7 @@ use env_logger::{Builder, Target};
 use fibertools_rs::cli::Commands;
 use fibertools_rs::*;
 use log::LevelFilter;
-use rayon::prelude::*;
 use rust_htslib::{bam, bam::Read};
-use std::collections::HashMap;
 use std::time::Instant;
 
 fn main() {
