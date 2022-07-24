@@ -1,0 +1,37 @@
+[package]
+authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
+categories = ["command-line-utilities"]
+description = "fiberseq toolkit in rust"
+edition = "2021"
+homepage = "https://mrvollger.github.io/fibertools-rs/"
+keywords = ["cli", "bam"]
+license = "MIT"
+name = "fibertools-rs"
+readme = "README.md"
+repository = "https://github.com/mrvollger/fibertools-rs"
+version = "0.1.0"
+
+[[bin]]
+name = "ft"
+path = "src/main.rs"
+
+[[bin]]
+name = "fibertools-rs"
+path = "src/main.rs"
+
+[dependencies]
+bio = "0.39.1"
+bio-types = "0.12.0"
+clap = {version = "3.1.6", features = ["derive"]}
+colored = "2.0.0"
+env_logger = "0.9.0"
+log = "*"
+rayon = "1.5"
+regex = "1.5.4"
+rust-htslib = "0.39.5"
+
+[build-dependencies]
+clap = {version = "3.1.6", features = ["derive"]}
+clap_generate = "3.0.0"
+env_logger = "0.9.0"
+log = "0.4.14"
