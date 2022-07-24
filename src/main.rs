@@ -40,23 +40,16 @@ pub fn parse_cli() {
         .unwrap();
 
     match &args.command {
-        //
-        // Run Stats
-        //
         Some(Commands::Extract { bam, reference }) => {
-            let mut bam = bam::Reader::from_path(bam).unwrap();
-            let _header = bam::Header::from_template(bam.header());
-            // copy reverse reads to new BAM file
-            for r in bam.records() {
-                let record = r.unwrap();
-                if record.is_reverse() {
-                    println!("{:?}", record.qname());
-                }
-            }
+            // read in the bam from stdin or from a file
+            let mut bam = if bam == "-" {
+                bam::Reader::from_stdin().unwrap()
+            } else {
+                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+            };
+            bam.set_threads(args.threads).unwrap();
+            extract::extract_contained(&mut bam, *reference);
         }
-        //
-        // no command opt
-        //
         None => {}
     };
     let duration = pg_start.elapsed();
