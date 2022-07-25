@@ -83,6 +83,40 @@ pub fn get_mm_tag(record: &bam::Record) -> Vec<BaseMods> {
     rtn
 }
 
+/// Merge two lists into a sorted list
+/// Normal sort is supposed to be very fast on two sorted lists
+/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
+pub fn merge_two_lists<T>(left: Vec<T>, right: Vec<T>) -> Vec<T>
+where
+    T: Ord,
+    T: Clone,
+{
+    let mut x = [left, right].concat();
+    x.sort();
+    x
+}
+
+pub fn get_reference_positions(record: &bam::Record, positions: Vec<i64>) {
+    let mut cur_pos = 0;
+    // reverse positions if needed
+    let positions = if record.is_reverse() {
+        let seq_len = i64::try_from(record.seq_len()).unwrap();
+        positions.iter().rev().map(|p| seq_len - p).collect()
+    } else {
+        positions
+    };
+
+    for [q_pos, r_pos] in record.aligned_pairs() {
+        log::debug!("q_pos: {}, r_pos: {}", q_pos, r_pos);
+        while positions[cur_pos] <= q_pos {
+            if positions[cur_pos] == q_pos {
+                log::debug!("Found position: {}", positions[cur_pos]);
+            }
+            cur_pos += 1;
+        }
+    }
+}
+
 pub fn extract_from_record(record: &bam::Record, reference: bool) {
     let mods = get_mm_tag(record);
     for moda in mods.iter() {
@@ -90,9 +124,7 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
             println!("{:?}", moda.modified_positions);
         }
         // we want to get the bases on the reference sequence when possible
-        if reference && !record.is_unmapped() {
-            let _aligned_bases = record.aligned_pairs();
-        }
+        if reference && !record.is_unmapped() {}
     }
 }
 
