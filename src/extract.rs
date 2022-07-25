@@ -138,17 +138,15 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
 }
 
 pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
-    //bam.records().par_iter().for_each(|record| {
-    //    extract_from_record(record, reference);
-    //});
-
+    // process bam in chunks
+    let bin_size = 5_000;
     let mut cur_count = 0;
     let mut cur_vec = vec![];
     for r in bam.records() {
         let record = r.unwrap();
         cur_vec.push(record);
         cur_count += 1;
-        if cur_count == 1000 {
+        if cur_count == bin_size {
             cur_vec.par_iter().for_each(|record| {
                 extract_from_record(&record, reference);
             });
@@ -156,4 +154,8 @@ pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
             cur_count = 0;
         }
     }
+    // clear any unporcessed recs not big enough to make a full chunk
+    cur_vec.par_iter().for_each(|record| {
+        extract_from_record(&record, reference);
+    });
 }
