@@ -1,5 +1,6 @@
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
+use rayon::prelude::*;
 use regex::Regex;
 use rust_htslib::{
     bam,
@@ -137,8 +138,22 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
 }
 
 pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
+    //bam.records().par_iter().for_each(|record| {
+    //    extract_from_record(record, reference);
+    //});
+
+    let mut cur_count = 0;
+    let mut cur_vec = vec![];
     for r in bam.records() {
         let record = r.unwrap();
-        extract_from_record(&record, reference);
+        cur_vec.push(record);
+        cur_count += 1;
+        if cur_count == 1000 {
+            cur_vec.par_iter().for_each(|record| {
+                extract_from_record(&record, reference);
+            });
+            cur_vec.clear();
+            cur_count = 0;
+        }
     }
 }
