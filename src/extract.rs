@@ -95,26 +95,31 @@ where
     x.sort();
     x
 }
-
-pub fn get_reference_positions(record: &bam::Record, positions: Vec<i64>) {
-    let mut cur_pos = 0;
+pub fn get_reference_positions(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
     // reverse positions if needed
     let positions = if record.is_reverse() {
         let seq_len = i64::try_from(record.seq_len()).unwrap();
         positions.iter().rev().map(|p| seq_len - p).collect()
     } else {
-        positions
+        positions.clone()
     };
-
+    // find the shared positions in the reference
+    let mut ref_positions = vec![];
+    let mut cur_pos = 0;
     for [q_pos, r_pos] in record.aligned_pairs() {
-        log::debug!("q_pos: {}, r_pos: {}", q_pos, r_pos);
-        while positions[cur_pos] <= q_pos {
+        while cur_pos < positions.len() && positions[cur_pos] <= q_pos {
             if positions[cur_pos] == q_pos {
-                log::debug!("Found position: {}", positions[cur_pos]);
+                log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
+                ref_positions.push(r_pos);
             }
             cur_pos += 1;
         }
+        if cur_pos == positions.len() {
+            break;
+        }
     }
+    //assert!(ref_positions.is_sorted());
+    ref_positions
 }
 
 pub fn extract_from_record(record: &bam::Record, reference: bool) {
@@ -124,7 +129,9 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
             println!("{:?}", moda.modified_positions);
         }
         // we want to get the bases on the reference sequence when possible
-        if reference && !record.is_unmapped() {}
+        if reference && !record.is_unmapped() {
+            get_reference_positions(record, &moda.modified_positions);
+        }
     }
 }
 
