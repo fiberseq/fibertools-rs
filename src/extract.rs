@@ -139,7 +139,7 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
 
 pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
     // process bam in chunks
-    let bin_size = 5_000;
+    let bin_size = 10_000;
     let mut cur_count = 0;
     let mut cur_vec = vec![];
     for r in bam.records() {
