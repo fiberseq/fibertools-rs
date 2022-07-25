@@ -126,7 +126,7 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
     let mods = get_mm_tag(record);
     for moda in mods.iter() {
         if moda.modified_base == b'C' && moda.modification_type == 'm' {
-            println!("{:?}", moda.modified_positions);
+            //println!("{:?}", moda.modified_positions);
         }
         // we want to get the bases on the reference sequence when possible
         if reference && !record.is_unmapped() {
