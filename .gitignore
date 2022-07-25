@@ -1,3 +1,5 @@
 /target
 *.code-workspace
 Cargo.lock
+tmp*
+temp*
