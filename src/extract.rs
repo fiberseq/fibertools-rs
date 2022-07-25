@@ -123,7 +123,7 @@ pub fn get_reference_positions(record: &bam::Record, positions: &Vec<i64>) -> Ve
     ref_positions
 }
 
-pub fn extract_from_record(record: &bam::Record, reference: bool) {
+pub fn extract_from_record(record: &bam::Record, reference: bool) -> Vec<i64> {
     let mods = get_mm_tag(record);
     for moda in mods.iter() {
         if moda.modified_base == b'C' && moda.modification_type == 'm' {
@@ -132,14 +132,15 @@ pub fn extract_from_record(record: &bam::Record, reference: bool) {
         }
         // we want to get the bases on the reference sequence when possible
         if reference && !record.is_unmapped() {
-            get_reference_positions(record, &moda.modified_positions);
+            return get_reference_positions(record, &moda.modified_positions);
         }
     }
+    vec![]
 }
 
 pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
     // process bam in chunks
-    let bin_size = 10_000;
+    let bin_size = 10_000; // keeps mem pretty low
     let mut cur_count = 0;
     let mut cur_vec = vec![];
     for r in bam.records() {
@@ -147,15 +148,19 @@ pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            cur_vec.par_iter().for_each(|record| {
-                extract_from_record(&record, reference);
-            });
+            let _pos: Vec<Vec<i64>> = cur_vec
+                .par_iter()
+                .map(|record| extract_from_record(&record, reference))
+                .collect();
             cur_vec.clear();
             cur_count = 0;
+            //println!("{_pos:?}");
         }
     }
     // clear any unporcessed recs not big enough to make a full chunk
-    cur_vec.par_iter().for_each(|record| {
-        extract_from_record(&record, reference);
-    });
+    let _pos: Vec<Vec<i64>> = cur_vec
+        .par_iter()
+        .map(|record| extract_from_record(&record, reference))
+        .collect();
+    //println!("{_pos:?}");
 }
