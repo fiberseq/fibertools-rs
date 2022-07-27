@@ -179,7 +179,7 @@ impl FiberseqData {
             start = self.record.reference_start();
             end = self.record.reference_end();
         } else {
-            ct = name.clone();
+            ct = name;
             start = 0;
             end = self.record.seq_len() as i64;
         }
@@ -210,6 +210,7 @@ pub fn process_bam_chunk(
         records.len() as f64 / duration,
         so_far + records.len()
     );
+
     match m6a {
         Some(m6a) => {
             log::info!("Processing {:}", m6a);
