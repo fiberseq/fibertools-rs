@@ -7,6 +7,7 @@ use regex::Regex;
 use rust_htslib::bam::HeaderView;
 use rust_htslib::{bam, bam::record::Aux, bam::Read};
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::time::Instant;
 pub struct BaseMods {
     pub modified_base: u8,
@@ -91,17 +92,25 @@ impl BaseMods {
         // get the reference positions
         self.modified_reference_positions = liftover_exact(record, &positions);
     }
+
+    pub fn is_m6a(&self) -> bool {
+        self.modification_type == 'a'
+    }
+
+    pub fn is_cpg(&self) -> bool {
+        self.modification_type == 'm'
+    }
 }
 
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
 /// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
-pub fn merge_two_lists<T>(left: Vec<T>, right: Vec<T>) -> Vec<T>
+pub fn merge_two_lists<T>(left: &[T], right: &[T]) -> Vec<T>
 where
     T: Ord,
     T: Clone,
 {
-    let mut x = [left, right].concat();
+    let mut x: Vec<T> = left.iter().chain(right.iter()).cloned().collect();
     x.sort();
     x
 }
@@ -171,8 +180,44 @@ impl FiberseqData {
             .collect::<Vec<_>>()
     }
 
+    pub fn write_m6a(&self, reference: bool, head_view: &HeaderView) -> String {
+        let m6a: Vec<&BaseMods> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
+
+        // skip if no m6a
+        if m6a.is_empty() {
+            return "".to_string();
+        }
+        // get starts
+        let starts = if reference {
+            merge_two_lists(
+                &m6a[0].modified_reference_positions,
+                &m6a[1].modified_reference_positions,
+            )
+        } else {
+            merge_two_lists(&m6a[0].modified_positions, &m6a[1].modified_positions)
+        };
+        let lengths = vec![1; starts.len()];
+        self.to_string(reference, &starts, &lengths, head_view)
+    }
+
+    pub fn write_cpg(&self, reference: bool, head_view: &HeaderView) -> String {
+        let cpg: Vec<&BaseMods> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
+        // skip if no cpg
+        if cpg.is_empty() {
+            return "".to_string();
+        }
+        // get starts
+        let starts = if reference {
+            &cpg[0].modified_reference_positions
+        } else {
+            &cpg[0].modified_positions
+        };
+        let lengths = vec![1; starts.len()];
+        self.to_string(reference, starts, &lengths, head_view)
+    }
+
     pub fn to_string(
-        &mut self,
+        &self,
         reference: bool,
         starts: &[i64],
         lengths: &[i64],
@@ -182,6 +227,7 @@ impl FiberseqData {
         let start;
         let end;
         let name = std::str::from_utf8(self.record.qname()).unwrap();
+        let mut rtn: String = String::with_capacity(0);
         if reference {
             ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
             start = self.record.reference_start();
@@ -191,15 +237,40 @@ impl FiberseqData {
             start = 0;
             end = self.record.seq_len() as i64;
         }
-        let strand = if self.record.is_reverse() { '-' } else { '+' };
         let score = 0;
+        let strand = if self.record.is_reverse() { '-' } else { '+' };
         let color = "126,126,126";
         let b_ct = starts.len() + 2;
-        assert_eq!(lengths.len(), starts.len());
-        let b_st: String = starts.iter().map(|&id| id.to_string() + ",").collect();
         let b_ln: String = lengths.iter().map(|&id| id.to_string() + ",").collect();
-        // a zero size block start is valid, but not a block end
-        format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
+        let b_st: String = starts.iter().map(|&id| id.to_string() + ",").collect();
+        assert_eq!(lengths.len(), starts.len());
+        // TODO add spacers
+        //format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
+        rtn.push_str(ct);
+        rtn.push('\t');
+        rtn.push_str(&start.to_string());
+        rtn.push('\t');
+        rtn.push_str(&end.to_string());
+        rtn.push('\t');
+        rtn.push_str(name);
+        rtn.push('\t');
+        rtn.push_str(&score.to_string());
+        rtn.push('\t');
+        rtn.push(strand);
+        rtn.push('\t');
+        rtn.push_str(&start.to_string());
+        rtn.push('\t');
+        rtn.push_str(&end.to_string());
+        rtn.push('\t');
+        rtn.push_str(color);
+        rtn.push('\t');
+        rtn.push_str(&b_ct.to_string());
+        rtn.push_str("\t0,"); // add a zero length start
+        rtn.push_str(&b_ln);
+        rtn.push_str("1\t0,"); // add a 1 base length and a 0 start point
+        rtn.push_str(&b_st);
+        write!(&mut rtn, "{}", format_args!("{}\n", end - start - 1)).unwrap();
+        rtn
     }
 }
 
@@ -221,14 +292,7 @@ pub fn process_bam_chunk(
         Some(_m6a) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| {
-                    r.to_string(
-                        reference,
-                        &r.msp_starts.clone(),
-                        &r.msp_length.clone(),
-                        head_view,
-                    )
-                })
+                .map(|r| r.write_m6a(reference, head_view))
                 .collect();
             for line in out {
                 print!("{}", line);
