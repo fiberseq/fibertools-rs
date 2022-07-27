@@ -193,7 +193,7 @@ pub fn extract_contained(
                 proccesed_reads + cur_count
             );
             proccesed_reads += cur_count;
-            //let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
+            let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
             cur_vec.clear();
             cur_count = 0;
             //println!("{_pos:?}");
