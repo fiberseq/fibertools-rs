@@ -216,7 +216,6 @@ pub fn process_bam_chunk(
 ) {
     let start = Instant::now();
     let mut fiber_data = FiberseqData::from_records(records);
-    let duration = start.elapsed().as_secs_f64();
 
     match m6a {
         Some(_m6a) => {
@@ -238,8 +237,9 @@ pub fn process_bam_chunk(
         None => {}
     }
 
+    let duration = start.elapsed().as_secs_f64();
     log::info!(
-        "Processing {}. {} reads done so far.",
+        "Processing {}, {} reads done so far.",
         format!("{:.2?} reads/s", records.len() as f64 / duration)
             .bright_cyan()
             .bold(),
