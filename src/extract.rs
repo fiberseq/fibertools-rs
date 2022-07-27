@@ -142,13 +142,13 @@ pub struct FiberseqData {
 
 impl FiberseqData {
     pub fn new(record: &bam::Record) -> Self {
-        let nuc_starts = get_u32_tag(&record, b"ns");
-        let msp_starts = get_u32_tag(&record, b"as");
-        let nuc_length = get_u32_tag(&record, b"nl");
-        let msp_length = get_u32_tag(&record, b"al");
+        let nuc_starts = get_u32_tag(record, b"ns");
+        let msp_starts = get_u32_tag(record, b"as");
+        let nuc_length = get_u32_tag(record, b"nl");
+        let msp_length = get_u32_tag(record, b"al");
         // range positions
-        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, &record);
-        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, &record);
+        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, record);
+        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, record);
         //
         FiberseqData {
             record: record.clone(),
@@ -165,7 +165,7 @@ impl FiberseqData {
     pub fn from_records(records: &Vec<bam::Record>) -> Vec<Self> {
         records
             .par_iter()
-            .map(|record| FiberseqData::new(record))
+            .map(FiberseqData::new)
             .collect::<Vec<_>>()
     }
 }
