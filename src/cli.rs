@@ -27,28 +27,31 @@ pub struct Cli {
 }
 
 ///
-/// This structure contains all the subcommands for rustybam and their help descriptions.
-///
-/// Because of naming conventions for rust enums the commands names have
-/// different capitalization than on the command line.
-/// For example, the `Liftover` enum is invoked using `rustybam liftover`
-/// and the `TrimPaf` command with `rustybam trim-paf`.
+/// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
 ///
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Trim PAF records that overlap in query sequence to find and optimal splitting point using dynamic programing.
-    ///
-    /// Note, this can be combined with `rb invert` to also trim the target sequence.
-    ///
-    /// This idea is to mimic some of the trimming that happens in PAV to improve breakpoint detection. Starts with the largest overlap and iterates until no query overlaps remain.
-    #[clap(visible_aliases = &["extract", "e"])]
+    /// Extract fiberseq data into plain text files.
+    #[clap(visible_aliases = &["ex", "e"])]
     Extract {
-        /// PAF file from minimap2 or unimap. Must have the cg tag, and n matches will be zero unless the cigar uses =X.
+        /// fiberseq bam file
         #[clap(default_value = "-")]
         bam: String,
-        /// Remove contained alignments as well as overlaps.
+        /// report in reference sequence coordinates.
         #[clap(short, long)]
         reference: bool,
+        /// Output path for m6a bed12.
+        #[clap(short, long)]
+        m6a: Option<String>,
+        /// Output path for CpG (primrose) bed12.
+        #[clap(short, long)]
+        cpg: Option<String>,
+        /// Output path for methylation sensitive patch (msp) bed12.
+        #[clap(short, long)]
+        msp: Option<String>,
+        /// Output path for nucleosome bed12.
+        #[clap(short, long)]
+        nuc: Option<String>,
     },
 }
 

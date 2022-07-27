@@ -5,6 +5,22 @@ pub mod extract;
 
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Display;
+
+/// get positions on the complimented sequence in the cigar record
+pub fn positions_on_complimented_sequence(
+    record: &bam::Record,
+    input_positions: &[i64],
+) -> Vec<i64> {
+    // reverse positions if needed
+    let positions: Vec<i64> = if record.is_reverse() {
+        let seq_len = i64::try_from(record.seq_len()).unwrap();
+        input_positions.iter().rev().map(|p| seq_len - p).collect()
+    } else {
+        input_positions.to_vec()
+    };
+    positions
+}
+
 /// search a sorted array for insertions positions of another sorted array
 /// returned index i satisfies
 /// left
@@ -102,4 +118,31 @@ pub fn liftover_exact(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
         }
     }
     ref_positions
+}
+
+pub fn get_closest_reference_positions(positions: &[i64], record: &bam::Record) -> Vec<i64> {
+    let positions = positions_on_complimented_sequence(record, positions);
+    // get the reference positions
+    liftover_closest(record, &positions)
+}
+
+pub fn get_closest_reference_range(
+    starts: &[i64],
+    lengths: &[i64],
+    record: &bam::Record,
+) -> Vec<(i64, i64)> {
+    let starts = get_closest_reference_positions(starts, record);
+    let mol_ends: Vec<i64> = starts
+        .iter()
+        .zip(lengths.iter())
+        .map(|(start, length)| start + length)
+        .collect();
+    let ends = get_closest_reference_positions(&mol_ends, record);
+
+    starts
+        .iter()
+        .zip(ends.iter())
+        .filter(|(&start, &end)| end - start > 0) // filter out zero length ranges, basically means there is no liftover
+        .map(|(&start, &end)| (start, end - start))
+        .collect()
 }
