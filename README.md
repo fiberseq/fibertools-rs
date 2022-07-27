@@ -1,10 +1,18 @@
 # fibertools-rs
+[![DOI](https://zenodo.org/badge/517338593.svg)](https://zenodo.org/badge/latestdoi/517338593)
+
+[![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
+[![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
+
+
+[![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
+
 
 `fibertools-rs` a CLI tool for interacting with fiberseq bam files. The main utility is `ft extract` which extracts fiberseq data from a bam file into plain text.
 
 ```bash
 $ ft extract --help
-ft-extract 0.0.1
+ft-extract 0.0.2
 Extract fiberseq data into plain text files
 
 USAGE:
