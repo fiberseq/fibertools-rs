@@ -168,9 +168,40 @@ impl FiberseqData {
             .map(FiberseqData::new)
             .collect::<Vec<_>>()
     }
+
+    pub fn to_string(&mut self, reference: bool, starts: &[i64], lengths: &[i64]) -> String {
+        let ct;
+        let start;
+        let end;
+        let name = std::str::from_utf8(self.record.qname()).unwrap();
+        if reference {
+            ct = "";
+            start = self.record.reference_start();
+            end = self.record.reference_end();
+        } else {
+            ct = name.clone();
+            start = 0;
+            end = self.record.seq_len() as i64;
+        }
+        let strand = self.record.is_reverse();
+        let score = 0;
+        let color = "126,126,126";
+        let b_ct = starts.len();
+        let b_st: String = starts.iter().map(|&id| id.to_string() + ",").collect();
+        let b_ln: String = lengths.iter().map(|&id| id.to_string() + ",").collect();
+        format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t{b_ln}\t{b_st}\n")
+    }
 }
 
-pub fn process_bam_chunk(records: &Vec<bam::Record>, so_far: usize) {
+pub fn process_bam_chunk(
+    records: &Vec<bam::Record>,
+    so_far: usize,
+    _reference: bool,
+    m6a: &Option<String>,
+    _cpg: &Option<String>,
+    _msp: &Option<String>,
+    _nuc: &Option<String>,
+) {
     let start = Instant::now();
     let _fiber_data = FiberseqData::from_records(records);
     let duration = start.elapsed().as_secs_f64();
@@ -179,15 +210,21 @@ pub fn process_bam_chunk(records: &Vec<bam::Record>, so_far: usize) {
         records.len() as f64 / duration,
         so_far + records.len()
     );
+    match m6a {
+        Some(m6a) => {
+            log::info!("Processing {:}", m6a);
+        }
+        None => {}
+    }
 }
 
 pub fn extract_contained(
     bam: &mut bam::Reader,
-    _reference: bool,
-    _m6a: &Option<String>,
-    _cpg: &Option<String>,
-    _msp: &Option<String>,
-    _nuc: &Option<String>,
+    reference: bool,
+    m6a: &Option<String>,
+    cpg: &Option<String>,
+    msp: &Option<String>,
+    nuc: &Option<String>,
 ) {
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
@@ -201,13 +238,12 @@ pub fn extract_contained(
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            process_bam_chunk(&cur_vec, proccesed_reads);
+            process_bam_chunk(&cur_vec, proccesed_reads, reference, m6a, cpg, msp, nuc);
             proccesed_reads += cur_vec.len();
             cur_vec.clear();
             cur_count = 0;
-            //println!("{_pos:?}");
         }
     }
     // clear any unprocessed recs not big enough to make a full chunk
-    process_bam_chunk(&cur_vec, proccesed_reads);
+    process_bam_chunk(&cur_vec, proccesed_reads, reference, m6a, cpg, msp, nuc);
 }
