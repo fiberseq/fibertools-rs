@@ -5,6 +5,7 @@ use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
 use rust_htslib::{bam, bam::record::Aux, bam::Read};
 use std::convert::TryFrom;
+use std::time::Instant;
 pub struct BaseMods {
     pub modified_base: u8,
     pub strand: char,
@@ -169,6 +170,16 @@ impl FiberseqData {
     }
 }
 
+pub fn process_bam_chunk(records: &Vec<bam::Record>) {
+    let start = Instant::now();
+    let _fiber_data = FiberseqData::from_records(records);
+    let duration = start.elapsed().as_secs_f64();
+    log::info!(
+        "Processed {:.2} reads / second.",
+        records.len() as f64 / duration
+    );
+}
+
 pub fn extract_contained(
     bam: &mut bam::Reader,
     _reference: bool,
@@ -195,7 +206,7 @@ pub fn extract_contained(
                 proccesed_reads + cur_count
             );
             proccesed_reads += cur_count;
-            let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
+            process_bam_chunk(&cur_vec);
             cur_vec.clear();
             cur_count = 0;
             //println!("{_pos:?}");
@@ -207,5 +218,5 @@ pub fn extract_contained(
         proccesed_reads,
         proccesed_reads + cur_count
     );
-    let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
+    process_bam_chunk(&cur_vec);
 }
