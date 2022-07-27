@@ -114,10 +114,10 @@ where
 /// let mut bam = bam::Reader::from_path(&".test/aligned.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
-///     let n_s = extract::get_u32_tag(&record, b"ns");    
-///     let n_l = extract::get_u32_tag(&record, b"nl");    
-///     let a_s = extract::get_u32_tag(&record, b"as");    
-///     let a_l = extract::get_u32_tag(&record, b"al");    
+///     let n_s = extract::get_u32_tag(&record, b"ns");
+///     let n_l = extract::get_u32_tag(&record, b"nl");
+///     let a_s = extract::get_u32_tag(&record, b"as");
+///     let a_l = extract::get_u32_tag(&record, b"al");
 ///     log::debug!("{:?}", a_s);
 /// }
 ///```
@@ -208,9 +208,7 @@ pub fn process_bam_chunk(
     let duration = start.elapsed().as_secs_f64();
 
     match m6a {
-        Some(m6a) => {
-            log::info!("Processing {:}", m6a);
-        }
+        Some(_m6a) => {}
         None => {}
     }
 
