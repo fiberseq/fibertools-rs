@@ -7,11 +7,6 @@ cargo clippy
 cargo test
 cargo run -- --help
 
-exit
-# broken for some reason
-# target=aarch64-unknown-linux-musl
-# target=x86_64-unknown-linux-gnu
-
 mkdir -p dists
 
 for target in x86_64-unknown-linux-musl; do
