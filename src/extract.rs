@@ -175,7 +175,7 @@ pub fn process_bam_chunk(records: &Vec<bam::Record>, so_far: usize) {
     let _fiber_data = FiberseqData::from_records(records);
     let duration = start.elapsed().as_secs_f64();
     log::info!(
-        "Processed {:.2} reads/second. {:} reads done so far.",
+        "Processing {:.2} reads/second. {:} reads done so far.",
         records.len() as f64 / duration,
         so_far + records.len()
     );
