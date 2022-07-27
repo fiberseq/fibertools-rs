@@ -9,16 +9,34 @@ use rust_htslib::{bam, bam::record::Aux, bam::Read};
 use std::convert::TryFrom;
 use std::fmt::Write;
 use std::time::Instant;
-pub struct BaseMods {
+pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
     pub modified_positions: Vec<i64>,
     pub modified_reference_positions: Vec<i64>,
 }
+impl BaseMod {
+    pub fn add_reference_positions(&mut self, record: &bam::Record) {
+        let positions = positions_on_complimented_sequence(record, &self.modified_positions);
+        // get the reference positions
+        self.modified_reference_positions = liftover_exact(record, &positions);
+    }
+
+    pub fn is_m6a(&self) -> bool {
+        self.modification_type == 'a'
+    }
+
+    pub fn is_cpg(&self) -> bool {
+        self.modification_type == 'm'
+    }
+}
+pub struct BaseMods {
+    pub base_mods: Vec<BaseMod>,
+}
 
 impl BaseMods {
-    pub fn new(record: &bam::Record) -> Vec<BaseMods> {
+    pub fn new(record: &bam::Record) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
             static ref MM_RE: Regex =
@@ -70,7 +88,7 @@ impl BaseMods {
                 assert_eq!(cur_mod_idx, mod_dists.len());
 
                 // add to a struct
-                let mut mods = BaseMods {
+                let mut mods = BaseMod {
                     modified_base: mod_base,
                     strand: mod_strand.chars().next().unwrap(),
                     modification_type: modification_type.chars().next().unwrap(),
@@ -84,21 +102,38 @@ impl BaseMods {
         } else {
             log::debug!("No MM tag found");
         }
-        rtn
+        BaseMods { base_mods: rtn }
     }
 
-    pub fn add_reference_positions(&mut self, record: &bam::Record) {
-        let positions = positions_on_complimented_sequence(record, &self.modified_positions);
-        // get the reference positions
-        self.modified_reference_positions = liftover_exact(record, &positions);
+    pub fn m6a_positions(&self, reference: bool) -> Vec<i64> {
+        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
+        // skip if no m6a
+        if m6a.is_empty() {
+            return vec![];
+        }
+        // get positions of m6a
+        if reference {
+            merge_two_lists(
+                &m6a[0].modified_reference_positions,
+                &m6a[1].modified_reference_positions,
+            )
+        } else {
+            merge_two_lists(&m6a[0].modified_positions, &m6a[1].modified_positions)
+        }
     }
 
-    pub fn is_m6a(&self) -> bool {
-        self.modification_type == 'a'
-    }
-
-    pub fn is_cpg(&self) -> bool {
-        self.modification_type == 'm'
+    pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
+        let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
+        // skip if no cpg
+        if cpg.is_empty() {
+            return vec![];
+        }
+        // get positions of cpg
+        if reference {
+            cpg[0].modified_reference_positions.clone()
+        } else {
+            cpg[0].modified_positions.clone()
+        }
     }
 }
 
@@ -148,7 +183,7 @@ pub struct FiberseqData {
     pub msp_length: Vec<i64>,
     pub ref_nuc: Vec<(i64, i64)>,
     pub ref_msp: Vec<(i64, i64)>,
-    pub base_mods: Vec<BaseMods>,
+    pub base_mods: BaseMods,
 }
 
 impl FiberseqData {
@@ -181,42 +216,24 @@ impl FiberseqData {
     }
 
     pub fn write_m6a(&self, reference: bool, head_view: &HeaderView) -> String {
-        let m6a: Vec<&BaseMods> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
-
-        // skip if no m6a
-        if m6a.is_empty() {
+        let starts = self.base_mods.m6a_positions(reference);
+        if starts.is_empty() {
             return "".to_string();
         }
-        // get starts
-        let starts = if reference {
-            merge_two_lists(
-                &m6a[0].modified_reference_positions,
-                &m6a[1].modified_reference_positions,
-            )
-        } else {
-            merge_two_lists(&m6a[0].modified_positions, &m6a[1].modified_positions)
-        };
         let lengths = vec![1; starts.len()];
-        self.to_string(reference, &starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view)
     }
 
     pub fn write_cpg(&self, reference: bool, head_view: &HeaderView) -> String {
-        let cpg: Vec<&BaseMods> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
-        // skip if no cpg
-        if cpg.is_empty() {
+        let starts = self.base_mods.cpg_positions(reference);
+        if starts.is_empty() {
             return "".to_string();
         }
-        // get starts
-        let starts = if reference {
-            &cpg[0].modified_reference_positions
-        } else {
-            &cpg[0].modified_positions
-        };
         let lengths = vec![1; starts.len()];
-        self.to_string(reference, starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view)
     }
 
-    pub fn to_string(
+    pub fn to_bed12(
         &self,
         reference: bool,
         starts: &[i64],
