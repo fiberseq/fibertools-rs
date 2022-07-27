@@ -8,8 +8,8 @@ cargo test
 cargo run -- --help
 
 mkdir -p dists
-
-for target in x86_64-unknown-linux-musl; do
+#aarch64-apple-darwin
+for target in x86_64-apple-darwin x86_64-unknown-linux-musl; do
     echo $target
     cross build --release --target ${target}
     tar -czvf ./dists/fibertools-rs_v${V}-${target}.tar.gz \
