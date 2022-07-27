@@ -17,12 +17,16 @@ pub fn parse_cli() {
     let subcommand = matches.subcommand_name().unwrap();
 
     // set the logging level
-    let min_log_level = match matches.occurrences_of("verbose") {
-        0 => LevelFilter::Warn,
-        1 => LevelFilter::Info,
-        2 => LevelFilter::Debug,
+    let mut min_log_level = match matches.occurrences_of("verbose") {
+        //0 => LevelFilter::Warn,
+        0 => LevelFilter::Info,
+        1 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
+    if args.quiet {
+        min_log_level = LevelFilter::Error;
+    }
+
     Builder::new()
         .target(Target::Stderr)
         .filter(None, min_log_level)
@@ -30,6 +34,8 @@ pub fn parse_cli() {
 
     log::debug!("DEBUG logging enabled");
     log::trace!("TRACE logging enabled");
+
+    log::info!("Starting ft-{}", subcommand.bright_green().bold());
 
     // set up number of threads to use globally
     rayon::ThreadPoolBuilder::new()
