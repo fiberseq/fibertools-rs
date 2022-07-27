@@ -170,13 +170,14 @@ impl FiberseqData {
     }
 }
 
-pub fn process_bam_chunk(records: &Vec<bam::Record>) {
+pub fn process_bam_chunk(records: &Vec<bam::Record>, so_far: usize) {
     let start = Instant::now();
     let _fiber_data = FiberseqData::from_records(records);
     let duration = start.elapsed().as_secs_f64();
     log::info!(
-        "Processed {:.2} reads / second.",
-        records.len() as f64 / duration
+        "Processed {:.2} reads / second. {} reads done.",
+        records.len() as f64 / duration,
+        so_far + records.len()
     );
 }
 
@@ -200,23 +201,13 @@ pub fn extract_contained(
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            log::debug!(
-                "Processing reads {}-{}",
-                proccesed_reads,
-                proccesed_reads + cur_count
-            );
-            proccesed_reads += cur_count;
-            process_bam_chunk(&cur_vec);
+            process_bam_chunk(&cur_vec, proccesed_reads);
+            proccesed_reads += cur_vec.len();
             cur_vec.clear();
             cur_count = 0;
             //println!("{_pos:?}");
         }
     }
     // clear any unprocessed recs not big enough to make a full chunk
-    log::debug!(
-        "Processing reads {}-{}",
-        proccesed_reads,
-        proccesed_reads + cur_count
-    );
-    process_bam_chunk(&cur_vec);
+    process_bam_chunk(&cur_vec, proccesed_reads);
 }
