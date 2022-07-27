@@ -38,7 +38,14 @@ pub fn parse_cli() {
         .unwrap();
 
     match &args.command {
-        Some(Commands::Extract { bam, reference }) => {
+        Some(Commands::Extract {
+            bam,
+            reference,
+            m6a,
+            cpg,
+            msp,
+            nuc,
+        }) => {
             // read in the bam from stdin or from a file
             let mut bam = if bam == "-" {
                 bam::Reader::from_stdin().unwrap()
@@ -46,7 +53,7 @@ pub fn parse_cli() {
                 bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
             };
             bam.set_threads(args.threads).unwrap();
-            extract::extract_contained(&mut bam, *reference);
+            extract::extract_contained(&mut bam, *reference, m6a, cpg, msp, nuc);
         }
         None => {}
     };

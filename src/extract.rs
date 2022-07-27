@@ -1,4 +1,4 @@
-use super::{liftover_closest, liftover_exact};
+use super::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
 use rayon::prelude::*;
@@ -11,20 +11,6 @@ pub struct BaseMods {
     pub modification_type: char,
     pub modified_positions: Vec<i64>,
     pub modified_reference_positions: Vec<i64>,
-}
-/// get positions on the complimented sequence in the cigar record
-pub fn positions_on_complimented_sequence(
-    record: &bam::Record,
-    input_positions: &[i64],
-) -> Vec<i64> {
-    // reverse positions if needed
-    let positions: Vec<i64> = if record.is_reverse() {
-        let seq_len = i64::try_from(record.seq_len()).unwrap();
-        input_positions.iter().rev().map(|p| seq_len - p).collect()
-    } else {
-        input_positions.to_vec()
-    };
-    positions
 }
 
 impl BaseMods {
@@ -136,47 +122,88 @@ where
 pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
     if let Ok(Aux::ArrayU32(array)) = record.aux(tag) {
         let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
-        return read_array;
+        read_array
     } else {
-        return vec![];
+        vec![]
     }
 }
 
-pub fn extract_from_record(record: &bam::Record, reference: bool) -> Vec<i64> {
-    let mods = BaseMods::new(record);
-    get_u32_tag(record, b"nl");
-    for moda in mods.iter() {
-        // we want to get the bases on the reference sequence when possible
-        if reference && !record.is_unmapped() {
-            return moda.modified_reference_positions.clone();
+pub struct FiberseqData {
+    pub record: bam::Record,
+    pub nuc_starts: Vec<i64>,
+    pub msp_starts: Vec<i64>,
+    pub nuc_length: Vec<i64>,
+    pub msp_length: Vec<i64>,
+    pub ref_nuc: Vec<(i64, i64)>,
+    pub ref_msp: Vec<(i64, i64)>,
+    pub base_mods: Vec<BaseMods>,
+}
+
+impl FiberseqData {
+    pub fn new(record: &bam::Record) -> Self {
+        let nuc_starts = get_u32_tag(&record, b"ns");
+        let msp_starts = get_u32_tag(&record, b"as");
+        let nuc_length = get_u32_tag(&record, b"nl");
+        let msp_length = get_u32_tag(&record, b"al");
+        // range positions
+        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, &record);
+        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, &record);
+        //
+        FiberseqData {
+            record: record.clone(),
+            nuc_starts,
+            msp_starts,
+            nuc_length,
+            msp_length,
+            ref_nuc,
+            ref_msp,
+            base_mods: BaseMods::new(record),
         }
     }
-    vec![]
+
+    pub fn from_records(records: &Vec<bam::Record>) -> Vec<Self> {
+        records
+            .par_iter()
+            .map(|record| FiberseqData::new(record))
+            .collect::<Vec<_>>()
+    }
 }
 
-pub fn extract_contained(bam: &mut bam::Reader, reference: bool) {
+pub fn extract_contained(
+    bam: &mut bam::Reader,
+    _reference: bool,
+    _m6a: &Option<String>,
+    _cpg: &Option<String>,
+    _msp: &Option<String>,
+    _nuc: &Option<String>,
+) {
     // process bam in chunks
-    let bin_size = 10_000; // keeps mem pretty low
+    let bin_size = 1000; // keeps mem pretty low
     let mut cur_count = 0;
     let mut cur_vec = vec![];
+    let mut proccesed_reads = 0;
     for r in bam.records() {
         let record = r.unwrap();
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            let _pos: Vec<Vec<i64>> = cur_vec
-                .par_iter()
-                .map(|record| extract_from_record(record, reference))
-                .collect();
+            log::debug!(
+                "Processing reads {}-{}",
+                proccesed_reads,
+                proccesed_reads + cur_count
+            );
+            proccesed_reads += cur_count;
+            //let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
             cur_vec.clear();
             cur_count = 0;
             //println!("{_pos:?}");
         }
     }
-    // clear any unporcessed recs not big enough to make a full chunk
-    let _pos: Vec<Vec<i64>> = cur_vec
-        .par_iter()
-        .map(|record| extract_from_record(record, reference))
-        .collect();
-    //println!("{_pos:?}");
+    // clear any unprocessed recs not big enough to make a full chunk
+    log::debug!(
+        "Processing reads {}-{}",
+        proccesed_reads,
+        proccesed_reads + cur_count
+    );
+    let _fiberdata: Vec<FiberseqData> = FiberseqData::from_records(&cur_vec);
 }
