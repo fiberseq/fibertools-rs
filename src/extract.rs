@@ -1,7 +1,7 @@
 use super::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
-use rayon::prelude::*;
+use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
 use rust_htslib::{bam, bam::record::Aux, bam::Read};
 use std::convert::TryFrom;
@@ -178,7 +178,9 @@ pub fn extract_contained(
     _nuc: &Option<String>,
 ) {
     // process bam in chunks
-    let bin_size = 50_000; // keeps mem pretty low
+    // keeps mem pretty low, about 1GB per thread
+    let bin_size = current_num_threads() * 2000;
+    //
     let mut cur_count = 0;
     let mut cur_vec = vec![];
     let mut proccesed_reads = 0;
