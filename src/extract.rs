@@ -178,7 +178,7 @@ pub fn extract_contained(
     _nuc: &Option<String>,
 ) {
     // process bam in chunks
-    let bin_size = 50_000; // keeps mem pretty low
+    let bin_size = 10_000; // keeps mem pretty low
     let mut cur_count = 0;
     let mut cur_vec = vec![];
     let mut proccesed_reads = 0;
