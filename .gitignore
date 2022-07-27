@@ -4,3 +4,4 @@ Cargo.lock
 tmp*
 temp*
 dists/**
+.vscode/
