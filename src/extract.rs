@@ -4,6 +4,7 @@ use colored::Colorize;
 use lazy_static::lazy_static;
 use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
+use rust_htslib::bam::HeaderView;
 use rust_htslib::{bam, bam::record::Aux, bam::Read};
 use std::convert::TryFrom;
 use std::time::Instant;
@@ -170,13 +171,19 @@ impl FiberseqData {
             .collect::<Vec<_>>()
     }
 
-    pub fn to_string(&mut self, reference: bool, starts: &[i64], lengths: &[i64]) -> String {
+    pub fn to_string(
+        &mut self,
+        reference: bool,
+        starts: &[i64],
+        lengths: &[i64],
+        head_view: &HeaderView,
+    ) -> String {
         let ct;
         let start;
         let end;
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         if reference {
-            ct = "";
+            ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
             start = self.record.reference_start();
             end = self.record.reference_end();
         } else {
@@ -194,6 +201,7 @@ impl FiberseqData {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn process_bam_chunk(
     records: &Vec<bam::Record>,
     so_far: usize,
@@ -202,6 +210,7 @@ pub fn process_bam_chunk(
     _cpg: &Option<String>,
     _msp: &Option<String>,
     _nuc: &Option<String>,
+    _head_view: &HeaderView,
 ) {
     let start = Instant::now();
     let _fiber_data = FiberseqData::from_records(records);
@@ -231,6 +240,9 @@ pub fn extract_contained(
     msp: &Option<String>,
     nuc: &Option<String>,
 ) {
+    let header = bam::Header::from_template(bam.header());
+    let head_view = bam::HeaderView::from_header(&header);
+
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
     let bin_size = current_num_threads() * 2000;
@@ -243,12 +255,30 @@ pub fn extract_contained(
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            process_bam_chunk(&cur_vec, proccesed_reads, reference, m6a, cpg, msp, nuc);
+            process_bam_chunk(
+                &cur_vec,
+                proccesed_reads,
+                reference,
+                m6a,
+                cpg,
+                msp,
+                nuc,
+                &head_view,
+            );
             proccesed_reads += cur_vec.len();
             cur_vec.clear();
             cur_count = 0;
         }
     }
     // clear any unprocessed recs not big enough to make a full chunk
-    process_bam_chunk(&cur_vec, proccesed_reads, reference, m6a, cpg, msp, nuc);
+    process_bam_chunk(
+        &cur_vec,
+        proccesed_reads,
+        reference,
+        m6a,
+        cpg,
+        msp,
+        nuc,
+        &head_view,
+    );
 }
