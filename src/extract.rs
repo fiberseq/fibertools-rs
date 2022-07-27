@@ -191,13 +191,15 @@ impl FiberseqData {
             start = 0;
             end = self.record.seq_len() as i64;
         }
-        let strand = self.record.is_reverse();
+        let strand = if self.record.is_reverse() { '-' } else { '+' };
         let score = 0;
         let color = "126,126,126";
-        let b_ct = starts.len();
+        let b_ct = starts.len() + 2;
+        assert_eq!(lengths.len(), starts.len());
         let b_st: String = starts.iter().map(|&id| id.to_string() + ",").collect();
         let b_ln: String = lengths.iter().map(|&id| id.to_string() + ",").collect();
-        format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t{b_ln}\t{b_st}\n")
+        // a zero size block start is valid, but not a block end
+        format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
     }
 }
 
@@ -205,19 +207,34 @@ impl FiberseqData {
 pub fn process_bam_chunk(
     records: &Vec<bam::Record>,
     so_far: usize,
-    _reference: bool,
+    reference: bool,
     m6a: &Option<String>,
     _cpg: &Option<String>,
     _msp: &Option<String>,
     _nuc: &Option<String>,
-    _head_view: &HeaderView,
+    head_view: &HeaderView,
 ) {
     let start = Instant::now();
-    let _fiber_data = FiberseqData::from_records(records);
+    let mut fiber_data = FiberseqData::from_records(records);
     let duration = start.elapsed().as_secs_f64();
 
     match m6a {
-        Some(_m6a) => {}
+        Some(_m6a) => {
+            let out: Vec<String> = fiber_data
+                .iter_mut()
+                .map(|r| {
+                    r.to_string(
+                        reference,
+                        &r.msp_starts.clone(),
+                        &r.msp_length.clone(),
+                        head_view,
+                    )
+                })
+                .collect();
+            for line in out {
+                print!("{}", line);
+            }
+        }
         None => {}
     }
 
