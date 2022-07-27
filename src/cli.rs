@@ -18,9 +18,12 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 8)]
     pub threads: usize,
 
-    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
+    /// Logging level [-v: Debug, -vv: Trace].
     #[clap(short, long, parse(from_occurrences), help_heading = "DEBUG")]
     pub verbose: usize,
+    /// Turn of all logging.
+    #[clap(short, long)]
+    pub quiet: bool,
 
     #[clap(subcommand)]
     pub command: Option<Commands>,
