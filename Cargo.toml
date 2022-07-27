@@ -15,10 +15,6 @@ version = "0.1.0"
 name = "ft"
 path = "src/main.rs"
 
-[[bin]]
-name = "fibertools-rs"
-path = "src/main.rs"
-
 [dependencies]
 bio = "0.41.0"
 bio-types = "0.12.0"
