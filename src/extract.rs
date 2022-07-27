@@ -137,19 +137,6 @@ impl BaseMods {
     }
 }
 
-/// Merge two lists into a sorted list
-/// Normal sort is supposed to be very fast on two sorted lists
-/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
-pub fn merge_two_lists<T>(left: &[T], right: &[T]) -> Vec<T>
-where
-    T: Ord,
-    T: Clone,
-{
-    let mut x: Vec<T> = left.iter().chain(right.iter()).cloned().collect();
-    x.sort();
-    x
-}
-
 ///```
 /// use rust_htslib::{bam, bam::Read};
 /// use fibertools_rs::*;
@@ -177,13 +164,12 @@ pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
 
 pub struct FiberseqData {
     pub record: bam::Record,
-    pub nuc_starts: Vec<i64>,
-    pub msp_starts: Vec<i64>,
-    pub nuc_length: Vec<i64>,
-    pub msp_length: Vec<i64>,
+    pub nuc: Vec<(i64, i64)>,
+    pub msp: Vec<(i64, i64)>,
     pub ref_nuc: Vec<(i64, i64)>,
     pub ref_msp: Vec<(i64, i64)>,
     pub base_mods: BaseMods,
+    pub ec: f32,
 }
 
 impl FiberseqData {
@@ -195,16 +181,30 @@ impl FiberseqData {
         // range positions
         let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, record);
         let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, record);
+        // get the number of passes
+        let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
+            log::trace!("{f}");
+            f
+        } else {
+            0.0
+        };
         //
         FiberseqData {
             record: record.clone(),
-            nuc_starts,
-            msp_starts,
-            nuc_length,
-            msp_length,
+            nuc: nuc_starts
+                .iter()
+                .cloned()
+                .zip(nuc_length.iter().cloned())
+                .collect(),
+            msp: msp_starts
+                .iter()
+                .cloned()
+                .zip(msp_length.iter().cloned())
+                .collect(),
             ref_nuc,
             ref_msp,
             base_mods: BaseMods::new(record),
+            ec,
         }
     }
 
@@ -213,6 +213,50 @@ impl FiberseqData {
             .par_iter()
             .map(FiberseqData::new)
             .collect::<Vec<_>>()
+    }
+
+    pub fn get_nuc(&self, reference: bool, get_starts: bool) -> Vec<i64> {
+        let (starts, lengths): (Vec<_>, Vec<_>) = if reference {
+            self.ref_nuc.iter().map(|(a, b)| (a, b)).unzip()
+        } else {
+            self.nuc.iter().map(|(a, b)| (a, b)).unzip()
+        };
+        if get_starts {
+            starts
+        } else {
+            lengths
+        }
+    }
+
+    pub fn get_msp(&self, reference: bool, get_starts: bool) -> Vec<i64> {
+        let (starts, lengths): (Vec<_>, Vec<_>) = if reference {
+            self.ref_msp.iter().map(|(a, b)| (a, b)).unzip()
+        } else {
+            self.msp.iter().map(|(a, b)| (a, b)).unzip()
+        };
+        if get_starts {
+            starts
+        } else {
+            lengths
+        }
+    }
+
+    pub fn write_msp(&self, reference: bool, head_view: &HeaderView) -> String {
+        let starts = self.get_msp(reference, true);
+        let lengths = self.get_msp(reference, false);
+        if starts.is_empty() {
+            return "".to_string();
+        }
+        self.to_bed12(reference, &starts, &lengths, head_view)
+    }
+
+    pub fn write_nuc(&self, reference: bool, head_view: &HeaderView) -> String {
+        let starts = self.get_nuc(reference, true);
+        let lengths = self.get_nuc(reference, false);
+        if starts.is_empty() {
+            return "".to_string();
+        }
+        self.to_bed12(reference, &starts, &lengths, head_view)
     }
 
     pub fn write_m6a(&self, reference: bool, head_view: &HeaderView) -> String {
@@ -297,9 +341,9 @@ pub fn process_bam_chunk(
     so_far: usize,
     reference: bool,
     m6a: &Option<String>,
-    _cpg: &Option<String>,
-    _msp: &Option<String>,
-    _nuc: &Option<String>,
+    cpg: &Option<String>,
+    msp: &Option<String>,
+    nuc: &Option<String>,
     head_view: &HeaderView,
 ) {
     let start = Instant::now();
@@ -310,6 +354,42 @@ pub fn process_bam_chunk(
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_m6a(reference, head_view))
+                .collect();
+            for line in out {
+                print!("{}", line);
+            }
+        }
+        None => {}
+    }
+    match cpg {
+        Some(_cpg) => {
+            let out: Vec<String> = fiber_data
+                .iter_mut()
+                .map(|r| r.write_cpg(reference, head_view))
+                .collect();
+            for line in out {
+                print!("{}", line);
+            }
+        }
+        None => {}
+    }
+    match msp {
+        Some(_msp) => {
+            let out: Vec<String> = fiber_data
+                .iter_mut()
+                .map(|r| r.write_msp(reference, head_view))
+                .collect();
+            for line in out {
+                print!("{}", line);
+            }
+        }
+        None => {}
+    }
+    match nuc {
+        Some(_nuc) => {
+            let out: Vec<String> = fiber_data
+                .iter_mut()
+                .map(|r| r.write_nuc(reference, head_view))
                 .collect();
             for line in out {
                 print!("{}", line);

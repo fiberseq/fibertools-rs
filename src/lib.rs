@@ -6,6 +6,19 @@ pub mod extract;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Display;
 
+/// Merge two lists into a sorted list
+/// Normal sort is supposed to be very fast on two sorted lists
+/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
+pub fn merge_two_lists<T>(left: &[T], right: &[T]) -> Vec<T>
+where
+    T: Ord,
+    T: Clone,
+{
+    let mut x: Vec<T> = left.iter().chain(right.iter()).cloned().collect();
+    x.sort();
+    x
+}
+
 /// get positions on the complimented sequence in the cigar record
 pub fn positions_on_complimented_sequence(
     record: &bam::Record,
@@ -79,7 +92,7 @@ where
 ///     let record = record.unwrap();
 ///     let seq_len = i64::try_from(record.seq_len()).unwrap();
 ///     let positions: Vec<i64> = (0..seq_len).collect();
-///     liftover_closest(&record, &positions);    
+///     liftover_closest(&record, &positions);
 /// }
 ///```
 pub fn liftover_closest(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
