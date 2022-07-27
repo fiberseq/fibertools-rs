@@ -1,5 +1,6 @@
 use super::*;
 use bio::alphabets::dna::revcomp;
+use colored::Colorize;
 use lazy_static::lazy_static;
 use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
@@ -205,11 +206,6 @@ pub fn process_bam_chunk(
     let start = Instant::now();
     let _fiber_data = FiberseqData::from_records(records);
     let duration = start.elapsed().as_secs_f64();
-    log::info!(
-        "Processing {:.2} reads/second. {:} reads done so far.",
-        records.len() as f64 / duration,
-        so_far + records.len()
-    );
 
     match m6a {
         Some(m6a) => {
@@ -217,6 +213,16 @@ pub fn process_bam_chunk(
         }
         None => {}
     }
+
+    log::info!(
+        "Processing {}. {} reads done so far.",
+        format!("{:.2?} reads/s", records.len() as f64 / duration)
+            .bright_cyan()
+            .bold(),
+        format!("{:}", so_far + records.len())
+            .bright_magenta()
+            .bold()
+    );
 }
 
 pub fn extract_contained(
