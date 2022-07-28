@@ -36,7 +36,7 @@ pub fn positions_on_complimented_sequence(
 /// a[i-1] <= v < a[i]
 /// https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html
 /// ```
-/// use fibertools_rs::*;
+/// use fibertools_rs::bamlift::*;
 /// let a = vec![1, 2, 3, 5, 6, 7, 8, 9, 10];
 /// let v = vec![0, 1, 3, 4, 11, 11];
 /// let indexes = search_sorted(&a, &v);
@@ -78,6 +78,7 @@ where
 ///```
 /// use rust_htslib::{bam, bam::Read};
 /// use fibertools_rs::*;
+/// use fibertools_rs::bamlift::*;
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
