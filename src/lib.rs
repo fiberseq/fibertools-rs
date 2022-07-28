@@ -99,14 +99,14 @@ where
 ///     liftover_closest(&record, &positions);
 /// }
 ///```
-pub fn liftover_closest(record: &bam::Record, positions: &[i64]) -> Vec<i64> {
+pub fn liftover_closest(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
     // aligned pairs
     let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
         .aligned_pairs()
         .map(|[q_pos, r_pos]| (q_pos, r_pos))
         .unzip();
     // find the closest position within the q_pos matches
-    let ref_idxs = search_sorted(&q_pos, positions);
+    let ref_idxs = search_sorted(&q_pos, query_positions);
     // find the shared positions in the reference
     let mut ref_positions = vec![];
     for mut idx in ref_idxs {
