@@ -169,7 +169,7 @@ pub fn get_closest_reference_range(
     ref_starts
         .iter()
         .zip(ref_ends.iter())
-        .filter(|(&start, &end)| end - start > 0) // filter out zero length ranges, basically means there is no liftover
+        .filter(|(&start, &end)| start <= end) // filter out zero length ranges, basically means there is no liftover
         .map(|(&start, &end)| (start, end - start))
         .collect()
 }
