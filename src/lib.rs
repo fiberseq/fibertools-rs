@@ -1,10 +1,14 @@
+use anyhow::Result;
+use rust_htslib::{bam, bam::ext::BamRecordExtensions};
+use std::fmt::Display;
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+use std::path::PathBuf;
+
 /// Command line interface for fibertools-rs.
 pub mod cli;
 
 pub mod extract;
-
-use rust_htslib::{bam, bam::ext::BamRecordExtensions};
-use std::fmt::Display;
 
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
@@ -158,4 +162,75 @@ pub fn get_closest_reference_range(
         .filter(|(&start, &end)| end - start > 0) // filter out zero length ranges, basically means there is no liftover
         .map(|(&start, &end)| (start, end - start))
         .collect()
+}
+
+// MY IO TOOLS
+const BUFFER_SIZE: usize = 32 * 1024;
+
+/// Get a buffered output writer from stdout or a file
+fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> {
+    let writer: Box<dyn Write + Send + 'static> = match path {
+        Some(path) => {
+            if path.as_os_str() == "-" {
+                Box::new(BufWriter::with_capacity(BUFFER_SIZE, io::stdout()))
+            } else {
+                Box::new(BufWriter::with_capacity(BUFFER_SIZE, File::create(path)?))
+            }
+        }
+        None => Box::new(BufWriter::with_capacity(BUFFER_SIZE, io::stdout())),
+    };
+    Ok(writer)
+}
+
+/// Write to stdout if - or the file specified by a path
+pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
+    //let ext = Path::new(filename).extension();
+    let path = PathBuf::from(filename);
+    let buffer = get_output(Some(path))?; //.expect("Error: cannot create output file");
+    Ok(buffer)
+}
+pub struct FiberOutFiles {
+    pub m6a: Option<Box<dyn Write>>,
+    pub cpg: Option<Box<dyn Write>>,
+    pub msp: Option<Box<dyn Write>>,
+    pub nuc: Option<Box<dyn Write>>,
+    pub all: Option<Box<dyn Write>>,
+}
+
+impl FiberOutFiles {
+    pub fn new(
+        m6a: &Option<String>,
+        cpg: &Option<String>,
+        msp: &Option<String>,
+        nuc: &Option<String>,
+        all: &Option<String>,
+    ) -> Result<Self> {
+        let m6a = match m6a {
+            Some(m6a) => Some(writer(m6a)?),
+            None => None,
+        };
+        let cpg = match cpg {
+            Some(cpg) => Some(writer(cpg)?),
+            None => None,
+        };
+        let msp = match msp {
+            Some(msp) => Some(writer(msp)?),
+            None => None,
+        };
+        let nuc = match nuc {
+            Some(nuc) => Some(writer(nuc)?),
+            None => None,
+        };
+        let all = match all {
+            Some(all) => Some(writer(all)?),
+            None => None,
+        };
+        Ok(FiberOutFiles {
+            m6a,
+            cpg,
+            msp,
+            nuc,
+            all,
+        })
+    }
 }

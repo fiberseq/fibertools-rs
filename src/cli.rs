@@ -55,6 +55,9 @@ pub enum Commands {
         /// Output path for nucleosome bed12.
         #[clap(short, long)]
         nuc: Option<String>,
+        /// Output path for nucleosome bed12.
+        #[clap(short, long)]
+        all: Option<String>,
     },
 }
 

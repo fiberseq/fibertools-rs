@@ -340,59 +340,56 @@ pub fn process_bam_chunk(
     records: &Vec<bam::Record>,
     so_far: usize,
     reference: bool,
-    m6a: &Option<String>,
-    cpg: &Option<String>,
-    msp: &Option<String>,
-    nuc: &Option<String>,
+    out_files: &mut FiberOutFiles,
     head_view: &HeaderView,
 ) {
     let start = Instant::now();
     let mut fiber_data = FiberseqData::from_records(records);
 
-    match m6a {
-        Some(_m6a) => {
+    match &mut out_files.m6a {
+        Some(m6a) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_m6a(reference, head_view))
                 .collect();
             for line in out {
-                print!("{}", line);
+                write!(m6a, "{}", line).unwrap();
             }
         }
         None => {}
     }
-    match cpg {
-        Some(_cpg) => {
+    match &mut out_files.cpg {
+        Some(cpg) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_cpg(reference, head_view))
                 .collect();
             for line in out {
-                print!("{}", line);
+                write!(cpg, "{}", line).unwrap();
             }
         }
         None => {}
     }
-    match msp {
-        Some(_msp) => {
+    match &mut out_files.msp {
+        Some(msp) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_msp(reference, head_view))
                 .collect();
             for line in out {
-                print!("{}", line);
+                write!(msp, "{}", line).unwrap();
             }
         }
         None => {}
     }
-    match nuc {
-        Some(_nuc) => {
+    match &mut out_files.nuc {
+        Some(nuc) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_nuc(reference, head_view))
                 .collect();
             for line in out {
-                print!("{}", line);
+                write!(nuc, "{}", line).unwrap();
             }
         }
         None => {}
@@ -410,14 +407,7 @@ pub fn process_bam_chunk(
     );
 }
 
-pub fn extract_contained(
-    bam: &mut bam::Reader,
-    reference: bool,
-    m6a: &Option<String>,
-    cpg: &Option<String>,
-    msp: &Option<String>,
-    nuc: &Option<String>,
-) {
+pub fn extract_contained(bam: &mut bam::Reader, reference: bool, mut out_files: FiberOutFiles) {
     let header = bam::Header::from_template(bam.header());
     let head_view = bam::HeaderView::from_header(&header);
 
@@ -437,10 +427,7 @@ pub fn extract_contained(
                 &cur_vec,
                 proccesed_reads,
                 reference,
-                m6a,
-                cpg,
-                msp,
-                nuc,
+                &mut out_files,
                 &head_view,
             );
             proccesed_reads += cur_vec.len();
@@ -453,10 +440,7 @@ pub fn extract_contained(
         &cur_vec,
         proccesed_reads,
         reference,
-        m6a,
-        cpg,
-        msp,
-        nuc,
+        &mut out_files,
         &head_view,
     );
 }
