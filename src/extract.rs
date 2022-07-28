@@ -1,11 +1,13 @@
+use super::bamlift::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use colored::Colorize;
 use lazy_static::lazy_static;
 use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
-use rust_htslib::bam::HeaderView;
-use rust_htslib::{bam, bam::record::Aux, bam::Read};
+use rust_htslib::{
+    bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView, bam::Read,
+};
 use std::convert::TryFrom;
 use std::fmt::Write;
 use std::time::Instant;
@@ -278,6 +280,76 @@ impl FiberseqData {
         self.to_bed12(reference, &starts, &lengths, head_view)
     }
 
+    pub fn write_all(&self, head_view: &HeaderView) -> String {
+        // PB features
+        let name = std::str::from_utf8(self.record.qname()).unwrap();
+        let score = self.ec.round() as i64;
+        let q_len = self.record.seq_len() as i64;
+        // reference features
+        let ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
+        let start = self.record.reference_start();
+        let end = self.record.reference_end();
+        let strand = if self.record.is_reverse() { '-' } else { '+' };
+        // fiber features
+        let nuc_starts = self.get_nuc(false, true);
+        let nuc_lengths = self.get_nuc(false, false);
+        let ref_nuc_starts = self.get_nuc(true, true);
+        let ref_nuc_lengths = self.get_nuc(true, false);
+
+        let msp_starts = self.get_msp(false, true);
+        let msp_lengths = self.get_msp(false, false);
+        let ref_msp_starts = self.get_msp(true, true);
+        let ref_msp_lengths = self.get_msp(true, false);
+
+        let m6a = self.base_mods.m6a_positions(false);
+        let ref_m6a = self.base_mods.m6a_positions(true);
+
+        let cpg = self.base_mods.cpg_positions(false);
+        let ref_cpg = self.base_mods.cpg_positions(true);
+
+        // write the features
+        let mut rtn = String::with_capacity(0);
+        // add bed 6
+        rtn.write_fmt(format_args!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t",
+            ct, start, end, name, score, strand
+        ))
+        .unwrap();
+        // add PB features
+        rtn.write_fmt(format_args!(
+            "{}\t{}\t{}\t",
+            q_len,
+            String::from_utf8_lossy(&self.record.seq().as_bytes()),
+            self.ec
+        ))
+        .unwrap();
+        // add fiber features
+        for vec in &[
+            &nuc_starts,
+            &nuc_lengths,
+            &ref_nuc_starts,
+            &ref_nuc_lengths,
+            &msp_starts,
+            &msp_lengths,
+            &ref_msp_starts,
+            &ref_msp_lengths,
+            &m6a,
+            &ref_m6a,
+            &cpg,
+            &ref_cpg,
+        ] {
+            if vec.is_empty() {
+                rtn.push_str("None\t");
+            } else {
+                let z: String = vec.iter().map(|&x| x.to_string() + ",").collect();
+                rtn.write_fmt(format_args!("{}\t", z)).unwrap();
+            }
+        }
+        rtn.push('\n');
+
+        rtn
+    }
+
     pub fn to_bed12(
         &self,
         reference: bool,
@@ -299,7 +371,7 @@ impl FiberseqData {
             start = 0;
             end = self.record.seq_len() as i64;
         }
-        let score = 0;
+        let score = self.ec.round() as i64;
         let strand = if self.record.is_reverse() { '-' } else { '+' };
         let color = "126,126,126";
         let b_ct = starts.len() + 2;
@@ -394,6 +466,18 @@ pub fn process_bam_chunk(
                 .collect();
             for line in out {
                 write!(nuc, "{}", line).unwrap();
+            }
+        }
+        None => {}
+    }
+    match &mut out_files.all {
+        Some(all) => {
+            let out: Vec<String> = fiber_data
+                .iter_mut()
+                .map(|r| r.write_all(head_view))
+                .collect();
+            for line in out {
+                write!(all, "{}", line).unwrap();
             }
         }
         None => {}
