@@ -1,3 +1,4 @@
+use anyhow::{Error, Ok};
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::Commands;
@@ -6,11 +7,7 @@ use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
 
-fn main() {
-    parse_cli();
-}
-
-pub fn parse_cli() {
+pub fn main() -> Result<(), Error> {
     let pg_start = Instant::now();
     let args = cli::make_cli_parse();
     let matches = cli::make_cli_app().get_matches();
@@ -51,6 +48,7 @@ pub fn parse_cli() {
             cpg,
             msp,
             nuc,
+            all,
         }) => {
             // read in the bam from stdin or from a file
             let mut bam = if bam == "-" {
@@ -59,7 +57,8 @@ pub fn parse_cli() {
                 bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
             };
             bam.set_threads(args.threads).unwrap();
-            extract::extract_contained(&mut bam, *reference, m6a, cpg, msp, nuc);
+            let out_files = FiberOutFiles::new(m6a, cpg, msp, nuc, all)?;
+            extract::extract_contained(&mut bam, *reference, out_files);
         }
         None => {}
     };
@@ -69,4 +68,5 @@ pub fn parse_cli() {
         subcommand.bright_green().bold(),
         format!("{:.2?}", duration).bright_yellow().bold()
     );
+    Ok(())
 }
