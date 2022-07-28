@@ -52,7 +52,7 @@ pub fn positions_on_complimented_sequence(
 /// let indexes = search_sorted(&a, &v);
 /// assert_eq!(indexes, vec![0, 0, 2, 3, 9, 9]);
 /// ```
-pub fn search_sorted<T>(a: &Vec<T>, v: &Vec<T>) -> Vec<usize>
+pub fn search_sorted<T>(a: &[T], v: &[T]) -> Vec<usize>
 where
     T: Ord,
     T: Display,
@@ -99,33 +99,36 @@ where
 ///     liftover_closest(&record, &positions);
 /// }
 ///```
-pub fn liftover_closest(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
-    // find the shared positions in the reference
-    let mut ref_positions = vec![];
-    let (_q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
+pub fn liftover_closest(record: &bam::Record, positions: &[i64]) -> Vec<i64> {
+    // aligned pairs
+    let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
         .aligned_pairs()
         .map(|[q_pos, r_pos]| (q_pos, r_pos))
         .unzip();
-    let ref_idxs = search_sorted(&r_pos, positions);
+    // find the closest position within the q_pos matches
+    let ref_idxs = search_sorted(&q_pos, positions);
+    // find the shared positions in the reference
+    let mut ref_positions = vec![];
     for mut idx in ref_idxs {
         // if we map past the end of the reference take the last reference position
         if idx == r_pos.len() {
             idx -= 1;
         }
+        //log::trace!("Idx {}\tr_pos {}", idx, r_pos[idx]);
         ref_positions.push(r_pos[idx]);
     }
     ref_positions
 }
 
 /// liftover positions using the cigar string
-pub fn liftover_exact(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
+pub fn liftover_exact(record: &bam::Record, positions: &[i64]) -> Vec<i64> {
     // find the shared positions in the reference
     let mut ref_positions = vec![];
     let mut cur_pos = 0;
     for [q_pos, r_pos] in record.aligned_pairs() {
         while cur_pos < positions.len() && positions[cur_pos] <= q_pos {
             if positions[cur_pos] == q_pos {
-                log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
+                //log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
                 ref_positions.push(r_pos);
             }
             cur_pos += 1;
@@ -138,7 +141,10 @@ pub fn liftover_exact(record: &bam::Record, positions: &Vec<i64>) -> Vec<i64> {
 }
 
 pub fn get_closest_reference_positions(positions: &[i64], record: &bam::Record) -> Vec<i64> {
+    //
+    //log::trace!("seq {:?}", positions);
     let positions = positions_on_complimented_sequence(record, positions);
+    log::trace!("seq comp {:?}", positions);
     // get the reference positions
     liftover_closest(record, &positions)
 }
@@ -148,17 +154,21 @@ pub fn get_closest_reference_range(
     lengths: &[i64],
     record: &bam::Record,
 ) -> Vec<(i64, i64)> {
-    let starts = get_closest_reference_positions(starts, record);
     let mol_ends: Vec<i64> = starts
         .iter()
         .zip(lengths.iter())
         .map(|(start, length)| start + length)
         .collect();
-    let ends = get_closest_reference_positions(&mol_ends, record);
-
-    starts
+    //log::trace!("seq {:?}", starts);
+    //log::trace!("seq len {:?}", mol_ends);
+    let ref_starts = get_closest_reference_positions(starts, record);
+    let ref_ends = get_closest_reference_positions(&mol_ends, record);
+    assert_eq!(ref_starts.len(), ref_ends.len());
+    //log::trace!("ref_starts: {:?}", ref_starts);
+    //log::trace!("ref_ends: {:?}", ref_ends);
+    ref_starts
         .iter()
-        .zip(ends.iter())
+        .zip(ref_ends.iter())
         .filter(|(&start, &end)| end - start > 0) // filter out zero length ranges, basically means there is no liftover
         .map(|(&start, &end)| (start, end - start))
         .collect()

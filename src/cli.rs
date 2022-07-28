@@ -44,18 +44,18 @@ pub enum Commands {
         #[clap(short, long)]
         reference: bool,
         /// Output path for m6a bed12.
-        #[clap(short, long)]
+        #[clap(long)]
         m6a: Option<String>,
         /// Output path for CpG (primrose) bed12.
         #[clap(short, long)]
         cpg: Option<String>,
         /// Output path for methylation sensitive patch (msp) bed12.
-        #[clap(short, long)]
+        #[clap(long)]
         msp: Option<String>,
         /// Output path for nucleosome bed12.
         #[clap(short, long)]
         nuc: Option<String>,
-        /// Output path for nucleosome bed12.
+        /// Output path for .
         #[clap(short, long)]
         all: Option<String>,
     },
