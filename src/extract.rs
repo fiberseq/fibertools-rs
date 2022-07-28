@@ -178,6 +178,7 @@ impl FiberseqData {
         let msp_starts = get_u32_tag(record, b"as");
         let nuc_length = get_u32_tag(record, b"nl");
         let msp_length = get_u32_tag(record, b"al");
+
         // range positions
         let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, record);
         let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, record);
