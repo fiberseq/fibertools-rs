@@ -303,8 +303,11 @@ impl FiberseqData {
         let strand = if self.record.is_reverse() { '-' } else { '+' };
         let color = "126,126,126";
         let b_ct = starts.len() + 2;
-        let b_ln: String = lengths.iter().map(|&id| id.to_string() + ",").collect();
-        let b_st: String = starts.iter().map(|&id| id.to_string() + ",").collect();
+        let b_ln: String = lengths.iter().map(|&ln| ln.to_string() + ",").collect();
+        let b_st: String = starts
+            .iter()
+            .map(|&st| (st - start).to_string() + ",")
+            .collect();
         assert_eq!(lengths.len(), starts.len());
         // TODO add spacers
         //format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
