@@ -413,7 +413,7 @@ pub fn extract_contained(bam: &mut bam::Reader, reference: bool, mut out_files: 
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let bin_size = current_num_threads() * 2000;
+    let bin_size = current_num_threads() * 500;
     //
     let mut cur_count = 0;
     let mut cur_vec = vec![];
