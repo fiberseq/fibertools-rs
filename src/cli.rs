@@ -61,7 +61,6 @@ pub enum Commands {
     },
     Center {
         /// fiberseq bam file, must also be aligned and have an index.
-        #[clap(default_value = "-")]
         bam: String,
         /// bed file on which to centralize reads. If you include strand it will orient data accordingly.
         bed: String,

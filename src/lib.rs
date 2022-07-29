@@ -26,6 +26,15 @@ fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> 
     Ok(writer)
 }
 
+/// join a vector with commas
+pub fn join_by_str<'a, I, Z>(vals: I, sep: &str) -> String
+where
+    I: IntoIterator<Item = Z>,
+    Z: ToString + 'a,
+{
+    vals.into_iter().map(|v| v.to_string() + sep).collect()
+}
+
 /// Write to stdout if - or the file specified by a path
 pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
     //let ext = Path::new(filename).extension();

@@ -165,8 +165,12 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
     let mut return_positions = vec![];
     let mut cur_pos = 0;
     for [q_pos, r_pos] in record.aligned_pairs() {
-        while cur_pos < positions.len() && positions[cur_pos] <= q_pos {
-            if positions[cur_pos] == q_pos {
+        // check whether we are searching for an exact position in
+        // the reference or the query
+        let val_to_match = if get_reference { q_pos } else { r_pos };
+        // iterate over positions until we find the exact position or move past it
+        while cur_pos < positions.len() && positions[cur_pos] <= val_to_match {
+            if positions[cur_pos] == val_to_match {
                 //log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
                 if get_reference {
                     return_positions.push(r_pos);
