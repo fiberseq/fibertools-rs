@@ -1,6 +1,7 @@
 use super::bamlift::*;
 use super::extract::*;
 use super::*;
+use bio::alphabets::dna::revcomp;
 use rust_htslib::bam::record;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
@@ -112,23 +113,57 @@ impl CenteredFiberData {
             .collect()
     }
 
-    // TODO
-    pub fn write(&self) -> String {
-        let m6a = join_by_str(self.m6a_positions(), ",");
-        let cpg = join_by_str(self.cpg_positions(), ",");
+    pub fn get_sequence(&self) -> String {
+        let forward_bases = if self.center_position.strand == '+' {
+            self.record.seq().as_bytes()
+        } else {
+            revcomp(self.record.seq().as_bytes())
+        };
+        String::from_utf8_lossy(&forward_bases).to_string()
+    }
+
+    pub fn leading_columns(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.center_position.chrom,
             self.center_position.position,
             self.center_position.strand,
             self.record.reference_start(),
             self.record.reference_end(),
             std::str::from_utf8(self.record.qname()).unwrap(),
-            self.offset - self.record.seq_len() as i64,
-            self.offset,
-            self.record.seq_len(),
+            -self.offset,
+            self.record.seq_len() as i64 - self.offset,
+            self.record.seq_len()
+        )
+    }
+
+    // TODO
+    pub fn write(&self) -> String {
+        let m6a = join_by_str(self.m6a_positions(), ",");
+        let cpg = join_by_str(self.cpg_positions(), ",");
+        format!(
+            "{}{}\t{}\t{}\n",
+            self.leading_columns(),
             m6a,
-            cpg
+            cpg,
+            self.get_sequence(),
+        )
+    }
+    pub fn header() -> String {
+        format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "chrom",
+            "centering_position",
+            "strand",
+            "reference_start",
+            "reference_end",
+            "query_name",
+            "centered_query_start",
+            "centered_query_end",
+            "query_length",
+            "centered_m6a_positions",
+            "centered_cpg_positions",
+            "query_sequence"
         )
     }
 }
@@ -164,6 +199,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
 }
 
 pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<CenterPosition>) {
+    print!("{}", CenteredFiberData::header());
     for center_position in center_positions {
         bam.fetch((
             &center_position.chrom,
