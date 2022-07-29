@@ -141,17 +141,24 @@ impl CenteredFiberData {
     pub fn write(&self) -> String {
         let m6a = join_by_str(self.m6a_positions(), ",");
         let cpg = join_by_str(self.cpg_positions(), ",");
+        let (nuc_st, nuc_en) = unzip_to_vectors(self.nuc_positions());
+        let (msp_st, msp_en) = unzip_to_vectors(self.msp_positions());
         format!(
-            "{}{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
             m6a,
             cpg,
+            join_by_str(nuc_st, ","),
+            join_by_str(nuc_en, ","),
+            join_by_str(msp_st, ","),
+            join_by_str(msp_en, ","),
             self.get_sequence(),
         )
     }
-    pub fn header() -> String {
+
+    pub fn leading_header() -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             "chrom",
             "centering_position",
             "strand",
@@ -161,8 +168,19 @@ impl CenteredFiberData {
             "centered_query_start",
             "centered_query_end",
             "query_length",
+        )
+    }
+    // TODO
+    pub fn header() -> String {
+        format!(
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            CenteredFiberData::leading_header(),
             "centered_m6a_positions",
             "centered_cpg_positions",
+            "centered_nuc_starts",
+            "centered_nuc_ends",
+            "centered_msp_starts",
+            "centered_msp_ends",
             "query_sequence"
         )
     }
