@@ -22,7 +22,7 @@ impl BaseMod {
     pub fn add_reference_positions(&mut self, record: &bam::Record) {
         let positions = positions_on_complimented_sequence(record, &self.modified_positions);
         // get the reference positions
-        self.modified_reference_positions = liftover_exact(record, &positions);
+        self.modified_reference_positions = get_exact_reference_positions(record, &positions);
     }
 
     pub fn is_m6a(&self) -> bool {

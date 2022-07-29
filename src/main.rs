@@ -1,4 +1,5 @@
 use anyhow::{Error, Ok};
+use bio::io::bed;
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::Commands;
@@ -59,6 +60,16 @@ pub fn main() -> Result<(), Error> {
             bam.set_threads(args.threads).unwrap();
             let out_files = FiberOutFiles::new(m6a, cpg, msp, nuc, all)?;
             extract::extract_contained(&mut bam, *reference, out_files);
+        }
+        Some(Commands::Center { bam, bed }) => {
+            // read in the bam from stdin or from a file
+            let mut bam = if bam == "-" {
+                bam::Reader::from_stdin().unwrap()
+            } else {
+                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+            };
+            bam.set_threads(args.threads).unwrap();
+            let mut _reader = bed::Reader::from_file(bed).expect("Could not open bed file");
         }
         None => {}
     };
