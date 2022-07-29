@@ -1,5 +1,4 @@
 use anyhow::{Error, Ok};
-use bio::io::bed;
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::Commands;
@@ -63,13 +62,10 @@ pub fn main() -> Result<(), Error> {
         }
         Some(Commands::Center { bam, bed }) => {
             // read in the bam from stdin or from a file
-            let mut bam = if bam == "-" {
-                bam::Reader::from_stdin().unwrap()
-            } else {
-                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-            };
+            let mut bam = bam::IndexedReader::from_path(bam)?;
             bam.set_threads(args.threads).unwrap();
-            let mut _reader = bed::Reader::from_file(bed).expect("Could not open bed file");
+            let center_positions = center::read_center_positions(bed)?;
+            center::center_fiberdata(&mut bam, center_positions);
         }
         None => {}
     };
