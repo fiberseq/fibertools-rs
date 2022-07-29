@@ -17,15 +17,15 @@ impl CenteredFiberData {
         record: bam::Record,
         reference_position: i64,
         forward: bool,
-    ) -> Self {
+    ) -> Option<Self> {
         let offset = CenteredFiberData::find_offset(&record, reference_position);
-        Self {
+        offset.map(|offset| CenteredFiberData {
             fiber,
             record,
             offset,
             forward,
             reference_position,
-        }
+        })
     }
 
     pub fn get_centering_position(&self) -> i64 {
@@ -33,21 +33,22 @@ impl CenteredFiberData {
     }
 
     // TODO
-    fn find_offset(record: &bam::Record, reference_position: i64) -> i64 {
-        let z = get_exact_query_positions(record, &[reference_position]);
-        if z.is_empty() {
-            0
+    fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
+        let read_center = get_exact_query_positions(record, &[reference_position]);
+        if read_center.is_empty() {
+            None
         } else {
-            z[0] - reference_position
+            Some(read_center[0])
         }
     }
 
     // TODO
     fn apply_offset(&self, positions: &[i64]) -> Vec<i64> {
+        let out = positions.iter().map(|&p| p - self.offset).collect();
         if self.forward {
-            positions.iter().map(|&p| p + self.offset).collect()
+            out
         } else {
-            positions.iter().map(|&p| p + self.offset).collect()
+            out.iter().rev().map(|&p| -p).collect()
         }
     }
 
@@ -75,7 +76,12 @@ pub fn center(
     let fiber_data = FiberseqData::from_records(&records);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     for (fiber, record) in iter {
-        let centered_fiber = CenteredFiberData::new(fiber, record, reference_position, forward);
-        centered_fiber.write(head_view);
+        match CenteredFiberData::new(fiber, record, reference_position, forward) {
+            Some(centered_fiber) => centered_fiber.write(head_view),
+            None => {
+                log::info!("No centering for this record");
+                "".to_string()
+            }
+        };
     }
 }
