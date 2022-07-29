@@ -114,7 +114,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 ///     let record = record.unwrap();
 ///     let seq_len = i64::try_from(record.seq_len()).unwrap();
 ///     let positions: Vec<i64> = (0..seq_len).collect();
-///     liftover_closest(&record, &positions);
+///     get_closest_reference_positions(&positions, &record);
 /// }
 ///```
 pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
