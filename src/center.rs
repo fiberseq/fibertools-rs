@@ -5,6 +5,7 @@ use bio::alphabets::dna::revcomp;
 use rust_htslib::bam::record;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
+use std::fmt::Write;
 use std::fs::File;
 use std::io::{self, prelude::*, BufReader};
 
@@ -75,42 +76,42 @@ impl CenteredFiberData {
         self.apply_offset(&self.fiber.base_mods.cpg_positions(false))
     }
 
-    // todo
-    pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
-        let starts = self.apply_offset(&self.fiber.get_nuc(false, true));
-        let ends = self.apply_offset(
-            &self
-                .fiber
-                .get_nuc(false, false)
-                .iter()
-                .zip(starts.iter())
-                .map(|(length, start)| length + start)
-                .collect::<Vec<_>>(),
-        );
+    fn get_start_end_positions(&self, starts: Vec<i64>, lengths: Vec<i64>) -> Vec<(i64, i64)> {
+        let ends: Vec<i64> = lengths
+            .iter()
+            .zip(starts.iter())
+            .map(|(&length, &start)| length + start)
+            .collect();
+        let starts = self.apply_offset(&starts);
+        let ends = self.apply_offset(&ends);
         starts
             .into_iter()
             .zip(ends)
-            .map(|(s, e)| if s < e { (s, e) } else { (e, s) })
+            .map(|(s, e)| {
+                if e - s > 300 || s - e > 300 {
+                    log::trace!("{}, {}, {}", s, e, e - s);
+                }
+                if s < e {
+                    (s, e)
+                } else {
+                    (e, s)
+                }
+            })
             .collect()
     }
 
-    // todo
+    pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
+        self.get_start_end_positions(
+            self.fiber.get_nuc(false, true),
+            self.fiber.get_nuc(false, false),
+        )
+    }
+
     pub fn msp_positions(&self) -> Vec<(i64, i64)> {
-        let starts = self.apply_offset(&self.fiber.get_msp(false, true));
-        let ends = self.apply_offset(
-            &self
-                .fiber
-                .get_msp(false, false)
-                .iter()
-                .zip(starts.iter())
-                .map(|(length, start)| length + start)
-                .collect::<Vec<_>>(),
-        );
-        starts
-            .into_iter()
-            .zip(ends)
-            .map(|(s, e)| if s < e { (s, e) } else { (e, s) })
-            .collect()
+        self.get_start_end_positions(
+            self.fiber.get_msp(false, true),
+            self.fiber.get_msp(false, false),
+        )
     }
 
     pub fn get_sequence(&self) -> String {
@@ -137,7 +138,6 @@ impl CenteredFiberData {
         )
     }
 
-    // TODO
     pub fn write(&self) -> String {
         let m6a = join_by_str(self.m6a_positions(), ",");
         let cpg = join_by_str(self.cpg_positions(), ",");
@@ -170,7 +170,6 @@ impl CenteredFiberData {
             "query_length",
         )
     }
-    // TODO
     pub fn header() -> String {
         format!(
             "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -184,6 +183,44 @@ impl CenteredFiberData {
             "query_sequence"
         )
     }
+
+    pub fn long_header() -> String {
+        format!(
+            "{}{}\t{}\t{}\n",
+            CenteredFiberData::leading_header(),
+            "centered_position_type",
+            "centered_start",
+            "centered_end",
+        )
+    }
+
+    pub fn write_long(&self) -> String {
+        let m6a = self.m6a_positions();
+        let cpg = self.cpg_positions();
+        let (nuc_st, nuc_en) = unzip_to_vectors(self.nuc_positions());
+        let (msp_st, msp_en) = unzip_to_vectors(self.msp_positions());
+        let mut rtn = String::new();
+        for (t, vals) in [
+            ("m6a", (m6a, None)),
+            ("cpg", (cpg, None)),
+            ("nuc", (nuc_st, Some(nuc_en))),
+            ("msp", (msp_st, Some(msp_en))),
+        ] {
+            let starts = vals.0;
+            let ends = match vals.1 {
+                Some(ends) => ends,
+                None => starts.iter().map(|&st| st + 1).collect(),
+            };
+            for (&st, &en) in starts.iter().zip(ends.iter()) {
+                // add the leading data
+                rtn.push_str(&self.leading_columns());
+                // add the long form data
+                write!(&mut rtn, "{}", format_args!("{}\t{}\t{}\n", t, st, en)).unwrap();
+            }
+        }
+
+        rtn
+    }
 }
 
 pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
@@ -195,7 +232,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
         let out = match CenteredFiberData::new(fiber, record, center_position.clone()) {
             Some(centered_fiber) => {
                 total += 1;
-                centered_fiber.write()
+                centered_fiber.write_long()
             }
             None => {
                 total += 1;
@@ -217,7 +254,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
 }
 
 pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<CenterPosition>) {
-    print!("{}", CenteredFiberData::header());
+    print!("{}", CenteredFiberData::long_header());
     for center_position in center_positions {
         bam.fetch((
             &center_position.chrom,
