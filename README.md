@@ -30,3 +30,7 @@ OPTIONS:
     -h, --help         Print help information
     -V, --version      Print version information
 ```
+
+
+## ft-center
+![center](/images/center.png)
