@@ -1,9 +1,8 @@
 /// Command line interface for fibertools-rs.
-pub mod cli;
-
-pub mod extract;
-
 pub mod bamlift;
+pub mod center;
+pub mod cli;
+pub mod extract;
 
 use anyhow::Result;
 use std::fs::File;

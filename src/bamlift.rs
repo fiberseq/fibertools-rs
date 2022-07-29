@@ -75,6 +75,33 @@ where
     indexes
 }
 
+fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
+    let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
+        .aligned_pairs()
+        .map(|[q_pos, r_pos]| (q_pos, r_pos))
+        .unzip();
+    // if pulling from the query, we need to reverse the positions
+    let (query_positions, return_positions) = if get_reference {
+        (q_pos, r_pos)
+    } else {
+        (r_pos, q_pos)
+    };
+
+    // find the closest position within the q_pos matches
+    let return_idxs = search_sorted(&query_positions, positions);
+    // find the shared positions in the return positions
+    let mut rtn = vec![];
+    for mut idx in return_idxs {
+        // if we map past the end of the reference take the last reference position
+        if idx == return_positions.len() {
+            idx -= 1;
+        }
+        //log::trace!("Idx {}\tr_pos {}", idx, r_pos[idx]);
+        rtn.push(return_positions[idx]);
+    }
+    rtn
+}
+
 ///```
 /// use rust_htslib::{bam, bam::Read};
 /// use fibertools_rs::*;
@@ -90,45 +117,12 @@ where
 ///     liftover_closest(&record, &positions);
 /// }
 ///```
-pub fn liftover_closest(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    // aligned pairs
-    let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
-        .aligned_pairs()
-        .map(|[q_pos, r_pos]| (q_pos, r_pos))
-        .unzip();
-    // find the closest position within the q_pos matches
-    let ref_idxs = search_sorted(&q_pos, query_positions);
-    // find the shared positions in the reference
-    let mut ref_positions = vec![];
-    for mut idx in ref_idxs {
-        // if we map past the end of the reference take the last reference position
-        if idx == r_pos.len() {
-            idx -= 1;
-        }
-        //log::trace!("Idx {}\tr_pos {}", idx, r_pos[idx]);
-        ref_positions.push(r_pos[idx]);
-    }
-    ref_positions
+pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
+    liftover_closest(record, query_positions, true)
 }
 
-/// liftover positions using the cigar string
-pub fn liftover_exact(record: &bam::Record, positions: &[i64]) -> Vec<i64> {
-    // find the shared positions in the reference
-    let mut ref_positions = vec![];
-    let mut cur_pos = 0;
-    for [q_pos, r_pos] in record.aligned_pairs() {
-        while cur_pos < positions.len() && positions[cur_pos] <= q_pos {
-            if positions[cur_pos] == q_pos {
-                //log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
-                ref_positions.push(r_pos);
-            }
-            cur_pos += 1;
-        }
-        if cur_pos == positions.len() {
-            break;
-        }
-    }
-    ref_positions
+pub fn closest_query_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
+    liftover_closest(record, query_positions, false)
 }
 
 pub fn get_closest_reference_positions(positions: &[i64], record: &bam::Record) -> Vec<i64> {
@@ -137,7 +131,7 @@ pub fn get_closest_reference_positions(positions: &[i64], record: &bam::Record) 
     let positions = positions_on_complimented_sequence(record, positions);
     log::trace!("seq comp {:?}", positions);
     // get the reference positions
-    liftover_closest(record, &positions)
+    closest_reference_positions(record, &positions)
 }
 
 pub fn get_closest_reference_range(
@@ -160,7 +154,39 @@ pub fn get_closest_reference_range(
     ref_starts
         .iter()
         .zip(ref_ends.iter())
-        .filter(|(&start, &end)| start <= end) // filter out zero length ranges, basically means there is no liftover
+        .filter(|(&start, &end)| start < end) // filter out zero length ranges, basically means there is no liftover
         .map(|(&start, &end)| (start, end - start))
         .collect()
+}
+
+/// liftover positions using the cigar string
+fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
+    // find the shared positions in the reference
+    let mut return_positions = vec![];
+    let mut cur_pos = 0;
+    for [q_pos, r_pos] in record.aligned_pairs() {
+        while cur_pos < positions.len() && positions[cur_pos] <= q_pos {
+            if positions[cur_pos] == q_pos {
+                //log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
+                if get_reference {
+                    return_positions.push(r_pos);
+                } else {
+                    return_positions.push(q_pos);
+                }
+            }
+            cur_pos += 1;
+        }
+        if cur_pos == positions.len() {
+            break;
+        }
+    }
+    return_positions
+}
+
+pub fn get_exact_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
+    liftover_exact(record, query_positions, true)
+}
+
+pub fn get_exact_query_positions(record: &bam::Record, reference_positions: &[i64]) -> Vec<i64> {
+    liftover_exact(record, reference_positions, false)
 }
