@@ -26,6 +26,11 @@ fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> 
     Ok(writer)
 }
 
+/// unzip a vector of tupples
+pub fn unzip_to_vectors<T>(vec: Vec<(T, T)>) -> (Vec<T>, Vec<T>) {
+    vec.into_iter().unzip()
+}
+
 /// join a vector with commas
 pub fn join_by_str<'a, I, Z>(vals: I, sep: &str) -> String
 where
