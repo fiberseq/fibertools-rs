@@ -46,7 +46,7 @@ pub enum Commands {
         /// Output path for m6a bed12.
         #[clap(long)]
         m6a: Option<String>,
-        /// Output path for CpG (primrose) bed12.
+        /// Output path for 5mC (CpG, primrose) bed12.
         #[clap(short, long)]
         cpg: Option<String>,
         /// Output path for methylation sensitive patch (msp) bed12.
@@ -60,6 +60,7 @@ pub enum Commands {
         all: Option<String>,
     },
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs.
+    #[clap(visible_aliases = &["c", "ct"])]
     Center {
         /// fiberseq bam file, must be aligned and have an index.
         bam: String,
