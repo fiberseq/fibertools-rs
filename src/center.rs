@@ -286,15 +286,17 @@ pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
     for line in reader.lines() {
         let line = line?;
         let tokens = line.split('\t').collect::<Vec<_>>();
-        assert!(tokens.len() >= 2);
-        let strand = if tokens.len() >= 3 && tokens[2] == "-" {
-            '-'
+        assert!(tokens.len() >= 3);
+        let st = tokens[1].parse::<i64>().unwrap();
+        let en = tokens[1].parse::<i64>().unwrap();
+        let (strand, position) = if tokens.len() >= 4 && tokens[3] == "-" {
+            ('-', en - 1)
         } else {
-            '+'
+            ('+', st)
         };
         rtn.push(CenterPosition {
             chrom: tokens[0].to_string(),
-            position: tokens[1].parse::<i64>().unwrap(),
+            position,
             strand,
         });
     }
