@@ -2,6 +2,7 @@ use super::bamlift::*;
 use super::extract::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
+use indicatif::ProgressBar;
 use rust_htslib::bam::record;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
@@ -255,6 +256,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
 
 pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<CenterPosition>) {
     print!("{}", CenteredFiberData::long_header());
+    let pb = ProgressBar::new(center_positions.len() as u64);
     for center_position in center_positions {
         bam.fetch((
             &center_position.chrom,
@@ -264,7 +266,9 @@ pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<Cent
         .expect("Failed to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         center(records, center_position);
+        pb.inc(1);
     }
+    pb.finish_with_message("done");
 }
 
 pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
