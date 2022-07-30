@@ -259,7 +259,7 @@ pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<Cent
     let pb = ProgressBar::new(center_positions.len() as u64);
     pb.set_style(
         style::ProgressStyle::with_template(
-            "[{elapsed_precise}] {bar:50.cyan/blue} {pos:>7}/{len:7} ETA: {eta}",
+            "[{elapsed_precise}] {bar:50.cyan/blue}  {percent}%  ETA:{eta}",
         )
         .unwrap()
         .progress_chars("##-"),
