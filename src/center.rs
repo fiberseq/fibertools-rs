@@ -244,7 +244,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
         print!("{}", out);
     }
     if missing > 1 {
-        log::info!(
+        log::warn!(
             "Unable to exactly map {}/{} reads at position {}:{}",
             missing,
             total,
