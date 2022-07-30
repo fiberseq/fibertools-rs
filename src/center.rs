@@ -184,7 +184,7 @@ impl CenteredFiberData {
             "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_m6a_positions",
-            "centered_cpg_positions",
+            "centered_5mC_positions",
             "centered_nuc_starts",
             "centered_nuc_ends",
             "centered_msp_starts",
@@ -232,7 +232,7 @@ impl CenteredFiberData {
     }
 }
 
-pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
+pub fn center(records: Vec<bam::Record>, center_position: CenterPosition, wide: bool) {
     let fiber_data = FiberseqData::from_records(&records);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     let mut total = 0;
@@ -241,7 +241,11 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
         let out = match CenteredFiberData::new(fiber, record, center_position.clone()) {
             Some(centered_fiber) => {
                 total += 1;
-                centered_fiber.write_long()
+                if wide {
+                    centered_fiber.write()
+                } else {
+                    centered_fiber.write_long()
+                }
             }
             None => {
                 total += 1;
@@ -262,8 +266,17 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
     }
 }
 
-pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<CenterPosition>) {
-    print!("{}", CenteredFiberData::long_header());
+pub fn center_fiberdata(
+    bam: &mut bam::IndexedReader,
+    center_positions: Vec<CenterPosition>,
+    wide: bool,
+) {
+    if wide {
+        print!("{}", CenteredFiberData::header());
+    } else {
+        print!("{}", CenteredFiberData::long_header());
+    }
+
     let pb = ProgressBar::new(center_positions.len() as u64);
     pb.set_style(
         style::ProgressStyle::with_template(
@@ -281,7 +294,7 @@ pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<Cent
         ))
         .expect("Failed to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        center(records, center_position);
+        center(records, center_position, wide);
         pb.inc(1);
     }
     pb.finish_with_message("done");

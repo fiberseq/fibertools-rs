@@ -62,12 +62,12 @@ pub fn main() -> Result<(), Error> {
             let out_files = FiberOutFiles::new(m6a, cpg, msp, nuc, all)?;
             extract::extract_contained(&mut bam, *reference, out_files);
         }
-        Some(Commands::Center { bam, bed }) => {
+        Some(Commands::Center { bam, bed, wide }) => {
             // read in the bam from stdin or from a file
             let mut bam = bam::IndexedReader::from_path(bam)?;
             bam.set_threads(args.threads).unwrap();
             let center_positions = center::read_center_positions(bed)?;
-            center::center_fiberdata(&mut bam, center_positions);
+            center::center_fiberdata(&mut bam, center_positions, *wide);
         }
         None => {}
     };
