@@ -75,7 +75,14 @@ impl CenteredFiberData {
 
     pub fn cpg_positions(&self) -> Vec<i64> {
         // TODO adjust cpg on minus strand by -1
-        self.apply_offset(&self.fiber.base_mods.cpg_positions(false))
+        if self.center_position.strand == '+' {
+            self.apply_offset(&self.fiber.base_mods.cpg_positions(false))
+        } else {
+            self.apply_offset(&self.fiber.base_mods.cpg_positions(false))
+                .into_iter()
+                .map(|p| p - 1)
+                .collect()
+        }
     }
 
     fn get_start_end_positions(&self, starts: Vec<i64>, lengths: Vec<i64>) -> Vec<(i64, i64)> {
