@@ -2,7 +2,7 @@ use super::bamlift::*;
 use super::extract::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
-use indicatif::ProgressBar;
+use indicatif::{style, ProgressBar};
 use rust_htslib::bam::record;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
@@ -257,6 +257,14 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition) {
 pub fn center_fiberdata(bam: &mut bam::IndexedReader, center_positions: Vec<CenterPosition>) {
     print!("{}", CenteredFiberData::long_header());
     let pb = ProgressBar::new(center_positions.len() as u64);
+    pb.set_style(
+        style::ProgressStyle::with_template(
+            "[{elapsed_precise}] {bar:60.cyan/blue} {pos:>7}/{len:7} {msg}",
+        )
+        .unwrap()
+        .progress_chars("##-"),
+    );
+
     for center_position in center_positions {
         bam.fetch((
             &center_position.chrom,
