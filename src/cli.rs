@@ -59,10 +59,11 @@ pub enum Commands {
         #[clap(short, long)]
         all: Option<String>,
     },
+    /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs.
     Center {
-        /// fiberseq bam file, must also be aligned and have an index.
+        /// fiberseq bam file, must be aligned and have an index.
         bam: String,
-        /// bed file on which to centralize reads. If you include strand it will orient data accordingly.
+        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file. However, if you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
         bed: String,
     },
 }
