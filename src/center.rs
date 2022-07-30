@@ -288,7 +288,7 @@ pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
         let tokens = line.split('\t').collect::<Vec<_>>();
         assert!(tokens.len() >= 3);
         let st = tokens[1].parse::<i64>().unwrap();
-        let en = tokens[1].parse::<i64>().unwrap();
+        let en = tokens[2].parse::<i64>().unwrap();
         let (strand, position) = if tokens.len() >= 4 && tokens[3] == "-" {
             ('-', en - 1)
         } else {
