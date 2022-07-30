@@ -211,7 +211,7 @@ impl CenteredFiberData {
         let mut rtn = String::new();
         for (t, vals) in [
             ("m6a", (m6a, None)),
-            ("cpg", (cpg, None)),
+            ("5mC", (cpg, None)),
             ("nuc", (nuc_st, Some(nuc_en))),
             ("msp", (msp_st, Some(msp_en))),
         ] {
