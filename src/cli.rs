@@ -63,7 +63,10 @@ pub enum Commands {
     Center {
         /// fiberseq bam file, must be aligned and have an index.
         bam: String,
-        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file. However, if you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
+        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if a 4th strand column is included.
+        ///
+        /// If you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
+        /// Furthermore for CpG methylation if we are on the minus strand bases are further shifted by and extra -1 to account for the di-nucleotide nature of CpG methylation. This will allow profiles from the forward and reverse strands to align.
         bed: String,
     },
 }
