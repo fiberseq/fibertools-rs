@@ -8,6 +8,8 @@ use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
 
 pub fn main() -> Result<(), Error> {
+    colored::control::set_override(true);
+    console::set_colors_enabled(true);
     let pg_start = Instant::now();
     let args = cli::make_cli_parse();
     let matches = cli::make_cli_app().get_matches();
