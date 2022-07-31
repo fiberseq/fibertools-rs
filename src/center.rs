@@ -279,11 +279,9 @@ pub fn center_fiberdata(
 
     let pb = ProgressBar::new(center_positions.len() as u64);
     pb.set_style(
-        style::ProgressStyle::with_template(
-            "[{elapsed_precise}] {bar:50.cyan/blue} {human_pos:>5}/{human_len} {percent:>3}% {per_sec:<10}",
-        )
-        .unwrap()
-        .progress_chars("##-"),
+        style::ProgressStyle::with_template(PROGRESS_STYLE)
+            .unwrap()
+            .progress_chars("##-"),
     );
 
     for center_position in center_positions {

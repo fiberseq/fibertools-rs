@@ -2,12 +2,14 @@ use super::bamlift::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use colored::Colorize;
+use indicatif::{ParallelProgressIterator, ProgressStyle};
 use lazy_static::lazy_static;
 use rayon::{current_num_threads, prelude::*};
 use regex::Regex;
 use rust_htslib::{
     bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView, bam::Read,
 };
+
 use std::convert::TryFrom;
 use std::fmt::Write;
 use std::time::Instant;
@@ -212,8 +214,13 @@ impl FiberseqData {
     }
 
     pub fn from_records(records: &Vec<bam::Record>) -> Vec<Self> {
+        let style = ProgressStyle::with_template(PROGRESS_STYLE)
+            .unwrap()
+            .progress_chars("##-");
+
         records
             .par_iter()
+            .progress_with_style(style)
             .map(FiberseqData::new)
             .collect::<Vec<_>>()
     }
