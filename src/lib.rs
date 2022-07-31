@@ -8,6 +8,7 @@ use anyhow::Result;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
+use std::process::exit;
 const BUFFER_SIZE: usize = 32 * 1024;
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
@@ -91,5 +92,17 @@ impl FiberOutFiles {
             nuc,
             all,
         })
+    }
+}
+
+/// TODO
+pub fn write_to_stdout(out: &str) {
+    let out = write!(std::io::stdout(), "{}", out);
+    if let Err(err) = out {
+        if err.kind() == std::io::ErrorKind::BrokenPipe {
+            exit(0);
+        } else {
+            panic!("Error: {}", err);
+        }
     }
 }

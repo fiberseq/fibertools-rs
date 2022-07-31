@@ -70,7 +70,6 @@ where
             }
             a_idx += 1;
         }
-        //println!("{} {}\t{} {}", a_idx, v_idx, a[a_idx], v[v_idx]);
     }
     indexes
 }
