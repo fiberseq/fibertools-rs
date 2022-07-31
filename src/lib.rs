@@ -8,8 +8,9 @@ use anyhow::Result;
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
-// MY IO TOOLS
 const BUFFER_SIZE: usize = 32 * 1024;
+const PROGRESS_STYLE: &str =
+    "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
 
 /// Get a buffered output writer from stdout or a file
 fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> {
