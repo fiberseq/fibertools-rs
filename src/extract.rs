@@ -18,6 +18,7 @@ pub struct BaseMod {
     pub strand: char,
     pub modification_type: char,
     pub modified_positions: Vec<i64>,
+    pub modified_probabilities: Vec<u8>,
     pub modified_reference_positions: Vec<i64>,
 }
 impl BaseMod {
@@ -97,7 +98,7 @@ impl BaseMods {
 
                 // check for the probability of modification.
                 let num_mods_cur_end = num_mods_seen + modified_positions.len();
-                let _z = if num_mods_cur_end > ml_tag.len() {
+                let modified_probabilities = if num_mods_cur_end > ml_tag.len() {
                     let needed_num_of_zeros = num_mods_cur_end - ml_tag.len();
                     let mut to_add = vec![0; needed_num_of_zeros];
                     let mut has = ml_tag[num_mods_seen..ml_tag.len()].to_vec();
@@ -111,12 +112,15 @@ impl BaseMods {
                 };
                 num_mods_seen = num_mods_cur_end;
 
+                // TODO filter mods based on probabilities
+
                 // add to a struct
                 let mut mods = BaseMod {
                     modified_base: mod_base,
                     strand: mod_strand.chars().next().unwrap(),
                     modification_type: modification_type.chars().next().unwrap(),
                     modified_positions,
+                    modified_probabilities,
                     modified_reference_positions: vec![],
                 };
                 // add the reference bases
@@ -199,9 +203,9 @@ pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
     }
 }
 
-pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
+pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
     if let Ok(Aux::ArrayU8(array)) = record.aux(tag) {
-        let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
+        let read_array = array.iter().collect::<Vec<_>>();
         read_array
     } else {
         vec![]
