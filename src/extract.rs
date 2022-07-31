@@ -49,6 +49,10 @@ impl BaseMods {
         // Array to store all the different modifications within the MM tag
         let mut rtn = vec![];
 
+        let ml_tag = get_u8_tag(record, b"ML");
+
+        let mut num_mods_seen = 0;
+
         // if there is an MM tag iterate over all the regex matches
         if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
             for cap in MM_RE.captures_iter(mm_text) {
@@ -91,6 +95,13 @@ impl BaseMods {
                 // assert that we extract the same number of modifications as we have distances
                 assert_eq!(cur_mod_idx, mod_dists.len());
 
+                if !ml_tag.is_empty() {
+                    let end = num_mods_seen + modified_positions.len();
+                    let _z = &ml_tag[num_mods_seen..end];
+                    log::debug!("{} {}", num_mods_seen, end);
+                    num_mods_seen = end;
+                }
+
                 // add to a struct
                 let mut mods = BaseMod {
                     modified_base: mod_base,
@@ -106,6 +117,11 @@ impl BaseMods {
         } else {
             log::debug!("No MM tag found");
         }
+
+        if ml_tag.len() != num_mods_seen {
+            log::warn!("ML tag length does not match number of modifications");
+        }
+
         BaseMods { base_mods: rtn }
     }
 
@@ -167,6 +183,15 @@ impl BaseMods {
 ///```
 pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
     if let Ok(Aux::ArrayU32(array)) = record.aux(tag) {
+        let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
+        read_array
+    } else {
+        vec![]
+    }
+}
+
+pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
+    if let Ok(Aux::ArrayU8(array)) = record.aux(tag) {
         let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
         read_array
     } else {
