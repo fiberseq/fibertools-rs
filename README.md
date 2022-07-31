@@ -49,7 +49,7 @@ OPTIONS:
 ```
 
 
-# ft-center
+# `ft-center`
 Center a fiberseq reads (bam) around a reference position(s).
 ```bash
 ft-center 0.0.4
