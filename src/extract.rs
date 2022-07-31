@@ -112,6 +112,9 @@ impl BaseMods {
                 };
                 num_mods_seen = num_mods_cur_end;
 
+                // must be true for filtering, and at this point
+                assert_eq!(modified_positions.len(), modified_probabilities.len());
+
                 // TODO filter mods based on probabilities
                 let min_ml_value = 127; // (127+1)/255 ~= 50%
                 let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
