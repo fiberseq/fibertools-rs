@@ -10,6 +10,22 @@
 
 `fibertools-rs` a CLI tool for interacting with fiberseq bam files.
 
+# Install
+## From `cargo` (recommended)
+```
+cargo install fibertools-rs
+```
+[How to install `cargo`.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+## From `bioconda` (latest version not always available)
+```
+mamba install -c bioconda fibertools-rs
+```
+## From `github` (active development)
+```
+cargo install --git https://github.com/mrvollger/fibertools-rs
+```
+
+
 
 ## `ft extract`
 Extracts fiberseq data from a bam file into plain text.
