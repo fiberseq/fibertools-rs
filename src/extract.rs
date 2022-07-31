@@ -113,6 +113,13 @@ impl BaseMods {
                 num_mods_seen = num_mods_cur_end;
 
                 // TODO filter mods based on probabilities
+                let min_ml_value = 127; // (127+1)/255 ~= 50%
+                let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
+                    modified_probabilities
+                        .iter()
+                        .zip(modified_positions.iter())
+                        .filter(|(&ml, &_mm)| ml >= min_ml_value)
+                        .unzip();
 
                 // add to a struct
                 let mut mods = BaseMod {
