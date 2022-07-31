@@ -115,7 +115,15 @@ impl BaseMods {
         if m6a.is_empty() {
             return vec![];
         }
-        // get positions of m6a
+        // if we only have one of the two mod types
+        if m6a.len() == 1 {
+            if reference {
+                return m6a[0].modified_reference_positions.clone();
+            } else {
+                return m6a[0].modified_positions.clone();
+            }
+        }
+        // get positions of m6a if we have both A+a and T-a
         if reference {
             merge_two_lists(
                 &m6a[0].modified_reference_positions,
