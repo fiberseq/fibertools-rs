@@ -25,7 +25,7 @@ cargo install --git https://github.com/mrvollger/fibertools-rs
 
 
 
-## `ft extract`
+# `ft extract`
 Extracts fiberseq data from a bam file into plain text.
 ```bash
 ft-extract 0.0.4
@@ -49,7 +49,7 @@ OPTIONS:
 ```
 
 
-## ft-center
+# ft-center
 Center a fiberseq reads (bam) around a reference position(s).
 ```bash
 ft-center 0.0.4
