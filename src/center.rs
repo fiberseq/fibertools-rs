@@ -253,7 +253,8 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition, wide: 
                 "".to_string()
             }
         };
-        print!("{}", out);
+        //print!("{}", out);
+        write_to_stdout(&out);
     }
     if missing > 1 {
         log::warn!(
@@ -272,9 +273,11 @@ pub fn center_fiberdata(
     wide: bool,
 ) {
     if wide {
-        print!("{}", CenteredFiberData::header());
+        //print!("{}", CenteredFiberData::header());
+        write_to_stdout(&CenteredFiberData::header());
     } else {
-        print!("{}", CenteredFiberData::long_header());
+        //print!("{}", CenteredFiberData::long_header());
+        write_to_stdout(&CenteredFiberData::long_header());
     }
 
     let pb = ProgressBar::new(center_positions.len() as u64);
