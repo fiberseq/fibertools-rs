@@ -11,12 +11,13 @@
 `fibertools-rs` a CLI tool for interacting with fiberseq bam files.
 
 # Install
-## From `cargo` (recommended)
+## From [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs) (recommended)
 ```
 cargo install fibertools-rs
 ```
 [How to install `cargo`.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
-## From `bioconda` (latest version not always available)
+
+## From [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs) (latest version not always available)
 ```
 mamba install -c bioconda fibertools-rs
 ```
