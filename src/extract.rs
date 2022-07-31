@@ -95,12 +95,21 @@ impl BaseMods {
                 // assert that we extract the same number of modifications as we have distances
                 assert_eq!(cur_mod_idx, mod_dists.len());
 
-                if !ml_tag.is_empty() {
-                    let end = num_mods_seen + modified_positions.len();
-                    let _z = &ml_tag[num_mods_seen..end];
-                    log::debug!("{} {}", num_mods_seen, end);
-                    num_mods_seen = end;
-                }
+                // check for the probability of modification.
+                let num_mods_cur_end = num_mods_seen + modified_positions.len();
+                let _z = if num_mods_cur_end > ml_tag.len() {
+                    let needed_num_of_zeros = num_mods_cur_end - ml_tag.len();
+                    let mut to_add = vec![0; needed_num_of_zeros];
+                    let mut has = ml_tag[num_mods_seen..ml_tag.len()].to_vec();
+                    has.append(&mut to_add);
+                    log::warn!(
+                        "ML tag is too short for the number of modifications found in the MM tag. Assuming an ML value of 0 after the first {num_mods_cur_end} modifications."
+                    );
+                    has
+                } else {
+                    ml_tag[num_mods_seen..num_mods_cur_end].to_vec()
+                };
+                num_mods_seen = num_mods_cur_end;
 
                 // add to a struct
                 let mut mods = BaseMod {
@@ -118,8 +127,8 @@ impl BaseMods {
             log::debug!("No MM tag found");
         }
 
-        if ml_tag.len() != num_mods_seen {
-            log::warn!("ML tag length does not match number of modifications");
+        if ml_tag.len() > num_mods_seen {
+            log::warn!("ML tag has more entries than # of modifications in the MM tag.");
         }
 
         BaseMods { base_mods: rtn }
