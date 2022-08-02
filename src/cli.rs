@@ -43,6 +43,9 @@ pub enum Commands {
         /// report in reference sequence coordinates.
         #[clap(short, long)]
         reference: bool,
+        /// Minium score in the ML tag to include in the output.
+        #[clap(short, long, default_value = "20")]
+        min_ml_score: u8,
         /// Output path for m6a bed12.
         #[clap(long)]
         m6a: Option<String>,
@@ -69,6 +72,9 @@ pub enum Commands {
         /// If you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
         /// Furthermore for CpG methylation if we are on the minus strand bases are further shifted by and extra -1 to account for the di-nucleotide nature of CpG methylation. This will allow profiles from the forward and reverse strands to align.
         bed: String,
+        /// Minium score in the ML tag to include in the output.
+        #[clap(short, long, default_value = "20")]
+        min_ml_score: u8,
         /// Provide data in wide format, one row per read.
         #[clap(short, long)]
         wide: bool,

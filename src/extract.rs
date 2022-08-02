@@ -41,7 +41,7 @@ pub struct BaseMods {
 }
 
 impl BaseMods {
-    pub fn new(record: &bam::Record) -> BaseMods {
+    pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
             static ref MM_RE: Regex =
@@ -117,12 +117,11 @@ impl BaseMods {
 
                 // TODO filter mods based on probabilities
                 //let min_ml_value = 127; // (127+1)/255 ~= 50%
-                let min_ml_value = 5;
                 let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
                     modified_probabilities
                         .iter()
                         .zip(modified_positions.iter())
-                        .filter(|(&ml, &_mm)| ml >= min_ml_value)
+                        .filter(|(&ml, &_mm)| ml >= min_ml_score)
                         .unzip();
 
                 // add to a struct
@@ -234,7 +233,7 @@ pub struct FiberseqData {
 }
 
 impl FiberseqData {
-    pub fn new(record: &bam::Record) -> Self {
+    pub fn new(record: &bam::Record, min_ml_score: u8) -> Self {
         let nuc_starts = get_u32_tag(record, b"ns");
         let msp_starts = get_u32_tag(record, b"as");
         let nuc_length = get_u32_tag(record, b"nl");
@@ -265,12 +264,12 @@ impl FiberseqData {
                 .collect(),
             ref_nuc,
             ref_msp,
-            base_mods: BaseMods::new(record),
+            base_mods: BaseMods::new(record, min_ml_score),
             ec,
         }
     }
 
-    pub fn from_records(records: &Vec<bam::Record>) -> Vec<Self> {
+    pub fn from_records(records: &Vec<bam::Record>, min_ml_score: u8) -> Vec<Self> {
         /*
         let style = ProgressStyle::with_template(PROGRESS_STYLE)
             .unwrap()
@@ -280,7 +279,7 @@ impl FiberseqData {
         records
             .par_iter()
             //.progress_with_style(style)
-            .map(FiberseqData::new)
+            .map(|x| FiberseqData::new(x, min_ml_score))
             .collect::<Vec<_>>()
     }
 
@@ -405,7 +404,7 @@ impl FiberseqData {
             &ref_cpg,
         ] {
             if vec.is_empty() {
-                rtn.push_str("None\t");
+                rtn.push('\t');
             } else {
                 let z: String = vec.iter().map(|&x| x.to_string() + ",").collect();
                 rtn.write_fmt(format_args!("{}\t", z)).unwrap();
@@ -482,11 +481,12 @@ pub fn process_bam_chunk(
     records: &Vec<bam::Record>,
     so_far: usize,
     reference: bool,
+    min_ml_score: u8,
     out_files: &mut FiberOutFiles,
     head_view: &HeaderView,
 ) {
     let start = Instant::now();
-    let mut fiber_data = FiberseqData::from_records(records);
+    let mut fiber_data = FiberseqData::from_records(records, min_ml_score);
 
     match &mut out_files.m6a {
         Some(m6a) => {
@@ -561,7 +561,12 @@ pub fn process_bam_chunk(
     );
 }
 
-pub fn extract_contained(bam: &mut bam::Reader, reference: bool, mut out_files: FiberOutFiles) {
+pub fn extract_contained(
+    bam: &mut bam::Reader,
+    reference: bool,
+    min_ml_score: u8,
+    mut out_files: FiberOutFiles,
+) {
     let header = bam::Header::from_template(bam.header());
     let head_view = bam::HeaderView::from_header(&header);
 
@@ -581,6 +586,7 @@ pub fn extract_contained(bam: &mut bam::Reader, reference: bool, mut out_files: 
                 &cur_vec,
                 proccesed_reads,
                 reference,
+                min_ml_score,
                 &mut out_files,
                 &head_view,
             );
@@ -594,6 +600,7 @@ pub fn extract_contained(bam: &mut bam::Reader, reference: bool, mut out_files: 
         &cur_vec,
         proccesed_reads,
         reference,
+        min_ml_score,
         &mut out_files,
         &head_view,
     );

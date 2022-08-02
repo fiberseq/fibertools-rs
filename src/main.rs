@@ -46,6 +46,7 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Extract {
             bam,
             reference,
+            min_ml_score,
             m6a,
             cpg,
             msp,
@@ -60,14 +61,19 @@ pub fn main() -> Result<(), Error> {
             };
             bam.set_threads(args.threads).unwrap();
             let out_files = FiberOutFiles::new(m6a, cpg, msp, nuc, all)?;
-            extract::extract_contained(&mut bam, *reference, out_files);
+            extract::extract_contained(&mut bam, *reference, *min_ml_score, out_files);
         }
-        Some(Commands::Center { bam, bed, wide }) => {
+        Some(Commands::Center {
+            bam,
+            bed,
+            min_ml_score,
+            wide,
+        }) => {
             // read in the bam from stdin or from a file
             let mut bam = bam::IndexedReader::from_path(bam)?;
             bam.set_threads(args.threads).unwrap();
             let center_positions = center::read_center_positions(bed)?;
-            center::center_fiberdata(&mut bam, center_positions, *wide);
+            center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
         }
         None => {}
     };

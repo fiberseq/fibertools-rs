@@ -232,8 +232,13 @@ impl CenteredFiberData {
     }
 }
 
-pub fn center(records: Vec<bam::Record>, center_position: CenterPosition, wide: bool) {
-    let fiber_data = FiberseqData::from_records(&records);
+pub fn center(
+    records: Vec<bam::Record>,
+    center_position: CenterPosition,
+    min_ml_score: u8,
+    wide: bool,
+) {
+    let fiber_data = FiberseqData::from_records(&records, min_ml_score);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     let mut total = 0;
     let mut missing = 0;
@@ -270,6 +275,7 @@ pub fn center(records: Vec<bam::Record>, center_position: CenterPosition, wide: 
 pub fn center_fiberdata(
     bam: &mut bam::IndexedReader,
     center_positions: Vec<CenterPosition>,
+    min_ml_score: u8,
     wide: bool,
 ) {
     if wide {
@@ -295,7 +301,7 @@ pub fn center_fiberdata(
         ))
         .expect("Failed to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        center(records, center_position, wide);
+        center(records, center_position, min_ml_score, wide);
         pb.inc(1);
     }
     pb.finish_with_message("done");
