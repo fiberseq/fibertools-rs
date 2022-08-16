@@ -344,6 +344,34 @@ impl FiberseqData {
         let lengths = vec![1; starts.len()];
         self.to_bed12(reference, &starts, &lengths, head_view)
     }
+    pub fn all_header() -> String {
+        format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "ct",
+            "st",
+            "en",
+            "fiber",
+            "score",
+            "strand",
+            "fiber_length",
+            "fiber_sequence",
+            "ec",
+            "total_nuc_bp",
+            "total_msp_bp",
+            "nuc_starts",
+            "nuc_lengths",
+            "ref_nuc_starts",
+            "ref_nuc_lengths",
+            "msp_starts",
+            "msp_lengths",
+            "ref_msp_starts",
+            "ref_msp_lengths",
+            "m6a",
+            "ref_m6a",
+            "cpg",
+            "ref_cpg",
+        )
+    }
 
     pub fn write_all(&self, head_view: &HeaderView) -> String {
         // PB features
@@ -381,11 +409,15 @@ impl FiberseqData {
         ))
         .unwrap();
         // add PB features
+        let total_nuc_bp = nuc_lengths.iter().sum::<i64>();
+        let total_msp_bp = msp_lengths.iter().sum::<i64>();
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t",
             q_len,
             String::from_utf8_lossy(&self.record.seq().as_bytes()),
-            self.ec
+            self.ec,
+            total_nuc_bp,
+            total_msp_bp,
         ))
         .unwrap();
         // add fiber features
@@ -410,7 +442,10 @@ impl FiberseqData {
                 rtn.write_fmt(format_args!("{}\t", z)).unwrap();
             }
         }
-        rtn.push('\n');
+        //rtn.push('\n');
+        // replace the last tab with a newline
+        let len = rtn.len();
+        rtn.replace_range(len - 1..len, "\n");
 
         rtn
     }
@@ -538,6 +573,7 @@ pub fn process_bam_chunk(
     }
     match &mut out_files.all {
         Some(all) => {
+            write!(all, "{}", FiberseqData::all_header()).unwrap();
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_all(head_view))
