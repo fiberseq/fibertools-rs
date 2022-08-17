@@ -573,7 +573,6 @@ pub fn process_bam_chunk(
     }
     match &mut out_files.all {
         Some(all) => {
-            write!(all, "{}", FiberseqData::all_header()).unwrap();
             let out: Vec<String> = fiber_data
                 .iter_mut()
                 .map(|r| r.write_all(head_view))
@@ -605,6 +604,14 @@ pub fn extract_contained(
 ) {
     let header = bam::Header::from_template(bam.header());
     let head_view = bam::HeaderView::from_header(&header);
+
+    // print the header if in all mode
+    match &mut out_files.all {
+        Some(all) => {
+            write!(all, "{}", FiberseqData::all_header()).unwrap();
+        }
+        None => {}
+    }
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
