@@ -442,7 +442,6 @@ impl FiberseqData {
                 rtn.write_fmt(format_args!("{}\t", z)).unwrap();
             }
         }
-        //rtn.push('\n');
         // replace the last tab with a newline
         let len = rtn.len();
         rtn.replace_range(len - 1..len, "\n");
