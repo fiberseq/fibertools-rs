@@ -436,6 +436,7 @@ impl FiberseqData {
             &ref_cpg,
         ] {
             if vec.is_empty() {
+                rtn.push('.');
                 rtn.push('\t');
             } else {
                 let z: String = vec.iter().map(|&x| x.to_string() + ",").collect();
