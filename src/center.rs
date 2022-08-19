@@ -44,7 +44,10 @@ impl CenteredFiberData {
 
     /// find the query position that corresponds to the central reference position
     fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
-        let read_center = get_exact_query_positions(record, &[reference_position]);
+        let read_center: Vec<i64> = get_exact_query_positions(record, &[reference_position])
+            .into_iter()
+            .filter(|&x| x >= 0)
+            .collect();
         log::debug!(
             "{}, {}, {}, {:?}",
             reference_position,
