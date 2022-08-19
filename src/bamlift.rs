@@ -154,7 +154,14 @@ pub fn get_closest_reference_range(
         .iter()
         .zip(ref_ends.iter())
         .filter(|(&start, &end)| start < end) // filter out zero length ranges, basically means there is no liftover
-        .map(|(&start, &end)| (start, end - start))
+        //.map(|(&start, &end)| (start, end - start))
+        .map(|(&start, &end)| {
+            if end <= start {
+                (-1, -1)
+            } else {
+                (start, end - start)
+            }
+        })
         .collect()
 }
 
@@ -176,6 +183,8 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
                 } else {
                     return_positions.push(q_pos);
                 }
+            } else {
+                return_positions.push(-1);
             }
             cur_pos += 1;
         }

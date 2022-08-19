@@ -474,13 +474,22 @@ impl FiberseqData {
         let score = self.ec.round() as i64;
         let strand = if self.record.is_reverse() { '-' } else { '+' };
         let color = "126,126,126";
-        let b_ct = starts.len() + 2;
-        let b_ln: String = lengths.iter().map(|&ln| ln.to_string() + ",").collect();
-        let b_st: String = starts
+        // filter out positions that do not have an exact liftover
+        let (filtered_starts, filtered_lengths): (Vec<i64>, Vec<i64>) = starts
+            .iter()
+            .zip(lengths.iter())
+            .filter(|(&st, &ln)| st >= 0 && ln >= 0)
+            .unzip();
+        let b_ct = filtered_starts.len() + 2;
+        let b_ln: String = filtered_lengths
+            .iter()
+            .map(|&ln| ln.to_string() + ",")
+            .collect();
+        let b_st: String = filtered_starts
             .iter()
             .map(|&st| (st - start).to_string() + ",")
             .collect();
-        assert_eq!(lengths.len(), starts.len());
+        assert_eq!(filtered_lengths.len(), filtered_starts.len());
         // TODO add spacers
         //format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
         rtn.push_str(ct);
