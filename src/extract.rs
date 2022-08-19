@@ -368,8 +368,8 @@ impl FiberseqData {
             "ref_msp_lengths",
             "m6a",
             "ref_m6a",
-            "cpg",
-            "ref_cpg",
+            "5mC",
+            "ref_5mC",
         )
     }
 
