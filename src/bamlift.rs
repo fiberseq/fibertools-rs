@@ -145,9 +145,14 @@ pub fn get_closest_reference_range(
         .collect();
     //log::trace!("seq {:?}", starts);
     //log::trace!("seq len {:?}", mol_ends);
-    let ref_starts = get_closest_reference_positions(starts, record);
-    let ref_ends = get_closest_reference_positions(&mol_ends, record);
+    let mut ref_starts = get_closest_reference_positions(starts, record);
+    let mut ref_ends = get_closest_reference_positions(&mol_ends, record);
     assert_eq!(ref_starts.len(), ref_ends.len());
+
+    // swap starts and ends if we are on the reverse strand
+    if record.is_reverse() {
+        (ref_starts, ref_ends) = (ref_ends, ref_starts);
+    }
     //log::trace!("ref_starts: {:?}", ref_starts);
     //log::trace!("ref_ends: {:?}", ref_ends);
     ref_starts
