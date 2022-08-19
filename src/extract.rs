@@ -13,19 +13,61 @@ use rust_htslib::{
 use std::convert::TryFrom;
 use std::fmt::Write;
 use std::time::Instant;
+
 pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
-    pub modified_positions: Vec<i64>,
-    pub modified_probabilities: Vec<u8>,
-    pub modified_reference_positions: Vec<i64>,
+    modified_bases: Vec<i64>,
+    modified_bases_forward: Vec<i64>,
+    modified_probabilities: Vec<u8>,
+    reference_positions: Vec<i64>,
 }
 impl BaseMod {
-    pub fn add_reference_positions(&mut self, record: &bam::Record) {
-        let positions = positions_on_complimented_sequence(record, &self.modified_positions);
+    pub fn new(
+        record: &bam::Record,
+        modified_base: u8,
+        strand: char,
+        modification_type: char,
+        modified_bases_forward: Vec<i64>,
+        modified_probabilities: Vec<u8>,
+    ) -> Self {
+        let modified_bases = positions_on_complimented_sequence(record, &modified_bases_forward);
         // get the reference positions
-        self.modified_reference_positions = get_exact_reference_positions(record, &positions);
+        let reference_positions = get_exact_reference_positions(record, &modified_bases);
+        Self {
+            modified_base,
+            strand,
+            modification_type,
+            modified_bases,
+            modified_bases_forward,
+            modified_probabilities,
+            reference_positions,
+        }
+    }
+
+    pub fn get_reference_positions(&self) -> Vec<i64> {
+        self.reference_positions.clone()
+    }
+
+    pub fn get_modified_bases(&self) -> Vec<i64> {
+        self.modified_bases.clone()
+    }
+
+    pub fn get_modified_bases_forward(&self) -> Vec<i64> {
+        self.modified_bases_forward.clone()
+    }
+
+    pub fn get_modified_probabilities(&self) -> Vec<u8> {
+        if self.strand == '-' {
+            self.modified_probabilities
+                .clone()
+                .into_iter()
+                .rev()
+                .collect()
+        } else {
+            self.modified_probabilities.clone()
+        }
     }
 
     pub fn is_m6a(&self) -> bool {
@@ -36,6 +78,7 @@ impl BaseMod {
         self.modification_type == 'm'
     }
 }
+
 pub struct BaseMods {
     pub base_mods: Vec<BaseMod>,
 }
@@ -125,16 +168,14 @@ impl BaseMods {
                         .unzip();
 
                 // add to a struct
-                let mut mods = BaseMod {
-                    modified_base: mod_base,
-                    strand: mod_strand.chars().next().unwrap(),
-                    modification_type: modification_type.chars().next().unwrap(),
+                let mods = BaseMod::new(
+                    record,
+                    mod_base,
+                    mod_strand.chars().next().unwrap(),
+                    modification_type.chars().next().unwrap(),
                     modified_positions,
                     modified_probabilities,
-                    modified_reference_positions: vec![],
-                };
-                // add the reference bases
-                mods.add_reference_positions(record);
+                );
                 rtn.push(mods);
             }
         } else {
@@ -157,19 +198,19 @@ impl BaseMods {
         // if we only have one of the two mod types
         if m6a.len() == 1 {
             if reference {
-                return m6a[0].modified_reference_positions.clone();
+                return m6a[0].get_reference_positions();
             } else {
-                return m6a[0].modified_positions.clone();
+                return m6a[0].get_modified_bases();
             }
         }
         // get positions of m6a if we have both A+a and T-a
         if reference {
             merge_two_lists(
-                &m6a[0].modified_reference_positions,
-                &m6a[1].modified_reference_positions,
+                &m6a[0].get_reference_positions(),
+                &m6a[1].get_reference_positions(),
             )
         } else {
-            merge_two_lists(&m6a[0].modified_positions, &m6a[1].modified_positions)
+            merge_two_lists(&m6a[0].get_modified_bases(), &m6a[1].get_modified_bases())
         }
     }
 
@@ -181,9 +222,9 @@ impl BaseMods {
         }
         // get positions of cpg
         if reference {
-            cpg[0].modified_reference_positions.clone()
+            cpg[0].get_reference_positions()
         } else {
-            cpg[0].modified_positions.clone()
+            cpg[0].get_modified_bases()
         }
     }
 }
@@ -234,14 +275,50 @@ pub struct FiberseqData {
 
 impl FiberseqData {
     pub fn new(record: &bam::Record, min_ml_score: u8) -> Self {
-        let nuc_starts = get_u32_tag(record, b"ns");
-        let msp_starts = get_u32_tag(record, b"as");
-        let nuc_length = get_u32_tag(record, b"nl");
-        let msp_length = get_u32_tag(record, b"al");
+        let mut nuc_starts = get_u32_tag(record, b"ns");
+        let mut msp_starts = get_u32_tag(record, b"as");
+        let mut nuc_length = get_u32_tag(record, b"nl");
+        let mut msp_length = get_u32_tag(record, b"al");
+        let mut nuc_ends = nuc_starts
+            .iter()
+            .zip(nuc_length.iter())
+            .map(|(&x, &y)| x + y)
+            .collect::<Vec<_>>();
+        let mut msp_ends = msp_starts
+            .iter()
+            .zip(msp_length.iter())
+            .map(|(&x, &y)| x + y)
+            .collect::<Vec<_>>();
+        // get new starts, ends, and lengths in reference orientation
+        // i.e. query coordinates in bam format
+        if record.is_reverse() {
+            (nuc_ends, nuc_starts) = (
+                positions_on_complimented_sequence(record, &nuc_starts),
+                positions_on_complimented_sequence(record, &nuc_ends),
+            );
+            (msp_ends, msp_starts) = (
+                positions_on_complimented_sequence(record, &msp_starts),
+                positions_on_complimented_sequence(record, &msp_ends),
+            );
+            nuc_length = nuc_starts
+                .iter()
+                .zip(nuc_ends.iter())
+                .map(|(&x, &y)| y - x)
+                .collect::<Vec<_>>();
+            msp_length = msp_starts
+                .iter()
+                .zip(msp_ends.iter())
+                .map(|(&x, &y)| y - x)
+                .collect::<Vec<_>>();
+        }
 
         // range positions
         let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, record);
         let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, record);
+
+        assert_eq!(ref_nuc.len(), nuc_starts.len());
+        assert_eq!(ref_msp.len(), msp_starts.len());
+
         // get the number of passes
         let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
             log::trace!("{f}");

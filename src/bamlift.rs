@@ -1,5 +1,5 @@
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
 /// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
@@ -28,6 +28,13 @@ pub fn positions_on_complimented_sequence(
     positions
 }
 
+pub fn is_sorted<T>(v: &[T]) -> bool
+where
+    T: Ord,
+{
+    v.windows(2).all(|w| w[0] <= w[1])
+}
+
 /// search a sorted array for insertions positions of another sorted array
 /// returned index i satisfies
 /// left
@@ -46,7 +53,12 @@ pub fn search_sorted<T>(a: &[T], v: &[T]) -> Vec<usize>
 where
     T: Ord,
     T: Display,
+    [T]: Debug,
 {
+    if !is_sorted(v) {
+        panic!("v is not sorted: {:?}", v);
+    }
+
     let mut indexes = Vec::with_capacity(v.len());
     let mut a_idx = 0;
     for cur_v in v {
@@ -71,6 +83,7 @@ where
             a_idx += 1;
         }
     }
+    log::trace!("search_sorted: {:?}\n{:?}", v, indexes);
     indexes
 }
 
@@ -98,6 +111,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
         //log::trace!("Idx {}\tr_pos {}", idx, r_pos[idx]);
         rtn.push(return_positions[idx]);
     }
+    assert_eq!(rtn.len(), positions.len());
     rtn
 }
 
@@ -113,7 +127,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 ///     let record = record.unwrap();
 ///     let seq_len = i64::try_from(record.seq_len()).unwrap();
 ///     let positions: Vec<i64> = (0..seq_len).collect();
-///     get_closest_reference_positions(&positions, &record);
+///     closest_reference_positions(&record, &positions);
 /// }
 ///```
 pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
@@ -124,37 +138,22 @@ pub fn closest_query_positions(record: &bam::Record, query_positions: &[i64]) ->
     liftover_closest(record, query_positions, false)
 }
 
-pub fn get_closest_reference_positions(positions: &[i64], record: &bam::Record) -> Vec<i64> {
-    //
-    //log::trace!("seq {:?}", positions);
-    let positions = positions_on_complimented_sequence(record, positions);
-    log::trace!("seq comp {:?}", positions);
-    // get the reference positions
-    closest_reference_positions(record, &positions)
-}
-
 pub fn get_closest_reference_range(
     starts: &[i64],
     lengths: &[i64],
     record: &bam::Record,
 ) -> Vec<(i64, i64)> {
-    let mol_ends: Vec<i64> = starts
+    assert_eq!(starts.len(), lengths.len());
+    let ends: Vec<i64> = starts
         .iter()
         .zip(lengths.iter())
         .map(|(start, length)| start + length)
         .collect();
-    //log::trace!("seq {:?}", starts);
-    //log::trace!("seq len {:?}", mol_ends);
-    let mut ref_starts = get_closest_reference_positions(starts, record);
-    let mut ref_ends = get_closest_reference_positions(&mol_ends, record);
+
+    let ref_starts = closest_reference_positions(record, starts);
+    let ref_ends = closest_reference_positions(record, &ends);
     assert_eq!(ref_starts.len(), ref_ends.len());
 
-    // swap starts and ends if we are on the reverse strand
-    if record.is_reverse() {
-        (ref_starts, ref_ends) = (ref_ends, ref_starts);
-    }
-    //log::trace!("ref_starts: {:?}", ref_starts);
-    //log::trace!("ref_ends: {:?}", ref_ends);
     ref_starts
         .iter()
         .zip(ref_ends.iter())
@@ -182,7 +181,6 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
         // iterate over positions until we find the exact position or move past it
         while cur_pos < positions.len() && positions[cur_pos] <= val_to_match {
             if positions[cur_pos] == val_to_match {
-                //log::trace!("Found position: q_pos:{}, r_pos:{}", q_pos, r_pos);
                 if get_reference {
                     return_positions.push(r_pos);
                 } else {
