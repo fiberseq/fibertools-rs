@@ -22,53 +22,20 @@ mamba install -c bioconda fibertools-rs
 ```
 cargo install --git https://github.com/mrvollger/fibertools-rs
 ```
+# `fibertools`
 
-
+[Help page for fibertools](/docs/ft--help.md)
 
 # `ft extract`
-Extracts fiberseq data from a bam file into plain text.
-```bash
-ft-extract 0.0.4
-Extract fiberseq data into plain text files
+[Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
 
-USAGE:
-    ft extract [OPTIONS] [BAM]
 
-ARGS:
-    <BAM>    fiberseq bam file [default: -]
-
-OPTIONS:
-    -r, --reference    report in reference sequence coordinates
-        --m6a <M6A>    Output path for m6a bed12
-    -c, --cpg <CPG>    Output path for 5mC (CpG, primrose) bed12
-        --msp <MSP>    Output path for methylation sensitive patch (msp) bed12
-    -n, --nuc <NUC>    Output path for nucleosome bed12
-    -a, --all <ALL>    Output path for
-    -h, --help         Print help information
-    -V, --version      Print version information
-```
 ### `ft-extract --all`
 The extract all option is a special option that tries to extract all the fiberseq data into a tabular format. The following is an image of the output. Note that the column names will be preserved across different software versions (unless otherwise noted); however, the order may change and new columns may be added. Therefore, when loading the data (with `pandas` e.g.) be sure to use the column names as opposed to indexes for manipulation.
 ![ft-extract all](/images/ft-extract-all.png)
 
+
 # `ft-center`
-Center a fiberseq reads (bam) around a reference position(s).
-```bash
-ft-center 0.0.4
-This command centers fiberseq data around given reference positions. This is useful for making
-aggregate m6a and CpG observations, as well as visualization of SVs
+[Help page for center](/docs/ft-center-help.md). Center a fiberseq reads (bam) around a reference position(s).
 
-USAGE:
-    ft center [OPTIONS] <BAM> <BED>
-
-ARGS:
-    <BAM>    fiberseq bam file, must be aligned and have an index
-    <BED>    Bed file on which to center fiberseq reads. Data is adjusted to the start position
-             of the bed file and corrected for strand if a 4th strand column is included
-
-OPTIONS:
-    -w, --wide       Provide data in wide format, one row per read
-    -h, --help       Print help information
-    -V, --version    Print version information
-```
 ![center](/images/center.png)
