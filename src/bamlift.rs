@@ -131,11 +131,19 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 /// }
 ///```
 pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    liftover_closest(record, query_positions, true)
+    if record.is_unmapped() {
+        query_positions.iter().map(|_x| -1).collect()
+    } else {
+        liftover_closest(record, query_positions, true)
+    }
 }
 
 pub fn closest_query_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    liftover_closest(record, query_positions, false)
+    if record.is_unmapped() {
+        query_positions.iter().map(|_x| -1).collect()
+    } else {
+        liftover_closest(record, query_positions, false)
+    }
 }
 
 pub fn get_closest_reference_range(
