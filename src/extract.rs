@@ -423,7 +423,7 @@ impl FiberseqData {
     }
     pub fn all_header() -> String {
         format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ct",
             "st",
             "en",
@@ -433,8 +433,11 @@ impl FiberseqData {
             "fiber_length",
             "fiber_sequence",
             "ec",
+            "total_AT_bp",
+            "total_m6a_bp",
             "total_nuc_bp",
             "total_msp_bp",
+            "total_5mC_bp",
             "nuc_starts",
             "nuc_lengths",
             "ref_nuc_starts",
@@ -482,10 +485,20 @@ impl FiberseqData {
         let ref_msp_starts = self.get_msp(true, true);
         let ref_msp_lengths = self.get_msp(true, false);
 
+        let at_count = self
+            .record
+            .seq()
+            .as_bytes()
+            .iter()
+            .filter(|&x| *x == b'A' || *x == b'T')
+            .count() as i64;
+
         let m6a = self.base_mods.m6a_positions(false);
+        let m6a_count = m6a.len();
         let ref_m6a = self.base_mods.m6a_positions(true);
 
         let cpg = self.base_mods.cpg_positions(false);
+        let cpg_count = cpg.len();
         let ref_cpg = self.base_mods.cpg_positions(true);
 
         // write the features
@@ -500,12 +513,15 @@ impl FiberseqData {
         let total_nuc_bp = nuc_lengths.iter().sum::<i64>();
         let total_msp_bp = msp_lengths.iter().sum::<i64>();
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             q_len,
             String::from_utf8_lossy(&self.record.seq().as_bytes()),
             self.ec,
+            at_count,
+            m6a_count,
             total_nuc_bp,
             total_msp_bp,
+            cpg_count
         ))
         .unwrap();
         // add fiber features
