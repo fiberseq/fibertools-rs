@@ -461,7 +461,7 @@ impl FiberseqData {
         let end;
         let strand;
         if self.record.is_unmapped() {
-            ct = "";
+            ct = ".";
             start = 0;
             end = 0;
             strand = '.';
