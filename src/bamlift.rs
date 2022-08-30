@@ -21,7 +21,11 @@ pub fn positions_on_complimented_sequence(
     // reverse positions if needed
     let positions: Vec<i64> = if record.is_reverse() {
         let seq_len = i64::try_from(record.seq_len()).unwrap();
-        input_positions.iter().rev().map(|p| seq_len - p).collect()
+        input_positions
+            .iter()
+            .rev()
+            .map(|p| seq_len - p - 1)
+            .collect()
     } else {
         input_positions.to_vec()
     };
