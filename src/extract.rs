@@ -456,10 +456,21 @@ impl FiberseqData {
         let score = self.ec.round() as i64;
         let q_len = self.record.seq_len() as i64;
         // reference features
-        let ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
-        let start = self.record.reference_start();
-        let end = self.record.reference_end();
-        let strand = if self.record.is_reverse() { '-' } else { '+' };
+        let ct;
+        let start;
+        let end;
+        let strand;
+        if self.record.is_unmapped() {
+            ct = "";
+            start = 0;
+            end = 0;
+            strand = '.';
+        } else {
+            ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
+            start = self.record.reference_start();
+            end = self.record.reference_end();
+            strand = if self.record.is_reverse() { '-' } else { '+' };
+        }
         // fiber features
         let nuc_starts = self.get_nuc(false, true);
         let nuc_lengths = self.get_nuc(false, false);
