@@ -207,9 +207,17 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
 }
 
 pub fn get_exact_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    liftover_exact(record, query_positions, true)
+    if record.is_unmapped() {
+        query_positions.iter().map(|_x| -1).collect()
+    } else {
+        liftover_exact(record, query_positions, true)
+    }
 }
 
 pub fn get_exact_query_positions(record: &bam::Record, reference_positions: &[i64]) -> Vec<i64> {
-    liftover_exact(record, reference_positions, false)
+    if record.is_unmapped() {
+        reference_positions.iter().map(|_x| -1).collect()
+    } else {
+        liftover_exact(record, reference_positions, false)
+    }
 }
