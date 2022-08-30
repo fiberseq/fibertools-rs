@@ -8,6 +8,10 @@
 `fibertools-rs` a CLI tool for interacting with fiberseq bam files.
 
 # Install
+Installation from `cargo` requires a recent version of `gcc` and `cmake`. I have tested and recommend these versions of `gcc` and `cmake`, though other versions may work:
+```bash
+module load gcc/10.2.0 cmake/3.21.1
+```
 ## From [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs) (recommended)
 ```
 cargo install fibertools-rs
