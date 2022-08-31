@@ -55,5 +55,9 @@ jobs:
       - name: Run test
         run: |
           cargo test -- --test-threads=1
-          cargo run -- -v extract --all - .test/aligned.bam | cut -f 1-7 | head
-          cargo run -- -v center .test/aligned.bam .test/aligned.bed | head
+          cargo run -- -v extract --all - .test/all.bam | cut -f 1-7 | head
+          cargo run -- -v extract --msp - .test/all.bam | cut -f 1-7 | head
+          cargo run -- -v extract --nuc - .test/all.bam | cut -f 1-7 | head
+          cargo run -- -v extract --m6a - .test/all.bam | cut -f 1-7 | head
+          cargo run -- -v extract --cpg - .test/all.bam | cut -f 1-7 | head
+          cargo run -- center .test/all.bam .test/center.bed | head
