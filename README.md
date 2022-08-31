@@ -46,4 +46,4 @@ The extract all option is a special option that tries to extract all the fiberse
 
 
 # TODO
-- handle broken pipe errors in `ft-extract`
+- [x] handle broken pipe errors in `ft-extract`
