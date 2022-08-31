@@ -158,8 +158,7 @@ impl BaseMods {
                 // must be true for filtering, and at this point
                 assert_eq!(modified_positions.len(), modified_probabilities.len());
 
-                // TODO filter mods based on probabilities
-                //let min_ml_value = 127; // (127+1)/255 ~= 50%
+                // Filter mods based on probabilities
                 let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
                     modified_probabilities
                         .iter()
@@ -594,8 +593,7 @@ impl FiberseqData {
             .map(|&st| (st - start).to_string() + ",")
             .collect();
         assert_eq!(filtered_lengths.len(), filtered_starts.len());
-        // TODO add spacers
-        //format!("{ct}\t{start}\t{end}\t{name}\t{score}\t{strand}\t{start}\t{end}\t{color}\t{b_ct}\t0,{b_ln}1\t0,{b_st}{}\n", end-start-1)
+
         rtn.push_str(ct);
         rtn.push('\t');
         rtn.push_str(&start.to_string());
@@ -643,7 +641,7 @@ pub fn process_bam_chunk(
                 .map(|r| r.write_m6a(reference, head_view))
                 .collect();
             for line in out {
-                write!(m6a, "{}", line).unwrap();
+                write_to_file(&line, m6a);
             }
         }
         None => {}
@@ -655,7 +653,7 @@ pub fn process_bam_chunk(
                 .map(|r| r.write_cpg(reference, head_view))
                 .collect();
             for line in out {
-                write!(cpg, "{}", line).unwrap();
+                write_to_file(&line, cpg);
             }
         }
         None => {}
@@ -667,7 +665,7 @@ pub fn process_bam_chunk(
                 .map(|r| r.write_msp(reference, head_view))
                 .collect();
             for line in out {
-                write!(msp, "{}", line).unwrap();
+                write_to_file(&line, msp);
             }
         }
         None => {}
@@ -679,7 +677,7 @@ pub fn process_bam_chunk(
                 .map(|r| r.write_nuc(reference, head_view))
                 .collect();
             for line in out {
-                write!(nuc, "{}", line).unwrap();
+                write_to_file(&line, nuc);
             }
         }
         None => {}
@@ -691,7 +689,7 @@ pub fn process_bam_chunk(
                 .map(|r| r.write_all(head_view))
                 .collect();
             for line in out {
-                write!(all, "{}", line).unwrap();
+                write_to_file(&line, all);
             }
         }
         None => {}
