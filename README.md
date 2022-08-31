@@ -1,4 +1,5 @@
 # `fibertools-rs`
+[![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/rustybam/actions)
 [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
  [![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
 [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
