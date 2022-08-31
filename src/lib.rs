@@ -6,7 +6,7 @@ pub mod extract;
 
 use anyhow::Result;
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::exit;
 const BUFFER_SIZE: usize = 32 * 1024;
@@ -18,12 +18,12 @@ fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> 
     let writer: Box<dyn Write + Send + 'static> = match path {
         Some(path) => {
             if path.as_os_str() == "-" {
-                Box::new(BufWriter::with_capacity(BUFFER_SIZE, io::stdout()))
+                Box::new(BufWriter::with_capacity(BUFFER_SIZE, stdout()))
             } else {
                 Box::new(BufWriter::with_capacity(BUFFER_SIZE, File::create(path)?))
             }
         }
-        None => Box::new(BufWriter::with_capacity(BUFFER_SIZE, io::stdout())),
+        None => Box::new(BufWriter::with_capacity(BUFFER_SIZE, stdout())),
     };
     Ok(writer)
 }
@@ -95,14 +95,19 @@ impl FiberOutFiles {
     }
 }
 
-/// TODO
-pub fn write_to_stdout(out: &str) {
-    let out = write!(std::io::stdout(), "{}", out);
+/// write to a file, but don't error on broken pipes
+pub fn write_to_file(out: &str, file: &mut Box<dyn Write>) {
+    let out = write!(file, "{}", out);
     if let Err(err) = out {
-        if err.kind() == std::io::ErrorKind::BrokenPipe {
+        if err.kind() == io::ErrorKind::BrokenPipe {
             exit(0);
         } else {
             panic!("Error: {}", err);
         }
     }
+}
+
+pub fn write_to_stdout(out: &str) {
+    let mut out_f = Box::new(std::io::stdout()) as Box<dyn Write>;
+    write_to_file(out, &mut out_f);
 }
