@@ -37,7 +37,7 @@ jobs:
            components: clippy
 
        - name: Lint with clippy
-         uses: actions-rs/clippy-check@v1
+         run: cargo clippy
 
   Testing:
     needs: Formatting
