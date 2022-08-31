@@ -234,7 +234,7 @@ impl BaseMods {
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&".test/aligned.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&".test/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let n_s = extract::get_u32_tag(&record, b"ns");
