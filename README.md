@@ -36,7 +36,7 @@ cargo install --git https://github.com/mrvollger/fibertools-rs
 
 
 ### `ft-extract --all`
-The extract all option is a special option that tries to extract all the fiberseq data into a tabular format. The following is an image of the output. Note that the column names will be preserved across different software versions (unless otherwise noted); however, the order may change and new columns may be added. Therefore, when loading the data (with `pandas` e.g.) be sure to use the column names as opposed to indexes for manipulation.
+The extract all option is a special option that tries to extract all the fiberseq data into a tabular format. The following is an image of the output. Note that the [column names](/docs/ft-all-columns.md) will be preserved across different software versions (unless otherwise noted); however, the order may change and new columns may be added. Therefore, when loading the data (with `pandas` e.g.) be sure to use the column names as opposed to indexes for manipulation.
 ![ft-extract all](/images/ft-extract-all.png)
 
 
