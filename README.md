@@ -41,11 +41,13 @@ The extract all option is a special option that tries to extract all the fiberse
 
 
 # `ft-center`
-[Help page for center](/docs/ft-center-help.md). Center a fiberseq reads (bam) around a reference position(s).
+[Help page for center](/docs/ft-center-help.md). Center fiberseq reads (bam) around reference position(s).
 
-![center](/images/center.png)
+![Center](/images/center.png)
 
 
 # TODO
-- [] Add option for all format but without sequence
+- [ ] Add option for all format but without sequence
+- [ ] Add `rustybam` stats to ft `all`
 - [x] handle broken pipe errors in `ft-extract`
+- [x] add rq to all
