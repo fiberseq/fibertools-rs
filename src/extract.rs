@@ -420,9 +420,17 @@ impl FiberseqData {
         let lengths = vec![1; starts.len()];
         self.to_bed12(reference, &starts, &lengths, head_view)
     }
+
+    pub fn get_rq(&self) -> Option<f32> {
+        if let Ok(Aux::Float(f)) = self.record.aux(b"rq") {
+            Some(f)
+        } else {
+            None
+        }
+    }
     pub fn all_header() -> String {
         format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ct",
             "st",
             "en",
@@ -432,6 +440,7 @@ impl FiberseqData {
             "fiber_length",
             "fiber_sequence",
             "ec",
+            "rq",
             "total_AT_bp",
             "total_m6a_bp",
             "total_nuc_bp",
@@ -457,6 +466,10 @@ impl FiberseqData {
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;
         let q_len = self.record.seq_len() as i64;
+        let rq = match self.get_rq() {
+            Some(x) => format!("{}", x),
+            None => ".".to_string(),
+        };
         // reference features
         let ct;
         let start;
@@ -512,10 +525,11 @@ impl FiberseqData {
         let total_nuc_bp = nuc_lengths.iter().sum::<i64>();
         let total_msp_bp = msp_lengths.iter().sum::<i64>();
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             q_len,
             String::from_utf8_lossy(&self.record.seq().as_bytes()),
             self.ec,
+            rq,
             at_count,
             m6a_count,
             total_nuc_bp,
