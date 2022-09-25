@@ -1,14 +1,13 @@
-from pickletools import read_decimalnl_short
 import xgboost as xgb
 import numpy as np
 
-train_csv = "models/train.csv"
-val_csv = "models/val.csv"
+train_csv = "models/temp/train.csv"
+val_csv = "models/temp/val.csv"
 
 read_data = False
 
 if read_data:
-    data_path = "models/m6A_train_other_half_hifi.npz"
+    data_path = "models/temp/m6A_train_other_half_hifi.npz"
     train_val_data = np.load(data_path, allow_pickle=True)
 
     # Get the dictionary from the containing relevant data
@@ -49,16 +48,3 @@ bst = xgb.train(param, dtrain, num_round, evals=eval_s)
 
 # Save model
 bst.save_model("models/xgboost.0.81.bin")
-
-
-exit(1)
-m = xgb.Booster()
-print("here")
-m.load_model("models/xgboost.json")
-print(m.predict(xgb.DMatrix([90 * [1]])))
-exit(1)
-print(m.get_fscore())
-m.save_model("models/xgboost.bin")
-m.load_model("models/xgboost.bin")
-m.save_model("models/xgboost.2.json")
-m.dump_model("models/xgboost.dump")
