@@ -78,6 +78,14 @@ pub enum Commands {
         #[clap(short, long)]
         wide: bool,
     },
+    /// Predict m6A positions using HiFi kinetics data.
+    #[clap(visible_aliases = &["m6A", "m6a"])]
+    PredictM6A {
+        /// HiFi file with kinetics.
+        bam: String,
+        /// Output bam file.
+        out: String,
+    },
 }
 
 pub fn make_cli_parse() -> Cli {
