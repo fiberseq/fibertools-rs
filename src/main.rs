@@ -17,9 +17,9 @@ pub fn main() -> Result<(), Error> {
 
     // set the logging level
     let mut min_log_level = match matches.occurrences_of("verbose") {
-        //0 => LevelFilter::Warn,
-        0 => LevelFilter::Info,
-        1 => LevelFilter::Debug,
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
     if args.quiet {
@@ -74,6 +74,15 @@ pub fn main() -> Result<(), Error> {
             bam.set_threads(args.threads).unwrap();
             let center_positions = center::read_center_positions(bed)?;
             center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
+        }
+        Some(Commands::PredictM6A { bam, out: _out }) => {
+            let mut bam = if bam == "-" {
+                bam::Reader::from_stdin().unwrap()
+            } else {
+                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+            };
+            bam.set_threads(args.threads).unwrap();
+            predict_m6a::read_bam_into_fiberdata(&mut bam);
         }
         None => {}
     };

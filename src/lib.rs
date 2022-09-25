@@ -3,7 +3,7 @@ pub mod bamlift;
 pub mod center;
 pub mod cli;
 pub mod extract;
-
+pub mod predict_m6a;
 use anyhow::Result;
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
@@ -110,4 +110,47 @@ pub fn write_to_file(out: &str, file: &mut Box<dyn Write>) {
 pub fn write_to_stdout(out: &str) {
     let mut out_f = Box::new(std::io::stdout()) as Box<dyn Write>;
     write_to_file(out, &mut out_f);
+}
+
+// This is a bam chunk reader
+use colored::Colorize;
+use rust_htslib::bam;
+use std::time::Instant;
+
+struct BamChunk<'a> {
+    bam: bam::Records<'a, bam::Reader>,
+    chunk_size: usize,
+}
+
+// The `Iterator` trait only requires a method to be defined for the `next` element.
+impl<'a> Iterator for BamChunk<'a> {
+    // We can refer to this type using Self::Item
+    type Item = Vec<bam::Record>;
+
+    // The return type is `Option<T>`:
+    //     * When the `Iterator` is finished, `None` is returned.
+    //     * Otherwise, the next value is wrapped in `Some` and returned.
+    // We use Self::Item in the return type, so we can change
+    // the type without having to update the function signatures.
+    fn next(&mut self) -> Option<Self::Item> {
+        let start = Instant::now();
+        let mut cur_vec = vec![];
+        for r in self.bam.by_ref().take(self.chunk_size) {
+            cur_vec.push(r.unwrap())
+        }
+        // return
+        if cur_vec.is_empty() {
+            None
+        } else {
+            let duration = start.elapsed().as_secs_f64();
+            log::info!(
+                "Read {} bam records at {}.",
+                format!("{:}", cur_vec.len()).bright_magenta().bold(),
+                format!("{:.2?} reads/s", cur_vec.len() as f64 / duration)
+                    .bright_cyan()
+                    .bold(),
+            );
+            Some(cur_vec)
+        }
+    }
 }
