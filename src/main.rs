@@ -33,7 +33,7 @@ pub fn main() -> Result<(), Error> {
 
     log::debug!("DEBUG logging enabled");
     log::trace!("TRACE logging enabled");
-
+    log::debug!("Using {} threads.", args.threads);
     log::info!("Starting ft-{}", subcommand.bright_green().bold());
 
     // set up number of threads to use globally
@@ -75,14 +75,21 @@ pub fn main() -> Result<(), Error> {
             let center_positions = center::read_center_positions(bed)?;
             center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
         }
-        Some(Commands::PredictM6A { bam, out: _out }) => {
+        Some(Commands::PredictM6A { bam, out, keep }) => {
             let mut bam = if bam == "-" {
                 bam::Reader::from_stdin().unwrap()
             } else {
                 bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
             };
+            let header = bam::Header::from_template(bam.header());
+            let mut out = if out == "-" {
+                bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
+            } else {
+                bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
+            };
+
             bam.set_threads(args.threads).unwrap();
-            predict_m6a::read_bam_into_fiberdata(&mut bam);
+            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep);
         }
         None => {}
     };
