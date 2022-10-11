@@ -44,7 +44,7 @@ pub enum Commands {
         #[clap(short, long)]
         reference: bool,
         /// Minium score in the ML tag to include in the output.
-        #[clap(short, long, default_value = "20")]
+        #[clap(short, long, default_value = "150")]
         min_ml_score: u8,
         /// Output path for m6a bed12.
         #[clap(long)]
@@ -72,7 +72,7 @@ pub enum Commands {
         /// If you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
         bed: String,
         /// Minium score in the ML tag to include in the output.
-        #[clap(short, long, default_value = "20")]
+        #[clap(short, long, default_value = "150")]
         min_ml_score: u8,
         /// Provide data in wide format, one row per read.
         #[clap(short, long)]
@@ -85,6 +85,9 @@ pub enum Commands {
         bam: String,
         /// Output bam file.
         out: String,
+        /// keep hifi kinetics data
+        #[clap(short, long)]
+        keep: bool,
     },
 }
 
