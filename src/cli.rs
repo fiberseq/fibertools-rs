@@ -88,6 +88,9 @@ pub enum Commands {
         /// keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
+        /// use cnn model
+        #[clap(short, long)]
+        cnn: bool,
     },
 }
 
