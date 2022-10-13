@@ -27,6 +27,7 @@ fn get_saved_gbdt_model() -> &'static GBDT {
         fs::write(temp_file_name, JSON).expect("Unable to write file");
         let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
+        fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
         log::info!("Model from xgboost loaded");
         model
     })
