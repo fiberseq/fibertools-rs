@@ -1,7 +1,10 @@
 use super::extract;
 use super::*;
 use bio::alphabets::dna::revcomp;
+use gbdt::decision_tree::{Data, DataVec};
+use gbdt::gradient_boost::GBDT;
 use indicatif::{style, ParallelProgressIterator};
+use lazy_static::lazy_static;
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -10,7 +13,16 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
-use xgboost::{Booster, DMatrix};
+//use xgboost::{Booster, DMatrix};
+
+lazy_static! {
+    static ref GBDT_MODEL: GBDT =
+        GBDT::from_xgoost_dump("models/gbdt.0.81.json", "binary:logistic")
+            .expect("failed to load model");
+}
+lazy_static! {
+    static ref USE_GBDT_MODEL: bool = true;
+}
 
 pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
     let len = seq.len() * 4;
@@ -82,7 +94,6 @@ pub fn add_mm_ml(
 }
 
 pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
-    let model = get_model();
     let window = 15;
     let extend = window / 2;
     let f_ip = extract::get_u8_tag(record, b"fi");
@@ -151,17 +162,31 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
             t_count += 1;
         }
     }
-    let d_mat = DMatrix::from_dense(&a_windows, a_count).unwrap();
-    let a_predict = model.predict(&d_mat).unwrap();
-    let d_mat = DMatrix::from_dense(&t_windows, t_count).unwrap();
+    let a_predict = apply_model(&a_windows, a_count);
     add_mm_ml(record, leading_a_count, &a_predict, "A+a", keep);
-    let t_predict = model.predict(&d_mat).unwrap();
+    let t_predict = apply_model(&t_windows, t_count);
     add_mm_ml(record, leading_t_count, &t_predict, "T-a", keep);
 }
 
-fn get_model() -> Booster {
-    xgboost::Booster::load("models/xgboost.0.81.bin").unwrap()
+fn apply_model(windows: &Vec<f32>, count: usize) -> Vec<f32> {
+    if *USE_GBDT_MODEL {
+        let chunk_size = windows.len() / count;
+        let mut gbdt_data: DataVec = Vec::new();
+        for window in windows.chunks(chunk_size) {
+            let d = Data::new_test_data(window.to_vec(), None);
+            gbdt_data.push(d);
+        }
+        GBDT_MODEL.predict(&gbdt_data)
+    } else {
+        //let model = get_model();
+        //let d_mat = DMatrix::from_dense(windows, count).unwrap();
+        //model.predict(&d_mat).unwrap()
+        vec![]
+    }
 }
+//fn get_model() -> Booster {
+//xgboost::Booster::load("models/xgboost.0.81.bin").expect("failed to loaf model")
+//}
 
 pub fn read_bam_into_fiberdata(bam: &mut bam::Reader, out: &mut bam::Writer, keep: bool) {
     // read in bam data
