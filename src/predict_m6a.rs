@@ -4,7 +4,6 @@ use bio::alphabets::dna::revcomp;
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use indicatif::{style, ParallelProgressIterator};
-use lazy_static::lazy_static;
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -13,15 +12,23 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
+use spin;
+use std::fs;
 //use xgboost::{Booster, DMatrix};
 
-lazy_static! {
-    static ref GBDT_MODEL: GBDT =
-        GBDT::from_xgoost_dump("models/gbdt.0.81.json", "binary:logistic")
+// make sure file exists for cargo
+static USE_GBDT_MODEL: bool = true;
+static INIT: spin::Once<GBDT> = spin::Once::new();
+static JSON: &str = include_str!("../models/gbdt.0.81.json");
+
+fn get_saved_gbdt_model() -> &'static GBDT {
+    INIT.call_once(|| {
+        let temp_file_name = "ft.tmp.model.json";
+        fs::write(temp_file_name, JSON).expect("Unable to write file");
+        let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
-}
-lazy_static! {
-    static ref USE_GBDT_MODEL: bool = true;
+        model
+    })
 }
 
 pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
@@ -169,14 +176,15 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
 }
 
 fn apply_model(windows: &Vec<f32>, count: usize) -> Vec<f32> {
-    if *USE_GBDT_MODEL {
+    if USE_GBDT_MODEL {
         let chunk_size = windows.len() / count;
         let mut gbdt_data: DataVec = Vec::new();
         for window in windows.chunks(chunk_size) {
             let d = Data::new_test_data(window.to_vec(), None);
             gbdt_data.push(d);
         }
-        GBDT_MODEL.predict(&gbdt_data)
+        let gbdt_model = get_saved_gbdt_model();
+        gbdt_model.predict(&gbdt_data)
     } else {
         //let model = get_model();
         //let d_mat = DMatrix::from_dense(windows, count).unwrap();
@@ -195,6 +203,10 @@ pub fn read_bam_into_fiberdata(bam: &mut bam::Reader, out: &mut bam::Writer, kee
         bam: bam.records(),
         chunk_size,
     };
+
+    // call this once before we start anything in parallel threads just in case
+    let _gbdt_model = get_saved_gbdt_model();
+
     // iterate over chunks
     let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
