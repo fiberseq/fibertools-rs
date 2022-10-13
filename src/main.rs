@@ -89,6 +89,7 @@ pub fn main() -> Result<(), Error> {
             };
 
             bam.set_threads(args.threads).unwrap();
+            out.set_threads(args.threads).unwrap();
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep);
         }
         None => {}
