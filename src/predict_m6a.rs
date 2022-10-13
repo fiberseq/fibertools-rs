@@ -14,12 +14,15 @@ use rust_htslib::{
 };
 use spin;
 use std::fs;
+use tch;
 //use xgboost::{Booster, DMatrix};
 
 // make sure file exists for cargo
-static USE_GBDT_MODEL: bool = true;
+static USE_GBDT_MODEL: bool = false;
 static INIT: spin::Once<GBDT> = spin::Once::new();
+static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static JSON: &str = include_str!("../models/gbdt.0.81.json");
+static PT: &[u8] = include_bytes!("../models/m6ANet_other_half_hifi.3.best.torch.pt");
 
 fn get_saved_gbdt_model() -> &'static GBDT {
     INIT.call_once(|| {
@@ -29,6 +32,17 @@ fn get_saved_gbdt_model() -> &'static GBDT {
             .expect("failed to load model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
         log::info!("Model from xgboost loaded");
+        model
+    })
+}
+
+fn get_saved_pytorch_model() -> &'static tch::CModule {
+    INIT_PT.call_once(|| {
+        let temp_file_name = "ft.tmp.model.json";
+        fs::write(temp_file_name, PT).expect("Unable to write file");
+        let model = tch::CModule::load(temp_file_name).expect("Unable to load PyTorch model");
+        fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
+        log::info!("Model from PyTorch loaded");
         model
     })
 }
@@ -93,6 +107,10 @@ pub fn add_mm_ml(
         .map(|&x| (x * 256.0 - 1.0).ceil())
         .map(|x| x as u8)
         .collect();
+    log::trace!(
+        "{}",
+        new_ml.iter().map(|&x| x as f64).sum::<f64>() / (new_ml.len() as f64)
+    );
     ml_tag.extend(new_ml);
     let aux_array: AuxArray<u8> = (&ml_tag).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
@@ -172,8 +190,10 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
         }
     }
     let a_predict = apply_model(&a_windows, a_count);
+    assert_eq!(a_predict.len(), a_count);
     add_mm_ml(record, leading_a_count, &a_predict, "A+a", keep);
     let t_predict = apply_model(&t_windows, t_count);
+    assert_eq!(t_predict.len(), t_count);
     add_mm_ml(record, leading_t_count, &t_predict, "T-a", keep);
 }
 
@@ -188,10 +208,14 @@ fn apply_model(windows: &Vec<f32>, count: usize) -> Vec<f32> {
         let gbdt_model = get_saved_gbdt_model();
         gbdt_model.predict(&gbdt_data)
     } else {
-        //let model = get_model();
-        //let d_mat = DMatrix::from_dense(windows, count).unwrap();
-        //model.predict(&d_mat).unwrap()
-        vec![]
+        let model = get_saved_pytorch_model();
+        let ts = tch::Tensor::of_slice(windows);
+        let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
+        let x = model.forward_ts(&[ts]).unwrap();
+        let z: Vec<f32> = x.try_into().unwrap();
+        let z: Vec<f32> = z.chunks(2).map(|c| c[0]).collect();
+        log::trace!("{:?} {}", z.len(), count);
+        z
     }
 }
 //fn get_model() -> Booster {
@@ -208,6 +232,7 @@ pub fn read_bam_into_fiberdata(bam: &mut bam::Reader, out: &mut bam::Writer, kee
 
     // call this once before we start anything in parallel threads just in case
     let _gbdt_model = get_saved_gbdt_model();
+    let _pt_model = get_saved_pytorch_model();
 
     // iterate over chunks
     let mut total_read = 0;
