@@ -18,7 +18,6 @@ use tch;
 //use xgboost::{Booster, DMatrix};
 
 // make sure file exists for cargo
-static USE_GBDT_MODEL: bool = false;
 static INIT: spin::Once<GBDT> = spin::Once::new();
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static JSON: &str = include_str!("../models/gbdt.0.81.json");
@@ -120,7 +119,7 @@ pub fn add_mm_ml(
     log::trace!("MM:{:?}", mm_tag);
 }
 
-pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
+pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
     let window = 15;
     let extend = window / 2;
     let f_ip = extract::get_u8_tag(record, b"fi");
@@ -189,16 +188,16 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool) {
             t_count += 1;
         }
     }
-    let a_predict = apply_model(&a_windows, a_count);
+    let a_predict = apply_model(&a_windows, a_count, cnn);
     assert_eq!(a_predict.len(), a_count);
     add_mm_ml(record, leading_a_count, &a_predict, "A+a", keep);
-    let t_predict = apply_model(&t_windows, t_count);
+    let t_predict = apply_model(&t_windows, t_count, cnn);
     assert_eq!(t_predict.len(), t_count);
     add_mm_ml(record, leading_t_count, &t_predict, "T-a", keep);
 }
 
-fn apply_model(windows: &Vec<f32>, count: usize) -> Vec<f32> {
-    if USE_GBDT_MODEL {
+fn apply_model(windows: &Vec<f32>, count: usize, cnn: bool) -> Vec<f32> {
+    if !cnn {
         let chunk_size = windows.len() / count;
         let mut gbdt_data: DataVec = Vec::new();
         for window in windows.chunks(chunk_size) {
@@ -222,17 +221,22 @@ fn apply_model(windows: &Vec<f32>, count: usize) -> Vec<f32> {
 //xgboost::Booster::load("models/xgboost.0.81.bin").expect("failed to loaf model")
 //}
 
-pub fn read_bam_into_fiberdata(bam: &mut bam::Reader, out: &mut bam::Writer, keep: bool) {
+pub fn read_bam_into_fiberdata(
+    bam: &mut bam::Reader,
+    out: &mut bam::Writer,
+    keep: bool,
+    cnn: bool,
+) {
+    // call this once before we start anything in parallel threads just in case
+    let _gbdt_model = get_saved_gbdt_model();
+    let _pt_model = get_saved_pytorch_model();
+
     // read in bam data
     let chunk_size = current_num_threads() * 200;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
     };
-
-    // call this once before we start anything in parallel threads just in case
-    let _gbdt_model = get_saved_gbdt_model();
-    let _pt_model = get_saved_pytorch_model();
 
     // iterate over chunks
     let mut total_read = 0;
@@ -245,7 +249,7 @@ pub fn read_bam_into_fiberdata(bam: &mut bam::Reader, out: &mut bam::Writer, kee
         chunk
             .par_iter_mut()
             .progress_with_style(style)
-            .for_each(|r| predict_m6a(r, keep));
+            .for_each(|r| predict_m6a(r, keep, cnn));
 
         // write to output
         chunk.iter().for_each(|r| out.write(r).unwrap());

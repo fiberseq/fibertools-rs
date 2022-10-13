@@ -75,7 +75,12 @@ pub fn main() -> Result<(), Error> {
             let center_positions = center::read_center_positions(bed)?;
             center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
         }
-        Some(Commands::PredictM6A { bam, out, keep }) => {
+        Some(Commands::PredictM6A {
+            bam,
+            out,
+            keep,
+            cnn,
+        }) => {
             let mut bam = if bam == "-" {
                 bam::Reader::from_stdin().unwrap()
             } else {
@@ -90,7 +95,7 @@ pub fn main() -> Result<(), Error> {
 
             bam.set_threads(args.threads).unwrap();
             out.set_threads(args.threads).unwrap();
-            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep);
+            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep, *cnn);
         }
         None => {}
     };
