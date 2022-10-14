@@ -29,7 +29,7 @@ fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> 
 }
 
 /// unzip a vector of tupples
-pub fn unzip_to_vectors<T>(vec: Vec<(T, T)>) -> (Vec<T>, Vec<T>) {
+pub fn unzip_to_vectors<T, U>(vec: Vec<(T, U)>) -> (Vec<T>, Vec<U>) {
     vec.into_iter().unzip()
 }
 
