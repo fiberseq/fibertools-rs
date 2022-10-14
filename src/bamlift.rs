@@ -12,6 +12,43 @@ where
     x.sort();
     x
 }
+/// Merge two lists based on a key
+/// Normal sort is supposed to be very fast on two sorted lists
+/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
+/// ```
+/// use fibertools_rs::bamlift::*;
+/// let x = vec![1,3];
+/// let x_q = vec!["a","b"];
+/// let y = vec![2,4];
+/// let y_q = vec!["c", "d"];
+/// let z = merge_two_lists_with_qual(&x, &x_q, &y, &y_q);
+/// //assert_eq!(z,"a");
+/// ```
+pub fn merge_two_lists_with_qual<T, U>(
+    left: &[T],
+    left_q: &[U],
+    right: &[T],
+    right_q: &[U],
+) -> Vec<(T, U)>
+where
+    T: Ord,
+    T: Clone,
+    U: Clone,
+{
+    let l = left
+        .iter()
+        .zip(left_q.iter())
+        .map(|(a, b)| (a.clone(), b.clone()));
+
+    let r = right
+        .iter()
+        .zip(right_q.iter())
+        .map(|(a, b)| (a.clone(), b.clone()));
+
+    let mut x: Vec<(T, U)> = l.chain(r).collect();
+    x.sort_by_key(|(a, _b)| a.clone());
+    x
+}
 
 /// get positions on the complimented sequence in the cigar record
 pub fn positions_on_complimented_sequence(
