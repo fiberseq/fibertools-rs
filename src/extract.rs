@@ -213,6 +213,39 @@ impl BaseMods {
         }
     }
 
+    pub fn m6a(&self, reference: bool) -> (Vec<i64>, Vec<u8>) {
+        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
+        // skip if no m6a
+        if m6a.is_empty() {
+            return (vec![], vec![]);
+        }
+        // get left values
+        let m6a_l = if reference {
+            m6a[0].get_reference_positions()
+        } else {
+            m6a[0].get_modified_bases()
+        };
+        let m6a_l_q = m6a[0].get_modified_probabilities();
+        // get right values if they are there
+        let m6a_r;
+        let m6a_r_q;
+        if m6a.len() == 1 {
+            m6a_r = vec![];
+            m6a_r_q = vec![];
+        } else {
+            if reference {
+                m6a_r = m6a[1].get_reference_positions();
+            } else {
+                m6a_r = m6a[1].get_modified_bases();
+            }
+            m6a_r_q = m6a[1].get_modified_probabilities();
+        }
+        // merge lists
+        unzip_to_vectors(merge_two_lists_with_qual(
+            &m6a_l, &m6a_l_q, &m6a_r, &m6a_r_q,
+        ))
+    }
+
     pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
         let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
         // skip if no cpg
