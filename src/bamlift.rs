@@ -22,7 +22,7 @@ where
 /// let y = vec![2,4];
 /// let y_q = vec!["c", "d"];
 /// let z = merge_two_lists_with_qual(&x, &x_q, &y, &y_q);
-/// //assert_eq!(z,"a");
+/// assert_eq!(z, vec![(1,"a"), (2,"c"), (3,"b"), (4, "d")]);
 /// ```
 pub fn merge_two_lists_with_qual<T, U>(
     left: &[T],
