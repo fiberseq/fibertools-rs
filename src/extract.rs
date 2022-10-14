@@ -463,7 +463,7 @@ impl FiberseqData {
     }
     pub fn all_header() -> String {
         format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ct",
             "st",
             "en",
@@ -489,6 +489,7 @@ impl FiberseqData {
             "ref_msp_lengths",
             "m6a",
             "ref_m6a",
+            "m6a_qual",
             "5mC",
             "ref_5mC",
         )
@@ -538,9 +539,12 @@ impl FiberseqData {
             .filter(|&x| *x == b'A' || *x == b'T')
             .count() as i64;
 
-        let m6a = self.base_mods.m6a_positions(false);
+        //let m6a = self.base_mods.m6a_positions(false);
+        //let ref_m6a = self.base_mods.m6a_positions(true);
+        let (m6a, _m6a_qual) = self.base_mods.m6a(false);
         let m6a_count = m6a.len();
-        let ref_m6a = self.base_mods.m6a_positions(true);
+        let (ref_m6a, m6a_qual) = self.base_mods.m6a(true);
+        let m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
 
         let cpg = self.base_mods.cpg_positions(false);
         let cpg_count = cpg.len();
@@ -582,6 +586,7 @@ impl FiberseqData {
             &ref_msp_lengths,
             &m6a,
             &ref_m6a,
+            &m6a_qual,
             &cpg,
             &ref_cpg,
         ] {
