@@ -33,13 +33,36 @@ if read_data:
     np.savetxt(train_csv, final_train_data, delimiter=",")
     np.savetxt(val_csv, final_val_data, delimiter=",")
     print("saved")
+elif False:
+    train_csv = "models/temp/train_large.csv"
+    data_path = "../m6A-calling/large.PS00075.npz"
+    train_val_data = np.load(data_path, allow_pickle=True)
+
+    # Load training and validation features and labels
+    X_train = train_val_data["features"]
+    y_train = train_val_data["labels"]
+
+    # Reshape features to one dimension
+    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
+
+    # Add labels before feature list
+    final_train_data = np.concatenate([y_train[:, np.newaxis], X_train], axis=1)
+    print("saving")
+
+    # Save data as CSV
+    np.savetxt(train_csv, final_train_data, delimiter=",")
+    print("saved")
 
 # Read in training and validation data
 dtrain = xgb.DMatrix(f"{train_csv}?format=csv&label_column=0")
 dval = xgb.DMatrix(f"{val_csv}?format=csv&label_column=0")
 
 # Specify parameters via map
-param = {"max_depth": 6, "objective": "binary:logistic", "eval_metric": "auc"}
+param = {
+    "max_depth": 6,
+    "objective": "binary:logistic",
+    "eval_metric": ["aucpr", "auc"],
+}
 num_round = 100
 eval_s = [(dtrain, "train"), (dval, "validation")]
 
@@ -47,4 +70,4 @@ eval_s = [(dtrain, "train"), (dval, "validation")]
 bst = xgb.train(param, dtrain, num_round, evals=eval_s)
 
 # Save model
-bst.save_model("models/xgboost.0.81.bin")
+bst.save_model("models/xgboost_large.0.81.bin")
