@@ -104,6 +104,7 @@ pub fn add_mm_ml(
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| (x * 256.0 - 1.0).ceil())
+        .map(|x| if x < 0.0 { 0.0 } else { x })
         .map(|x| x as u8)
         .collect();
     log::trace!(
