@@ -33,9 +33,9 @@ if read_data:
     np.savetxt(train_csv, final_train_data, delimiter=",")
     np.savetxt(val_csv, final_val_data, delimiter=",")
     print("saved")
-elif False:
+elif True:
     train_csv = "models/temp/train_large.csv"
-    data_path = "../m6A-calling/large.PS00075.npz"
+    data_path = "models/temp/large.PS00075.npz"
     train_val_data = np.load(data_path, allow_pickle=True)
 
     # Load training and validation features and labels
@@ -47,10 +47,22 @@ elif False:
 
     # Add labels before feature list
     final_train_data = np.concatenate([y_train[:, np.newaxis], X_train], axis=1)
-    print("saving")
+
+    data_path = "models/temp/PS00075_2.val.npz"
+    train_val_data = np.load(data_path, allow_pickle=True)
+    X_val = train_val_data["features"]
+    y_val = train_val_data["labels"]
+    X_val = X_val.reshape(X_val.shape[0], X_val.shape[1] * X_val.shape[2])
+    final_val_data = np.concatenate([y_val[:, np.newaxis], X_val], axis=1)
+
+    # Read in training and validation data
+    dtrain = xgb.DMatrix(X_train, label=y_train)
+    dval = xgb.DMatrix(X_val, label=y_val)
 
     # Save data as CSV
+    print("saving")
     np.savetxt(train_csv, final_train_data, delimiter=",")
+    np.savetxt(val_csv, final_val_data, delimiter=",")
     print("saved")
 
 # Read in training and validation data
@@ -70,4 +82,4 @@ eval_s = [(dtrain, "train"), (dval, "validation")]
 bst = xgb.train(param, dtrain, num_round, evals=eval_s)
 
 # Save model
-bst.save_model("models/xgboost_large.0.81.bin")
+bst.save_model("models/xgboost_large_2.0.81.bin")
