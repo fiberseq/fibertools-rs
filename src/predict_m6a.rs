@@ -100,11 +100,25 @@ pub fn add_mm_ml(
     let aux_integer_field = Aux::String(&mm_tag);
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
+    /*
+    let sum: f32 = predictions.iter().sum();
+    let min = predictions.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+    let max = predictions.iter().fold(-1.0, |a: f32, &b| a.max(b));
+    log::trace!("{} {} {} {}", sum / predictions.len() as f32, sum, min, max);
+     */
+
     // update the ML tag with new data
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| (x * 256.0 - 1.0).ceil())
-        .map(|x| if x < 0.0 { 0.0 } else { x })
+        .map(|x| {
+            if x < 0.0 {
+                log::trace!("{:?}", x);
+                0.0
+            } else {
+                x
+            }
+        })
         .map(|x| x as u8)
         .collect();
     log::trace!(
@@ -212,9 +226,15 @@ fn apply_model(windows: &Vec<f32>, count: usize, cnn: bool) -> Vec<f32> {
         let ts = tch::Tensor::of_slice(windows);
         let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
         let x = model.forward_ts(&[ts]).unwrap();
-        let z: Vec<f32> = x.try_into().unwrap();
-        let z: Vec<f32> = z.chunks(2).map(|c| c[0]).collect();
-        log::trace!("{:?} {}", z.len(), count);
+        let w: Vec<f32> = x.try_into().unwrap();
+        let z: Vec<f32> = w.chunks(2).map(|c| c[0]).collect();
+        log::trace!(
+            "{:?} {} {} {}",
+            z.len(),
+            count,
+            z.iter().sum::<f32>() / z.len() as f32,
+            w.chunks(2).map(|c| c[1]).sum::<f32>() / z.len() as f32
+        );
         z
     }
 }
