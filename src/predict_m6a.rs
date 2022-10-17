@@ -21,7 +21,7 @@ use tch;
 static INIT: spin::Once<GBDT> = spin::Once::new();
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static JSON: &str = include_str!("../models/gbdt_large.0.81.json");
-static PT: &[u8] = include_bytes!("../models/m6ANet_other_half_hifi.3.best.torch.pt");
+static PT: &[u8] = include_bytes!("../models/m6ANet_PS00075.best.torch.pt");
 
 fn get_saved_gbdt_model() -> &'static GBDT {
     INIT.call_once(|| {
