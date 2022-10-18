@@ -33,7 +33,7 @@ if read_data:
     np.savetxt(train_csv, final_train_data, delimiter=",")
     np.savetxt(val_csv, final_val_data, delimiter=",")
     print("saved")
-elif True:
+elif False:
     train_csv = "models/temp/train_large.csv"
     data_path = "models/temp/large.PS00075.npz"
     train_val_data = np.load(data_path, allow_pickle=True)
