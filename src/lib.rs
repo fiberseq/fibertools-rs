@@ -3,6 +3,7 @@ pub mod bamlift;
 pub mod center;
 pub mod cli;
 pub mod extract;
+pub mod ml_models;
 pub mod predict_m6a;
 use anyhow::Result;
 use std::fs::File;
