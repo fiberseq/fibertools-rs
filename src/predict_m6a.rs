@@ -50,9 +50,10 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
     let len = seq.len() * 4;
     let mut out = vec![0.0; len];
     for (row, base) in [b'A', b'C', b'G', b'T'].into_iter().enumerate() {
+        let already_done = seq.len() * row;
         for i in 0..seq.len() {
             if seq[i] == base {
-                out[(row + 1) * i] = 1.0;
+                out[already_done + i] = 1.0;
             }
         }
     }
