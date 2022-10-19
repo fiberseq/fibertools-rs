@@ -163,8 +163,8 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
         if !((*base == b'A') || (*base == b'T')) {
             continue;
         }
-        // get the number of leading As and Ts for MM tag
-        if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
+        // get the number of leading As and Ts for MM tag and skip
+        if pos < extend {
             if *base == b'A' {
                 leading_a_count += 1;
             } else {
@@ -172,6 +172,11 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
             }
             continue;
         }
+        // skip if we are at the end
+        if pos + extend + 1 > record.seq_len() {
+            continue;
+        }
+
         let start = pos - extend;
         let end = pos + extend + 1;
         let ip: Vec<f32>;
