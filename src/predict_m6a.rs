@@ -174,22 +174,40 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
         }
         let start = pos - extend;
         let end = pos + extend + 1;
-        let ip;
-        let pw;
+        let ip: Vec<f32>;
+        let pw: Vec<f32>;
         let hot_one;
         if *base == b'A' {
             let w_seq = &revcomp(&seq[start..end]);
             hot_one = hot_one_dna(w_seq);
-            ip = &r_ip[start..end];
-            pw = &r_pw[start..end];
+            ip = (r_ip[start..end])
+                .iter()
+                .copied()
+                .rev()
+                .map(|x| x as f32 / 255.0)
+                .collect();
+            pw = (r_pw[start..end])
+                .iter()
+                .copied()
+                .rev()
+                .map(|x| x as f32 / 255.0)
+                .collect();
         } else {
             let w_seq = &seq[start..end];
             hot_one = hot_one_dna(w_seq);
-            ip = &f_ip[start..end];
-            pw = &f_pw[start..end];
+            ip = (f_ip[start..end])
+                .iter()
+                .copied()
+                .map(|x| x as f32 / 255.0)
+                .collect();
+            pw = (f_pw[start..end])
+                .iter()
+                .copied()
+                .map(|x| x as f32 / 255.0)
+                .collect();
         }
-        let ip: Vec<f32> = ip.iter().map(|x| *x as f32 / 255.0).collect();
-        let pw: Vec<f32> = pw.iter().map(|x| *x as f32 / 255.0).collect();
+        //let ip: Vec<f32> = ip.iter().map(|x| *x as f32 / 255.0).collect();
+        //let pw: Vec<f32> = pw.iter().map(|x| *x as f32 / 255.0).collect();
         let mut data_window = vec![];
         data_window.extend(hot_one);
         data_window.extend(ip);
