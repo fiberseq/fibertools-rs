@@ -117,11 +117,16 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     // update the ML tag with new data
     let new_ml: Vec<u8> = predictions
         .iter()
-        .map(|&x| (x * 256.0 - 1.0).ceil())
+        .map(
+            //|&x| (x * 256.0 - 1.0).ceil()
+            |&x| -10.0 * (1.0 - x).log2(),
+        )
         .map(|x| {
             if x < 0.0 {
                 log::trace!("{:?}", x);
                 0.0
+            } else if x > 255.0 {
+                255.0
             } else {
                 x
             }
@@ -168,10 +173,9 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
         if !((*base == b'A') || (*base == b'T')) {
             continue;
         }
-
-        // get the number of leading As and Ts for MM tag and skip
+        // get the data window
         let data_window = if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
-            // make fake data
+            // make fake data for leading and trailing As
             vec![0.0; window * 6]
         } else {
             let start = pos - extend;
@@ -227,6 +231,7 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
     let a_predict = apply_model(&a_windows, a_count, cnn);
     assert_eq!(a_predict.len(), a_count);
     add_mm_ml(record, &a_predict, "A+a", keep);
+
     let t_predict = apply_model(&t_windows, t_count, cnn);
     assert_eq!(t_predict.len(), t_count);
     add_mm_ml(record, &t_predict, "T-a", keep);
