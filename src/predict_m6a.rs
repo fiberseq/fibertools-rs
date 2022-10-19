@@ -85,18 +85,8 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
         .iter()
         .map(
             //|&x| (x * 256.0 - 1.0).ceil()
-            |&x| (-5.0 * (1.0 - x).log10()).ceil(),
+            |&x| (-20.0 * (1.0 - x).log10()).floor(),
         )
-        .map(|x| {
-            if x < 0.0 {
-                log::trace!("{:?}", x);
-                0.0
-            } else if x > 255.0 {
-                255.0
-            } else {
-                x
-            }
-        })
         .map(|x| x as u8)
         .collect();
     log::trace!(
