@@ -119,7 +119,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
         .iter()
         .map(
             //|&x| (x * 256.0 - 1.0).ceil()
-            |&x| (1.0 - x).log2(),
+            |&x| -1.0 * (1.0 - x).log2(),
         )
         .map(|x| {
             if x < 0.0 {
