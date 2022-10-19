@@ -46,6 +46,18 @@ fn get_saved_pytorch_model() -> &'static tch::CModule {
     })
 }
 
+/// ```
+/// use fibertools_rs::predict_m6a::hot_one_dna;
+/// let x: Vec<u8> = vec![b'A', b'G', b'T', b'C', b'A'];
+/// let ho = hot_one_dna(&x);
+/// let e: Vec<f32> = vec![
+///                          1.0, 0.0, 0.0, 0.0, 1.0,
+///                          0.0, 0.0, 0.0, 1.0, 0.0,
+///                          0.0, 1.0, 0.0, 0.0, 0.0,
+///                          0.0, 0.0, 1.0, 0.0, 0.0
+///                         ];
+/// assert_eq!(ho, e);
+/// ```
 pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
     let len = seq.len() * 4;
     let mut out = vec![0.0; len];
@@ -61,13 +73,7 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
 }
 
 // TODO make it extend existing results instead of replacing even if MM ML is already there
-pub fn add_mm_ml(
-    record: &mut bam::Record,
-    starting_basemod: usize,
-    predictions: &Vec<f32>,
-    base_mod: &str,
-    keep: bool,
-) {
+pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &str, keep: bool) {
     if predictions.is_empty() {
         return;
     }
@@ -92,8 +98,8 @@ pub fn add_mm_ml(
     }
 
     // update the MM tag with new data
-    let mut new_mm = format!("{},{}", base_mod, starting_basemod);
-    for _i in 0..(predictions.len() - 1) {
+    let mut new_mm = base_mod.to_string();
+    for _i in 0..predictions.len() {
         new_mm.push_str(",0")
     }
     new_mm.push(';');
@@ -154,8 +160,6 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
         .collect::<Vec<_>>();
     let seq = record.seq().as_bytes();
     assert_eq!(f_ip.len(), seq.len());
-    let mut leading_a_count = 0;
-    let mut leading_t_count = 0;
     let mut a_count = 0;
     let mut t_count = 0;
     let mut a_windows = vec![];
@@ -164,60 +168,53 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
         if !((*base == b'A') || (*base == b'T')) {
             continue;
         }
-        // get the number of leading As and Ts for MM tag and skip
-        if pos < extend {
-            if *base == b'A' {
-                leading_a_count += 1;
-            } else {
-                leading_t_count += 1;
-            }
-            continue;
-        }
-        // skip if we are at the end
-        if pos + extend + 1 > record.seq_len() {
-            continue;
-        }
 
-        let start = pos - extend;
-        let end = pos + extend + 1;
-        let ip: Vec<f32>;
-        let pw: Vec<f32>;
-        let hot_one;
-        if *base == b'A' {
-            let w_seq = &revcomp(&seq[start..end]);
-            hot_one = hot_one_dna(w_seq);
-            ip = (r_ip[start..end])
-                .iter()
-                .copied()
-                .rev()
-                .map(|x| x as f32 / 255.0)
-                .collect();
-            pw = (r_pw[start..end])
-                .iter()
-                .copied()
-                .rev()
-                .map(|x| x as f32 / 255.0)
-                .collect();
+        // get the number of leading As and Ts for MM tag and skip
+        let data_window = if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
+            // make fake data
+            vec![0.0; window * 6]
         } else {
-            let w_seq = &seq[start..end];
-            hot_one = hot_one_dna(w_seq);
-            ip = (f_ip[start..end])
-                .iter()
-                .copied()
-                .map(|x| x as f32 / 255.0)
-                .collect();
-            pw = (f_pw[start..end])
-                .iter()
-                .copied()
-                .map(|x| x as f32 / 255.0)
-                .collect();
-        }
-        //let ip: Vec<f32> = ip.iter().map(|x| *x as f32 / 255.0).collect();
-        //let pw: Vec<f32> = pw.iter().map(|x| *x as f32 / 255.0).collect();
-        let mut data_window = vec![];
-        data_window.extend(hot_one);
-        data_window.extend(ip);
-        data_window.extend(pw);
+            let start = pos - extend;
+            let end = pos + extend + 1;
+            let ip: Vec<f32>;
+            let pw: Vec<f32>;
+            let hot_one;
+            if *base == b'A' {
+                let w_seq = &revcomp(&seq[start..end]);
+                hot_one = hot_one_dna(w_seq);
+                ip = (r_ip[start..end])
+                    .iter()
+                    .copied()
+                    .rev()
+                    .map(|x| x as f32 / 255.0)
+                    .collect();
+                pw = (r_pw[start..end])
+                    .iter()
+                    .copied()
+                    .rev()
+                    .map(|x| x as f32 / 255.0)
+                    .collect();
+            } else {
+                let w_seq = &seq[start..end];
+                hot_one = hot_one_dna(w_seq);
+                ip = (f_ip[start..end])
+                    .iter()
+                    .copied()
+                    .map(|x| x as f32 / 255.0)
+                    .collect();
+                pw = (f_pw[start..end])
+                    .iter()
+                    .copied()
+                    .map(|x| x as f32 / 255.0)
+                    .collect();
+            }
+            let mut data_window = vec![];
+            data_window.extend(hot_one);
+            data_window.extend(ip);
+            data_window.extend(pw);
+            data_window
+        };
+
         // add to data windows and record positions
         if *base == b'A' {
             a_windows.extend(data_window);
@@ -229,10 +226,10 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
     }
     let a_predict = apply_model(&a_windows, a_count, cnn);
     assert_eq!(a_predict.len(), a_count);
-    add_mm_ml(record, leading_a_count, &a_predict, "A+a", keep);
+    add_mm_ml(record, &a_predict, "A+a", keep);
     let t_predict = apply_model(&t_windows, t_count, cnn);
     assert_eq!(t_predict.len(), t_count);
-    add_mm_ml(record, leading_t_count, &t_predict, "T-a", keep);
+    add_mm_ml(record, &t_predict, "T-a", keep);
 }
 
 fn apply_model(windows: &Vec<f32>, count: usize, cnn: bool) -> Vec<f32> {
