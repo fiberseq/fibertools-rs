@@ -39,7 +39,9 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
 }
 
 pub fn ml_score_transform(x: f32) -> f32 {
-    (x / (1.0 - x)).log2()
+    // logit
+    //(x / (1.0 - x)).log2()
+    x
 }
 
 // TODO make it extend existing results instead of replacing even if MM ML is already there
@@ -84,15 +86,8 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     //log::info!("{} {}", min, max);
 
     // update the ML tag with new data
-    // log transform
-    // .map(|x| -3.0 * (1.0 - x).log10() )
-
-    // arcsinh
-    // .map(|x|  200.0*(x + (x*x + 1.0).sqrt()).log2() )
     let min_allowed: f32 = 0.3;
     let max_allowed: f32 = 0.99999;
-    // X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
-    // X_scaled = X_std * (max - min) + min
     let t_min = ml_score_transform(min_allowed);
     let t_max = ml_score_transform(max_allowed);
     let new_ml: Vec<u8> = predictions
