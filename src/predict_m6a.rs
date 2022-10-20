@@ -16,7 +16,7 @@ use std::env::var;
 
 lazy_static! {
     static ref ML_MIN: f32 = var("ML_MIN")
-        .unwrap_or_else(|_| "0.2".to_string())
+        .unwrap_or_else(|_| "0.3".to_string())
         .parse()
         .unwrap_or(0.2);
     static ref ML_MAX: f32 = var("ML_MAX")
