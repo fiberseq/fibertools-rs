@@ -73,12 +73,11 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     let aux_integer_field = Aux::String(&mm_tag);
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
-    /*
-    let sum: f32 = predictions.iter().sum();
-    let min = predictions.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-    let max = predictions.iter().fold(-1.0, |a: f32, &b| a.max(b));
-    log::trace!("{} {} {} {}", sum / predictions.len() as f32, sum, min, max);
-     */
+    //let sum: f32 = predictions.iter().sum();
+    //let min = predictions.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+    //let max = predictions.iter().fold(-1.0, |a: f32, &b| a.max(b));
+    //log::info!("{} {} {} {}", sum / predictions.len() as f32, sum, min, max);
+    //log::info!("{} {}", min, max);
 
     // update the ML tag with new data
     // log transform
@@ -86,19 +85,27 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
 
     // arcsinh
     // .map(|x|  200.0*(x + (x*x + 1.0).sqrt()).log2() )
+    let min_allowed: f32 = 0.0000001;
+    let max_allowed: f32 = 0.9999;
+    // X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
+    // X_scaled = X_std * (max - min) + min
+    let logit_min = (min_allowed / (1.0 - min_allowed)).log2();
+    let logit_max = (max_allowed / (1.0 - max_allowed)).log2();
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| {
-            if x > 1.0 {
-                1.0
-            } else if x < 0.0 {
-                0.0
+            if x > max_allowed {
+                //log::info!("{}", x);
+                max_allowed
+            } else if x < min_allowed {
+                //log::info!("{}", x);
+                min_allowed
             } else {
                 x
             }
         })
         // logit
-        .map(|x| 255.0 / 2.0 + 20.0 * (x / (1.0 - x)).log2())
+        .map(|x| 255.0 * ((x / (1.0 - x)).log2() - logit_min) / (logit_max - logit_min))
         .map(|x| x as u8)
         .collect();
     log::trace!(
