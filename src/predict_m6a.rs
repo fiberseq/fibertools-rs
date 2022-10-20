@@ -83,10 +83,16 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     // update the ML tag with new data
     let new_ml: Vec<u8> = predictions
         .iter()
-        .map(
-            //|&x| (x * 256.0 - 1.0).ceil()
-            |&x| -9.0 * (1.0 - x).log10(),
-        )
+        .map(|&x| {
+            if x > 1.0 {
+                1.0
+            } else if x < 0.0 {
+                0.0
+            } else {
+                x
+            }
+        })
+        .map(|x| -10.0 * (1.0 - x).log10())
         .map(|x| x as u8)
         .collect();
     log::trace!(
