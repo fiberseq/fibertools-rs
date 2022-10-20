@@ -85,8 +85,8 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     //log::info!("{} {}", min, max);
 
     // update the ML tag with new data
-    let min_allowed: f32 = 0.4; // set at about 1% FDR
-    let max_allowed: f32 = 0.99999; // values above this are nearly always positive.
+    let min_allowed: f32 = 0.4; // set at about 0.1% FDR
+    let max_allowed: f32 = 0.9999; // values above this are nearly always positive.
     let t_min = ml_score_transform(min_allowed);
     let t_max = ml_score_transform(max_allowed);
     let new_ml: Vec<u8> = predictions
