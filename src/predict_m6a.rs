@@ -98,7 +98,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
             }
         })
         // logit
-        .map(|x| 255.0 / 2.0 + (x / (1.0 - x)).log2())
+        .map(|x| 255.0 / 2.0 + 20.0 * (x / (1.0 - x)).log2())
         .map(|x| x as u8)
         .collect();
     log::trace!(
