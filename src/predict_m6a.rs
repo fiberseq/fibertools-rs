@@ -3,6 +3,7 @@ use super::ml_models::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
+use lazy_static::lazy_static;
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -11,6 +12,18 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
+use std::env::var;
+
+lazy_static! {
+    static ref ML_MIN: f32 = var("ML_MIN")
+        .unwrap_or_else(|_| "0.2".to_string())
+        .parse()
+        .unwrap_or(0.2);
+    static ref ML_MAX: f32 = var("ML_MAX")
+        .unwrap_or_else(|_| "0.99".to_string())
+        .parse()
+        .unwrap_or(0.99);
+}
 
 /// ```
 /// use fibertools_rs::predict_m6a::hot_one_dna;
@@ -85,8 +98,8 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     //log::info!("{} {}", min, max);
 
     // update the ML tag with new data
-    let min_allowed: f32 = 0.6; // set at about 0.1% FDR
-    let max_allowed: f32 = 0.99; // if I dont set this low enough than the 255 value is basically never reached with scaling
+    let min_allowed: f32 = *ML_MIN; // set at about 0.1% FDR
+    let max_allowed: f32 = *ML_MAX; // if I dont set this low enough than the 255 value is basically never reached with scaling
     let t_min = ml_score_transform(min_allowed);
     let t_max = ml_score_transform(max_allowed);
     let new_ml: Vec<u8> = predictions
