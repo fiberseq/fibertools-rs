@@ -18,11 +18,11 @@ lazy_static! {
     static ref ML_MIN: f32 = var("ML_MIN")
         .unwrap_or_else(|_| "0.4".to_string())
         .parse()
-        .unwrap_or(0.2);
+        .expect("ML_MIN must be a float!");
     static ref ML_MAX: f32 = var("ML_MAX")
-        .unwrap_or_else(|_| "0.95".to_string())
+        .unwrap_or_else(|_| "0.991".to_string())
         .parse()
-        .unwrap_or(0.99);
+        .expect("ML_MAX must be a float!");
 }
 
 /// ```
