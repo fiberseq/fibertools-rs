@@ -92,7 +92,11 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
                 x
             }
         })
-        .map(|x| -3.0 * (1.0 - x).log10())
+        .map(|x|
+        // log transform
+        // -3.0 * (1.0 - x).log10()
+        // arcsinh * constant
+            200.0*(x + (x*x + 1.0).sqrt()).log2())
         .map(|x| x as u8)
         .collect();
     log::trace!(
