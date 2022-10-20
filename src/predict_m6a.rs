@@ -81,6 +81,10 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
      */
 
     // update the ML tag with new data
+    // log transform
+    //    -3.0 * (1.0 - x).log10()
+    // arcsinh * constant
+    //    200.0*(x + (x*x + 1.0).sqrt()).log2())
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| {
@@ -92,11 +96,8 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
                 x
             }
         })
-        .map(|x|
-        // log transform
-        // -3.0 * (1.0 - x).log10()
-        // arcsinh * constant
-            200.0*(x + (x*x + 1.0).sqrt()).log2())
+        // logit
+        .map(|x| 255.0 / 2.0 * (x / (1.0 - x)).log2())
         .map(|x| x as u8)
         .collect();
     log::trace!(
