@@ -105,7 +105,9 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
             }
         })
         // logit
-        .map(|x| 255.0 * ((x / (1.0 - x)).log2() - t_min) / (t_max - t_min))
+        .map(|x| (x / (1.0 - x)).log2())
+        // scale between 0 and 255.0
+        .map(|x| 255.0 * (x - t_min) / (t_max - t_min))
         .map(|x| x.round() as u8)
         .collect();
     log::trace!(
