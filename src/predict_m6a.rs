@@ -86,7 +86,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     // arcsinh
     // .map(|x|  200.0*(x + (x*x + 1.0).sqrt()).log2() )
     let min_allowed: f32 = 0.01;
-    let max_allowed: f32 = 0.9999;
+    let max_allowed: f32 = 0.99;
     // X_std = (X - X.min(axis=0)) / (X.max(axis=0) - X.min(axis=0))
     // X_scaled = X_std * (max - min) + min
     let logit_min = (min_allowed / (1.0 - min_allowed)).log2();
