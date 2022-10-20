@@ -83,6 +83,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     // update the ML tag with new data
     // log transform
     // .map(|x| -3.0 * (1.0 - x).log10() )
+
     // arcsinh
     // .map(|x|  200.0*(x + (x*x + 1.0).sqrt()).log2() )
     let new_ml: Vec<u8> = predictions
