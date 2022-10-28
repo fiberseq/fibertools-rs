@@ -25,6 +25,7 @@ ref_msp_starts
 ref_msp_lengths
 m6a
 ref_m6a
+m6a_qual
 5mC
 ref_5mC
 ```

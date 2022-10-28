@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+echo $LIBTORCH
+#echo $LD_LIBRARY_PATH
+#echo $DYLD_LIBRARY_PATH
+#export LIBTORCH=/Users/mrvollger/lib/libtorch_1.12.0
+export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+
 for subcommand in "" "extract" "center"; do
     echo $subcommand
     out="docs/ft-${subcommand}-help.md"

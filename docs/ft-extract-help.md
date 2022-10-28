@@ -1,5 +1,5 @@
 ```
-ft-extract 0.0.6-alpha.1
+ft-extract 0.0.7
 Extract fiberseq data into plain text files
 
 USAGE:
@@ -12,8 +12,14 @@ OPTIONS:
     -r, --reference
             report in reference sequence coordinates
 
+    -s, --simplify
+            simplify output by remove fiber sequence
+
+    -q, --quality
+            include per base quality scores in "fiber_qual"
+
     -m, --min-ml-score <MIN_ML_SCORE>
-            Minium score in the ML tag to include in the output [default: 20]
+            Minium score in the ML tag to include in the output [default: 150]
 
         --m6a <M6A>
             Output path for m6a bed12
