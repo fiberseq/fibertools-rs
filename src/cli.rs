@@ -43,6 +43,12 @@ pub enum Commands {
         /// report in reference sequence coordinates.
         #[clap(short, long)]
         reference: bool,
+        /// simplify output by remove fiber sequence
+        #[clap(short, long)]
+        simplify: bool,
+        /// include per base quality scores in "fiber_qual"
+        #[clap(short, long)]
+        quality: bool,
         /// Minium score in the ML tag to include in the output.
         #[clap(short, long, default_value = "150")]
         min_ml_score: u8,

@@ -461,17 +461,19 @@ impl FiberseqData {
             None
         }
     }
-    pub fn all_header() -> String {
-        format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-            "ct",
-            "st",
-            "en",
-            "fiber",
-            "score",
-            "strand",
-            "fiber_length",
-            "fiber_sequence",
+    pub fn all_header(simplify: bool, quality: bool) -> String {
+        let mut x = format!(
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "ct", "st", "en", "fiber", "score", "strand", "fiber_length",
+        );
+        if !simplify {
+            x.push_str("fiber_sequence\t")
+        }
+        if quality {
+            x.push_str("fiber_qual\t")
+        }
+        x.push_str(&format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ec",
             "rq",
             "total_AT_bp",
@@ -492,10 +494,11 @@ impl FiberseqData {
             "m6a_qual",
             "5mC",
             "ref_5mC",
-        )
+        ));
+        x
     }
 
-    pub fn write_all(&self, head_view: &HeaderView) -> String {
+    pub fn write_all(&self, head_view: &HeaderView, simplify: bool, quality: bool) -> String {
         // PB features
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;
@@ -552,26 +555,41 @@ impl FiberseqData {
 
         // write the features
         let mut rtn = String::with_capacity(0);
-        // add bed 6
+        // add first things 7
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t",
-            ct, start, end, name, score, strand
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            ct, start, end, name, score, strand, q_len
         ))
         .unwrap();
+        // add sequence
+        if !simplify {
+            rtn.write_fmt(format_args!(
+                "{}\t",
+                String::from_utf8_lossy(&self.record.seq().as_bytes()),
+            ))
+            .unwrap();
+        }
+        if quality {
+            // TODO add quality offset
+            rtn.write_fmt(format_args!(
+                "{}\t",
+                String::from_utf8_lossy(
+                    &self
+                        .record
+                        .qual()
+                        .iter()
+                        .map(|x| x + 33)
+                        .collect::<Vec<u8>>()
+                ),
+            ))
+            .unwrap();
+        }
         // add PB features
         let total_nuc_bp = nuc_lengths.iter().sum::<i64>();
         let total_msp_bp = msp_lengths.iter().sum::<i64>();
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            q_len,
-            String::from_utf8_lossy(&self.record.seq().as_bytes()),
-            self.ec,
-            rq,
-            at_count,
-            m6a_count,
-            total_nuc_bp,
-            total_msp_bp,
-            cpg_count
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
         ))
         .unwrap();
         // add fiber features
@@ -678,19 +696,17 @@ impl FiberseqData {
 pub fn process_bam_chunk(
     records: &Vec<bam::Record>,
     so_far: usize,
-    reference: bool,
-    min_ml_score: u8,
-    out_files: &mut FiberOutFiles,
+    out_files: &mut FiberOut,
     head_view: &HeaderView,
 ) {
     let start = Instant::now();
-    let mut fiber_data = FiberseqData::from_records(records, min_ml_score);
+    let mut fiber_data = FiberseqData::from_records(records, out_files.min_ml_score);
 
     match &mut out_files.m6a {
         Some(m6a) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_m6a(reference, head_view))
+                .map(|r| r.write_m6a(out_files.reference, head_view))
                 .collect();
             for line in out {
                 write_to_file(&line, m6a);
@@ -702,7 +718,7 @@ pub fn process_bam_chunk(
         Some(cpg) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_cpg(reference, head_view))
+                .map(|r| r.write_cpg(out_files.reference, head_view))
                 .collect();
             for line in out {
                 write_to_file(&line, cpg);
@@ -714,7 +730,7 @@ pub fn process_bam_chunk(
         Some(msp) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_msp(reference, head_view))
+                .map(|r| r.write_msp(out_files.reference, head_view))
                 .collect();
             for line in out {
                 write_to_file(&line, msp);
@@ -726,7 +742,7 @@ pub fn process_bam_chunk(
         Some(nuc) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_nuc(reference, head_view))
+                .map(|r| r.write_nuc(out_files.reference, head_view))
                 .collect();
             for line in out {
                 write_to_file(&line, nuc);
@@ -738,7 +754,7 @@ pub fn process_bam_chunk(
         Some(all) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_all(head_view))
+                .map(|r| r.write_all(head_view, out_files.simplify, out_files.quality))
                 .collect();
             for line in out {
                 write_to_file(&line, all);
@@ -759,19 +775,19 @@ pub fn process_bam_chunk(
     );
 }
 
-pub fn extract_contained(
-    bam: &mut bam::Reader,
-    reference: bool,
-    min_ml_score: u8,
-    mut out_files: FiberOutFiles,
-) {
+pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
     let header = bam::Header::from_template(bam.header());
     let head_view = bam::HeaderView::from_header(&header);
 
     // print the header if in all mode
     match &mut out_files.all {
         Some(all) => {
-            write!(all, "{}", FiberseqData::all_header()).unwrap();
+            write!(
+                all,
+                "{}",
+                FiberseqData::all_header(out_files.simplify, out_files.quality)
+            )
+            .unwrap();
         }
         None => {}
     }
@@ -788,26 +804,12 @@ pub fn extract_contained(
         cur_vec.push(record);
         cur_count += 1;
         if cur_count == bin_size {
-            process_bam_chunk(
-                &cur_vec,
-                proccesed_reads,
-                reference,
-                min_ml_score,
-                &mut out_files,
-                &head_view,
-            );
+            process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
             proccesed_reads += cur_vec.len();
             cur_vec.clear();
             cur_count = 0;
         }
     }
     // clear any unprocessed recs not big enough to make a full chunk
-    process_bam_chunk(
-        &cur_vec,
-        proccesed_reads,
-        reference,
-        min_ml_score,
-        &mut out_files,
-        &head_view,
-    );
+    process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
 }

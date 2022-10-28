@@ -99,17 +99,17 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
 
     // update the ML tag with new data
     let min_allowed: f32 = *ML_MIN; // set at about 0.1% FDR
-    let max_allowed: f32 = *ML_MAX; // if I dont set this low enough than the 255 value is basically never reached with scaling
-    let t_min = ml_score_transform(min_allowed);
-    let t_max = ml_score_transform(max_allowed);
-    let new_ml: Vec<u8> = predictions
+    let max_allowed: f32 = *ML_MAX;
+    let rescaled_min = 0.001;
+    let rescaled_max = 0.999;
+    let t_min = ml_score_transform(rescaled_min);
+    let t_max = ml_score_transform(rescaled_max);
+    let _new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| {
             if x > max_allowed {
-                //log::info!("{}", x);
                 max_allowed
             } else if x < min_allowed {
-                //log::info!("{}", x);
                 min_allowed
             } else {
                 x
@@ -120,6 +120,22 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
         .map(|x| 255.0 * (x - t_min) / (t_max - t_min))
         .map(|x| x.round() as u8)
         .collect();
+
+    let min_score = 0.5;
+    let new_ml: Vec<u8> = predictions
+        .iter()
+        .map(|&x| {
+            if x > 1.0 {
+                1.0
+            } else if x < min_score {
+                0.0
+            } else {
+                x
+            }
+        })
+        .map(|x| x.round() as u8)
+        .collect();
+
     log::trace!(
         "{}",
         new_ml.iter().map(|&x| x as f64).sum::<f64>() / (new_ml.len() as f64)

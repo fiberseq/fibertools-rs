@@ -6,6 +6,7 @@ pub mod extract;
 pub mod ml_models;
 pub mod predict_m6a;
 use anyhow::Result;
+use rust_htslib::{bam, bam::Read};
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
@@ -50,21 +51,42 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
     let buffer = get_output(Some(path))?; //.expect("Error: cannot create output file");
     Ok(buffer)
 }
-pub struct FiberOutFiles {
+
+/// Open bam file
+pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
+    let mut bam = if bam == "-" {
+        bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
+    } else {
+        bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+    };
+    bam.set_threads(threads).unwrap();
+    bam
+}
+
+pub struct FiberOut {
     pub m6a: Option<Box<dyn Write>>,
     pub cpg: Option<Box<dyn Write>>,
     pub msp: Option<Box<dyn Write>>,
     pub nuc: Option<Box<dyn Write>>,
     pub all: Option<Box<dyn Write>>,
+    pub reference: bool,
+    pub simplify: bool,
+    pub quality: bool,
+    pub min_ml_score: u8,
 }
 
-impl FiberOutFiles {
+impl FiberOut {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         m6a: &Option<String>,
         cpg: &Option<String>,
         msp: &Option<String>,
         nuc: &Option<String>,
         all: &Option<String>,
+        reference: bool,
+        simplify: bool,
+        quality: bool,
+        min_ml_score: u8,
     ) -> Result<Self> {
         let m6a = match m6a {
             Some(m6a) => Some(writer(m6a)?),
@@ -86,12 +108,16 @@ impl FiberOutFiles {
             Some(all) => Some(writer(all)?),
             None => None,
         };
-        Ok(FiberOutFiles {
+        Ok(FiberOut {
             m6a,
             cpg,
             msp,
             nuc,
             all,
+            reference,
+            simplify,
+            quality,
+            min_ml_score,
         })
     }
 }
@@ -115,7 +141,6 @@ pub fn write_to_stdout(out: &str) {
 
 // This is a bam chunk reader
 use colored::Colorize;
-use rust_htslib::bam;
 use std::time::Instant;
 
 struct BamChunk<'a> {
