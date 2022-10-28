@@ -46,6 +46,8 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Extract {
             bam,
             reference,
+            simplify,
+            quality,
             min_ml_score,
             m6a,
             cpg,
@@ -54,14 +56,19 @@ pub fn main() -> Result<(), Error> {
             all,
         }) => {
             // read in the bam from stdin or from a file
-            let mut bam = if bam == "-" {
-                bam::Reader::from_stdin().unwrap()
-            } else {
-                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-            };
-            bam.set_threads(args.threads).unwrap();
-            let out_files = FiberOutFiles::new(m6a, cpg, msp, nuc, all)?;
-            extract::extract_contained(&mut bam, *reference, *min_ml_score, out_files);
+            let mut bam = fibertools_rs::bam_reader(bam, args.threads);
+            let out_files = FiberOut::new(
+                m6a,
+                cpg,
+                msp,
+                nuc,
+                all,
+                *reference,
+                *simplify,
+                *quality,
+                *min_ml_score,
+            )?;
+            extract::extract_contained(&mut bam, out_files);
         }
         Some(Commands::Center {
             bam,
@@ -81,19 +88,13 @@ pub fn main() -> Result<(), Error> {
             keep,
             cnn,
         }) => {
-            let mut bam = if bam == "-" {
-                bam::Reader::from_stdin().unwrap()
-            } else {
-                bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-            };
+            let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
             let mut out = if out == "-" {
                 bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
             } else {
                 bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
             };
-
-            bam.set_threads(args.threads).unwrap();
             out.set_threads(args.threads).unwrap();
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep, *cnn);
         }
