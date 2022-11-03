@@ -82,6 +82,7 @@ pub fn main() -> Result<(), Error> {
             let center_positions = center::read_center_positions(bed)?;
             center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
         }
+        #[cfg(feature = "predict")]
         Some(Commands::PredictM6A {
             bam,
             out,
