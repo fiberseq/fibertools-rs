@@ -85,7 +85,6 @@ pub enum Commands {
         wide: bool,
     },
     /// Predict m6A positions using HiFi kinetics data.
-    #[cfg(feature = "predict")]
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
         /// HiFi file with kinetics.

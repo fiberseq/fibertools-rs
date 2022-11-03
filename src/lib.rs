@@ -2,11 +2,12 @@
 pub mod bamlift;
 pub mod center;
 pub mod cli;
+#[cfg(feature = "cnn")]
+pub mod cnn;
 pub mod extract;
-#[cfg(feature = "predict")]
 pub mod ml_models;
-#[cfg(feature = "predict")]
 pub mod predict_m6a;
+
 use anyhow::Result;
 use rust_htslib::{bam, bam::Read};
 use std::fs::File;

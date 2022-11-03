@@ -35,4 +35,4 @@ tch = {version = "0.8.0", optional = true}
 tempfile = "3.3.0"
 
 [features]
-predict = ["dep:tch"]
+cnn = ["dep:tch"]

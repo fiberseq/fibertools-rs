@@ -250,10 +250,6 @@ pub fn read_bam_into_fiberdata(
     keep: bool,
     cnn: bool,
 ) {
-    // call this once before we start anything in parallel threads just in case
-    let _gbdt_model = get_saved_gbdt_model();
-    let _pt_model = get_saved_pytorch_model();
-
     // read in bam data
     let chunk_size = current_num_threads() * 200;
     let bam_chunk_iter = BamChunk {
