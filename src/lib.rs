@@ -5,11 +5,13 @@ pub mod cli;
 #[cfg(feature = "cnn")]
 pub mod cnn;
 pub mod extract;
-pub mod ml_models;
 pub mod predict_m6a;
+pub mod xgb;
 
 use anyhow::Result;
+use lazy_static::lazy_static;
 use rust_htslib::{bam, bam::Read};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
@@ -182,4 +184,52 @@ impl<'a> Iterator for BamChunk<'a> {
             Some(cur_vec)
         }
     }
+}
+
+pub fn find_pb_polymerase(header: &bam::Header) -> f32 {
+    lazy_static! {
+        static ref CHEMISTRY_MAP: HashMap<String, f32> = HashMap::from([
+            // regular 2.0
+            ("101-789-500".to_string(), 2.0),
+            // this is actually 2.1 we didn't have training data for it
+            ("101-820-500".to_string(), 2.0),
+            // regular 2.2
+            ("101-894-200".to_string(), 2.2),
+            // is really 3.1 but has polymerase of 2.1, and we need to make that 2.0
+            ("102-194-200".to_string(), 2.0),
+            // is really 3.2 but has polymerase of 2.2
+            ("102-194-100".to_string(), 2.2),
+            // Revio has kinetics most similar to 2.2
+            ("102-739-100".to_string(), 2.2)
+        ]);
+    }
+    lazy_static! {
+        static ref MM_DS: regex::Regex =
+            regex::Regex::new(r".*READTYPE=([^;]+);.*BINDINGKIT=([^;]+);").unwrap();
+    }
+    let z = header.to_hashmap();
+    let rg = &z["RG"];
+    let mut read_type = "";
+    let mut binding_kit = "";
+    for tag in rg {
+        for (tag, val) in tag {
+            if tag == "DS" {
+                for cap in MM_DS.captures_iter(val) {
+                    read_type = cap.get(1).map_or("", |m| m.as_str());
+                    binding_kit = cap.get(2).map_or("", |m| m.as_str());
+                }
+            }
+        }
+    }
+    // make sure read-type is CCS
+    assert_eq!(read_type, "CCS");
+    // grab chemistry
+    let chemistry = CHEMISTRY_MAP.get(binding_kit).unwrap_or_else(|| {
+        log::warn!(
+            "Polymerase for BINDINGKIT={} not found. Defaulting to ML model made with 2.2",
+            binding_kit
+        );
+        &2.2
+    });
+    *chemistry
 }

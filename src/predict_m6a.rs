@@ -1,5 +1,4 @@
 use super::extract;
-use super::ml_models::*;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
@@ -240,9 +239,22 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
     add_mm_ml(record, &t_predict, "T-a", keep);
 }
 
-//fn get_model() -> Booster {
-//xgboost::Booster::load("models/xgboost.0.81.bin").expect("failed to loaf model")
-//}
+enum WhichML {
+    Xgb,
+    #[cfg(feature = "cnn")]
+    Cnn,
+}
+pub fn apply_model(windows: &[f32], count: usize, _cnn: bool) -> Vec<f32> {
+    let _which_ml = WhichML::Xgb;
+    #[cfg(feature = "cnn")]
+    let _which_ml = if _cnn { WhichML::Cnn } else { WhichML::Xgb };
+
+    match _which_ml {
+        WhichML::Xgb => xgb::predict_with_xgb(windows, count),
+        #[cfg(feature = "cnn")]
+        WhichML::Cnn => cnn::predict_with_cnn(windows, count),
+    }
+}
 
 pub fn read_bam_into_fiberdata(
     bam: &mut bam::Reader,
