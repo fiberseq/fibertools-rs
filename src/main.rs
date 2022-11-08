@@ -90,6 +90,7 @@ pub fn main() -> Result<(), Error> {
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
+            let _polymerase = find_pb_polymerase(&header);
             let mut out = if out == "-" {
                 bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
             } else {
