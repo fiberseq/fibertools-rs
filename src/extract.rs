@@ -630,6 +630,11 @@ impl FiberseqData {
         lengths: &[i64],
         head_view: &HeaderView,
     ) -> String {
+        // skip if no alignments are here
+        if self.record.is_unmapped() && reference {
+            return "".to_string();
+        }
+
         let ct;
         let start;
         let end;
