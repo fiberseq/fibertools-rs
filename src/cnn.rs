@@ -1,3 +1,4 @@
+use super::PbChem;
 use spin;
 use std::fs;
 use tch;
@@ -6,7 +7,7 @@ use tch;
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static PT: &[u8] = include_bytes!("../models/m6ANet_PS00075.best.torch.pt");
 
-pub fn get_saved_pytorch_model() -> &'static tch::CModule {
+pub fn get_saved_pytorch_model(_polyermase: &PbChem) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, PT).expect("Unable to write file");
@@ -17,8 +18,8 @@ pub fn get_saved_pytorch_model() -> &'static tch::CModule {
     })
 }
 
-pub fn predict_with_cnn(windows: &[f32], count: usize) -> Vec<f32> {
-    let model = get_saved_pytorch_model();
+pub fn predict_with_cnn(windows: &[f32], count: usize, polyermase: &PbChem) -> Vec<f32> {
+    let model = get_saved_pytorch_model(polyermase);
     let ts = tch::Tensor::of_slice(windows);
     let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
     let x = model.forward_ts(&[ts]).unwrap();

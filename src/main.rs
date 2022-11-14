@@ -90,14 +90,14 @@ pub fn main() -> Result<(), Error> {
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
-            let _polymerase = find_pb_polymerase(&header);
+            let polymerase = find_pb_polymerase(&header);
             let mut out = if out == "-" {
                 bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
             } else {
                 bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
             };
             out.set_threads(args.threads).unwrap();
-            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, *keep, *cnn);
+            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &polymerase, *keep, *cnn);
         }
         None => {}
     };

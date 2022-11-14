@@ -186,21 +186,27 @@ impl<'a> Iterator for BamChunk<'a> {
     }
 }
 
-pub fn find_pb_polymerase(header: &bam::Header) -> f32 {
+#[derive(Clone)]
+pub enum PbChem {
+    Two,
+    TwoPointTwo,
+}
+
+pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     lazy_static! {
-        static ref CHEMISTRY_MAP: HashMap<String, f32> = HashMap::from([
+        static ref CHEMISTRY_MAP: HashMap<String, PbChem> = HashMap::from([
             // regular 2.0
-            ("101-789-500".to_string(), 2.0),
+            ("101-789-500".to_string(), PbChem::Two),
             // this is actually 2.1 we didn't have training data for it
-            ("101-820-500".to_string(), 2.0),
+            ("101-820-500".to_string(), PbChem::Two),
             // regular 2.2
-            ("101-894-200".to_string(), 2.2),
+            ("101-894-200".to_string(), PbChem::TwoPointTwo),
             // is really 3.1 but has polymerase of 2.1, and we need to make that 2.0
-            ("102-194-200".to_string(), 2.0),
+            ("102-194-200".to_string(), PbChem::Two),
             // is really 3.2 but has polymerase of 2.2
-            ("102-194-100".to_string(), 2.2),
+            ("102-194-100".to_string(), PbChem::TwoPointTwo),
             // Revio has kinetics most similar to 2.2
-            ("102-739-100".to_string(), 2.2)
+            ("102-739-100".to_string(), PbChem::TwoPointTwo)
         ]);
     }
     lazy_static! {
@@ -229,7 +235,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> f32 {
             "Polymerase for BINDINGKIT={} not found. Defaulting to ML model made with 2.2",
             binding_kit
         );
-        &2.2
+        &PbChem::TwoPointTwo
     });
-    *chemistry
+    chemistry.clone()
 }
