@@ -148,7 +148,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     log::trace!("MM:{:?}", mm_tag);
 }
 
-pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
+pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool, polymerase: &PbChem) {
     let window = 15;
     let extend = window / 2;
     let f_ip = extract::get_u8_tag(record, b"fi");
@@ -230,11 +230,11 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool) {
             t_count += 1;
         }
     }
-    let a_predict = apply_model(&a_windows, a_count, cnn);
+    let a_predict = apply_model(&a_windows, a_count, cnn, polymerase);
     assert_eq!(a_predict.len(), a_count);
     add_mm_ml(record, &a_predict, "A+a", keep);
 
-    let t_predict = apply_model(&t_windows, t_count, cnn);
+    let t_predict = apply_model(&t_windows, t_count, cnn, polymerase);
     assert_eq!(t_predict.len(), t_count);
     add_mm_ml(record, &t_predict, "T-a", keep);
 }
@@ -244,21 +244,22 @@ enum WhichML {
     #[cfg(feature = "cnn")]
     Cnn,
 }
-pub fn apply_model(windows: &[f32], count: usize, _cnn: bool) -> Vec<f32> {
+pub fn apply_model(windows: &[f32], count: usize, _cnn: bool, polymerase: &PbChem) -> Vec<f32> {
     let _which_ml = WhichML::Xgb;
     #[cfg(feature = "cnn")]
     let _which_ml = if _cnn { WhichML::Cnn } else { WhichML::Xgb };
 
     match _which_ml {
-        WhichML::Xgb => xgb::predict_with_xgb(windows, count),
+        WhichML::Xgb => xgb::predict_with_xgb(windows, count, polymerase),
         #[cfg(feature = "cnn")]
-        WhichML::Cnn => cnn::predict_with_cnn(windows, count),
+        WhichML::Cnn => cnn::predict_with_cnn(windows, count, polymerase),
     }
 }
 
 pub fn read_bam_into_fiberdata(
     bam: &mut bam::Reader,
     out: &mut bam::Writer,
+    polymerase: &PbChem,
     keep: bool,
     cnn: bool,
 ) {
@@ -280,7 +281,7 @@ pub fn read_bam_into_fiberdata(
         chunk
             .par_iter_mut()
             .progress_with_style(style)
-            .for_each(|r| predict_m6a(r, keep, cnn));
+            .for_each(|r| predict_m6a(r, keep, cnn, polymerase));
 
         // write to output
         chunk.iter().for_each(|r| out.write(r).unwrap());
