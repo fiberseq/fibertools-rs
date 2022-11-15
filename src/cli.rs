@@ -97,6 +97,9 @@ pub enum Commands {
         /// use cnn model
         #[clap(short, long)]
         cnn: bool,
+        /// Add a bam tag (mp) with the full floating point predictions of the ML model
+        #[clap(short, long)]
+        full_float: bool,
     },
 }
 

@@ -295,6 +295,15 @@ pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
     }
 }
 
+pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
+    if let Ok(Aux::ArrayFloat(array)) = record.aux(tag) {
+        let read_array = array.iter().collect::<Vec<_>>();
+        read_array
+    } else {
+        vec![]
+    }
+}
+
 pub struct FiberseqData {
     pub record: bam::Record,
     pub nuc: Vec<(i64, i64)>,

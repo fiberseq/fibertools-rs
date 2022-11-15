@@ -56,7 +56,12 @@ pub fn ml_score_transform(x: f32) -> f32 {
 }
 
 // TODO make it extend existing results instead of replacing even if MM ML is already there
-pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &str, keep: bool) {
+pub fn add_mm_ml(
+    record: &mut bam::Record,
+    predictions: &Vec<f32>,
+    base_mod: &str,
+    predict_options: &PredictOptions,
+) {
     if predictions.is_empty() {
         return;
     }
@@ -73,7 +78,7 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     // clear the existing data
     record.remove_aux(b"MM").unwrap_or(());
     record.remove_aux(b"ML").unwrap_or(());
-    if !keep {
+    if !predict_options.keep {
         record.remove_aux(b"fp").unwrap_or(());
         record.remove_aux(b"fi").unwrap_or(());
         record.remove_aux(b"rp").unwrap_or(());
@@ -144,11 +149,23 @@ pub fn add_mm_ml(record: &mut bam::Record, predictions: &Vec<f32>, base_mod: &st
     let aux_array_field = Aux::ArrayU8(aux_array);
     record.push_aux(b"ML", aux_array_field).unwrap();
 
+    // add full floating point values
+    if predict_options.full_float {
+        let mut pre_predict = extract::get_f32_tag(record, b"mp");
+        pre_predict.extend(predictions.iter());
+        // clean current tag
+        record.remove_aux(b"mp").unwrap_or(());
+        // add new tag
+        let aux_array: AuxArray<f32> = (&pre_predict).into();
+        let aux_array_field = Aux::ArrayFloat(aux_array);
+        record.push_aux(b"mp", aux_array_field).unwrap();
+    }
+
     log::trace!("ML:{:?}", ml_tag);
     log::trace!("MM:{:?}", mm_tag);
 }
 
-pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool, polymerase: &PbChem) {
+pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     let window = 15;
     let extend = window / 2;
     let f_ip = extract::get_u8_tag(record, b"fi");
@@ -230,13 +247,13 @@ pub fn predict_m6a(record: &mut bam::Record, keep: bool, cnn: bool, polymerase: 
             t_count += 1;
         }
     }
-    let a_predict = apply_model(&a_windows, a_count, cnn, polymerase);
+    let a_predict = apply_model(&a_windows, a_count, predict_options);
     assert_eq!(a_predict.len(), a_count);
-    add_mm_ml(record, &a_predict, "A+a", keep);
+    add_mm_ml(record, &a_predict, "A+a", predict_options);
 
-    let t_predict = apply_model(&t_windows, t_count, cnn, polymerase);
+    let t_predict = apply_model(&t_windows, t_count, predict_options);
     assert_eq!(t_predict.len(), t_count);
-    add_mm_ml(record, &t_predict, "T-a", keep);
+    add_mm_ml(record, &t_predict, "T-a", predict_options);
 }
 
 enum WhichML {
@@ -244,24 +261,33 @@ enum WhichML {
     #[cfg(feature = "cnn")]
     Cnn,
 }
-pub fn apply_model(windows: &[f32], count: usize, _cnn: bool, polymerase: &PbChem) -> Vec<f32> {
+pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
     let _which_ml = WhichML::Xgb;
     #[cfg(feature = "cnn")]
-    let _which_ml = if _cnn { WhichML::Cnn } else { WhichML::Xgb };
+    let _which_ml = if predict_options.cnn {
+        WhichML::Cnn
+    } else {
+        WhichML::Xgb
+    };
 
     match _which_ml {
-        WhichML::Xgb => xgb::predict_with_xgb(windows, count, polymerase),
+        WhichML::Xgb => xgb::predict_with_xgb(windows, count, &predict_options.polymerase),
         #[cfg(feature = "cnn")]
-        WhichML::Cnn => cnn::predict_with_cnn(windows, count, polymerase),
+        WhichML::Cnn => cnn::predict_with_cnn(windows, count, &predict_options.polymerase),
     }
+}
+
+pub struct PredictOptions {
+    pub keep: bool,
+    pub cnn: bool,
+    pub full_float: bool,
+    pub polymerase: PbChem,
 }
 
 pub fn read_bam_into_fiberdata(
     bam: &mut bam::Reader,
     out: &mut bam::Writer,
-    polymerase: &PbChem,
-    keep: bool,
-    cnn: bool,
+    predict_options: &PredictOptions,
 ) {
     // read in bam data
     let chunk_size = current_num_threads() * 200;
@@ -281,7 +307,7 @@ pub fn read_bam_into_fiberdata(
         chunk
             .par_iter_mut()
             .progress_with_style(style)
-            .for_each(|r| predict_m6a(r, keep, cnn, polymerase));
+            .for_each(|r| predict_m6a(r, predict_options));
 
         // write to output
         chunk.iter().for_each(|r| out.write(r).unwrap());
