@@ -54,6 +54,7 @@ pub fn main() -> Result<(), Error> {
             msp,
             nuc,
             all,
+            full_float,
         }) => {
             // read in the bam from stdin or from a file
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
@@ -67,6 +68,7 @@ pub fn main() -> Result<(), Error> {
                 *simplify,
                 *quality,
                 *min_ml_score,
+                *full_float,
             )?;
             extract::extract_contained(&mut bam, out_files);
         }
