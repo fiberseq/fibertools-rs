@@ -47,7 +47,9 @@ The extract all option is a special option that tries to extract all the fiberse
 
 
 # TODO
-- [ ] Add option for all format but without sequence
 - [ ] Add `rustybam` stats to ft `all`
+- [ ] Add CNN to CI
+- [ ] Option to keep full float info in predict-m6a
+- [x] Add option for all format but without sequence
 - [x] handle broken pipe errors in `ft-extract`
 - [x] add rq to all

@@ -87,17 +87,24 @@ pub fn main() -> Result<(), Error> {
             out,
             keep,
             cnn,
+            full_float,
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
-            let polymerase = find_pb_polymerase(&header);
             let mut out = if out == "-" {
                 bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
             } else {
                 bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
             };
             out.set_threads(args.threads).unwrap();
-            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &polymerase, *keep, *cnn);
+
+            let predict_options = predict_m6a::PredictOptions {
+                keep: *keep,
+                cnn: *cnn,
+                full_float: *full_float,
+                polymerase: find_pb_polymerase(&header),
+            };
+            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
         None => {}
     };
