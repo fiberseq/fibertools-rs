@@ -67,6 +67,9 @@ pub enum Commands {
         /// Output path for .
         #[clap(short, long)]
         all: Option<String>,
+        /// Add the full floating point predictions of the ML model
+        #[clap(short, long)]
+        full_float: bool,
     },
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs.
     #[clap(visible_aliases = &["c", "ct"])]

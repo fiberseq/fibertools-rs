@@ -213,6 +213,27 @@ impl BaseMods {
         }
     }
 
+    pub fn m6a_full_probabilities(&self, record: &bam::Record) -> Vec<(i64, f32)> {
+        let mp = get_f32_tag(record, b"mp");
+        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
+        // skip if no mp or m6a
+        if m6a.is_empty() || mp.is_empty() {
+            return vec![];
+        }
+        let m6a: Vec<i64> = m6a.iter().flat_map(|x| x.get_modified_bases()).collect();
+        // skip if not equal
+        if m6a.len() != mp.len() {
+            log::warn!(
+                "In {} m6A mods ({}) not equal to number of predictions ({}), returning nothing for this read.",
+                String::from_utf8_lossy(record.qname()),
+                m6a.len(),
+                mp.len()
+            );
+            return vec![];
+        }
+        m6a.into_iter().zip(mp.into_iter()).collect()
+    }
+
     pub fn m6a(&self, reference: bool) -> (Vec<i64>, Vec<u8>) {
         let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
         // skip if no m6a
@@ -507,7 +528,13 @@ impl FiberseqData {
         x
     }
 
-    pub fn write_all(&self, head_view: &HeaderView, simplify: bool, quality: bool) -> String {
+    pub fn write_all(
+        &self,
+        head_view: &HeaderView,
+        simplify: bool,
+        quality: bool,
+        full_float: bool,
+    ) -> String {
         // PB features
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;
@@ -553,10 +580,20 @@ impl FiberseqData {
 
         //let m6a = self.base_mods.m6a_positions(false);
         //let ref_m6a = self.base_mods.m6a_positions(true);
-        let (m6a, _m6a_qual) = self.base_mods.m6a(false);
+        let (mut m6a, _m6a_qual) = self.base_mods.m6a(false);
         let m6a_count = m6a.len();
         let (ref_m6a, m6a_qual) = self.base_mods.m6a(true);
-        let m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
+        let mut m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
+        // replace with full quality when possible
+        if full_float {
+            let m6a_full = self.base_mods.m6a_full_probabilities(&self.record);
+            let (z_m6a, z_m6a_qual) = unzip_to_vectors(m6a_full);
+            m6a = z_m6a;
+            m6a_qual = z_m6a_qual
+                .into_iter()
+                .map(|x| (x * 100_000.0) as i64)
+                .collect();
+        }
 
         let cpg = self.base_mods.cpg_positions(false);
         let cpg_count = cpg.len();
@@ -768,7 +805,14 @@ pub fn process_bam_chunk(
         Some(all) => {
             let out: Vec<String> = fiber_data
                 .iter_mut()
-                .map(|r| r.write_all(head_view, out_files.simplify, out_files.quality))
+                .map(|r| {
+                    r.write_all(
+                        head_view,
+                        out_files.simplify,
+                        out_files.quality,
+                        out_files.full_float,
+                    )
+                })
                 .collect();
             for line in out {
                 write_to_file(&line, all);

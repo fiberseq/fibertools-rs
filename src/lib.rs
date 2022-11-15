@@ -78,6 +78,7 @@ pub struct FiberOut {
     pub simplify: bool,
     pub quality: bool,
     pub min_ml_score: u8,
+    pub full_float: bool,
 }
 
 impl FiberOut {
@@ -92,6 +93,7 @@ impl FiberOut {
         simplify: bool,
         quality: bool,
         min_ml_score: u8,
+        full_float: bool,
     ) -> Result<Self> {
         let m6a = match m6a {
             Some(m6a) => Some(writer(m6a)?),
@@ -113,6 +115,12 @@ impl FiberOut {
             Some(all) => Some(writer(all)?),
             None => None,
         };
+        // set to zero
+        let mut min_ml_score = min_ml_score;
+        if full_float {
+            min_ml_score = 0;
+        }
+
         Ok(FiberOut {
             m6a,
             cpg,
@@ -123,6 +131,7 @@ impl FiberOut {
             simplify,
             quality,
             min_ml_score,
+            full_float,
         })
     }
 }
