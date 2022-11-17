@@ -276,4 +276,15 @@ impl BaseMods {
             cpg[0].get_modified_bases()
         }
     }
+
+    /* TODO
+    pub fn make_mm_and_ml_tags(&self) -> Vec<u8> {
+        let mut mm = "".to_string();
+        let mut ml = vec![];
+        for basemod in &self.base_mods {
+            for
+        }
+        ml
+    }
+    */
 }
