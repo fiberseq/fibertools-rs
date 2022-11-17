@@ -1,7 +1,6 @@
 use super::bamlift::*;
 use bio::alphabets::dna::revcomp;
-use itertools::izip;
-use itertools::multiunzip;
+//use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_htslib::{bam, bam::record::Aux};
@@ -237,29 +236,20 @@ impl BaseMods {
         if m6a.is_empty() {
             return (vec![], vec![], vec![]);
         }
-        // get left values
-        let m6a_l = m6a[0].get_modified_bases();
-        let m6a_l_ref = m6a[0].get_reference_positions();
-        let m6a_l_q = m6a[0].get_modified_probabilities();
-
-        // get right values if they are there
-        let m6a_r;
-        let m6a_r_ref;
-        let m6a_r_q;
-        if m6a.len() == 1 {
-            m6a_r = vec![];
-            m6a_r_ref = vec![];
-            m6a_r_q = vec![];
-        } else {
-            m6a_r = m6a[1].get_modified_bases();
-            m6a_r_ref = m6a[1].get_reference_positions();
-            m6a_r_q = m6a[1].get_modified_probabilities();
-        }
-        let z: Vec<(i64, i64, u8)> = izip!(m6a_l, m6a_l_ref, m6a_l_q)
-            .chain(izip!(m6a_r, m6a_r_ref, m6a_r_q))
+        let m6a_pos: Vec<i64> = m6a.iter().flat_map(|x| x.get_modified_bases()).collect();
+        let m6a_ref: Vec<i64> = m6a
+            .iter()
+            .flat_map(|x| x.get_reference_positions())
             .collect();
-        //z.sort_by_key(|(p, _r, _q)| *p);
-        multiunzip(z)
+        let m6a_qual: Vec<u8> = m6a
+            .iter()
+            .flat_map(|x| x.get_modified_probabilities())
+            .collect();
+
+        //let mut _z: Vec<(i64, i64, u8)> = izip!(m6a_pos, m6a_ref, m6a_qual).collect();
+        //_z.sort_by_key(|(p, _r, _q)| *p);
+        //let _a = multiunzip(_z);
+        (m6a_pos, m6a_ref, m6a_qual)
     }
 
     pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
