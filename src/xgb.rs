@@ -6,8 +6,8 @@ use std::fs;
 
 // make sure file exists for cargo
 static INIT: spin::Once<GBDT> = spin::Once::new();
-static JSON: &str = include_str!("../models/gbdt_large.0.81_p2.0.json");
-static JSON_2_2: &str = include_str!("../models/gbdt_large.0.81_p2.2.json");
+static JSON: &str = include_str!("../models/gbdt_0.81_p2.0.json");
+static JSON_2_2: &str = include_str!("../models/gbdt_0.81_p2.2.json");
 
 pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
     INIT.call_once(|| {
