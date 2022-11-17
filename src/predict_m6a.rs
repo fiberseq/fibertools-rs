@@ -96,12 +96,6 @@ pub fn add_mm_ml(
 
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
-    log::warn!(
-        "{} {} {}",
-        bamlift::get_f32_tag(record, b"ML").len(),
-        bamlift::get_u32_tag(record, b"ML").len(),
-        ml_tag.len()
-    );
     record.remove_aux(b"ML").unwrap_or(());
 
     // extend the old ml_tag
@@ -109,6 +103,9 @@ pub fn add_mm_ml(
     let aux_array: AuxArray<u8> = (&ml_tag).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
     record.push_aux(b"ML", aux_array_field).unwrap();
+
+    // make sure they are the same
+    assert_eq!(ml_tag.len(), mm_tag.chars().filter(|&x| x == ',').count());
 
     // add full floating point values
     if predict_options.full_float {
