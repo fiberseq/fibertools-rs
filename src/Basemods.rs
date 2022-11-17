@@ -116,11 +116,12 @@ impl BaseMods {
                 let mut cur_mod_idx = 0;
                 let mut cur_seq_idx = 0;
                 let mut dist_from_last_mod_base = 0;
-                let mut modified_positions: Vec<i64> = vec![0; mod_dists.len()];
+                let mut unfiltered_modified_positions: Vec<i64> = vec![0; mod_dists.len()];
                 while cur_seq_idx < forward_bases.len() && cur_mod_idx < mod_dists.len() {
                     let cur_base = forward_bases[cur_seq_idx];
                     if cur_base == mod_base && dist_from_last_mod_base == mod_dists[cur_mod_idx] {
-                        modified_positions[cur_mod_idx] = i64::try_from(cur_seq_idx).unwrap();
+                        unfiltered_modified_positions[cur_mod_idx] =
+                            i64::try_from(cur_seq_idx).unwrap();
                         dist_from_last_mod_base = 0;
                         cur_mod_idx += 1;
                     } else if cur_base == mod_base {
@@ -132,8 +133,8 @@ impl BaseMods {
                 assert_eq!(cur_mod_idx, mod_dists.len());
 
                 // check for the probability of modification.
-                let num_mods_cur_end = num_mods_seen + modified_positions.len();
-                let modified_probabilities = if num_mods_cur_end > ml_tag.len() {
+                let num_mods_cur_end = num_mods_seen + unfiltered_modified_positions.len();
+                let unfiltered_modified_probabilities = if num_mods_cur_end > ml_tag.len() {
                     let needed_num_of_zeros = num_mods_cur_end - ml_tag.len();
                     let mut to_add = vec![0; needed_num_of_zeros];
                     let mut has = ml_tag[num_mods_seen..ml_tag.len()].to_vec();
@@ -148,13 +149,16 @@ impl BaseMods {
                 num_mods_seen = num_mods_cur_end;
 
                 // must be true for filtering, and at this point
-                assert_eq!(modified_positions.len(), modified_probabilities.len());
+                assert_eq!(
+                    unfiltered_modified_positions.len(),
+                    unfiltered_modified_probabilities.len()
+                );
 
                 // Filter mods based on probabilities
                 let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
-                    modified_probabilities
+                    unfiltered_modified_probabilities
                         .iter()
-                        .zip(modified_positions.iter())
+                        .zip(unfiltered_modified_positions.iter())
                         .filter(|(&ml, &_mm)| ml >= min_ml_score)
                         .unzip();
 
