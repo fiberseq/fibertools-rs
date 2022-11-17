@@ -246,7 +246,7 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
         }
     }
     // add values for things that won't lift at the end
-    while positions.len() < return_positions.len() {
+    while positions.len() > return_positions.len() {
         return_positions.push(-1);
     }
     assert_eq!(positions.len(), return_positions.len());
