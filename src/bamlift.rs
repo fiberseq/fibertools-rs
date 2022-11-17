@@ -245,6 +245,7 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
             break;
         }
     }
+    assert_eq!(positions.len(), return_positions.len());
     return_positions
 }
 
