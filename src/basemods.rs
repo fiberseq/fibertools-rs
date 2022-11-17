@@ -51,17 +51,7 @@ impl BaseMod {
     }
 
     pub fn get_modified_probabilities(&self) -> Vec<u8> {
-        /*
-        if self.strand == '-' {
-            self.modified_probabilities
-                .clone()
-                .into_iter()
-                .rev()
-                .collect()
-        } else {
-            self.modified_probabilities.clone()
-        }
-         */
+        // DO NOT RC THESE BASED ON STRAND!
         self.modified_probabilities.clone()
     }
 
