@@ -89,11 +89,6 @@ pub fn add_mm_ml(
         .map(|&x| (255.0 * x).round() as u8)
         .collect();
 
-    log::trace!(
-        "{}",
-        new_ml.iter().map(|&x| x as f64).sum::<f64>() / (new_ml.len() as f64)
-    );
-
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
     record.remove_aux(b"ML").unwrap_or(());
