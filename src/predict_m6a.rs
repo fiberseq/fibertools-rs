@@ -2,7 +2,6 @@ use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
-use lazy_static::lazy_static;
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -11,8 +10,10 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
-use std::env::var;
 
+/*
+use std::env::var;
+use lazy_static::lazy_static;
 lazy_static! {
     static ref ML_MIN: f32 = var("ML_MIN")
         .unwrap_or_else(|_| "0.4".to_string())
@@ -23,6 +24,7 @@ lazy_static! {
         .parse()
         .expect("ML_MAX must be a float!");
 }
+*/
 
 /// ```
 /// use fibertools_rs::predict_m6a::hot_one_dna;
@@ -90,7 +92,7 @@ pub fn add_mm_ml(
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
     // update the ml tag
-    let min_score = 0.5;
+    let min_score = 0.2;
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| {
