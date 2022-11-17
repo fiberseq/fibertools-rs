@@ -112,6 +112,12 @@ pub fn add_mm_ml(
         let aux_array_field = Aux::ArrayFloat(aux_array);
         record.push_aux(b"mp", aux_array_field).unwrap();
         log::trace!("mp:{:?}", pre_predict);
+
+        let zz: Vec<u8> = pre_predict
+            .iter()
+            .map(|&x| (255.0 * x).round() as u8)
+            .collect();
+        assert_eq!(zz, new_ml);
     }
 
     log::trace!("ML:{:?}", ml_tag);
