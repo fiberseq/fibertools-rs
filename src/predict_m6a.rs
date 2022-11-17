@@ -167,6 +167,10 @@ pub fn add_mm_ml(
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
+    // clear the existing data
+    record.remove_aux(b"MM").unwrap_or(());
+    record.remove_aux(b"ML").unwrap_or(());
+
     let window = 15;
     let extend = window / 2;
     let f_ip = extract::get_u8_tag(record, b"fi");
