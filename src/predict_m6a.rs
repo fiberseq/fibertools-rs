@@ -11,20 +11,19 @@ use rust_htslib::{
     bam::Read,
 };
 
-/*
-use std::env::var;
-use lazy_static::lazy_static;
-lazy_static! {
-    static ref ML_MIN: f32 = var("ML_MIN")
-        .unwrap_or_else(|_| "0.4".to_string())
-        .parse()
-        .expect("ML_MIN must be a float!");
-    static ref ML_MAX: f32 = var("ML_MAX")
-        .unwrap_or_else(|_| "0.991".to_string())
-        .parse()
-        .expect("ML_MAX must be a float!");
+static WINDOW: usize = 15;
+
+pub struct PredictOptions {
+    pub keep: bool,
+    pub cnn: bool,
+    pub full_float: bool,
+    pub polymerase: PbChem,
 }
-*/
+enum WhichML {
+    Xgb,
+    #[cfg(feature = "cnn")]
+    Cnn,
+}
 
 /// ```
 /// use fibertools_rs::predict_m6a::hot_one_dna;
@@ -112,21 +111,12 @@ pub fn add_mm_ml(
         let aux_array_field = Aux::ArrayFloat(aux_array);
         record.push_aux(b"mp", aux_array_field).unwrap();
         log::trace!("mp:{:?}", pre_predict);
-
-        let zz: Vec<u8> = pre_predict
-            .iter()
-            .map(|&x| (255.0 * x).round() as u8)
-            .collect();
-        assert_eq!(zz, ml_tag);
     }
-
     log::trace!("ML:{:?}", ml_tag);
     log::trace!("MM:{:?}", mm_tag);
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
-    record.remove_aux(b"MM").unwrap_or(());
-    record.remove_aux(b"ML").unwrap_or(());
     // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
     let mut mm_tag: String = "".to_string();
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
@@ -139,8 +129,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         record.remove_aux(b"ML").unwrap_or(());
     }
 
-    let window = 15;
-    let extend = window / 2;
+    let extend = WINDOW / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
     let r_ip = bamlift::get_u8_tag(record, b"ri")
         .into_iter()
@@ -168,7 +157,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         // get the data window
         let data_window = if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
             // make fake data for leading and trailing As
-            vec![0.0; window * 6]
+            vec![0.0; WINDOW * 6]
         } else {
             let start = pos - extend;
             let end = pos + extend + 1;
@@ -237,11 +226,6 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     }
 }
 
-enum WhichML {
-    Xgb,
-    #[cfg(feature = "cnn")]
-    Cnn,
-}
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
     let _which_ml = WhichML::Xgb;
     #[cfg(feature = "cnn")]
@@ -256,13 +240,6 @@ pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptio
         #[cfg(feature = "cnn")]
         WhichML::Cnn => cnn::predict_with_cnn(windows, count, &predict_options.polymerase),
     }
-}
-
-pub struct PredictOptions {
-    pub keep: bool,
-    pub cnn: bool,
-    pub full_float: bool,
-    pub polymerase: PbChem,
 }
 
 pub fn read_bam_into_fiberdata(

@@ -25,6 +25,14 @@ impl BaseMod {
         modified_probabilities: Vec<u8>,
     ) -> Self {
         let modified_bases = positions_on_complimented_sequence(record, &modified_bases_forward);
+
+        // rev qualities if needed
+        let modified_probabilities = if record.is_reverse() {
+            modified_probabilities.into_iter().rev().collect()
+        } else {
+            modified_probabilities
+        };
+
         // get the reference positions
         let reference_positions = get_exact_reference_positions(record, &modified_bases);
         Self {
@@ -51,7 +59,6 @@ impl BaseMod {
     }
 
     pub fn get_modified_probabilities(&self) -> Vec<u8> {
-        // DO NOT RC THESE BASED ON STRAND!
         self.modified_probabilities.clone()
     }
 
