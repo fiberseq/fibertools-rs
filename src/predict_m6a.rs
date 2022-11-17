@@ -92,18 +92,8 @@ pub fn add_mm_ml(
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
     // update the ml tag
-    let min_score = 0.0;
     let new_ml: Vec<u8> = predictions
         .iter()
-        .map(|&x| {
-            if x > 1.0 {
-                1.0
-            } else if x < min_score {
-                0.0
-            } else {
-                x
-            }
-        })
         .map(|x| (255.0 * x).round() as u8)
         .collect();
 
