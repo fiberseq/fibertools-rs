@@ -73,14 +73,6 @@ pub fn add_mm_ml(
     }
     record.remove_aux(b"MM").unwrap_or(());
 
-    // clear the existing data
-    if !predict_options.keep {
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
-    }
-
     // update the MM tag with new data
     let mut new_mm = base_mod.to_string();
     for _i in 0..predictions.len() {
@@ -104,6 +96,7 @@ pub fn add_mm_ml(
 
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
+    log::warn!("{}", bamlift::get_f32_tag(record, b"ML").len());
     record.remove_aux(b"ML").unwrap_or(());
 
     // extend the old ml_tag
@@ -231,6 +224,14 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     let t_predict = apply_model(&t_windows, t_count, predict_options);
     assert_eq!(t_predict.len(), t_count);
     add_mm_ml(record, &t_predict, "T-a", predict_options);
+
+    // clear the existing data
+    if !predict_options.keep {
+        record.remove_aux(b"fp").unwrap_or(());
+        record.remove_aux(b"fi").unwrap_or(());
+        record.remove_aux(b"rp").unwrap_or(());
+        record.remove_aux(b"ri").unwrap_or(());
+    }
 }
 
 enum WhichML {
