@@ -92,7 +92,7 @@ pub fn add_mm_ml(
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
     // update the ml tag
-    let min_score = 0.2;
+    let min_score = 0.0;
     let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| {
@@ -117,7 +117,7 @@ pub fn add_mm_ml(
     record.remove_aux(b"ML").unwrap_or(());
 
     // extend the old ml_tag
-    ml_tag.extend(new_ml);
+    ml_tag.extend(new_ml.iter());
     let aux_array: AuxArray<u8> = (&ml_tag).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
     record.push_aux(b"ML", aux_array_field).unwrap();
