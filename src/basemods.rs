@@ -1,6 +1,6 @@
 use super::bamlift::*;
 use bio::alphabets::dna::revcomp;
-//use itertools::{izip, multiunzip};
+use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_htslib::{bam, bam::record::Aux};
@@ -255,10 +255,9 @@ impl BaseMods {
 
         assert_eq!(m6a_pos.len(), m6a_ref.len());
         assert_eq!(m6a_ref.len(), m6a_qual.len());
-        //let mut _z: Vec<(i64, i64, u8)> = izip!(m6a_pos, m6a_ref, m6a_qual).collect();
-        //_z.sort_by_key(|(p, _r, _q)| *p);
-        //let _a = multiunzip(_z);
-        (m6a_pos, m6a_ref, m6a_qual)
+        let mut z: Vec<(i64, i64, u8)> = izip!(m6a_pos, m6a_ref, m6a_qual).collect();
+        z.sort_by_key(|(p, _r, _q)| *p);
+        multiunzip(z)
     }
 
     pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
