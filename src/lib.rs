@@ -1,5 +1,6 @@
-/// Command line interface for fibertools-rs.
 pub mod bamlift;
+/// Command line interface for fibertools-rs.
+pub mod basemods;
 pub mod center;
 pub mod cli;
 #[cfg(feature = "cnn")]
