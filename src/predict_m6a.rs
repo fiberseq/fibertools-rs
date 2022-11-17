@@ -117,7 +117,7 @@ pub fn add_mm_ml(
             .iter()
             .map(|&x| (255.0 * x).round() as u8)
             .collect();
-        assert_eq!(zz, new_ml);
+        assert_eq!(zz, ml_tag);
     }
 
     log::trace!("ML:{:?}", ml_tag);
