@@ -95,37 +95,7 @@ pub fn add_mm_ml(
     let aux_integer_field = Aux::String(&mm_tag);
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
-    //let sum: f32 = predictions.iter().sum();
-    //let min = predictions.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-    //let max = predictions.iter().fold(-1.0, |a: f32, &b| a.max(b));
-    //log::info!("{} {} {} {}", sum / predictions.len() as f32, sum, min, max);
-    //log::info!("{} {}", min, max);
-
-    // update the ML tag with new data
-    /*
-    let min_allowed: f32 = *ML_MIN; // set at about 0.1% FDR
-    let max_allowed: f32 = *ML_MAX;
-    let rescaled_min = 0.001;
-    let rescaled_max = 0.999;
-    let t_min = ml_score_transform(rescaled_min);
-    let t_max = ml_score_transform(rescaled_max);
-    let _new_ml: Vec<u8> = predictions
-        .iter()
-        .map(|&x| {
-            if x > max_allowed {
-                max_allowed
-            } else if x < min_allowed {
-                min_allowed
-            } else {
-                x
-            }
-        })
-        .map(ml_score_transform)
-        // scale between 0 and 255.0
-        .map(|x| 255.0 * (x - t_min) / (t_max - t_min))
-        .map(|x| x.round() as u8)
-        .collect();
-    */
+    // update the ml tag
     let min_score = 0.5;
     let new_ml: Vec<u8> = predictions
         .iter()
@@ -167,6 +137,18 @@ pub fn add_mm_ml(
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
+    // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
+    let mut mm_tag: String = "".to_string();
+    if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
+        mm_tag.push_str(mm_text);
+    }
+    // if we already have the base mode then we need to clear the whole thing
+    if mm_tag.contains("A+a") || mm_tag.contains("T-a") {
+        // clear the existing data
+        record.remove_aux(b"MM").unwrap_or(());
+        record.remove_aux(b"ML").unwrap_or(());
+    }
+
     let window = 15;
     let extend = window / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
