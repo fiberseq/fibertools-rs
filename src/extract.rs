@@ -93,15 +93,8 @@ impl FiberseqData {
     }
 
     pub fn from_records(records: &Vec<bam::Record>, min_ml_score: u8) -> Vec<Self> {
-        /*
-        let style = ProgressStyle::with_template(PROGRESS_STYLE)
-            .unwrap()
-            .progress_chars("##-");
-         */
-
         records
             .par_iter()
-            //.progress_with_style(style)
             .map(|x| FiberseqData::new(x, min_ml_score))
             .collect::<Vec<_>>()
     }

@@ -246,6 +246,8 @@ impl BaseMods {
             .flat_map(|x| x.get_modified_probabilities())
             .collect();
 
+        assert_eq!(m6a_pos.len(), m6a_ref.len());
+        assert_eq!(m6a_ref.len(), m6a_qual.len());
         //let mut _z: Vec<(i64, i64, u8)> = izip!(m6a_pos, m6a_ref, m6a_qual).collect();
         //_z.sort_by_key(|(p, _r, _q)| *p);
         //let _a = multiunzip(_z);
