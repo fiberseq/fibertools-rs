@@ -63,21 +63,17 @@ pub fn add_mm_ml(
     predict_options: &PredictOptions,
 ) {
     if predictions.is_empty() {
+        record.remove_aux(b"MM").unwrap_or(());
+        record.remove_aux(b"ML").unwrap_or(());
         return;
     }
     let mut mm_tag: String = "".to_string();
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
         mm_tag.push_str(mm_text);
     }
-    let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
-    // if we already have the base mode then we need to clear the whole thing
-    if mm_tag.contains(base_mod) {
-        mm_tag = "".to_string();
-        ml_tag = vec![];
-    }
-    // clear the existing data
     record.remove_aux(b"MM").unwrap_or(());
-    record.remove_aux(b"ML").unwrap_or(());
+
+    // clear the existing data
     if !predict_options.keep {
         record.remove_aux(b"fp").unwrap_or(());
         record.remove_aux(b"fi").unwrap_or(());
@@ -115,6 +111,12 @@ pub fn add_mm_ml(
         "{}",
         new_ml.iter().map(|&x| x as f64).sum::<f64>() / (new_ml.len() as f64)
     );
+
+    // old get the old ml tag
+    let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
+    record.remove_aux(b"ML").unwrap_or(());
+
+    // extend the old ml_tag
     ml_tag.extend(new_ml);
     let aux_array: AuxArray<u8> = (&ml_tag).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
