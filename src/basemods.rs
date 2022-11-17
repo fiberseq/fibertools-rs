@@ -177,11 +177,12 @@ impl BaseMods {
             log::debug!("No MM tag found");
         }
 
-        if ml_tag.len() > num_mods_seen {
-            log::warn!("ML tag has more entries than # of modifications in the MM tag.");
-        }
         if ml_tag.len() != num_mods_seen {
-            log::warn!("ML tag different number than MM tag.");
+            log::warn!(
+                "ML tag ({}) different number than MM tag ({}).",
+                ml_tag.len(),
+                num_mods_seen
+            );
         }
 
         BaseMods { base_mods: rtn }
