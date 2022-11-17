@@ -98,7 +98,6 @@ impl BaseMods {
                 let mod_base = cap.get(3).map(|m| m.as_str().as_bytes()[0]).unwrap();
                 let mod_strand = cap.get(4).map_or("", |m| m.as_str());
                 let modification_type = cap.get(5).map_or("", |m| m.as_str());
-                log::warn!("{}", modification_type);
                 let mod_dists_str = cap.get(6).map_or("", |m| m.as_str());
                 // parse the string containing distances between modifications into a vector of i64
                 let mod_dists: Vec<i64> = mod_dists_str
