@@ -3,18 +3,24 @@ use bio::alphabets::dna::revcomp;
 use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
-use rust_htslib::{bam, bam::record::Aux};
+use rust_htslib::{
+    bam,
+    bam::record::{Aux, AuxArray},
+};
 use std::convert::TryFrom;
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
+    record_is_reverse: bool,
     modified_bases: Vec<i64>,
     modified_bases_forward: Vec<i64>,
     modified_probabilities: Vec<u8>,
     reference_positions: Vec<i64>,
 }
+
 impl BaseMod {
     pub fn new(
         record: &bam::Record,
@@ -33,12 +39,15 @@ impl BaseMod {
             modified_probabilities
         };
 
+        let record_is_reverse = record.is_reverse();
+
         // get the reference positions
         let reference_positions = get_exact_reference_positions(record, &modified_bases);
         Self {
             modified_base,
             strand,
             modification_type,
+            record_is_reverse,
             modified_bases,
             modified_bases_forward,
             modified_probabilities,
@@ -62,6 +71,14 @@ impl BaseMod {
         self.modified_probabilities.clone()
     }
 
+    pub fn get_modified_probabilities_forward(&self) -> Vec<u8> {
+        if self.record_is_reverse {
+            self.modified_probabilities.iter().rev().cloned().collect()
+        } else {
+            self.modified_probabilities.clone()
+        }
+    }
+
     pub fn is_m6a(&self) -> bool {
         self.modification_type == 'a'
     }
@@ -71,6 +88,7 @@ impl BaseMod {
     }
 }
 
+#[derive(Eq, PartialEq, Debug)]
 pub struct BaseMods {
     pub base_mods: Vec<BaseMod>,
 }
@@ -188,6 +206,11 @@ impl BaseMods {
         BaseMods { base_mods: rtn }
     }
 
+    /// remove m6a base mods from the struct
+    pub fn drop_m6a(&mut self) {
+        self.base_mods.retain(|bm| !bm.is_m6a());
+    }
+
     pub fn m6a_positions(&self, reference: bool) -> Vec<i64> {
         let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
         // skip if no m6a
@@ -271,14 +294,90 @@ impl BaseMods {
         }
     }
 
-    /* TODO
-    pub fn make_mm_and_ml_tags(&self) -> Vec<u8> {
-        let mut mm = "".to_string();
-        let mut ml = vec![];
-        for basemod in &self.base_mods {
-            for
+    // TODO finish this
+    /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
+    /// Example ML tag: ML:B:C,157,30,2,164,118,255
+    pub fn add_mm_and_ml_tags(&self, record: &mut bam::Record) {
+        // init the mm and ml tag to be populated
+        let mut ml_tag: Vec<u8> = vec![];
+        let mut mm_tag = "".to_string();
+        // need the original sequence for distances between bases.
+        let mut seq = record.seq().as_bytes();
+        if record.is_reverse() {
+            seq = revcomp(seq);
         }
-        ml
+        // add to the ml and mm tag.
+        for basemod in self.base_mods.iter() {
+            // adding quality values (ML)
+            ml_tag.extend(basemod.get_modified_probabilities_forward());
+            // get MM tag values
+            let mut cur_mm = vec![];
+            let positions = basemod.get_modified_bases_forward();
+            let mut last_pos = 0;
+            for pos in positions {
+                let u_pos = pos as usize;
+                let mut in_between = 0;
+                if last_pos < u_pos {
+                    for base in seq[last_pos..u_pos].iter() {
+                        if *base == basemod.modified_base {
+                            in_between += 1;
+                        }
+                    }
+                }
+                last_pos = u_pos + 1;
+                cur_mm.push(in_between);
+            }
+            // Add to the MM string
+            mm_tag.push(basemod.modified_base as char);
+            mm_tag.push(basemod.strand);
+            mm_tag.push(basemod.modification_type);
+            for diff in cur_mm {
+                mm_tag.push_str(&format!(",{}", diff));
+            }
+            mm_tag.push(';')
+            // next basemod
+        }
+        log::trace!(
+            "{}\n{}\n{}\n",
+            record.is_reverse(),
+            mm_tag,
+            String::from_utf8_lossy(&seq)
+        );
+        // clear out the old base mods
+        record.remove_aux(b"MM").unwrap_or(());
+        record.remove_aux(b"ML").unwrap_or(());
+        // Add MM
+        let aux_integer_field = Aux::String(&mm_tag);
+        record.push_aux(b"MM", aux_integer_field).unwrap();
+        // Add ML
+        let aux_array: AuxArray<u8> = (&ml_tag).into();
+        let aux_array_field = Aux::ArrayU8(aux_array);
+        record.push_aux(b"ML", aux_array_field).unwrap();
     }
-    */
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use env_logger::{Builder, Target};
+    use log;
+    use rust_htslib::{bam, bam::Read};
+
+    #[test]
+    /// checks that we can read base mods into BaseMods and the write the BaseMods to a new bam
+    /// record, extract them again and they remain the same.
+    fn test_mods_do_not_change() {
+        Builder::new()
+            .target(Target::Stderr)
+            .filter(None, log::LevelFilter::Debug)
+            .init();
+        let mut bam = bam::Reader::from_path(&".test/all.bam").unwrap();
+        for rec in bam.records() {
+            let mut rec = rec.unwrap();
+            let mods = BaseMods::new(&rec, 0);
+            mods.add_mm_and_ml_tags(&mut rec);
+            let mods_2 = BaseMods::new(&rec, 0);
+            assert_eq!(mods, mods_2);
+        }
+    }
 }
