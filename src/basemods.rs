@@ -180,6 +180,9 @@ impl BaseMods {
         if ml_tag.len() > num_mods_seen {
             log::warn!("ML tag has more entries than # of modifications in the MM tag.");
         }
+        if ml_tag.len() != num_mods_seen {
+            log::warn!("ML tag different number than MM tag.");
+        }
 
         BaseMods { base_mods: rtn }
     }
