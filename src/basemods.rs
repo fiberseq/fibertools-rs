@@ -1,6 +1,7 @@
 use super::bamlift::*;
-use super::*;
 use bio::alphabets::dna::revcomp;
+use itertools::izip;
+use itertools::multiunzip;
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_htslib::{bam, bam::record::Aux};
@@ -230,37 +231,35 @@ impl BaseMods {
         m6a.into_iter().zip(mp.into_iter()).collect()
     }
 
-    pub fn m6a(&self, reference: bool) -> (Vec<i64>, Vec<u8>) {
+    pub fn m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
         let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
         // skip if no m6a
         if m6a.is_empty() {
-            return (vec![], vec![]);
+            return (vec![], vec![], vec![]);
         }
         // get left values
-        let m6a_l = if reference {
-            m6a[0].get_reference_positions()
-        } else {
-            m6a[0].get_modified_bases()
-        };
+        let m6a_l = m6a[0].get_modified_bases();
+        let m6a_l_ref = m6a[0].get_reference_positions();
         let m6a_l_q = m6a[0].get_modified_probabilities();
+
         // get right values if they are there
         let m6a_r;
+        let m6a_r_ref;
         let m6a_r_q;
         if m6a.len() == 1 {
             m6a_r = vec![];
+            m6a_r_ref = vec![];
             m6a_r_q = vec![];
         } else {
-            if reference {
-                m6a_r = m6a[1].get_reference_positions();
-            } else {
-                m6a_r = m6a[1].get_modified_bases();
-            }
+            m6a_r = m6a[1].get_modified_bases();
+            m6a_r_ref = m6a[1].get_reference_positions();
             m6a_r_q = m6a[1].get_modified_probabilities();
         }
-        // merge lists
-        unzip_to_vectors(merge_two_lists_with_qual(
-            &m6a_l, &m6a_l_q, &m6a_r, &m6a_r_q,
-        ))
+        let mut z: Vec<(i64, i64, u8)> = izip!(m6a_l, m6a_l_ref, m6a_l_q)
+            .chain(izip!(m6a_r, m6a_r_ref, m6a_r_q))
+            .collect();
+        z.sort_by_key(|(p, _r, _q)| *p);
+        multiunzip(z)
     }
 
     pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
