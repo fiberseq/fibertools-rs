@@ -270,6 +270,7 @@ pub fn read_bam_into_fiberdata(
         chunk
             .par_iter_mut()
             .progress_with_style(style)
+            .filter(|r| r.is_unmapped())
             .for_each(|r| predict_m6a(r, predict_options));
 
         // write to output
