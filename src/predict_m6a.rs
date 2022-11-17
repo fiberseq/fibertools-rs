@@ -139,6 +139,8 @@ pub fn add_mm_ml(
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
+    record.remove_aux(b"MM").unwrap_or(());
+    record.remove_aux(b"ML").unwrap_or(());
     // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
     let mut mm_tag: String = "".to_string();
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
