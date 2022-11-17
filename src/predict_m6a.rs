@@ -111,6 +111,7 @@ pub fn add_mm_ml(
         let aux_array: AuxArray<f32> = (&pre_predict).into();
         let aux_array_field = Aux::ArrayFloat(aux_array);
         record.push_aux(b"mp", aux_array_field).unwrap();
+        log::trace!("mp:{:?}", pre_predict);
     }
 
     log::trace!("ML:{:?}", ml_tag);
