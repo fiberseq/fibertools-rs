@@ -255,10 +255,10 @@ impl BaseMods {
             m6a_r_ref = m6a[1].get_reference_positions();
             m6a_r_q = m6a[1].get_modified_probabilities();
         }
-        let mut z: Vec<(i64, i64, u8)> = izip!(m6a_l, m6a_l_ref, m6a_l_q)
+        let z: Vec<(i64, i64, u8)> = izip!(m6a_l, m6a_l_ref, m6a_l_q)
             .chain(izip!(m6a_r, m6a_r_ref, m6a_r_q))
             .collect();
-        z.sort_by_key(|(p, _r, _q)| *p);
+        //z.sort_by_key(|(p, _r, _q)| *p);
         multiunzip(z)
     }
 
