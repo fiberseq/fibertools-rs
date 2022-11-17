@@ -1,4 +1,4 @@
-use super::extract;
+use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
@@ -69,7 +69,7 @@ pub fn add_mm_ml(
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
         mm_tag.push_str(mm_text);
     }
-    let mut ml_tag = extract::get_u8_tag(record, b"ML");
+    let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
     // if we already have the base mode then we need to clear the whole thing
     if mm_tag.contains(base_mod) {
         mm_tag = "".to_string();
@@ -152,7 +152,7 @@ pub fn add_mm_ml(
 
     // add full floating point values
     if predict_options.full_float {
-        let mut pre_predict = extract::get_f32_tag(record, b"mp");
+        let mut pre_predict = bamlift::get_f32_tag(record, b"mp");
         pre_predict.extend(predictions.iter());
         // clean current tag
         record.remove_aux(b"mp").unwrap_or(());
@@ -173,8 +173,8 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
 
     let window = 15;
     let extend = window / 2;
-    let f_ip = extract::get_u8_tag(record, b"fi");
-    let r_ip = extract::get_u8_tag(record, b"ri")
+    let f_ip = bamlift::get_u8_tag(record, b"fi");
+    let r_ip = bamlift::get_u8_tag(record, b"ri")
         .into_iter()
         .rev()
         .collect::<Vec<_>>();
@@ -182,8 +182,8 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     if f_ip.is_empty() || r_ip.is_empty() {
         return;
     }
-    let f_pw = extract::get_u8_tag(record, b"fp");
-    let r_pw = extract::get_u8_tag(record, b"rp")
+    let f_pw = bamlift::get_u8_tag(record, b"fp");
+    let r_pw = bamlift::get_u8_tag(record, b"rp")
         .into_iter()
         .rev()
         .collect::<Vec<_>>();
