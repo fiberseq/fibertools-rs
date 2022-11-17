@@ -262,8 +262,7 @@ impl FiberseqData {
             .filter(|&x| *x == b'A' || *x == b'T')
             .count() as i64;
 
-        //let m6a = self.base_mods.m6a_positions(false);
-        //let ref_m6a = self.base_mods.m6a_positions(true);
+        // get the info
         let (mut m6a, ref_m6a, m6a_qual) = self.base_mods.m6a();
         let m6a_count = m6a.len();
         let mut m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
