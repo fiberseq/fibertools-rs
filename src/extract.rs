@@ -63,7 +63,7 @@ impl BaseMod {
             self.modified_probabilities
                 .clone()
                 .into_iter()
-                .rev()
+                //.rev()
                 .collect()
         } else {
             self.modified_probabilities.clone()
