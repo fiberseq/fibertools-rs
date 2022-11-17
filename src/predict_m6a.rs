@@ -144,7 +144,12 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         .into_iter()
         .rev()
         .collect::<Vec<_>>();
-    let seq = record.seq().as_bytes();
+
+    let mut seq = record.seq().as_bytes();
+    if record.is_reverse() {
+        seq = revcomp(seq);
+    }
+
     assert_eq!(f_ip.len(), seq.len());
     let mut a_count = 0;
     let mut t_count = 0;
