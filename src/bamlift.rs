@@ -1,5 +1,6 @@
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux};
 use std::fmt::{Debug, Display};
+
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
 /// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6

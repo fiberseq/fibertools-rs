@@ -25,6 +25,7 @@ console = "0.15"
 env_logger = "0.9.0"
 gbdt = "0.1.1"
 indicatif = {version = "0.17.0", features = ["rayon"]}
+itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
 rayon = "1.5"

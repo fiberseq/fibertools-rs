@@ -264,9 +264,8 @@ impl FiberseqData {
 
         //let m6a = self.base_mods.m6a_positions(false);
         //let ref_m6a = self.base_mods.m6a_positions(true);
-        let (mut m6a, _m6a_qual) = self.base_mods.m6a(false);
+        let (mut m6a, ref_m6a, m6a_qual) = self.base_mods.m6a();
         let m6a_count = m6a.len();
-        let (ref_m6a, m6a_qual) = self.base_mods.m6a(true);
         let mut m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
         // replace with full quality when possible
         if full_float {

@@ -63,8 +63,6 @@ pub fn add_mm_ml(
     predict_options: &PredictOptions,
 ) {
     if predictions.is_empty() {
-        record.remove_aux(b"MM").unwrap_or(());
-        record.remove_aux(b"ML").unwrap_or(());
         return;
     }
     let mut mm_tag: String = "".to_string();
