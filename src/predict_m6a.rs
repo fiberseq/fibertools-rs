@@ -102,6 +102,7 @@ pub fn add_mm_ml(
     //log::info!("{} {}", min, max);
 
     // update the ML tag with new data
+    /*
     let min_allowed: f32 = *ML_MIN; // set at about 0.1% FDR
     let max_allowed: f32 = *ML_MAX;
     let rescaled_min = 0.001;
@@ -124,7 +125,7 @@ pub fn add_mm_ml(
         .map(|x| 255.0 * (x - t_min) / (t_max - t_min))
         .map(|x| x.round() as u8)
         .collect();
-
+    */
     let min_score = 0.5;
     let new_ml: Vec<u8> = predictions
         .iter()
@@ -137,7 +138,7 @@ pub fn add_mm_ml(
                 x
             }
         })
-        .map(|x| x.round() as u8)
+        .map(|x| (255.0 * x).round() as u8)
         .collect();
 
     log::trace!(
