@@ -9,7 +9,7 @@ license = "MIT"
 name = "fibertools-rs"
 readme = "README.md"
 repository = "https://github.com/mrvollger/fibertools-rs"
-version = "0.0.7"
+version = "0.0.8"
 
 [[bin]]
 name = "ft"
