@@ -97,8 +97,9 @@ pub fn add_mm_ml(
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
     log::warn!(
-        "{} {}",
+        "{} {} {}",
         bamlift::get_f32_tag(record, b"ML").len(),
+        bamlift::get_u32_tag(record, b"ML").len(),
         ml_tag.len()
     );
     record.remove_aux(b"ML").unwrap_or(());
