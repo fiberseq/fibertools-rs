@@ -5,12 +5,17 @@ use tch;
 
 // make sure file exists for cargo
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
-static PT: &[u8] = include_bytes!("../models/m6ANet_PS00075.best.torch.pt");
+static PT: &[u8] = include_bytes!("../models/2.0_torch.pt");
+static PT_2_2: &[u8] = include_bytes!("../models/2.0_torch.pt");
 
-pub fn get_saved_pytorch_model(_polyermase: &PbChem) -> &'static tch::CModule {
+pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
+        let model_str = match polymerase {
+            PbChem::Two => PT,
+            PbChem::TwoPointTwo => PT_2_2,
+        };
         let temp_file_name = "ft.tmp.model.json";
-        fs::write(temp_file_name, PT).expect("Unable to write file");
+        fs::write(temp_file_name, model_str).expect("Unable to write file");
         let model = tch::CModule::load(temp_file_name).expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
         log::info!("Model from PyTorch loaded");
