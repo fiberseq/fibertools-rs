@@ -94,6 +94,16 @@ pub fn add_mm_ml(
         new_ml.iter().map(|&x| x as f64).sum::<f64>() / (new_ml.len() as f64)
     );
 
+    let mut ml_tag: String = "".to_string();
+    if let Ok(Aux::String(ml_text)) = record.aux(b"ML") {
+        ml_tag.push_str(ml_text);
+    }
+    record.remove_aux(b"ML").unwrap_or(());
+    for val in new_ml {
+        ml_tag.push_str(&format!("{},", val));
+    }
+    ml_tag.pop();
+    /*
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
     record.remove_aux(b"ML").unwrap_or(());
@@ -103,9 +113,9 @@ pub fn add_mm_ml(
     let aux_array: AuxArray<u8> = (&ml_tag).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
     record.push_aux(b"ML", aux_array_field).unwrap();
-
     // make sure they are the same
     assert_eq!(ml_tag.len(), mm_tag.chars().filter(|&x| x == ',').count());
+     */
 
     // add full floating point values
     if predict_options.full_float {
