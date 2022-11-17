@@ -51,6 +51,7 @@ impl BaseMod {
     }
 
     pub fn get_modified_probabilities(&self) -> Vec<u8> {
+        /*
         if self.strand == '-' {
             self.modified_probabilities
                 .clone()
@@ -60,6 +61,8 @@ impl BaseMod {
         } else {
             self.modified_probabilities.clone()
         }
+         */
+        self.modified_probabilities.clone()
     }
 
     pub fn is_m6a(&self) -> bool {
