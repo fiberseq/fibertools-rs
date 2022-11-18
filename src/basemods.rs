@@ -28,15 +28,15 @@ impl BaseMod {
         strand: char,
         modification_type: char,
         modified_bases_forward: Vec<i64>,
-        modified_probabilities: Vec<u8>,
+        modified_probabilities_forward: Vec<u8>,
     ) -> Self {
         let modified_bases = positions_on_complimented_sequence(record, &modified_bases_forward);
 
         // rev qualities if needed
         let modified_probabilities = if record.is_reverse() {
-            modified_probabilities.into_iter().rev().collect()
+            modified_probabilities_forward.into_iter().rev().collect()
         } else {
-            modified_probabilities
+            modified_probabilities_forward
         };
 
         let record_is_reverse = record.is_reverse();
