@@ -78,13 +78,10 @@ pub fn add_mm_ml(
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
     // update the ml tag
-    let mut new_ml: Vec<u8> = predictions
+    let new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| (255.0 * x).round() as u8)
         .collect();
-    if record.is_reverse() {
-        new_ml = new_ml.into_iter().rev().collect();
-    }
 
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
@@ -114,10 +111,40 @@ pub fn add_mm_ml(
     log::trace!("MM:{:?}", mm_tag);
 }
 
+/// Create a basemod object form our predictions
+pub fn basemod_from_ml(
+    record: &mut bam::Record,
+    predictions: &[f32],
+    positions: &[usize],
+    base_mod: &str,
+) -> basemods::BaseMod {
+    // new ml tag
+    let modified_probabilities_forward: Vec<u8> = predictions
+        .iter()
+        .map(|&x| (255.0 * x).round() as u8)
+        .collect();
+    // new mm tag
+    let modified_bases_forward = positions.iter().map(|&x| x as i64).collect();
+    let base_mod = base_mod.as_bytes();
+    let modified_base = base_mod[0];
+    let strand = base_mod[1] as char;
+    let modification_type = base_mod[2] as char;
+
+    basemods::BaseMod::new(
+        record,
+        modified_base,
+        strand,
+        modification_type,
+        modified_bases_forward,
+        modified_probabilities_forward,
+    )
+}
+
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     let mut cur_basemods = basemods::BaseMods::new(record, 0);
     cur_basemods.drop_m6a();
     log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+    /*
     // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
     let mut mm_tag: String = "".to_string();
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
@@ -129,6 +156,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         record.remove_aux(b"MM").unwrap_or(());
         record.remove_aux(b"ML").unwrap_or(());
     }
+    */
 
     let extend = WINDOW / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
@@ -160,6 +188,8 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     let mut t_count = 0;
     let mut a_windows = vec![];
     let mut t_windows = vec![];
+    let mut a_positions = vec![];
+    let mut t_positions = vec![];
     for (pos, base) in seq.iter().enumerate() {
         if !((*base == b'A') || (*base == b'T')) {
             continue;
@@ -214,18 +244,30 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         if *base == b'A' {
             a_windows.extend(data_window);
             a_count += 1;
+            a_positions.push(pos);
         } else {
             t_windows.extend(data_window);
             t_count += 1;
+            t_positions.push(pos);
         }
     }
+
     let a_predict = apply_model(&a_windows, a_count, predict_options);
     assert_eq!(a_predict.len(), a_count);
-    add_mm_ml(record, &a_predict, "A+a", predict_options);
-
     let t_predict = apply_model(&t_windows, t_count, predict_options);
     assert_eq!(t_predict.len(), t_count);
-    add_mm_ml(record, &t_predict, "T-a", predict_options);
+
+    cur_basemods
+        .base_mods
+        .push(basemod_from_ml(record, &a_predict, &a_positions, "A+a"));
+    cur_basemods
+        .base_mods
+        .push(basemod_from_ml(record, &t_predict, &t_positions, "T-a"));
+
+    // write the ml and mm tags
+    cur_basemods.add_mm_and_ml_tags(record);
+    //add_mm_ml(record, &a_predict, "A+a", predict_options);
+    //add_mm_ml(record, &t_predict, "T-a", predict_options);
 
     // clear the existing data
     if !predict_options.keep {
