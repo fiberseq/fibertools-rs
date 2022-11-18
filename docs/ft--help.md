@@ -20,6 +20,7 @@ SUBCOMMANDS:
     center         This command centers fiberseq data around given reference positions. This is
                        useful for making aggregate m6a and CpG observations, as well as
                        visualization of SVs [aliases: c, ct]
-    predict-m6a    Predict m6A positions using HiFi kinetics data [aliases: m6A, m6a]
+    predict-m6a    Predict m6A positions using HiFi kinetics data and encode the results in the
+                       MM and ML bam tags [aliases: m6A, m6a]
     help           Print this message or the help of the given subcommand(s)
 ```
