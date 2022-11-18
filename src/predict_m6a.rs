@@ -51,11 +51,6 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
     out
 }
 
-pub fn ml_score_transform(x: f32) -> f32 {
-    // logit
-    (x / (1.0 - x)).log2()
-}
-
 // TODO make it extend existing results instead of replacing even if MM ML is already there
 pub fn add_mm_ml(
     record: &mut bam::Record,
@@ -83,10 +78,13 @@ pub fn add_mm_ml(
     record.push_aux(b"MM", aux_integer_field).unwrap();
 
     // update the ml tag
-    let new_ml: Vec<u8> = predictions
+    let mut new_ml: Vec<u8> = predictions
         .iter()
         .map(|&x| (255.0 * x).round() as u8)
         .collect();
+    if record.is_reverse() {
+        new_ml = new_ml.into_iter().rev().collect();
+    }
 
     // old get the old ml tag
     let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
@@ -138,15 +136,19 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         .into_iter()
         .rev()
         .collect::<Vec<_>>();
-    // return if missing kinetics
-    if f_ip.is_empty() || r_ip.is_empty() {
-        return;
-    }
     let f_pw = bamlift::get_u8_tag(record, b"fp");
     let r_pw = bamlift::get_u8_tag(record, b"rp")
         .into_iter()
         .rev()
         .collect::<Vec<_>>();
+    // return if missing kinetics
+    if f_ip.is_empty() || r_ip.is_empty() || f_pw.is_empty() || r_pw.is_empty() {
+        log::warn!(
+            "Hifi kinetics are missing for: {}",
+            String::from_utf8_lossy(record.qname())
+        );
+        return;
+    }
 
     let mut seq = record.seq().as_bytes();
     if record.is_reverse() {
