@@ -5,11 +5,7 @@ use indicatif::{style, ParallelProgressIterator};
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
-use rust_htslib::{
-    bam,
-    bam::record::{Aux, AuxArray},
-    bam::Read,
-};
+use rust_htslib::{bam, bam::Read};
 
 static WINDOW: usize = 15;
 
@@ -51,66 +47,6 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
     out
 }
 
-// TODO make it extend existing results instead of replacing even if MM ML is already there
-pub fn add_mm_ml(
-    record: &mut bam::Record,
-    predictions: &Vec<f32>,
-    base_mod: &str,
-    predict_options: &PredictOptions,
-) {
-    if predictions.is_empty() {
-        return;
-    }
-    let mut mm_tag: String = "".to_string();
-    if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
-        mm_tag.push_str(mm_text);
-    }
-    record.remove_aux(b"MM").unwrap_or(());
-
-    // update the MM tag with new data
-    let mut new_mm = base_mod.to_string();
-    for _i in 0..predictions.len() {
-        new_mm.push_str(",0")
-    }
-    new_mm.push(';');
-    mm_tag.push_str(&new_mm);
-    let aux_integer_field = Aux::String(&mm_tag);
-    record.push_aux(b"MM", aux_integer_field).unwrap();
-
-    // update the ml tag
-    let new_ml: Vec<u8> = predictions
-        .iter()
-        .map(|&x| (255.0 * x).round() as u8)
-        .collect();
-
-    // old get the old ml tag
-    let mut ml_tag = bamlift::get_u8_tag(record, b"ML");
-    record.remove_aux(b"ML").unwrap_or(());
-
-    // extend the old ml_tag
-    ml_tag.extend(new_ml.iter());
-    let aux_array: AuxArray<u8> = (&ml_tag).into();
-    let aux_array_field = Aux::ArrayU8(aux_array);
-    record.push_aux(b"ML", aux_array_field).unwrap();
-    // make sure they are the same
-    assert_eq!(ml_tag.len(), mm_tag.chars().filter(|&x| x == ',').count());
-
-    // add full floating point values
-    if predict_options.full_float {
-        let mut pre_predict = bamlift::get_f32_tag(record, b"mp");
-        pre_predict.extend(predictions.iter());
-        // clean current tag
-        record.remove_aux(b"mp").unwrap_or(());
-        // add new tag
-        let aux_array: AuxArray<f32> = (&pre_predict).into();
-        let aux_array_field = Aux::ArrayFloat(aux_array);
-        record.push_aux(b"mp", aux_array_field).unwrap();
-        log::trace!("mp:{:?}", pre_predict);
-    }
-    log::trace!("ML:{:?}", ml_tag);
-    log::trace!("MM:{:?}", mm_tag);
-}
-
 /// Create a basemod object form our predictions
 pub fn basemod_from_ml(
     record: &mut bam::Record,
@@ -144,19 +80,6 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     let mut cur_basemods = basemods::BaseMods::new(record, 0);
     cur_basemods.drop_m6a();
     log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
-    /*
-    // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
-    let mut mm_tag: String = "".to_string();
-    if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
-        mm_tag.push_str(mm_text);
-    }
-    // if we already have the base mode then we need to clear the whole thing
-    if mm_tag.contains("A+a") || mm_tag.contains("T-a") {
-        // clear the existing data
-        record.remove_aux(b"MM").unwrap_or(());
-        record.remove_aux(b"ML").unwrap_or(());
-    }
-    */
 
     let extend = WINDOW / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
@@ -171,7 +94,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         .collect::<Vec<_>>();
     // return if missing kinetics
     if f_ip.is_empty() || r_ip.is_empty() || f_pw.is_empty() || r_pw.is_empty() {
-        log::warn!(
+        log::debug!(
             "Hifi kinetics are missing for: {}",
             String::from_utf8_lossy(record.qname())
         );
