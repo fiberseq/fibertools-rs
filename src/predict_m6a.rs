@@ -117,6 +117,9 @@ pub fn add_mm_ml(
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
+    let mut cur_basemods = basemods::BaseMods::new(record, 0);
+    cur_basemods.drop_m6a();
+    log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
     // if there is previous m6a predictions in the MM,ML,tags clear the whole tag
     let mut mm_tag: String = "".to_string();
     if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
