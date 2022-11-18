@@ -7,7 +7,7 @@ echo $LIBTORCH
 export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 
-for subcommand in "" "extract" "center"; do
+for subcommand in "" "extract" "center" "predict-m6a"; do
     echo $subcommand
     out="docs/ft-${subcommand}-help.md"
     echo '```' >$out

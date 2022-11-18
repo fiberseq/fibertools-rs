@@ -87,17 +87,17 @@ pub enum Commands {
         #[clap(short, long)]
         wide: bool,
     },
-    /// Predict m6A positions using HiFi kinetics data.
+    /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
         /// HiFi file with kinetics.
         bam: String,
-        /// Output bam file.
+        /// Output bam file with m6A calls in new/extended MM and ML bam tags.
         out: String,
         /// keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
-        /// use cnn model
+        /// use CNN model for prediction instead of XGB.
         #[clap(short, long)]
         cnn: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
