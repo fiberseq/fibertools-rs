@@ -81,6 +81,16 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
     cur_basemods.drop_m6a();
     log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
 
+    if record.is_secondary() {
+        log::warn!(
+            "Skipping secondary alignment of {}",
+            String::from_utf8_lossy(record.qname())
+        );
+        // clear old m6a
+        cur_basemods.add_mm_and_ml_tags(record);
+        return;
+    }
+
     let extend = WINDOW / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
     let r_ip = bamlift::get_u8_tag(record, b"ri")
@@ -189,8 +199,6 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
 
     // write the ml and mm tags
     cur_basemods.add_mm_and_ml_tags(record);
-    //add_mm_ml(record, &a_predict, "A+a", predict_options);
-    //add_mm_ml(record, &t_predict, "T-a", predict_options);
 
     // clear the existing data
     if !predict_options.keep {
@@ -240,8 +248,6 @@ pub fn read_bam_into_fiberdata(
         chunk
             .par_iter_mut()
             .progress_with_style(style)
-            //.filter(|r| r.is_unmapped())
-            .filter(|r| r.is_unmapped() || !r.is_secondary() || !r.is_supplementary())
             .for_each(|r| predict_m6a(r, predict_options));
 
         // write to output
