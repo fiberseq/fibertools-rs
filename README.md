@@ -27,7 +27,7 @@ mamba install -c bioconda fibertools-rs
 ```
 cargo install --git https://github.com/mrvollger/fibertools-rs
 ```
-# `fibertools`
+# `fibertools-rs`
 
 [Help page for fibertools](/docs/ft--help.md)
 
@@ -45,11 +45,13 @@ The extract all option is a special option that tries to extract all the fiberse
 
 ![Center](/images/center.png)
 
+# `ft-predict-m6a`
+[Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
 
 # TODO
 - [ ] Add `rustybam` stats to ft `all`
-- [ ] Add CNN to CI
-- [ ] Option to keep full float info in predict-m6a
+- [x] Add CNN to CI
+- [x] Option to keep full float info in predict-m6a
 - [x] Add option for all format but without sequence
 - [x] handle broken pipe errors in `ft-extract`
 - [x] add rq to all

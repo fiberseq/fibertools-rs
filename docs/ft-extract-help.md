@@ -1,5 +1,5 @@
 ```
-ft-extract 0.0.7
+ft-extract 0.0.8
 Extract fiberseq data into plain text files
 
 USAGE:
@@ -35,6 +35,9 @@ OPTIONS:
 
     -a, --all <ALL>
             Output path for
+
+    -f, --full-float
+            Add the full floating point predictions of the ML model
 
     -h, --help
             Print help information
