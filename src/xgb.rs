@@ -12,8 +12,14 @@ static JSON_2_2: &str = include_str!("../models/gbdt_0.81_p2.2.json");
 pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
     INIT.call_once(|| {
         let json = match polymerase {
-            PbChem::Two => JSON,
-            PbChem::TwoPointTwo => JSON_2_2,
+            PbChem::Two => {
+                log::warn!("Using model for 2.2 chemistry");
+                JSON
+            }
+            PbChem::TwoPointTwo => {
+                log::warn!("Using model for 2.2 chemistry");
+                JSON_2_2
+            }
         };
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, json).expect("Unable to write file");
