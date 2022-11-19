@@ -11,8 +11,14 @@ static PT_2_2: &[u8] = include_bytes!("../models/2.0_torch.pt");
 pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
         let model_str = match polymerase {
-            PbChem::Two => PT,
-            PbChem::TwoPointTwo => PT_2_2,
+            PbChem::Two => {
+                log::warn!("Using model for 2.0 chemistry");
+                PT
+            }
+            PbChem::TwoPointTwo => {
+                log::warn!("Using model for 2.2 chemistry");
+                PT_2_2
+            }
         };
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, model_str).expect("Unable to write file");
