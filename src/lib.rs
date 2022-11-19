@@ -224,7 +224,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
             regex::Regex::new(r".*READTYPE=([^;]+);.*BINDINGKIT=([^;]+);").unwrap();
     }
     let z = header.to_hashmap();
-    let rg = &z["RG"];
+    let rg = z.get("RG").expect("RG tag missing from bam file");
     let mut read_type = "";
     let mut binding_kit = "";
     for tag in rg {
