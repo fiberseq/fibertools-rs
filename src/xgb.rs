@@ -13,7 +13,7 @@ pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
     INIT.call_once(|| {
         let json = match polymerase {
             PbChem::Two => {
-                log::warn!("Using model for 2.2 chemistry");
+                log::warn!("Using model for 2.0 chemistry");
                 JSON
             }
             PbChem::TwoPointTwo => {
