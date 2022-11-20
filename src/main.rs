@@ -5,7 +5,28 @@ use fibertools_rs::cli::Commands;
 use fibertools_rs::*;
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
+use std::path::Path;
 use std::time::Instant;
+
+// TODO FINISH THIS CHECK
+pub fn yank_check() {
+    let config = cargo::util::Config::default().unwrap();
+    //let build = config.build_config().unwrap();
+    let cur_exe_path = config.cargo_exe().unwrap();
+    log::warn!("{:?}", config.cargo_exe());
+    let sid = cargo::core::SourceId::for_path(cur_exe_path).unwrap();
+    log::warn!("{:?}", config.registry_source_path());
+    let _ws = cargo::core::Workspace::new(
+        Path::new("/Users/mrvollger/Desktop/repos/fibertools-rs/Cargo.toml"),
+        &config,
+    )
+    .unwrap();
+
+    let pkg = cargo::core::package_id::PackageId::new("fibertools-rs", "0.0.8", sid).unwrap();
+    log::warn!("{:?}", pkg);
+    let src_map = cargo::core::source::SourceMap::new();
+    let _pkg_set = cargo::core::package::PackageSet::new(&[pkg], src_map, &config).unwrap();
+}
 
 pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
