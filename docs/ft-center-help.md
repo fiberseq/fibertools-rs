@@ -1,5 +1,5 @@
 ```
-ft-center 0.0.8
+ft-center 0.0.9
 This command centers fiberseq data around given reference positions. This is useful for making
 aggregate m6a and CpG observations, as well as visualization of SVs
 

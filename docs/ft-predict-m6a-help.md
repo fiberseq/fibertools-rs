@@ -1,5 +1,5 @@
 ```
-ft-predict-m6a 0.0.8
+ft-predict-m6a 0.0.9
 Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags
 
 USAGE:
