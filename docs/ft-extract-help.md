@@ -12,11 +12,17 @@ OPTIONS:
     -r, --reference
             report in reference sequence coordinates
 
+    -t, --threads <THREADS>
+            Threads for decompression [default: 8]
+
     -s, --simplify
             simplify output by remove fiber sequence
 
     -q, --quality
             include per base quality scores in "fiber_qual"
+
+        --quiet
+            Turn of all logging
 
     -m, --min-ml-score <MIN_ML_SCORE>
             Minium score in the ML tag to include in the output [default: 150]
@@ -44,4 +50,7 @@ OPTIONS:
 
     -V, --version
             Print version information
+
+DEBUG:
+    -v, --verbose    Logging level [-v: Info, -vv: Debug, -vvv: Trace]
 ```
