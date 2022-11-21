@@ -7,13 +7,15 @@ USAGE:
     ft [OPTIONS] <SUBCOMMAND>
 
 OPTIONS:
-    -t, --threads <THREADS>    Threads for decompression [default: 8]
-        --quiet                Turn of all logging
-    -h, --help                 Print help information
-    -V, --version              Print version information
+    -h, --help       Print help information
+    -V, --version    Print version information
 
-DEBUG:
+GLOBAL-OPTIONS:
+    -t, --threads <THREADS>    Threads for decompression [default: 8]
+
+DEBUG-OPTIONS:
     -v, --verbose    Logging level [-v: Info, -vv: Debug, -vvv: Trace]
+        --quiet      Turn of all logging
 
 SUBCOMMANDS:
     extract        Extract fiberseq data into plain text files [aliases: ex, e]

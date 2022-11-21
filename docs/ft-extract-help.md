@@ -12,18 +12,6 @@ OPTIONS:
     -r, --reference
             report in reference sequence coordinates
 
-    -t, --threads <THREADS>
-            Threads for decompression [default: 8]
-
-    -s, --simplify
-            simplify output by remove fiber sequence
-
-    -q, --quality
-            include per base quality scores in "fiber_qual"
-
-        --quiet
-            Turn of all logging
-
     -m, --min-ml-score <MIN_ML_SCORE>
             Minium score in the ML tag to include in the output [default: 150]
 
@@ -40,10 +28,7 @@ OPTIONS:
             Output path for nucleosome bed12
 
     -a, --all <ALL>
-            Output path for
-
-    -f, --full-float
-            Add the full floating point predictions of the ML model
+            Output path for a tabular format including "all" fiberseq information in the bam
 
     -h, --help
             Print help information
@@ -51,6 +36,15 @@ OPTIONS:
     -V, --version
             Print version information
 
-DEBUG:
+ALL-FORMATTING-OPTIONS:
+    -q, --quality       include per base quality scores in "fiber_qual"
+    -f, --full-float    Add the full floating point predictions of the ML model
+    -s, --simplify      simplify output by remove fiber sequence
+
+GLOBAL-OPTIONS:
+    -t, --threads <THREADS>    Threads for decompression [default: 8]
+
+DEBUG-OPTIONS:
     -v, --verbose    Logging level [-v: Info, -vv: Debug, -vvv: Trace]
+        --quiet      Turn of all logging
 ```

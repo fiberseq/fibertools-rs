@@ -20,23 +20,22 @@ pub struct Cli {
         short,
         long,
         default_value_t = 8,
-        help_heading = "GLOBAL"
+        help_heading = "GLOBAL-OPTIONS"
     )]
     pub threads: usize,
-
     /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
     #[clap(
         global = true,
         short,
         long,
         parse(from_occurrences),
-        help_heading = "DEBUG"
+        help_heading = "DEBUG-OPTIONS"
     )]
     pub verbose: usize,
     /// Turn of all logging.
-    #[clap(global = true, long, help_heading = "DEBUG")]
+    #[clap(global = true, long, help_heading = "DEBUG-OPTIONS")]
     pub quiet: bool,
-
+    /// Subcommands for fibertools-rs
     #[clap(subcommand)]
     pub command: Option<Commands>,
 }
@@ -55,12 +54,6 @@ pub enum Commands {
         /// report in reference sequence coordinates.
         #[clap(short, long)]
         reference: bool,
-        /// simplify output by remove fiber sequence
-        #[clap(short, long)]
-        simplify: bool,
-        /// include per base quality scores in "fiber_qual"
-        #[clap(short, long)]
-        quality: bool,
         /// Minium score in the ML tag to include in the output.
         #[clap(short, long, default_value = "150")]
         min_ml_score: u8,
@@ -76,12 +69,18 @@ pub enum Commands {
         /// Output path for nucleosome bed12.
         #[clap(short, long)]
         nuc: Option<String>,
-        /// Output path for .
+        /// Output path for a tabular format including "all" fiberseq information in the bam.
         #[clap(short, long)]
         all: Option<String>,
+        /// include per base quality scores in "fiber_qual"
+        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
+        quality: bool,
         /// Add the full floating point predictions of the ML model
-        #[clap(short, long)]
+        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
         full_float: bool,
+        /// simplify output by remove fiber sequence
+        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
+        simplify: bool,
     },
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs.
     #[clap(visible_aliases = &["c", "ct"])]
