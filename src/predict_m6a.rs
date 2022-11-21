@@ -76,7 +76,7 @@ pub fn basemod_from_ml(
     )
 }
 
-pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
+pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -> Option<()> {
     let mut cur_basemods = basemods::BaseMods::new(record, 0);
     cur_basemods.drop_m6a();
     log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
@@ -88,7 +88,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         );
         // clear old m6a
         cur_basemods.add_mm_and_ml_tags(record);
-        return;
+        return None;
     }
 
     let extend = WINDOW / 2;
@@ -108,7 +108,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
             "Hifi kinetics are missing for: {}",
             String::from_utf8_lossy(record.qname())
         );
-        return;
+        return None;
     }
 
     let mut seq = record.seq().as_bytes();
@@ -207,6 +207,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) {
         record.remove_aux(b"rp").unwrap_or(());
         record.remove_aux(b"ri").unwrap_or(());
     }
+    Some(())
 }
 
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
@@ -245,10 +246,16 @@ pub fn read_bam_into_fiberdata(
             .progress_chars("##-");
 
         // add m6a calls
-        chunk
+        let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .progress_with_style(style)
-            .for_each(|r| predict_m6a(r, predict_options));
+            .map(|r| predict_m6a(r, predict_options))
+            .flatten()
+            .count() as f32;
+        let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
+        if frac_called < 0.05 {
+            log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0*frac_called);
+        }
 
         // write to output
         chunk.iter().for_each(|r| out.write(r).unwrap());
