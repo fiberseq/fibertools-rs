@@ -15,14 +15,20 @@ use clap::{AppSettings, Parser, Subcommand};
 #[clap(global_setting(AppSettings::DeriveDisplayOrder))]
 pub struct Cli {
     /// Threads for decompression.
-    #[clap(short, long, default_value_t = 8)]
+    #[clap(global = true, short, long, default_value_t = 8)]
     pub threads: usize,
 
-    /// Logging level [-v: Debug, -vv: Trace].
-    #[clap(short, long, parse(from_occurrences), help_heading = "DEBUG")]
+    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
+    #[clap(
+        global = true,
+        short,
+        long,
+        parse(from_occurrences),
+        help_heading = "DEBUG"
+    )]
     pub verbose: usize,
     /// Turn of all logging.
-    #[clap(short, long)]
+    #[clap(global = true, short, long)]
     pub quiet: bool,
 
     #[clap(subcommand)]
