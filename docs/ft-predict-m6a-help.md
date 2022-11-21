@@ -10,15 +10,16 @@ ARGS:
     <OUT>    Output bam file with m6A calls in new/extended MM and ML bam tags [default: -]
 
 OPTIONS:
-    -k, --keep                 keep hifi kinetics data
-    -t, --threads <THREADS>    Threads for decompression [default: 8]
-    -c, --cnn                  use CNN model for prediction instead of XGB
-    -f, --full-float           Add a bam tag (mp) with the full floating point predictions of the ML
-                               model
-        --quiet                Turn of all logging
-    -h, --help                 Print help information
-    -V, --version              Print version information
+    -k, --keep          keep hifi kinetics data
+    -c, --cnn           use CNN model for prediction instead of XGB
+    -f, --full-float    Add a bam tag (mp) with the full floating point predictions of the ML model
+    -h, --help          Print help information
+    -V, --version       Print version information
 
-DEBUG:
+GLOBAL-OPTIONS:
+    -t, --threads <THREADS>    Threads for decompression [default: 8]
+
+DEBUG-OPTIONS:
     -v, --verbose    Logging level [-v: Info, -vv: Debug, -vvv: Trace]
+        --quiet      Turn of all logging
 ```
