@@ -352,7 +352,7 @@ impl FiberseqData {
         head_view: &HeaderView,
     ) -> String {
         // skip if no alignments are here
-        if (self.record.is_unmapped() && reference) || lengths.is_empty() || starts.is_empty() {
+        if self.record.is_unmapped() && reference {
             return "".to_string();
         }
 
@@ -379,6 +379,10 @@ impl FiberseqData {
             .zip(lengths.iter())
             .filter(|(&st, &ln)| st >= 0 && ln >= 0)
             .unzip();
+        // skip empty ones
+        if filtered_lengths.is_empty() || filtered_starts.is_empty() {
+            return "".to_string();
+        }
         let b_ct = filtered_starts.len() + 2;
         let b_ln: String = filtered_lengths
             .iter()
