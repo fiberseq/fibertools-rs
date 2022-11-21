@@ -352,7 +352,7 @@ impl FiberseqData {
         head_view: &HeaderView,
     ) -> String {
         // skip if no alignments are here
-        if self.record.is_unmapped() && reference {
+        if (self.record.is_unmapped() && reference) || lengths.is_empty() || starts.is_empty() {
             return "".to_string();
         }
 
