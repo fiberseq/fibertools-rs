@@ -232,7 +232,7 @@ pub fn read_bam_into_fiberdata(
     predict_options: &PredictOptions,
 ) {
     // read in bam data
-    let chunk_size = current_num_threads() * 200;
+    let chunk_size = current_num_threads() * 500;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
