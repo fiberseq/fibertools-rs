@@ -18,6 +18,11 @@ module load gcc/10.2.0 cmake/3.21.1
 cargo install fibertools-rs
 ```
 [How to install `cargo`.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+### Install with support for CNN m6A prediction
+```bash
+cargo install fibertools-rs --features cnn
+```
+
 
 ## From [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs) (latest version not always available)
 ```
