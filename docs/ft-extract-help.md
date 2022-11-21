@@ -6,11 +6,11 @@ USAGE:
     ft extract [OPTIONS] [BAM]
 
 ARGS:
-    <BAM>    fiberseq bam file [default: -]
+    <BAM>    Fiberseq bam file [default: -]
 
 OPTIONS:
     -r, --reference
-            report in reference sequence coordinates
+            Report in reference sequence coordinates
 
     -m, --min-ml-score <MIN_ML_SCORE>
             Minium score in the ML tag to include in the output [default: 150]
@@ -37,9 +37,9 @@ OPTIONS:
             Print version information
 
 ALL-FORMATTING-OPTIONS:
-    -q, --quality       include per base quality scores in "fiber_qual"
+    -q, --quality       Include per base quality scores in "fiber_qual"
     -f, --full-float    Add the full floating point predictions of the ML model
-    -s, --simplify      simplify output by remove fiber sequence
+    -s, --simplify      Simplify output by remove fiber sequence
 
 GLOBAL-OPTIONS:
     -t, --threads <THREADS>    Threads for decompression [default: 8]

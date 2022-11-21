@@ -8,11 +8,11 @@ USAGE:
 
 ARGS:
     <BAM>
-            fiberseq bam file, must be aligned and have an index
+            Fiberseq bam file, must be aligned and have an index
 
     <BED>
             Bed file on which to center fiberseq reads. Data is adjusted to the start position of
-            the bed file and corrected for strand if a 4th strand column is included.
+            the bed file and corrected for strand if a 4th strand column is included
 
             If you include strand information in the 4th column it will orient data accordingly and
             use the end position of bed record instead of the start if on the minus strand. This
