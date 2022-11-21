@@ -1,5 +1,5 @@
 ```
-fibertools-rs 0.0.8
+fibertools-rs 0.0.9
 Mitchell R. Vollger <mrvollger@gmail.com>
 fiberseq toolkit in rust
 

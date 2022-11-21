@@ -1,5 +1,5 @@
 ```
-ft-extract 0.0.8
+ft-extract 0.0.9
 Extract fiberseq data into plain text files
 
 USAGE:
