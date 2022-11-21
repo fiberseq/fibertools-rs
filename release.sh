@@ -1,7 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euxo pipefail
 V=$(grep "^version" Cargo.toml | sed 's/.*= //g' | sed 's/"//g' | xargs)
 echo $V
+
+export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 
 cargo clippy
 cargo test
