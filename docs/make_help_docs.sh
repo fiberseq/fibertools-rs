@@ -10,7 +10,6 @@ for subcommand in "" "extract" "center" "predict-m6a"; do
     echo '```' >$out
     cargo run -- $subcommand --help >>$out
     echo '```' >>$out
-    echo '' >>$out
 done
 
 # extract the column names for the all command
