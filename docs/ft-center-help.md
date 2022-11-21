@@ -25,12 +25,24 @@ OPTIONS:
 
             [default: 150]
 
+    -t, --threads <THREADS>
+            Threads for decompression
+
+            [default: 8]
+
     -w, --wide
             Provide data in wide format, one row per read
+
+        --quiet
+            Turn of all logging
 
     -h, --help
             Print help information
 
     -V, --version
             Print version information
+
+DEBUG:
+    -v, --verbose
+            Logging level [-v: Info, -vv: Debug, -vvv: Trace]
 ```

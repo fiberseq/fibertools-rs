@@ -28,7 +28,7 @@ pub struct Cli {
     )]
     pub verbose: usize,
     /// Turn of all logging.
-    #[clap(global = true, short, long)]
+    #[clap(global = true, long)]
     pub quiet: bool,
 
     #[clap(subcommand)]
