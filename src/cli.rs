@@ -15,7 +15,13 @@ use clap::{AppSettings, Parser, Subcommand};
 #[clap(global_setting(AppSettings::DeriveDisplayOrder))]
 pub struct Cli {
     /// Threads for decompression.
-    #[clap(global = true, short, long, default_value_t = 8)]
+    #[clap(
+        global = true,
+        short,
+        long,
+        default_value_t = 8,
+        help_heading = "GLOBAL"
+    )]
     pub threads: usize,
 
     /// Logging level [-v: Info, -vv: Debug, -vvv: Trace].
@@ -28,7 +34,7 @@ pub struct Cli {
     )]
     pub verbose: usize,
     /// Turn of all logging.
-    #[clap(global = true, long)]
+    #[clap(global = true, long, help_heading = "DEBUG")]
     pub quiet: bool,
 
     #[clap(subcommand)]
