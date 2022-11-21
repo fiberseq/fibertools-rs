@@ -10,8 +10,8 @@ ARGS:
     <OUT>    Output bam file with m6A calls in new/extended MM and ML bam tags [default: -]
 
 OPTIONS:
-    -k, --keep          keep hifi kinetics data
-    -c, --cnn           use CNN model for prediction instead of XGB
+    -k, --keep          Keep hifi kinetics data
+    -c, --cnn           Use CNN model for prediction instead of XGBoost
     -f, --full-float    Add a bam tag (mp) with the full floating point predictions of the ML model
     -h, --help          Print help information
     -V, --version       Print version information
