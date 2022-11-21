@@ -69,6 +69,18 @@ pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
     bam
 }
 
+/// Write to a bam file.
+pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
+    let header = bam::Header::from_template(template_bam.header());
+    let mut out = if out == "-" {
+        bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
+    } else {
+        bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
+    };
+    out.set_threads(threads).unwrap();
+    out
+}
+
 pub struct FiberOut {
     pub m6a: Option<Box<dyn Write>>,
     pub cpg: Option<Box<dyn Write>>,

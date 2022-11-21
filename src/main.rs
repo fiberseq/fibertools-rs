@@ -114,13 +114,7 @@ pub fn main() -> Result<(), Error> {
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
-            let mut out = if out == "-" {
-                bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
-            } else {
-                bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
-            };
-            out.set_threads(args.threads).unwrap();
-
+            let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
             let predict_options = predict_m6a::PredictOptions {
                 keep: *keep,
                 cnn: *cnn,

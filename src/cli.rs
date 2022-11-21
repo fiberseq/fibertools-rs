@@ -90,9 +90,11 @@ pub enum Commands {
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
-        /// HiFi file with kinetics.
+        /// Bam HiFi file with kinetics.
+        #[clap(default_value = "-")]
         bam: String,
         /// Output bam file with m6A calls in new/extended MM and ML bam tags.
+        #[clap(default_value = "-")]
         out: String,
         /// keep hifi kinetics data
         #[clap(short, long)]
