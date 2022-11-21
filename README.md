@@ -26,7 +26,7 @@ cargo install fibertools-rs --features cnn
 
 ## From [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs) (latest version not always available)
 ```
-mamba install -c bioconda fibertools-rs
+mamba install -c conda-forge -c bioconda fibertools-rs
 ```
 ## From `github` (active development)
 ```
