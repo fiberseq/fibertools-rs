@@ -5,9 +5,10 @@ use fibertools_rs::cli::Commands;
 use fibertools_rs::*;
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
-use std::path::Path;
 use std::time::Instant;
 
+/*
+use std::path::Path;
 // TODO FINISH THIS CHECK
 pub fn yank_check() {
     let config = cargo::util::Config::default().unwrap();
@@ -27,6 +28,7 @@ pub fn yank_check() {
     let src_map = cargo::core::source::SourceMap::new();
     let _pkg_set = cargo::core::package::PackageSet::new(&[pkg], src_map, &config).unwrap();
 }
+*/
 
 pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
@@ -37,7 +39,7 @@ pub fn main() -> Result<(), Error> {
     let subcommand = matches.subcommand_name().unwrap();
 
     // set the logging level
-    let mut min_log_level = match matches.occurrences_of("verbose") {
+    let mut min_log_level = match matches.get_count("verbose") {
         0 => LevelFilter::Warn,
         1 => LevelFilter::Info,
         2 => LevelFilter::Debug,

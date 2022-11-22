@@ -1,5 +1,4 @@
-use clap::IntoApp;
-use clap::{AppSettings, Parser, Subcommand};
+use clap::{Command, CommandFactory, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -12,7 +11,6 @@ use clap::{AppSettings, Parser, Subcommand};
     arg_required_else_help = true,
     help_expected = true
 )]
-#[clap(global_setting(AppSettings::DeriveDisplayOrder))]
 pub struct Cli {
     /// Threads for decompression
     #[clap(
@@ -28,10 +26,10 @@ pub struct Cli {
         global = true,
         short,
         long,
-        parse(from_occurrences),
+        action = clap::ArgAction::Count,
         help_heading = "DEBUG-OPTIONS"
     )]
-    pub verbose: usize,
+    pub verbose: u8,
     /// Turn of all logging
     #[clap(global = true, long, help_heading = "DEBUG-OPTIONS")]
     pub quiet: bool,
@@ -123,6 +121,6 @@ pub fn make_cli_parse() -> Cli {
     Cli::parse()
 }
 
-pub fn make_cli_app() -> clap::Command<'static> {
+pub fn make_cli_app() -> Command {
     Cli::command()
 }
