@@ -1,10 +1,10 @@
 [package]
 authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
 categories = ["command-line-utilities"]
-description = "fiberseq toolkit in rust"
+description = "Fiber-seq toolkit in rust"
 edition = "2021"
 homepage = "https://mrvollger.github.io/fibertools-rs/"
-keywords = ["cli", "bam"]
+keywords = ["cli", "bam", "bfx"]
 license = "MIT"
 name = "fibertools-rs"
 readme = "README.md"
