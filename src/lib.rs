@@ -19,6 +19,7 @@ pub mod xgb;
 use anyhow::Result;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use regex::Regex;
 use rust_htslib::{bam, bam::Read};
 use std::collections::HashMap;
 use std::env;
@@ -86,13 +87,24 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
 
     // add to the header
     let header_string = String::from_utf8_lossy(&header.to_bytes()).to_string();
-    let ft_count = header_string.matches("PP:ft").count();
     let mut header_rec = bam::header::HeaderRecord::new(b"PG");
+    // ID
+    let ft_count = header_string.matches("PN:fibertools-rs").count();
     header_rec.push_tag(b"ID", &format!("ft.{}", ft_count + 1));
-    header_rec.push_tag(b"PP", &format!("ft.{}", ft_count));
+    // PN
     header_rec.push_tag(b"PN", &"fibertools-rs");
+    // PP
+    let re_pp = Regex::new(r"@PG\tID:([^\t]+)").unwrap();
+    let last_program = re_pp.captures_iter(&header_string).last();
+    if let Some(last_program) = last_program {
+        let last_program = last_program[1].to_string();
+        log::trace!("last program {}", last_program);
+        header_rec.push_tag(b"PP", &last_program);
+    };
+    // VN
     header_rec.push_tag(b"VN", &VERSION);
     let cli = env::args().join(" ");
+    // CL
     header_rec.push_tag(b"CL", &cli);
     header.push_record(&header_rec);
     log::trace!("{:?}", String::from_utf8_lossy(&header.to_bytes()));
