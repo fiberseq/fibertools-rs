@@ -17,15 +17,15 @@ Options:
   -h, --help                         Print help information
   -V, --version                      Print version information
 
-ALL-FORMATTING-OPTIONS:
+All-format-options:
   -q, --quality     Include per base quality scores in "fiber_qual"
   -f, --full-float  Add the full floating point predictions of the ML model
   -s, --simplify    Simplify output by remove fiber sequence
 
-GLOBAL-OPTIONS:
+Global-options:
   -t, --threads <THREADS>  Threads for decompression [default: 8]
 
-DEBUG-OPTIONS:
+Debug-options:
   -v, --verbose...  Logging level [-v: Info, -vv: Debug, -vvv: Trace]
       --quiet       Turn of all logging
 ```

@@ -27,13 +27,13 @@ Options:
   -V, --version
           Print version information
 
-GLOBAL-OPTIONS:
+Global-options:
   -t, --threads <THREADS>
           Threads for decompression
 
           [default: 8]
 
-DEBUG-OPTIONS:
+Debug-options:
   -v, --verbose...
           Logging level [-v: Info, -vv: Debug, -vvv: Trace]
 
