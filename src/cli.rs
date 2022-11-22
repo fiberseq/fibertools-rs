@@ -18,7 +18,7 @@ pub struct Cli {
         short,
         long,
         default_value_t = 8,
-        help_heading = "GLOBAL-OPTIONS"
+        help_heading = "Global-options"
     )]
     pub threads: usize,
     /// Logging level [-v: Info, -vv: Debug, -vvv: Trace]
@@ -27,11 +27,11 @@ pub struct Cli {
         short,
         long,
         action = clap::ArgAction::Count,
-        help_heading = "DEBUG-OPTIONS"
+        help_heading = "Debug-options"
     )]
     pub verbose: u8,
     /// Turn of all logging
-    #[clap(global = true, long, help_heading = "DEBUG-OPTIONS")]
+    #[clap(global = true, long, help_heading = "Debug-options")]
     pub quiet: bool,
     /// Subcommands for fibertools-rs
     #[clap(subcommand)]
@@ -71,13 +71,13 @@ pub enum Commands {
         #[clap(short, long)]
         all: Option<String>,
         /// Include per base quality scores in "fiber_qual"
-        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
+        #[clap(short, long, help_heading = "All-format-options")]
         quality: bool,
         /// Add the full floating point predictions of the ML model
-        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
+        #[clap(short, long, help_heading = "All-format-options")]
         full_float: bool,
         /// Simplify output by remove fiber sequence
-        #[clap(short, long, help_heading = "ALL-FORMATTING-OPTIONS")]
+        #[clap(short, long, help_heading = "All-format-options")]
         simplify: bool,
     },
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs
