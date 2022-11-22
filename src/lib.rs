@@ -10,13 +10,17 @@ pub mod predict_m6a;
 pub mod xgb;
 
 use anyhow::Result;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use rust_htslib::{bam, bam::Read};
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::exit;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUFFER_SIZE: usize = 32 * 1024;
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
@@ -71,7 +75,22 @@ pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
 
 /// Write to a bam file.
 pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
-    let header = bam::Header::from_template(template_bam.header());
+    let mut header = bam::Header::from_template(template_bam.header());
+
+    // add to the header
+    let header_string = String::from_utf8_lossy(&header.to_bytes()).to_string();
+    let ft_count = header_string.matches("PP:ft").count();
+    let mut header_rec = bam::header::HeaderRecord::new(b"PG");
+    header_rec.push_tag(b"ID", &format!("ft.{}", ft_count + 1));
+    header_rec.push_tag(b"PP", &format!("ft.{}", ft_count));
+    header_rec.push_tag(b"PN", &"fibertools-rs");
+    header_rec.push_tag(b"VN", &VERSION);
+    let cli = env::args().join(" ");
+    header_rec.push_tag(b"CL", &cli);
+    header.push_record(&header_rec);
+    log::trace!("{:?}", String::from_utf8_lossy(&header.to_bytes()));
+
+    // make the writer
     let mut out = if out == "-" {
         bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
     } else {
