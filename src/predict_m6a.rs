@@ -248,8 +248,8 @@ pub fn read_bam_into_fiberdata(
         // add m6a calls
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .progress_with_style(style)
             .map(|r| predict_m6a(r, predict_options))
+            .progress_with_style(style)
             .flatten()
             .count() as f32;
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
