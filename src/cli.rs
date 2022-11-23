@@ -114,6 +114,11 @@ pub enum Commands {
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
         #[clap(short, long)]
         full_float: bool,
+        /// Number of reads to include in batch prediction
+        ///
+        /// Increasing improved GPU performance at the cost of memory.
+        #[clap(short, long, default_value_t = 10)]
+        batch_size: usize,
     },
 }
 

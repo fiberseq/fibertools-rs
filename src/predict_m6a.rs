@@ -14,6 +14,7 @@ pub struct PredictOptions {
     pub cnn: bool,
     pub full_float: bool,
     pub polymerase: PbChem,
+    pub batch_size: usize,
 }
 enum WhichML {
     Xgb,
@@ -340,7 +341,7 @@ pub fn read_bam_into_fiberdata(
         // add m6a calls
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .chunks(20)
+            .chunks(predict_options.batch_size)
             .map(|recs| predict_m6a_on_records(recs, predict_options))
             .progress_with_style(style)
             .sum::<usize>() as f32;
