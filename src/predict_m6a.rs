@@ -91,6 +91,15 @@ struct DataWidows {
 }
 
 fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)> {
+    // skip invalid or redundant records
+    if record.is_secondary() {
+        log::warn!(
+            "Skipping secondary alignment of {}",
+            String::from_utf8_lossy(record.qname())
+        );
+        return None;
+    }
+
     let extend = WINDOW / 2;
     let f_ip = bamlift::get_u8_tag(record, b"fi");
     let r_ip = bamlift::get_u8_tag(record, b"ri")
@@ -258,55 +267,6 @@ pub fn predict_m6a_on_records(
     }
     assert_eq!(cur_predict_st, predictions.len());
     data.iter().flatten().count()
-}
-
-pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -> Option<()> {
-    let mut cur_basemods = basemods::BaseMods::new(record, 0);
-    cur_basemods.drop_m6a();
-    log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
-
-    if record.is_secondary() {
-        log::warn!(
-            "Skipping secondary alignment of {}",
-            String::from_utf8_lossy(record.qname())
-        );
-        // clear old m6a
-        cur_basemods.add_mm_and_ml_tags(record);
-        return None;
-    }
-
-    // get window data if it is there
-    let (a_data, t_data) = get_m6a_data_windows(record)?;
-
-    let a_predict = apply_model(&a_data.windows, a_data.count, predict_options);
-    assert_eq!(a_predict.len(), a_data.count);
-    let t_predict = apply_model(&t_data.windows, t_data.count, predict_options);
-    assert_eq!(t_predict.len(), t_data.count);
-
-    cur_basemods.base_mods.push(basemod_from_ml(
-        record,
-        &a_predict,
-        &a_data.positions,
-        "A+a",
-    ));
-    cur_basemods.base_mods.push(basemod_from_ml(
-        record,
-        &t_predict,
-        &t_data.positions,
-        "T-a",
-    ));
-
-    // write the ml and mm tags
-    cur_basemods.add_mm_and_ml_tags(record);
-
-    // clear the existing data
-    if !predict_options.keep {
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
-    }
-    Some(())
 }
 
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
