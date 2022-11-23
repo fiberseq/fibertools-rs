@@ -14,11 +14,11 @@ pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
         log::warn!("Using {:?} for Torch device.", d);
         let model_str = match polymerase {
             PbChem::Two => {
-                log::warn!("Using model for 2.0 chemistry");
+                log::info!("Using model for 2.0 chemistry");
                 PT
             }
             PbChem::TwoPointTwo => {
-                log::warn!("Using model for 2.2 chemistry");
+                log::info!("Using model for 2.2 chemistry");
                 PT_2_2
             }
         };
@@ -28,7 +28,7 @@ pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
         let model = tch::CModule::load_data_on_device(&mut temp_path, d)
             .expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-        //tch::nn::VarStore::set_device(&mut self, device)
+        log::info!("CNN model loaded");
         model
     })
 }
