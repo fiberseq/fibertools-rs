@@ -7,7 +7,8 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rayon::{current_num_threads, prelude::IndexedParallelIterator};
 use rust_htslib::{bam, bam::Read};
 
-static WINDOW: usize = 15;
+pub const WINDOW: usize = 15;
+pub const LAYERS: usize = 6;
 
 pub struct PredictOptions {
     pub keep: bool,
@@ -129,7 +130,7 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
         // get the data window
         let data_window = if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
             // make fake data for leading and trailing As
-            vec![0.0; WINDOW * 6]
+            vec![0.0; WINDOW * LAYERS]
         } else {
             let start = pos - extend;
             let end = pos + extend + 1;

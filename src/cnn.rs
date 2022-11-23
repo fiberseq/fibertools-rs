@@ -1,3 +1,4 @@
+use super::predict_m6a::{LAYERS, WINDOW};
 use super::PbChem;
 use spin;
 use std::fs;
@@ -36,7 +37,7 @@ pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
 pub fn predict_with_cnn(windows: &[f32], count: usize, polyermase: &PbChem) -> Vec<f32> {
     let model = get_saved_pytorch_model(polyermase);
     let ts = tch::Tensor::of_slice(windows).to_device(tch::Device::cuda_if_available());
-    let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
+    let ts = ts.reshape(&[count.try_into().unwrap(), LAYERS as i64, WINDOW as i64]);
     let x = model.forward_ts(&[ts]).unwrap();
     let w: Vec<f32> = x.try_into().unwrap();
     // take every second value since we are doing binary classification.
