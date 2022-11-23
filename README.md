@@ -13,21 +13,30 @@ Installation from `cargo` requires a recent version of `gcc` and `cmake`. I have
 ```bash
 module load gcc/10.2.0 cmake/3.21.1
 ```
-## From [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs) (recommended)
+## From [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
 ```
 cargo install fibertools-rs
 ```
 [How to install `cargo`.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
-#### Install with support for CNN m6A prediction
+### Install with support for CNN m6A prediction
+* Get `libtorch` **v1.12.0** from the PyTorch website download section and extract the content of the zip file.
+* Add the following to your `.bashrc` or equivalent, where `/path/to/libtorch` is the path to the directory that was created when unzipping the file:
+```bash
+export LIBTORCH=/path/to/libtorch # e.g. export LIBTORCH=/Users/mrvollger/lib/libtorch_1.12.0
+export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+```
+And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
 ```bash
 cargo install fibertools-rs --features cnn
 ```
 
 
-## From [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs) (latest version not always available)
+## From [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
 ```
 mamba install -c conda-forge -c bioconda fibertools-rs
 ```
+Note this version does not currently have CNN support.
 ## From `github` (active development)
 ```
 cargo install --git https://github.com/mrvollger/fibertools-rs
@@ -51,7 +60,7 @@ The extract all option is a special option that tries to extract all the fiberse
 ![Center](/images/center.png)
 
 # `ft-predict-m6a`
-[Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
+[Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. See install instructions for how to include CNN support.
 
 # TODO
 - [ ] Add `rustybam` stats to ft `all`
