@@ -39,6 +39,7 @@ pub fn predict_with_cnn(windows: &[f32], count: usize, polyermase: &PbChem) -> V
     let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
     let x = model.forward_ts(&[ts]).unwrap();
     let w: Vec<f32> = x.try_into().unwrap();
+    // take every second value since we are doing binary classification.
     let z: Vec<f32> = w.chunks(2).map(|c| c[0]).collect();
     log::trace!(
         "{:?} {} {} {}",
