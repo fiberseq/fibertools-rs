@@ -16,6 +16,11 @@ pub struct PredictOptions {
     pub polymerase: PbChem,
     pub batch_size: usize,
 }
+impl PredictOptions {
+    pub fn progress_style(&self) -> &str {
+        "Predicting m6A: [{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% Batches per second {per_sec:<10.cyan}"
+    }
+}
 enum WhichML {
     Xgb,
     #[cfg(feature = "cnn")]
@@ -334,7 +339,7 @@ pub fn read_bam_into_fiberdata(
     // iterate over chunks
     let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
-        let style = style::ProgressStyle::with_template(PROGRESS_STYLE)
+        let style = style::ProgressStyle::with_template(predict_options.progress_style())
             .unwrap()
             .progress_chars("##-");
 
