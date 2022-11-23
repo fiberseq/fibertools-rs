@@ -121,7 +121,7 @@ pub enum Commands {
             short,
             long,
             default_value = "1",
-            default_value_if("cnn", "true", "15")
+            default_value_if("cnn", "true", "10")
         )]
         batch_size: usize,
     },
