@@ -24,9 +24,10 @@ pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
         };
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, model_str).expect("Unable to write file");
-        let model = tch::CModule::load(temp_file_name).expect("Unable to load PyTorch model");
+        let mut temp_path = fs::File::open(temp_file_name).expect("Unable to open model file.");
+        let model = tch::CModule::load_data_on_device(&mut temp_path, d)
+            .expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-        log::info!("Model from PyTorch loaded");
         //tch::nn::VarStore::set_device(&mut self, device)
         model
     })
