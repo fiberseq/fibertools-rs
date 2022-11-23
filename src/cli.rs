@@ -120,7 +120,7 @@ pub enum Commands {
         #[clap(
             short,
             long,
-            default_value = "5",
+            default_value = "1",
             default_value_if("cnn", "true", "15")
         )]
         batch_size: usize,
