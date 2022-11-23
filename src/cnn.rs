@@ -10,6 +10,10 @@ static PT_2_2: &[u8] = include_bytes!("../models/2.0_torch.pt");
 
 pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
+        log::warn!(
+            "Using {:?} for Torch device.",
+            tch::Device::cuda_if_available()
+        );
         let model_str = match polymerase {
             PbChem::Two => {
                 log::warn!("Using model for 2.0 chemistry");
