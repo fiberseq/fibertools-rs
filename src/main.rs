@@ -125,6 +125,7 @@ pub fn main() -> Result<(), Error> {
                 polymerase: find_pb_polymerase(&header),
                 batch_size: *batch_size,
             };
+            log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
         None => {}
