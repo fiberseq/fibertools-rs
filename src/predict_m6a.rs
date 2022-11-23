@@ -340,9 +340,9 @@ pub fn read_bam_into_fiberdata(
         // add m6a calls
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .progress_with_style(style)
             .chunks(10)
             .map(|recs| predict_m6a_on_records(recs, predict_options))
+            .progress_with_style(style)
             .sum::<usize>() as f32;
         //.map(|r| predict_m6a(r, predict_options))
         //.flatten()
