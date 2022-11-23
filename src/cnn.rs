@@ -36,6 +36,7 @@ pub fn predict_with_cnn(windows: &[f32], count: usize, polyermase: &PbChem) -> V
     let model = get_saved_pytorch_model(polyermase);
     let ts = tch::Tensor::of_slice(windows).to_device(tch::Device::cuda_if_available());
     let ts = ts.reshape(&[count.try_into().unwrap(), 6, 15]);
+    log::warn!("Made other gpu? tensor");
     let x = model.forward_ts(&[ts]).unwrap();
     let w: Vec<f32> = x.try_into().unwrap();
     let z: Vec<f32> = w.chunks(2).map(|c| c[0]).collect();
