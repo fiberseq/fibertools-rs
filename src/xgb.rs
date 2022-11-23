@@ -32,6 +32,9 @@ pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
 }
 
 pub fn predict_with_xgb(windows: &[f32], count: usize, polymerase: &PbChem) -> Vec<f32> {
+    if count == 0 {
+        return vec![];
+    }
     let chunk_size = windows.len() / count;
     let mut gbdt_data: DataVec = Vec::new();
     for window in windows.chunks(chunk_size) {
