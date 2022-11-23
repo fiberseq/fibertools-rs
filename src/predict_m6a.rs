@@ -257,7 +257,7 @@ pub fn predict_m6a_on_records(
         }
     }
     assert_eq!(cur_predict_st, predictions.len());
-    data.len()
+    data.iter().flatten().count()
 }
 
 pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -> Option<()> {
@@ -351,9 +351,7 @@ pub fn read_bam_into_fiberdata(
             .map(|recs| predict_m6a_on_records(recs, predict_options))
             .progress_with_style(style)
             .sum::<usize>() as f32;
-        //.map(|r| predict_m6a(r, predict_options))
-        //.flatten()
-        //.count() as f32;
+
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
         if frac_called < 0.05 {
             log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0*frac_called);
