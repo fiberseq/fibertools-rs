@@ -10,8 +10,8 @@ static PT_2_2: &[u8] = include_bytes!("../models/2.0_torch.pt");
 
 pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
-        let d = tch::Device::cuda_if_available();
-        log::warn!("Using {:?} for Torch device.", d);
+        let device = tch::Device::cuda_if_available();
+        log::info!("Using {:?} for Torch device.", device);
         let model_str = match polymerase {
             PbChem::Two => {
                 log::info!("Using model for 2.0 chemistry");
@@ -25,7 +25,7 @@ pub fn get_saved_pytorch_model(polymerase: &PbChem) -> &'static tch::CModule {
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, model_str).expect("Unable to write file");
         let mut temp_path = fs::File::open(temp_file_name).expect("Unable to open model file.");
-        let model = tch::CModule::load_data_on_device(&mut temp_path, d)
+        let model = tch::CModule::load_data_on_device(&mut temp_path, device)
             .expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
         log::info!("CNN model loaded");
