@@ -6,7 +6,7 @@
 [![crates.io downloads](https://img.shields.io/crates/d/fibertools-rs?color=orange&label=downloads)](https://crates.io/crates/fibertools-rs)
 [![DOI](https://zenodo.org/badge/517338593.svg)](https://zenodo.org/badge/latestdoi/517338593)
 
-`fibertools-rs` a CLI tool for interacting with fiberseq bam files.
+`fibertools-rs` a CLI tool for creating and interacting with fiberseq bam files.
 
 # Install
 ## From `crates.io` [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
