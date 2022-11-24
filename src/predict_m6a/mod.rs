@@ -7,6 +7,11 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rayon::{current_num_threads, prelude::IndexedParallelIterator};
 use rust_htslib::{bam, bam::Read};
 
+// sub modules
+#[cfg(feature = "cnn")]
+mod cnn;
+mod xgb;
+
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 

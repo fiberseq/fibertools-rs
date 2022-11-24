@@ -6,15 +6,10 @@ pub mod basemods;
 pub mod center;
 /// Command line interface for fibertools-rs.
 pub mod cli;
-#[cfg(feature = "cnn")]
-/// m6A prediction with a CNN
-pub mod cnn;
 /// Extract fiberseq data into plain text formats
 pub mod extract;
 /// m6A prediction
 pub mod predict_m6a;
-/// m6A prediction with a XGBoost
-pub mod xgb;
 
 use anyhow::Result;
 use itertools::Itertools;
