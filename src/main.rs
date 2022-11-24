@@ -113,6 +113,7 @@ pub fn main() -> Result<(), Error> {
             keep,
             cnn,
             full_float,
+            batch_size,
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
@@ -122,7 +123,9 @@ pub fn main() -> Result<(), Error> {
                 cnn: *cnn,
                 full_float: *full_float,
                 polymerase: find_pb_polymerase(&header),
+                batch_size: *batch_size,
             };
+            log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
         None => {}
