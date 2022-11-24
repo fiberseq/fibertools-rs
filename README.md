@@ -62,10 +62,11 @@ The extract all option is a special option that tries to extract all the fiberse
 
 
 
-# TODO
-- [ ] Add `rustybam` stats to ft `all`
-- [x] Add CNN to CI
-- [x] Option to keep full float info in predict-m6a
-- [x] Add option for all format but without sequence
-- [x] handle broken pipe errors in `ft-extract`
-- [x] add rq to all
+# TODO for v0.0.11
+- [ ] Add `rustybam` stats to ft `all` as an option
+- [ ] Add more test cases, learn about test modules in folders
+- [ ] Test GPU support, see if I can simplify or statically link PyTorch.
+- [ ] Improve progress bar for predict-m6a.
+    - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
+- [ ] Add unaligned, secondary, supplemental reads to the test bam.
+- [ ] Detect GPU memory to set batch size dynamically.
