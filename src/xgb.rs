@@ -13,11 +13,11 @@ pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
     INIT.call_once(|| {
         let json = match polymerase {
             PbChem::Two => {
-                log::warn!("Using model for 2.0 chemistry");
+                log::info!("Using model for 2.0 chemistry");
                 JSON
             }
             PbChem::TwoPointTwo => {
-                log::warn!("Using model for 2.2 chemistry");
+                log::info!("Using model for 2.2 chemistry");
                 JSON_2_2
             }
         };
@@ -26,12 +26,15 @@ pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
         let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-        log::info!("Model from xgboost loaded");
+        log::info!("XGBoost model loaded");
         model
     })
 }
 
 pub fn predict_with_xgb(windows: &[f32], count: usize, polymerase: &PbChem) -> Vec<f32> {
+    if count == 0 {
+        return vec![];
+    }
     let chunk_size = windows.len() / count;
     let mut gbdt_data: DataVec = Vec::new();
     for window in windows.chunks(chunk_size) {

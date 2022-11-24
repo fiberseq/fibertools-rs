@@ -2,18 +2,25 @@ use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
-use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
+use rayon::{current_num_threads, prelude::IndexedParallelIterator};
 use rust_htslib::{bam, bam::Read};
 
-static WINDOW: usize = 15;
+pub const WINDOW: usize = 15;
+pub const LAYERS: usize = 6;
 
 pub struct PredictOptions {
     pub keep: bool,
     pub cnn: bool,
     pub full_float: bool,
     pub polymerase: PbChem,
+    pub batch_size: usize,
+}
+impl PredictOptions {
+    pub fn progress_style(&self) -> &str {
+        "Predicting m6A: [{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% Batches per second {per_sec:<10.cyan}"
+    }
 }
 enum WhichML {
     Xgb,
@@ -76,18 +83,20 @@ pub fn basemod_from_ml(
     )
 }
 
-pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -> Option<()> {
-    let mut cur_basemods = basemods::BaseMods::new(record, 0);
-    cur_basemods.drop_m6a();
-    log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+struct DataWidows {
+    pub windows: Vec<f32>,
+    pub positions: Vec<usize>,
+    pub count: usize,
+    pub base_mod: String,
+}
 
+fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)> {
+    // skip invalid or redundant records
     if record.is_secondary() {
         log::warn!(
             "Skipping secondary alignment of {}",
             String::from_utf8_lossy(record.qname())
         );
-        // clear old m6a
-        cur_basemods.add_mm_and_ml_tags(record);
         return None;
     }
 
@@ -130,7 +139,7 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -
         // get the data window
         let data_window = if (pos < extend) || (pos + extend + 1 > record.seq_len()) {
             // make fake data for leading and trailing As
-            vec![0.0; WINDOW * 6]
+            vec![0.0; WINDOW * LAYERS]
         } else {
             let start = pos - extend;
             let end = pos + extend + 1;
@@ -184,30 +193,80 @@ pub fn predict_m6a(record: &mut bam::Record, predict_options: &PredictOptions) -
             t_positions.push(pos);
         }
     }
+    let a_data = DataWidows {
+        windows: a_windows,
+        positions: a_positions,
+        count: a_count,
+        base_mod: "A+a".to_string(),
+    };
+    let t_data = DataWidows {
+        windows: t_windows,
+        positions: t_positions,
+        count: t_count,
+        base_mod: "T-a".to_string(),
+    };
+    Some((a_data, t_data))
+}
 
-    let a_predict = apply_model(&a_windows, a_count, predict_options);
-    assert_eq!(a_predict.len(), a_count);
-    let t_predict = apply_model(&t_windows, t_count, predict_options);
-    assert_eq!(t_predict.len(), t_count);
+/// group reads together for predictions so we have to move data to the GPU less often
+pub fn predict_m6a_on_records(
+    records: Vec<&mut bam::Record>,
+    predict_options: &PredictOptions,
+) -> usize {
+    // data windows for all the records in this chunk
+    let data: Vec<Option<(DataWidows, DataWidows)>> = records
+        .iter()
+        .map(|rec| get_m6a_data_windows(rec))
+        .collect();
+    // collect ml windows into one vector
+    let mut all_ml_data = vec![];
+    let mut all_count = 0;
+    data.iter().flatten().for_each(|(a, t)| {
+        all_ml_data.extend(a.windows.clone());
+        all_count += a.count;
+        all_ml_data.extend(t.windows.clone());
+        all_count += t.count;
+    });
+    let predictions = apply_model(&all_ml_data, all_count, predict_options);
+    assert_eq!(predictions.len(), all_count);
+    // split ml results back to all the records and modify the MM ML tags
+    assert_eq!(data.len(), records.len());
+    let mut cur_predict_st = 0;
+    for (option_data, record) in data.iter().zip(records) {
+        // base mods in the exiting record
+        let mut cur_basemods = basemods::BaseMods::new(record, 0);
+        cur_basemods.drop_m6a();
+        log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+        // check if there is any data
+        let (a_data, t_data) = match option_data {
+            Some((a_data, t_data)) => (a_data, t_data),
+            None => continue,
+        };
+        // iterate over A and then T basemods
+        for data in &[a_data, t_data] {
+            let cur_predict_en = cur_predict_st + data.count;
+            let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
 
-    cur_basemods
-        .base_mods
-        .push(basemod_from_ml(record, &a_predict, &a_positions, "A+a"));
-    cur_basemods
-        .base_mods
-        .push(basemod_from_ml(record, &t_predict, &t_positions, "T-a"));
-
-    // write the ml and mm tags
-    cur_basemods.add_mm_and_ml_tags(record);
-
-    // clear the existing data
-    if !predict_options.keep {
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
+            cur_predict_st += data.count;
+            cur_basemods.base_mods.push(basemod_from_ml(
+                record,
+                cur_predictions,
+                &data.positions,
+                &data.base_mod,
+            ));
+        }
+        // write the ml and mm tags
+        cur_basemods.add_mm_and_ml_tags(record);
+        // clear the existing data
+        if !predict_options.keep {
+            record.remove_aux(b"fp").unwrap_or(());
+            record.remove_aux(b"fi").unwrap_or(());
+            record.remove_aux(b"rp").unwrap_or(());
+            record.remove_aux(b"ri").unwrap_or(());
+        }
     }
-    Some(())
+    assert_eq!(cur_predict_st, predictions.len());
+    data.iter().flatten().count()
 }
 
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
@@ -241,17 +300,18 @@ pub fn read_bam_into_fiberdata(
     // iterate over chunks
     let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
-        let style = style::ProgressStyle::with_template(PROGRESS_STYLE)
+        let style = style::ProgressStyle::with_template(predict_options.progress_style())
             .unwrap()
             .progress_chars("##-");
 
         // add m6a calls
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .map(|r| predict_m6a(r, predict_options))
+            .chunks(predict_options.batch_size)
+            .map(|recs| predict_m6a_on_records(recs, predict_options))
             .progress_with_style(style)
-            .flatten()
-            .count() as f32;
+            .sum::<usize>() as f32;
+
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
         if frac_called < 0.05 {
             log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0*frac_called);
@@ -261,6 +321,6 @@ pub fn read_bam_into_fiberdata(
         chunk.iter().for_each(|r| out.write(r).unwrap());
 
         total_read += chunk.len();
-        eprintln!("Finished {} reads", total_read);
+        log::info!("Finished predicting m6A for {} reads", total_read);
     }
 }
