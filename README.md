@@ -64,6 +64,7 @@ The extract all option is a special option that tries to extract all the fiberse
 
 # TODO for v0.0.11
 - [ ] Add `rustybam` stats to ft `all` as an option
+- [ ] add option result to bamlift
 - [ ] Add more test cases, learn about test modules in folders
 - [ ] Test GPU support, see if I can simplify or statically link PyTorch.
 - [ ] Improve progress bar for predict-m6a.

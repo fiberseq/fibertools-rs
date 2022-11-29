@@ -257,13 +257,21 @@ impl BaseMods {
         m6a.into_iter().zip(mp.into_iter()).collect()
     }
 
-    pub fn m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+    fn helper_get_m6a(&self, forward: bool) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
         let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
         // skip if no m6a
         if m6a.is_empty() {
             return (vec![], vec![], vec![]);
         }
-        let m6a_pos: Vec<i64> = m6a.iter().flat_map(|x| x.get_modified_bases()).collect();
+
+        let m6a_pos: Vec<i64> = if forward {
+            m6a.iter()
+                .flat_map(|x| x.get_modified_bases_forward())
+                .collect()
+        } else {
+            m6a.iter().flat_map(|x| x.get_modified_bases()).collect()
+        };
+
         let m6a_ref: Vec<i64> = m6a
             .iter()
             .flat_map(|x| x.get_reference_positions())
@@ -280,6 +288,14 @@ impl BaseMods {
         multiunzip(z)
     }
 
+    pub fn m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+        self.helper_get_m6a(false)
+    }
+
+    pub fn forward_m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+        self.helper_get_m6a(true)
+    }
+
     pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
         let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
         // skip if no cpg
@@ -294,7 +310,6 @@ impl BaseMods {
         }
     }
 
-    // TODO finish this
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
     /// Example ML tag: ML:B:C,157,30,2,164,118,255
     pub fn add_mm_and_ml_tags(&self, record: &mut bam::Record) {
