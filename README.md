@@ -64,7 +64,7 @@ The extract all option is a special option that tries to extract all the fiberse
 # Read the fibertools docs
 You can find the docs for the latest release here:
 [https://docs.rs/fibertools-rs/latest/fibertools_rs/](https://docs.rs/fibertools-rs/latest/fibertools_rs/)
-Or download from source and run:
+or download from source and run:
 ```
 cargo doc --open --features cnn
 ```

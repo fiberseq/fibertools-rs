@@ -126,39 +126,43 @@ impl FiberseqData {
     }
 
     pub fn write_msp(&self, reference: bool, head_view: &HeaderView) -> String {
+        let color = "255,0,255";
         let starts = self.get_msp(reference, true);
         let lengths = self.get_msp(reference, false);
         if starts.is_empty() {
             return "".to_string();
         }
-        self.to_bed12(reference, &starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view, color)
     }
 
     pub fn write_nuc(&self, reference: bool, head_view: &HeaderView) -> String {
+        let color = "169,169,169";
         let starts = self.get_nuc(reference, true);
         let lengths = self.get_nuc(reference, false);
         if starts.is_empty() {
             return "".to_string();
         }
-        self.to_bed12(reference, &starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view, color)
     }
 
     pub fn write_m6a(&self, reference: bool, head_view: &HeaderView) -> String {
+        let color = "128,0,128";
         let starts = self.base_mods.m6a_positions(reference);
         if starts.is_empty() {
             return "".to_string();
         }
         let lengths = vec![1; starts.len()];
-        self.to_bed12(reference, &starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view, color)
     }
 
     pub fn write_cpg(&self, reference: bool, head_view: &HeaderView) -> String {
+        let color = "139,69,19";
         let starts = self.base_mods.cpg_positions(reference);
         if starts.is_empty() {
             return "".to_string();
         }
         let lengths = vec![1; starts.len()];
-        self.to_bed12(reference, &starts, &lengths, head_view)
+        self.to_bed12(reference, &starts, &lengths, head_view, color)
     }
 
     pub fn get_rq(&self) -> Option<f32> {
@@ -350,6 +354,7 @@ impl FiberseqData {
         starts: &[i64],
         lengths: &[i64],
         head_view: &HeaderView,
+        color: &str,
     ) -> String {
         // skip if no alignments are here
         if self.record.is_unmapped() && reference {
@@ -372,7 +377,6 @@ impl FiberseqData {
         }
         let score = self.ec.round() as i64;
         let strand = if self.record.is_reverse() { '-' } else { '+' };
-        let color = "126,126,126";
         // filter out positions that do not have an exact liftover
         let (filtered_starts, filtered_lengths): (Vec<i64>, Vec<i64>) = starts
             .iter()
