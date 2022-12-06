@@ -23,7 +23,8 @@ use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const GIT_HASH: &str = env!("GIT_HASH");
 const BUFFER_SIZE: usize = 32 * 1024;
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
