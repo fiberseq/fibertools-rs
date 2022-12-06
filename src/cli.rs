@@ -11,7 +11,7 @@ use clap::{Command, CommandFactory, Parser, Subcommand};
     arg_required_else_help = true,
     help_expected = true
 )]
-#[command(long_version = super::GIT_HASH)]
+#[command(version = super::LONG_VERSION)]
 pub struct Cli {
     /// Threads for decompression
     #[clap(
