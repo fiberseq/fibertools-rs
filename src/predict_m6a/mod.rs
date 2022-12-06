@@ -15,16 +15,19 @@ mod xgb;
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 
+#[derive(Debug, Clone)]
 pub struct PredictOptions {
     pub keep: bool,
     pub cnn: bool,
+    pub semi: bool,
     pub full_float: bool,
     pub polymerase: PbChem,
     pub batch_size: usize,
 }
 impl PredictOptions {
     pub fn progress_style(&self) -> &str {
-        "Predicting m6A: [{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% Batches per second {per_sec:<10.cyan}"
+        // {percent:>3.green}%
+        "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
     }
 }
 enum WhichML {
@@ -284,9 +287,9 @@ pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptio
     };
 
     match _which_ml {
-        WhichML::Xgb => xgb::predict_with_xgb(windows, count, &predict_options.polymerase),
+        WhichML::Xgb => xgb::predict_with_xgb(windows, count, predict_options),
         #[cfg(feature = "cnn")]
-        WhichML::Cnn => cnn::predict_with_cnn(windows, count, &predict_options.polymerase),
+        WhichML::Cnn => cnn::predict_with_cnn(windows, count, predict_options),
     }
 }
 

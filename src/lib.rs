@@ -241,7 +241,7 @@ impl<'a> Iterator for BamChunk<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PbChem {
     Two,
     TwoPointTwo,

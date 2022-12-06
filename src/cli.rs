@@ -109,8 +109,11 @@ pub enum Commands {
         #[clap(short, long)]
         keep: bool,
         /// Use CNN model for prediction instead of XGBoost
-        #[clap(short, long)]
+        #[clap(short, long, default_value_if("semi", "true", "true"))]
         cnn: bool,
+        /// Use semi-supervised CNN model for prediction
+        #[clap(short, long)]
+        semi: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
         #[clap(short, long)]
         full_float: bool,
