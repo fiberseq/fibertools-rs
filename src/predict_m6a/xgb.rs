@@ -13,11 +13,11 @@ pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
     INIT.call_once(|| {
         let json = match predict_options.polymerase {
             PbChem::Two => {
-                log::info!("Using model for 2.0 chemistry");
+                log::info!("Loading XGBoost model for 2.0 chemistry");
                 JSON
             }
             PbChem::TwoPointTwo => {
-                log::info!("Using model for 2.2 chemistry");
+                log::info!("Loading XGBoost model for 2.2 chemistry");
                 JSON_2_2
             }
         };
@@ -26,7 +26,6 @@ pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
         let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-        log::info!("XGBoost model loaded");
         model
     })
 }

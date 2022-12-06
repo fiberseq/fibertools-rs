@@ -15,29 +15,27 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
     INIT_PT.call_once(|| {
         let device = tch::Device::cuda_if_available();
         log::info!("Using {:?} for Torch device.", device);
-        let model_str = if predict_options.semi {
-            match predict_options.polymerase {
-                PbChem::Two => {
-                    log::info!("Using semi-CNN model for 2.0 chemistry");
+        let model_str = match predict_options.polymerase {
+            PbChem::Two => {
+                log::info!("Loading CNN model for 2.0 chemistry");
+                if predict_options.semi {
                     SEMI
-                }
-                PbChem::TwoPointTwo => {
-                    log::info!("Using semi-CNN model for 2.2 chemistry");
-                    SEMI_2_2
-                }
-            }
-        } else {
-            match predict_options.polymerase {
-                PbChem::Two => {
-                    log::info!("Using model for 2.0 chemistry");
+                } else {
                     PT
                 }
-                PbChem::TwoPointTwo => {
-                    log::info!("Using model for 2.2 chemistry");
+            }
+            PbChem::TwoPointTwo => {
+                log::info!("Loading CNN model for 2.2 chemistry");
+                if predict_options.semi {
+                    SEMI_2_2
+                } else {
                     PT_2_2
                 }
             }
         };
+        if predict_options.semi {
+            log::info!("Using semi-supervised CNN");
+        }
 
         let temp_file_name = "ft.tmp.model.json";
         fs::write(temp_file_name, model_str).expect("Unable to write file");
@@ -45,7 +43,6 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
         let model = tch::CModule::load_data_on_device(&mut temp_path, device)
             .expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-        log::info!("CNN model loaded");
         model
     })
 }
