@@ -11,6 +11,7 @@ use clap::{Command, CommandFactory, Parser, Subcommand};
     arg_required_else_help = true,
     help_expected = true
 )]
+#[command(long_version = super::GIT_HASH)]
 pub struct Cli {
     /// Threads for decompression
     #[clap(
@@ -108,13 +109,15 @@ pub enum Commands {
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
-        /// Use CNN model for prediction instead of XGBoost
+        /// Use the CNN model for prediction instead of XGBoost
         #[clap(short, long, default_value_if("semi", "true", "true"))]
         cnn: bool,
-        /// Use semi-supervised CNN model for prediction
+        /// Use the semi-supervised CNN model for prediction
         #[clap(short, long)]
         semi: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
+        ///
+        /// For debugging only.
         #[clap(short, long)]
         full_float: bool,
         /// Number of reads to include in batch prediction

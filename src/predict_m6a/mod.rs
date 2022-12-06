@@ -24,6 +24,7 @@ pub struct PredictOptions {
     pub polymerase: PbChem,
     pub batch_size: usize,
 }
+
 impl PredictOptions {
     pub fn progress_style(&self) -> &str {
         // {percent:>3.green}%
