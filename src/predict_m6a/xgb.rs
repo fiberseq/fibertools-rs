@@ -1,4 +1,4 @@
-use super::PbChem;
+use super::{PbChem, PredictOptions};
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use spin;
@@ -9,9 +9,9 @@ static INIT: spin::Once<GBDT> = spin::Once::new();
 static JSON: &str = include_str!("../../models/gbdt_0.81_p2.0.json");
 static JSON_2_2: &str = include_str!("../../models/gbdt_0.81_p2.2.json");
 
-pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
+pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
     INIT.call_once(|| {
-        let json = match polymerase {
+        let json = match predict_options.polymerase {
             PbChem::Two => {
                 log::info!("Using model for 2.0 chemistry");
                 JSON
@@ -31,7 +31,11 @@ pub fn get_saved_gbdt_model(polymerase: &PbChem) -> &'static GBDT {
     })
 }
 
-pub fn predict_with_xgb(windows: &[f32], count: usize, polymerase: &PbChem) -> Vec<f32> {
+pub fn predict_with_xgb(
+    windows: &[f32],
+    count: usize,
+    predict_options: &PredictOptions,
+) -> Vec<f32> {
     if count == 0 {
         return vec![];
     }
@@ -41,6 +45,6 @@ pub fn predict_with_xgb(windows: &[f32], count: usize, polymerase: &PbChem) -> V
         let d = Data::new_test_data(window.to_vec(), None);
         gbdt_data.push(d);
     }
-    let gbdt_model = get_saved_gbdt_model(polymerase);
+    let gbdt_model = get_saved_gbdt_model(predict_options);
     gbdt_model.predict(&gbdt_data)
 }

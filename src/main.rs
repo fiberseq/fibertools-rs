@@ -112,6 +112,7 @@ pub fn main() -> Result<(), Error> {
             out,
             keep,
             cnn,
+            semi,
             full_float,
             batch_size,
         }) => {
@@ -121,6 +122,7 @@ pub fn main() -> Result<(), Error> {
             let predict_options = predict_m6a::PredictOptions {
                 keep: *keep,
                 cnn: *cnn,
+                semi: *semi,
                 full_float: *full_float,
                 polymerase: find_pb_polymerase(&header),
                 batch_size: *batch_size,
