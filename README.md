@@ -1,4 +1,7 @@
-# `fibertools-rs`
+---
+---
+`fibertools-rs`
+==============
 [![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/fibertools-rs/actions)
 [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
  [![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
@@ -49,6 +52,7 @@ And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
 ```bash
 cargo install fibertools-rs --features cnn
 ```
+
 ## `ft extract`
 [Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
 ### `ft extract --all`
