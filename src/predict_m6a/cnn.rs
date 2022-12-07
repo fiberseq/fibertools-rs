@@ -7,7 +7,7 @@ use tch;
 // make sure file exists for cargo
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
-static PT_2_2: &[u8] = include_bytes!("../../models/2.0_torch.pt");
+static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
 static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 static SEMI_2_2: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 
