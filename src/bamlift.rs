@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
-/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
+/// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
 pub fn merge_two_lists<T>(left: &[T], right: &[T]) -> Vec<T>
 where
     T: Ord,
@@ -15,7 +15,7 @@ where
 }
 /// Merge two lists based on a key
 /// Normal sort is supposed to be very fast on two sorted lists
-/// https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6
+/// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
 /// ```
 /// use fibertools_rs::bamlift::*;
 /// let x = vec![1,3];
@@ -80,10 +80,10 @@ where
 /// search a sorted array for insertions positions of another sorted array
 /// returned index i satisfies
 /// left
-/// a[i-1] < v <= a[i]
+/// a\[i-1\] < v <= a\[i\]
 /// right
-/// a[i-1] <= v < a[i]
-/// https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html
+/// a\[i-1\] <= v < a\[i\]
+/// <https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html>
 /// ```
 /// use fibertools_rs::bamlift::*;
 /// let a = vec![1, 2, 3, 5, 6, 7, 8, 9, 10];

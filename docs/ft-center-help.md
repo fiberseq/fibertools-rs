@@ -1,5 +1,5 @@
 ```
-This command centers fiberseq data around given reference positions. This is useful for making aggregate m6a and CpG observations, as well as visualization of SVs
+This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs
 
 Usage: ft center [OPTIONS] <BAM> <BED>
 
@@ -27,13 +27,13 @@ Options:
   -V, --version
           Print version information
 
-Global-options:
+Global-Options:
   -t, --threads <THREADS>
           Threads for decompression
 
           [default: 8]
 
-Debug-options:
+Debug-Options:
   -v, --verbose...
           Logging level [-v: Info, -vv: Debug, -vvv: Trace]
 

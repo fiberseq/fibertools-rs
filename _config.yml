@@ -1,1 +1,22 @@
-theme: jekyll-theme-minimal
+#theme: jekyll-theme-minimal
+#theme: minima
+remote_theme: jekyll/minima
+logo: /assets/img/logo.png
+
+minima:
+  skin: dark
+
+
+defaults:
+  -
+    scope:
+      path: "README.md"
+    values:
+      permalink: "index.html"
+
+exclude:
+    - target
+    - models
+    - dists
+    - tmp.*
+    - temp
