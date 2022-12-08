@@ -39,6 +39,7 @@ ft --help
 [Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
 
 We recommend filtering out ML scores less than 250 for the XGBoost model and ML scores less than 200 for the CNN model.
+
 ### Installing with support for CNN m6A prediction
 To allow for m6A predictions with the CNN model you must follow these modified installation instructions.
 * Get `libtorch` **v1.12.0** from the [PyTorch website](https://pytorch.org/get-started/) download section and extract the content of the zip file.
@@ -54,6 +55,9 @@ And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
 ```bash
 cargo install fibertools-rs --features cnn
 ```
+
+### Adding nucleosome calls to the BAM files
+To add nucleosome calls to the BAM files you can use the python package [fibertools](https://github.com/mrvollger/fibertools#add-nucleosomes-and-msps-to-a-fibertools-rs-m6a-bam). See that repository for installation and instructions.
 
 ## `ft extract`
 [Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
