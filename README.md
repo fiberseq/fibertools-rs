@@ -53,7 +53,7 @@ export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 ```
 And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
 ```bash
-cargo install fibertools-rs --features cnn
+cargo install --git https://github.com/mrvollger/fibertools-rs --features cnn
 ```
 
 ### Adding nucleosome calls to the BAM files
