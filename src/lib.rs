@@ -6,15 +6,10 @@ pub mod basemods;
 pub mod center;
 /// Command line interface for fibertools-rs.
 pub mod cli;
-#[cfg(feature = "cnn")]
-/// m6A prediction with a CNN
-pub mod cnn;
 /// Extract fiberseq data into plain text formats
 pub mod extract;
 /// m6A prediction
 pub mod predict_m6a;
-/// m6A prediction with a XGBoost
-pub mod xgb;
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -28,7 +23,9 @@ use std::io::{self, stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const GIT_HASH: &str = env!("CARGO_GIT_HASH");
+pub const LONG_VERSION: &str = env!("CARGO_LONG_VERSION");
 const BUFFER_SIZE: usize = 32 * 1024;
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
@@ -246,7 +243,7 @@ impl<'a> Iterator for BamChunk<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PbChem {
     Two,
     TwoPointTwo,
