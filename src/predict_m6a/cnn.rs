@@ -3,6 +3,7 @@ use super::{PbChem, PredictOptions};
 use spin;
 use std::fs;
 use tch;
+use tempfile::NamedTempFile;
 
 // make sure file exists for cargo
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
@@ -36,8 +37,8 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
         if predict_options.semi {
             log::info!("Using semi-supervised CNN");
         }
-
-        let temp_file_name = "ft.tmp.model.json";
+        let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
+        let temp_file_name = temp_file.path();
         fs::write(temp_file_name, model_str).expect("Unable to write file");
         let mut temp_path = fs::File::open(temp_file_name).expect("Unable to open model file.");
         let model = tch::CModule::load_data_on_device(&mut temp_path, device)

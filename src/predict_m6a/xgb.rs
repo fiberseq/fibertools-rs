@@ -3,6 +3,7 @@ use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use spin;
 use std::fs;
+use tempfile::NamedTempFile;
 
 // make sure file exists for cargo
 static INIT: spin::Once<GBDT> = spin::Once::new();
@@ -21,7 +22,12 @@ pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
                 JSON_2_2
             }
         };
-        let temp_file_name = "ft.tmp.model.json";
+        let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
+        let temp_file_name = temp_file
+            .path()
+            .as_os_str()
+            .to_str()
+            .expect("Unable to convert the path of the named temp file to an &str.");
         fs::write(temp_file_name, json).expect("Unable to write file");
         let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
