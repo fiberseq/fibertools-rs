@@ -75,6 +75,7 @@ cargo doc --open --features cnn
 and the docs will open in your browser.
 
 # TODO for v0.0.11
+- [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
 - [ ] Add `rustybam` stats to ft `all` as an option
 - [ ] add option result to bamlift
 - [ ] Add more test cases, learn about test modules in folders
