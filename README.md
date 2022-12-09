@@ -80,8 +80,9 @@ cargo doc --open --features cnn
 ```
 and the docs will open in your browser.
 
-# TODO for v0.0.11
+# TODO items
 - [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
+- [ ] Set filters for ML depending on the model used
 - [ ] long format extract command
 - [ ] Add `rustybam` stats to ft `all` as an option
 - [ ] add option result to bamlift

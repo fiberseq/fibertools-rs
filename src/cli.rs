@@ -109,6 +109,9 @@ pub enum Commands {
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
+        /// Keep all m6A calls regardless of how low the ML value is
+        #[clap(short, long)]
+        all_calls: bool,
         /// Use the CNN model for prediction instead of XGBoost
         #[clap(short, long, default_value_if("semi", "true", "true"))]
         cnn: bool,
