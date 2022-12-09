@@ -45,7 +45,7 @@ impl PredictOptions {
 
     pub fn min_ml_value(&self) -> u8 {
         if self.all_calls {
-            0
+            1
         } else {
             self.recommended_ml_value() - 100
         }
