@@ -7,3 +7,5 @@ temp*
 dists/**
 .vscode/
 .test/small_unaligned_fiberseq.bam
+Gemfile*
+_site/*
