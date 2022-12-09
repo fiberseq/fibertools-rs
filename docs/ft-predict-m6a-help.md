@@ -19,10 +19,15 @@ Options:
           Keep hifi kinetics data
 
   -c, --cnn
-          Use CNN model for prediction instead of XGBoost
+          Use the CNN model for prediction instead of XGBoost
+
+  -s, --semi
+          Use the semi-supervised CNN model for prediction
 
   -f, --full-float
           Add a bam tag (mp) with the full floating point predictions of the ML model
+
+          For debugging only.
 
   -b, --batch-size <BATCH_SIZE>
           Number of reads to include in batch prediction
