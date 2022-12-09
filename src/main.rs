@@ -111,6 +111,7 @@ pub fn main() -> Result<(), Error> {
             bam,
             out,
             keep,
+            all_calls,
             cnn,
             semi,
             full_float,
@@ -124,6 +125,7 @@ pub fn main() -> Result<(), Error> {
                 cnn: *cnn,
                 semi: *semi,
                 full_float: *full_float,
+                all_calls: *all_calls,
                 polymerase: find_pb_polymerase(&header),
                 batch_size: *batch_size,
             };

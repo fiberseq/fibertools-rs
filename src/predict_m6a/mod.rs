@@ -21,6 +21,7 @@ pub struct PredictOptions {
     pub cnn: bool,
     pub semi: bool,
     pub full_float: bool,
+    pub all_calls: bool,
     pub polymerase: PbChem,
     pub batch_size: usize,
 }
@@ -29,6 +30,25 @@ impl PredictOptions {
     pub fn progress_style(&self) -> &str {
         // {percent:>3.green}%
         "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
+    }
+
+    pub fn recommended_ml_value(&self) -> u8 {
+        if self.cnn {
+            200
+        } else if self.semi {
+            1
+        } else {
+            // xgboost model
+            250
+        }
+    }
+
+    pub fn min_ml_value(&self) -> u8 {
+        if self.all_calls {
+            0
+        } else {
+            self.recommended_ml_value() - 100
+        }
     }
 }
 enum WhichML {
@@ -65,18 +85,19 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
 
 /// Create a basemod object form our predictions
 pub fn basemod_from_ml(
-    record: &mut bam::Record,
+    record: &bam::Record,
     predictions: &[f32],
     positions: &[usize],
     base_mod: &str,
+    min_ml_value: u8,
 ) -> basemods::BaseMod {
-    // new ml tag
-    let modified_probabilities_forward: Vec<u8> = predictions
+    let (modified_probabilities_forward, modified_bases_forward) = predictions
         .iter()
-        .map(|&x| (255.0 * x).round() as u8)
-        .collect();
-    // new mm tag
-    let modified_bases_forward = positions.iter().map(|&x| x as i64).collect();
+        .zip(positions.iter())
+        .map(|(&x, &pos)| ((255.0 * x).round() as u8, pos as i64))
+        .filter(|(ml, _)| *ml >= min_ml_value)
+        .unzip();
+
     let base_mod = base_mod.as_bytes();
     let modified_base = base_mod[0];
     let strand = base_mod[1] as char;
@@ -222,6 +243,7 @@ pub fn predict_m6a_on_records(
     records: Vec<&mut bam::Record>,
     predict_options: &PredictOptions,
 ) -> usize {
+    let min_ml_value = predict_options.min_ml_value();
     // data windows for all the records in this chunk
     let data: Vec<Option<(DataWidows, DataWidows)>> = records
         .iter()
@@ -262,6 +284,7 @@ pub fn predict_m6a_on_records(
                 cur_predictions,
                 &data.positions,
                 &data.base_mod,
+                min_ml_value,
             ));
         }
         // write the ml and mm tags
