@@ -15,8 +15,10 @@ static SEMI_2_2: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
         // set threads to one, since rayon will dispatch multiple at once anyways
-        tch::set_num_threads(1);
         let device = tch::Device::cuda_if_available();
+        if !device.is_cuda() {
+            tch::set_num_threads(1);
+        }
         log::info!("Using {:?} for Torch device.", device);
         let model_str = match predict_options.polymerase {
             PbChem::Two => {
