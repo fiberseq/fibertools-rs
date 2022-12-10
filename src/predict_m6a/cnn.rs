@@ -65,6 +65,6 @@ pub fn predict_with_cnn(
         .expect("Unable to run forward")
         .try_into()
         .expect("Unable to convert tensor to Vec<f32>");
-
+    // only interested in the probability of m6A being true, first column.
     x.chunks(2).map(|c| c[0]).collect()
 }
