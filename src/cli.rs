@@ -126,7 +126,12 @@ pub enum Commands {
         /// Number of reads to include in batch prediction
         ///
         /// Increasing improved GPU performance at the cost of memory.
-        #[clap(short, long, default_value = "1", default_value_if("cnn", "true", "5"))]
+        #[clap(
+            short,
+            long,
+            default_value = "1",
+            default_value_if("cnn", "true", "10")
+        )]
         batch_size: usize,
     },
 }
