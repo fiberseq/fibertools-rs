@@ -258,7 +258,7 @@ pub fn predict_m6a_on_records(
         all_ml_data.extend(t.windows.clone());
         all_count += t.count;
     });
-    let predictions = _fake_apply_model(&all_ml_data, all_count, predict_options);
+    let predictions = apply_model(&all_ml_data, all_count, predict_options);
     assert_eq!(predictions.len(), all_count);
     // split ml results back to all the records and modify the MM ML tags
     assert_eq!(data.len(), records.len());
