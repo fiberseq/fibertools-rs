@@ -56,9 +56,15 @@ pub fn predict_with_cnn(
     let model = get_saved_pytorch_model(predict_options);
     let ts = tch::Tensor::of_slice(windows).to_device(tch::Device::cuda_if_available());
     let ts = ts.reshape(&[count.try_into().unwrap(), LAYERS as i64, WINDOW as i64]);
-    let x = model.forward_ts(&[ts]).unwrap();
+
+    let x: Vec<f32> = model
+        .forward_ts(&[ts])
+        .expect("Unable to run forward")
+        .try_into()
+        .expect("Unable to convert tensor to Vec<f32>");
+    /*
     let w: Vec<f32> = x.try_into().unwrap();
-    // take every second value since we are doing binary classification.
+    //take every second value since we are doing binary classification.
     let z: Vec<f32> = w.chunks(2).map(|c| c[0]).collect();
     log::trace!(
         "{:?} {} {} {}",
@@ -68,4 +74,6 @@ pub fn predict_with_cnn(
         w.chunks(2).map(|c| c[1]).sum::<f32>() / z.len() as f32
     );
     z
+    */
+    x.chunks(2).map(|c| c[0]).collect()
 }
