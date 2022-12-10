@@ -14,6 +14,8 @@ static SEMI_2_2: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
+        // set threads to one, since rayon will dispatch multiple at once anyways
+        tch::set_num_threads(1);
         let device = tch::Device::cuda_if_available();
         log::info!("Using {:?} for Torch device.", device);
         let model_str = match predict_options.polymerase {
@@ -53,6 +55,7 @@ pub fn predict_with_cnn(
     count: usize,
     predict_options: &PredictOptions,
 ) -> Vec<f32> {
+    //log::debug!("{}", tch::get_num_threads());
     let model = get_saved_pytorch_model(predict_options);
     let ts = tch::Tensor::of_slice(windows).to_device(tch::Device::cuda_if_available());
     let ts = ts.reshape(&[count.try_into().unwrap(), LAYERS as i64, WINDOW as i64]);
@@ -62,18 +65,6 @@ pub fn predict_with_cnn(
         .expect("Unable to run forward")
         .try_into()
         .expect("Unable to convert tensor to Vec<f32>");
-    /*
-    let w: Vec<f32> = x.try_into().unwrap();
-    //take every second value since we are doing binary classification.
-    let z: Vec<f32> = w.chunks(2).map(|c| c[0]).collect();
-    log::trace!(
-        "{:?} {} {} {}",
-        z.len(),
-        count,
-        z.iter().sum::<f32>() / z.len() as f32,
-        w.chunks(2).map(|c| c[1]).sum::<f32>() / z.len() as f32
-    );
-    z
-    */
+
     x.chunks(2).map(|c| c[0]).collect()
 }
