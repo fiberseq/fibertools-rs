@@ -535,22 +535,14 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let bin_size = current_num_threads() * 500;
-    //
-    let mut cur_count = 0;
-    let mut cur_vec = vec![];
-    let mut proccesed_reads = 0;
-    for r in bam.records() {
-        let record = r.unwrap();
-        cur_vec.push(record);
-        cur_count += 1;
-        if cur_count == bin_size {
-            process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
-            proccesed_reads += cur_vec.len();
-            cur_vec.clear();
-            cur_count = 0;
-        }
+    let chunk_size = current_num_threads() * 500;
+    let bam_chunk_iter = BamChunk {
+        bam: bam.records(),
+        chunk_size,
+    };
+    let mut processed_reads = 0;
+    for chunk in bam_chunk_iter {
+        process_bam_chunk(&chunk, processed_reads, &mut out_files, &head_view);
+        processed_reads += chunk.len();
     }
-    // clear any unprocessed recs not big enough to make a full chunk
-    process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
 }
