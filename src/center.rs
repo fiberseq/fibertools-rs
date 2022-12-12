@@ -229,11 +229,12 @@ impl CenteredFiberData {
 
 pub fn center(
     records: Vec<bam::Record>,
+    header_view: &rust_htslib::bam::HeaderView,
     center_position: CenterPosition,
     min_ml_score: u8,
     wide: bool,
 ) {
-    let fiber_data = FiberseqData::from_records(&records, min_ml_score);
+    let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     let mut total = 0;
     let mut missing = 0;
@@ -273,6 +274,10 @@ pub fn center_fiberdata(
     min_ml_score: u8,
     wide: bool,
 ) {
+    // header needed for the contig name...
+    let header = bam::Header::from_template(bam.header());
+    let header_view = bam::HeaderView::from_header(&header);
+
     if wide {
         //print!("{}", CenteredFiberData::header());
         write_to_stdout(&CenteredFiberData::header());
@@ -296,7 +301,7 @@ pub fn center_fiberdata(
         ))
         .expect("Failed to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        center(records, center_position, min_ml_score, wide);
+        center(records, &header_view, center_position, min_ml_score, wide);
         pb.inc(1);
     }
     pb.finish_with_message("done");
