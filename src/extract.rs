@@ -99,7 +99,7 @@ impl FiberseqData {
         }
     }
 
-    pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<u32, String> {
+    pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
         let target_u8s = head_view.target_names();
         let tids = target_u8s
             .iter()
@@ -108,11 +108,13 @@ impl FiberseqData {
             .iter()
             .map(|&a| String::from_utf8_lossy(a).to_string());
 
-        tids.zip(target_names).map(|(id, t)| (id, t)).collect()
+        tids.zip(target_names)
+            .map(|(id, t)| (id as i32, t))
+            .collect()
     }
 
-    pub fn target_name_from_tid(tid: i32, target_dict: &HashMap<u32, String>) -> Option<&String> {
-        target_dict.get(&tid.try_into().expect("Unable to convert tid"))
+    pub fn target_name_from_tid(tid: i32, target_dict: &HashMap<i32, String>) -> Option<&String> {
+        target_dict.get(&tid)
     }
 
     pub fn from_records(
