@@ -10,8 +10,7 @@ use std::io;
     propagate_version = true,
     subcommand_required = true,
     infer_subcommands = true,
-    arg_required_else_help = true,
-    help_expected = true
+    arg_required_else_help = true
 )]
 #[command(version = super::LONG_VERSION)]
 pub struct Cli {
@@ -133,10 +132,14 @@ pub enum Commands {
     },
     /// Make command line completions
     Completions {
-        // If provided, outputs the completion file for given shell
+        /// If provided, outputs the completion file for given shell
         #[arg(value_enum)]
         shell: Shell,
     },
+    /// Make a man page for fibertools-rs
+    ///
+    /// Writes file for `man`  to stdout.
+    Man {},
 }
 
 pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {

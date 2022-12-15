@@ -136,6 +136,15 @@ pub fn main() -> Result<(), Error> {
             log::info!("Generating completion file for {:?}...", shell);
             cli::print_completions(*shell, &mut cli::make_cli_app());
         }
+        Some(Commands::Man {}) => {
+            let man = clap_mangen::Man::new(cli::make_cli_app());
+            //let mut buffer: Vec<u8> = Default::default();
+            let mut buffer = Box::new(std::io::stdout()) as Box<dyn std::io::Write>;
+            man.render(&mut buffer)?;
+            //man.render_subcommands_section(&mut buffer)?;
+            //man.render_description_section(&mut buffer)?;
+            //std::fs::write("ft.1", buffer)?;
+        }
         None => {}
     };
     let duration = pg_start.elapsed();
