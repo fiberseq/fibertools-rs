@@ -1,4 +1,6 @@
-use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
+use clap_complete::{generate, Generator, Shell};
+use std::io;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -42,13 +44,13 @@ pub struct Cli {
 ///
 /// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
 ///
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
     /// Extract fiberseq data into plain text files
     #[clap(visible_aliases = &["ex", "e"])]
     Extract {
         /// Fiberseq bam file
-        #[clap(default_value = "-")]
+        #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
         bam: String,
         /// Report in reference sequence coordinates
         #[clap(short, long)]
@@ -129,6 +131,16 @@ pub enum Commands {
         #[clap(short, long, default_value = "1", default_value_if("cnn", "true", "1"))]
         batch_size: usize,
     },
+    /// Make command line completions
+    Completions {
+        // If provided, outputs the completion file for given shell
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+}
+
+pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 pub fn make_cli_parse() -> Cli {
