@@ -22,6 +22,7 @@ bio = "0.41.0"
 bio-types = "0.12.0"
 clap = {version = "4.0.26", features = ["derive"]}
 clap_complete = "4.0.6"
+clap_mangen = "0.2.5"
 colored = "2.0.0"
 console = "0.15"
 env_logger = "0.9.0"
