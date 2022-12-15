@@ -132,6 +132,10 @@ pub fn main() -> Result<(), Error> {
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
+        Some(Commands::Completions { shell }) => {
+            log::info!("Generating completion file for {:?}...", shell);
+            cli::print_completions(*shell, &mut cli::make_cli_app());
+        }
         None => {}
     };
     let duration = pg_start.elapsed();
