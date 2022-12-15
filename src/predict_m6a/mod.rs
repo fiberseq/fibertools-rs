@@ -5,7 +5,11 @@ use indicatif::{style, ParallelProgressIterator};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rayon::{current_num_threads, prelude::IndexedParallelIterator};
-use rust_htslib::{bam, bam::Read};
+use rust_htslib::{
+    bam,
+    bam::record::{Aux, AuxArray},
+    bam::Read,
+};
 
 // sub modules
 #[cfg(feature = "cnn")]
@@ -85,18 +89,33 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
 
 /// Create a basemod object form our predictions
 pub fn basemod_from_ml(
-    record: &bam::Record,
+    record: &mut bam::Record,
     predictions: &[f32],
     positions: &[usize],
     base_mod: &str,
     min_ml_value: u8,
+    full_float: bool,
 ) -> basemods::BaseMod {
-    let (modified_probabilities_forward, modified_bases_forward) = predictions
+    let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
+        Vec<u8>,
+        Vec<f32>,
+        Vec<i64>,
+    ) = predictions
         .iter()
         .zip(positions.iter())
-        .map(|(&x, &pos)| ((255.0 * x).round() as u8, pos as i64))
-        .filter(|(ml, _)| *ml >= min_ml_value)
-        .unzip();
+        .map(|(&x, &pos)| ((255.0 * x).round() as u8, x, pos as i64))
+        .filter(|(ml, _, _)| *ml >= min_ml_value)
+        .multiunzip();
+
+    // add full probabilities if needed requested
+    if full_float {
+        let mut mp = super::bamlift::get_f32_tag(record, b"mp");
+        record.remove_aux(b"mp").unwrap_or(());
+        mp.extend(&full_probabilities_forward);
+        let aux_array: AuxArray<f32> = (&mp).into();
+        let aux_array_field = Aux::ArrayFloat(aux_array);
+        record.push_aux(b"mp", aux_array_field).unwrap();
+    }
 
     let base_mod = base_mod.as_bytes();
     let modified_base = base_mod[0];
@@ -285,6 +304,7 @@ pub fn predict_m6a_on_records(
                 &data.positions,
                 &data.base_mod,
                 min_ml_value,
+                predict_options.full_float,
             ));
         }
         // write the ml and mm tags
