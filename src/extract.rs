@@ -296,7 +296,7 @@ impl FiberseqData {
             m6a = z_m6a;
             m6a_qual = z_m6a_qual
                 .into_iter()
-                .map(|x| (x * 255.0).round() as i64)
+                .map(|x| (x * 10_000.0).round() as i64)
                 .collect();
         }
 
