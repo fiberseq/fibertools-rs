@@ -205,8 +205,8 @@ impl FiberseqData {
     }
     pub fn all_header(simplify: bool, quality: bool) -> String {
         let mut x = format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            "ct", "st", "en", "fiber", "score", "strand", "fiber_length",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "ct", "st", "en", "fiber", "score", "strand", "sam_flag", "fiber_length",
         );
         if !simplify {
             x.push_str("fiber_sequence\t")
@@ -265,6 +265,7 @@ impl FiberseqData {
             end = self.record.reference_end();
             strand = if self.record.is_reverse() { '-' } else { '+' };
         }
+        let sam_flag = self.record.flags();
         // fiber features
         let nuc_starts = self.get_nuc(false, true);
         let nuc_lengths = self.get_nuc(false, false);
@@ -307,8 +308,8 @@ impl FiberseqData {
         let mut rtn = String::with_capacity(0);
         // add first things 7
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            ct, start, end, name, score, strand, q_len
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            ct, start, end, name, score, strand, sam_flag, q_len
         ))
         .unwrap();
         // add sequence
