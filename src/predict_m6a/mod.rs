@@ -54,6 +54,14 @@ impl PredictOptions {
             self.recommended_ml_value() - 100
         }
     }
+
+    pub fn float_to_u8(&self, x: f32) -> u8 {
+        if self.semi {
+            (5.0 + 5.0 * x * 255.0).round() as u8
+        } else {
+            (x * 255.0).round() as u8
+        }
+    }
 }
 enum WhichML {
     Xgb,
@@ -90,11 +98,10 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
 /// Create a basemod object form our predictions
 pub fn basemod_from_ml(
     record: &mut bam::Record,
+    predict_options: &PredictOptions,
     predictions: &[f32],
     positions: &[usize],
     base_mod: &str,
-    min_ml_value: u8,
-    full_float: bool,
 ) -> basemods::BaseMod {
     let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
         Vec<u8>,
@@ -103,12 +110,12 @@ pub fn basemod_from_ml(
     ) = predictions
         .iter()
         .zip(positions.iter())
-        .map(|(&x, &pos)| ((255.0 * x).round() as u8, x, pos as i64))
-        .filter(|(ml, _, _)| *ml >= min_ml_value)
+        .map(|(&x, &pos)| (predict_options.float_to_u8(x), x, pos as i64))
+        .filter(|(ml, _, _)| *ml >= predict_options.min_ml_value())
         .multiunzip();
 
     // add full probabilities if needed requested
-    if full_float {
+    if predict_options.full_float {
         let mut mp = super::bamlift::get_f32_tag(record, b"mp");
         record.remove_aux(b"mp").unwrap_or(());
         mp.extend(&full_probabilities_forward);
@@ -262,7 +269,6 @@ pub fn predict_m6a_on_records(
     records: Vec<&mut bam::Record>,
     predict_options: &PredictOptions,
 ) -> usize {
-    let min_ml_value = predict_options.min_ml_value();
     // data windows for all the records in this chunk
     let data: Vec<Option<(DataWidows, DataWidows)>> = records
         .iter()
@@ -300,11 +306,10 @@ pub fn predict_m6a_on_records(
             cur_predict_st += data.count;
             cur_basemods.base_mods.push(basemod_from_ml(
                 record,
+                predict_options,
                 cur_predictions,
                 &data.positions,
                 &data.base_mod,
-                min_ml_value,
-                predict_options.full_float,
             ));
         }
         // write the ml and mm tags
