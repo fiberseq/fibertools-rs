@@ -57,7 +57,7 @@ impl PredictOptions {
 
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
-            (1000.0 * x * 255.0).round() as u8
+            (10.0 * x * 255.0).round() as u8
         } else {
             (x * 255.0).round() as u8
         }
@@ -115,8 +115,12 @@ pub fn basemod_from_ml(
         .multiunzip();
 
     log::debug!(
-        "values: {:?}",
-        full_probabilities_forward.iter().sum::<f32>() / (full_probabilities_forward.len() as f32)
+        "Low but non zero values: {:?}",
+        full_probabilities_forward
+            .iter()
+            .filter(|&x| *x < 1.0 / 255.0)
+            .filter(|&x| *x > 0.0)
+            .count()
     );
 
     // add full probabilities if needed requested
