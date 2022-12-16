@@ -124,7 +124,7 @@ pub fn basemod_from_ml(
         full_probabilities_forward
             .iter()
             .filter(|&x| *x <= 0.0)
-            .filter(|&x| *x > -1.0)
+            .filter(|&x| *x > -0.01)
             .count(),
         predictions.len()
     );
