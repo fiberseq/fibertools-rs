@@ -114,6 +114,11 @@ pub fn basemod_from_ml(
         .filter(|(ml, _, _)| *ml >= predict_options.min_ml_value())
         .multiunzip();
 
+    log::debug!(
+        "values: {:?}",
+        full_probabilities_forward.iter().sum::<f32>() / (full_probabilities_forward.len() as f32)
+    );
+
     // add full probabilities if needed requested
     if predict_options.full_float {
         let mut mp = super::bamlift::get_f32_tag(record, b"mp");
