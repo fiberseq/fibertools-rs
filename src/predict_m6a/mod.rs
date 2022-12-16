@@ -57,7 +57,7 @@ impl PredictOptions {
 
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
-            (5.0 + 5.0 * x * 255.0).round() as u8
+            (5.0 + 1000.0 * x * 255.0).round() as u8
         } else {
             (x * 255.0).round() as u8
         }
