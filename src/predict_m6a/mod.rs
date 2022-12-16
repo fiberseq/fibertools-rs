@@ -131,7 +131,7 @@ pub fn basemod_from_ml(
             .filter(|&x| *x <= 2.0 / 255.0)
             .filter(|&x| *x > 1.0 / 255.0)
             .count(),
-        full_probabilities_forward.len()
+        predictions.len()
     );
 
     // add full probabilities if needed requested
