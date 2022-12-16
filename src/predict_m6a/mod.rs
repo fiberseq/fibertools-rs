@@ -40,7 +40,7 @@ impl PredictOptions {
         if self.cnn {
             200
         } else if self.semi {
-            1
+            0
         } else {
             // xgboost model
             250
@@ -49,7 +49,7 @@ impl PredictOptions {
 
     pub fn min_ml_value(&self) -> u8 {
         if self.all_calls {
-            1
+            0
         } else {
             self.recommended_ml_value() - 100
         }
