@@ -115,7 +115,7 @@ pub fn basemod_from_ml(
         .multiunzip();
 
     log::debug!(
-        "Low but non zero values: {:?}\tZero values: {:?}\tOne values: {:?}\tlength:{:?}",
+        "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
         full_probabilities_forward
             .iter()
             .filter(|&x| *x <= 1.0 / 255.0)
@@ -125,11 +125,6 @@ pub fn basemod_from_ml(
             .iter()
             .filter(|&x| *x <= 0.0)
             .filter(|&x| *x > -1.0)
-            .count(),
-        full_probabilities_forward
-            .iter()
-            .filter(|&x| *x <= 2.0 / 255.0)
-            .filter(|&x| *x > 1.0 / 255.0)
             .count(),
         predictions.len()
     );
