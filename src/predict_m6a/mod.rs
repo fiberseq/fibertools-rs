@@ -18,7 +18,7 @@ mod xgb;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
-
+pub const MIN_F32_PRED: f32 = 1.0e-46;
 #[derive(Debug, Clone)]
 pub struct PredictOptions {
     pub keep: bool,
@@ -37,8 +37,9 @@ impl PredictOptions {
     }
 
     pub fn recommended_ml_value(&self) -> u8 {
+        // these values are picked based off of best autocorrelation seen with nucleosome distances.
         if self.semi {
-            0
+            180
         } else if self.cnn {
             200
         } else {
