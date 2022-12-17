@@ -37,10 +37,10 @@ impl PredictOptions {
     }
 
     pub fn recommended_ml_value(&self) -> u8 {
-        if self.cnn {
-            200
-        } else if self.semi {
+        if self.semi {
             0
+        } else if self.cnn {
+            200
         } else {
             // xgboost model
             250
@@ -58,7 +58,7 @@ impl PredictOptions {
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
             if x > 0.0 {
-                (1.0 + 255.0 * -10.0 * (1.0 - x).log10()).round() as u8
+                (1.0 + 255.0 * -100.0 * (1.0 - x).log10()).round() as u8
             } else {
                 0
             }
