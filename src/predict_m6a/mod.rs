@@ -60,7 +60,8 @@ impl PredictOptions {
             if x > 0.1 {
                 (100.0 + x * 255.0).round() as u8
             } else if x > 0.00000000000000001 {
-                let t = (1.0 + 255.0 * -100_000_000_000.0 * (1.0 - x).log10()).round() as u8;
+                //let t = (1.0 + 255.0 * -100_000_000_000.0 * (1.0 - x).log10()).round() as u8;
+                let t = ((x / (1.0 - x)).log10() + 100.0) as u8;
                 if t < 100 {
                     t
                 } else {
