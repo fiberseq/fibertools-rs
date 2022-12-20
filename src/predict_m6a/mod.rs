@@ -36,15 +36,29 @@ impl PredictOptions {
         "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
     }
 
+    // values selected based on 94.5% precision
     pub fn recommended_ml_value(&self) -> u8 {
         // these values are picked based off of best autocorrelation seen with nucleosome distances.
-        if self.semi {
-            180
-        } else if self.cnn {
-            200
-        } else {
-            // xgboost model
-            250
+        match self.polymerase {
+            PbChem::Two => {
+                if self.semi {
+                    180
+                } else if self.cnn {
+                    205
+                } else {
+                    // xgboost model
+                    250
+                }
+            }
+            PbChem::TwoPointTwo => {
+                if self.semi {
+                    190
+                } else if self.cnn {
+                    185
+                } else {
+                    240
+                }
+            }
         }
     }
 
@@ -52,7 +66,7 @@ impl PredictOptions {
         if self.all_calls {
             0
         } else {
-            self.recommended_ml_value() - 100
+            self.recommended_ml_value() - 50
         }
     }
 
