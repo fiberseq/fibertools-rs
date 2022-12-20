@@ -10,7 +10,7 @@ static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
 static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
 static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
 static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
-static SEMI_2_2: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
+static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
