@@ -2,6 +2,11 @@
 ---
 `fibertools-rs`
 ==============
+
+![fibertools-rs dark logo](/assets/img/fiber_tools_teal.png#gh-dark-mode-only)
+![fibertools-rs light logo](/assets/img/fiber_tools_grey.png#gh-light-mode-only)
+
+
 [![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/fibertools-rs/actions)
 [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
  [![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)

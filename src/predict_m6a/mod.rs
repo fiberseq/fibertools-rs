@@ -36,7 +36,7 @@ impl PredictOptions {
         "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
     }
 
-    // values selected based on 94.5% precision
+    // values selected based on visualization of m6a distance curves
     pub fn recommended_ml_value(&self) -> u8 {
         // these values are picked based off of best autocorrelation seen with nucleosome distances.
         match self.polymerase {
@@ -72,7 +72,9 @@ impl PredictOptions {
 
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
-            ((x / (1.0 - x)).log2() + 200.0) as u8
+            // TODO different offsets for different semi models
+            let offset = 200.0;
+            ((x / (1.0 - x)).log2() + offset) as u8
         } else {
             (x * 255.0).round() as u8
         }
