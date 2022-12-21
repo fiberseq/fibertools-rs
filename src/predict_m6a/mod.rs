@@ -2,6 +2,7 @@ use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
+use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rayon::{current_num_threads, prelude::IndexedParallelIterator};
@@ -10,6 +11,7 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
+use std::collections::BTreeMap;
 
 // sub modules
 #[cfg(feature = "cnn")]
@@ -28,12 +30,52 @@ pub struct PredictOptions {
     pub all_calls: bool,
     pub polymerase: PbChem,
     pub batch_size: usize,
+    map: BTreeMap<OrderedFloat<f32>, u8>,
 }
 
 impl PredictOptions {
+    pub fn new(
+        keep: bool,
+        cnn: bool,
+        semi: bool,
+        full_float: bool,
+        all_calls: bool,
+        polymerase: PbChem,
+        batch_size: usize,
+    ) -> Self {
+        let mut map = BTreeMap::new();
+        // TODO insert into map
+        map.insert(OrderedFloat(1.0), 240);
+        // return prediction options
+        PredictOptions {
+            keep,
+            cnn,
+            semi,
+            full_float,
+            all_calls,
+            polymerase,
+            batch_size,
+            map,
+        }
+    }
+
     pub fn progress_style(&self) -> &str {
         // {percent:>3.green}%
         "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
+    }
+
+    /// function to find closest value in a btree based on precision
+    pub fn precision_from_float(&self, value: f32) -> u8 {
+        let key = OrderedFloat(value);
+        // maximum in map less than key
+        let (less_key, less_val) = self.map.range(..key).next_back().unwrap();
+        // minimum in map greater than or equal to key
+        let (more_key, more_val) = self.map.range(key..).next().unwrap();
+        if (more_key - key).abs() < (less_key - key).abs() {
+            *more_val
+        } else {
+            *less_val
+        }
     }
 
     // values selected based on visualization of m6a distance curves
@@ -73,8 +115,9 @@ impl PredictOptions {
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
             // TODO different offsets for different semi models
-            let offset = 200.0;
-            ((x / (1.0 - x)).log2() + offset) as u8
+            //let offset = 200.0;
+            //((x / (1.0 - x)).log2() + offset) as u8
+            self.precision_from_float(x)
         } else {
             (x * 255.0).round() as u8
         }

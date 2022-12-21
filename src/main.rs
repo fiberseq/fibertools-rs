@@ -1,8 +1,8 @@
 use anyhow::{Error, Ok};
 use colored::Colorize;
 use env_logger::{Builder, Target};
-use fibertools_rs::cli::Commands;
 use fibertools_rs::*;
+use fibertools_rs::{cli::Commands, predict_m6a::PredictOptions};
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
@@ -120,15 +120,15 @@ pub fn main() -> Result<(), Error> {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
-            let predict_options = predict_m6a::PredictOptions {
-                keep: *keep,
-                cnn: *cnn,
-                semi: *semi,
-                full_float: *full_float,
-                all_calls: *all_calls,
-                polymerase: find_pb_polymerase(&header),
-                batch_size: *batch_size,
-            };
+            let predict_options = PredictOptions::new(
+                *keep,
+                *cnn,
+                *semi,
+                *full_float,
+                *all_calls,
+                find_pb_polymerase(&header),
+                *batch_size,
+            );
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
