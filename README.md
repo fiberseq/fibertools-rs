@@ -3,8 +3,8 @@
 `fibertools-rs`
 ==============
 
-![fibertools-rs dark logo](/assets/img/fiber_tools_teal.png#gh-dark-mode-only)
-![fibertools-rs light logo](/assets/img/fiber_tools_grey.png#gh-light-mode-only)
+<img src="./assets/img/fiber_tools_teal.png#gh-dark-mode-only" alt="fibertools-rs dark logo" width="200"/>
+<img src="./assets/img/fiber_tools_grey.png#gh-light-mode-only" alt="fibertools-rs light logo" width="200"/>
 
 
 [![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/fibertools-rs/actions)
