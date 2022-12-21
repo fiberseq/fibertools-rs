@@ -1,8 +1,6 @@
 use super::predict_m6a::{LAYERS, WINDOW};
 use super::{PbChem, PredictOptions};
-use ordered_float::OrderedFloat;
 use spin;
-use std::collections::BTreeMap;
 use std::fs;
 use tch;
 use tempfile::NamedTempFile;
