@@ -33,6 +33,7 @@ indicatif = {version = "0.17.0", features = ["rayon"]}
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
+ordered-float = "3.4.0"
 quote = "0.6.10"
 rayon = "1.5"
 regex = "1.5.4"
