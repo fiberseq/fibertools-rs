@@ -72,20 +72,3 @@ pub fn predict_with_cnn(
     // only interested in the probability of m6A being true, first column.
     x.chunks(2).map(|c| c[0]).collect()
 }
-///
-/// let mut map = BTreeMap::new();
-///  map.insert(OrderedFloat(2.0f32), 0u8);
-///  map.insert(OrderedFloat(3.0f32), 1u8);
-/// function to find closest value in a btree based on precision
-pub fn precision_from_float(value: f32, map: BTreeMap<OrderedFloat<f32>, u8>) -> u8 {
-    let key = OrderedFloat(value);
-    // maximum in map less than 6: (5, 2)
-    let (less_key, less_val) = map.range(..key).next_back().unwrap();
-    // minimum in map greater than or equal to 6: (7, 3)
-    let (more_key, more_val) = map.range(key..).next().unwrap();
-    if (more_key - key).abs() < (less_key - key).abs() {
-        *more_val
-    } else {
-        *less_val
-    }
-}
