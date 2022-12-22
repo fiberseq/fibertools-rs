@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 // sub modules
 #[cfg(feature = "cnn")]
-mod cnn;
+pub mod cnn;
 mod xgb;
 
 pub const WINDOW: usize = 15;
@@ -44,8 +44,20 @@ impl PredictOptions {
         batch_size: usize,
     ) -> Self {
         let mut map = BTreeMap::new();
-        // TODO insert into map
-        map.insert(OrderedFloat(1.0), 240);
+        map.insert(OrderedFloat(0.0), 0);
+        #[cfg(feature = "cnn")]
+        {
+            let json = match polymerase {
+                PbChem::Two => cnn::SEMI_JSON_2_0,
+                PbChem::TwoPointTwo => cnn::SEMI_JSON_2_2,
+            };
+            let precision_table: cnn::PrecisionTable =
+                serde_json::from_str(json).expect("Precision table JSON was not well-formatted");
+            for (cnn_score, precision) in precision_table.data {
+                map.insert(OrderedFloat(cnn_score), precision);
+            }
+        }
+
         // return prediction options
         PredictOptions {
             keep,
@@ -68,9 +80,17 @@ impl PredictOptions {
     pub fn precision_from_float(&self, value: f32) -> u8 {
         let key = OrderedFloat(value);
         // maximum in map less than key
-        let (less_key, less_val) = self.map.range(..key).next_back().unwrap();
+        let (less_key, less_val) = self
+            .map
+            .range(..key)
+            .next_back()
+            .unwrap_or((&OrderedFloat(0.0), &0));
         // minimum in map greater than or equal to key
-        let (more_key, more_val) = self.map.range(key..).next().unwrap();
+        let (more_key, more_val) = self
+            .map
+            .range(key..)
+            .next()
+            .unwrap_or((&OrderedFloat(1.0), &255));
         if (more_key - key).abs() < (less_key - key).abs() {
             *more_val
         } else {
@@ -84,7 +104,7 @@ impl PredictOptions {
         match self.polymerase {
             PbChem::Two => {
                 if self.semi {
-                    180
+                    242
                 } else if self.cnn {
                     205
                 } else {
@@ -94,7 +114,7 @@ impl PredictOptions {
             }
             PbChem::TwoPointTwo => {
                 if self.semi {
-                    190
+                    242
                 } else if self.cnn {
                     185
                 } else {

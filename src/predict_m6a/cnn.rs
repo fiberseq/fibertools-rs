@@ -11,6 +11,9 @@ static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
 static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
 static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
+// json precision tables
+pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
+pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
@@ -69,4 +72,25 @@ pub fn predict_with_cnn(
         .expect("Unable to convert tensor to Vec<f32>");
     // only interested in the probability of m6A being true, first column.
     x.chunks(2).map(|c| c[0]).collect()
+}
+
+use serde::Deserialize;
+#[derive(Debug, Deserialize)]
+pub struct PrecisionTable {
+    //pub cnn_score: Vec<f32>,
+    //pub precision_u8: Vec<u8>,
+    pub columns: Vec<String>,
+    pub data: Vec<(f32, u8)>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_precision_json_validity() {
+        for file in [SEMI_JSON_2_0, SEMI_JSON_2_2] {
+            let _p: PrecisionTable =
+                serde_json::from_str(file).expect("Precision table JSON was not well-formatted");
+        }
+    }
 }

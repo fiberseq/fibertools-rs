@@ -138,7 +138,7 @@ pub enum Commands {
     },
     /// Make a man page for fibertools-rs
     ///
-    /// Writes file for `man`  to stdout.
+    /// Writes file for `man` to stdout.
     Man {},
 }
 
