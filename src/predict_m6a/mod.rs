@@ -104,7 +104,7 @@ impl PredictOptions {
         match self.polymerase {
             PbChem::Two => {
                 if self.semi {
-                    242
+                    225
                 } else if self.cnn {
                     205
                 } else {
@@ -114,7 +114,7 @@ impl PredictOptions {
             }
             PbChem::TwoPointTwo => {
                 if self.semi {
-                    242
+                    225
                 } else if self.cnn {
                     185
                 } else {
