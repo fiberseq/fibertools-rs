@@ -104,9 +104,9 @@ impl PredictOptions {
         match self.polymerase {
             PbChem::Two => {
                 if self.semi {
-                    225
+                    230
                 } else if self.cnn {
-                    205
+                    200
                 } else {
                     // xgboost model
                     250
@@ -114,11 +114,11 @@ impl PredictOptions {
             }
             PbChem::TwoPointTwo => {
                 if self.semi {
-                    225
+                    244
                 } else if self.cnn {
-                    185
+                    215
                 } else {
-                    240
+                    245
                 }
             }
         }
@@ -128,7 +128,7 @@ impl PredictOptions {
         if self.all_calls {
             0
         } else {
-            self.recommended_ml_value() - 50
+            self.recommended_ml_value()
         }
     }
 
