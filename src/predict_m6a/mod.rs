@@ -252,16 +252,28 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     }
 
     let extend = WINDOW / 2;
-    let f_ip = bamlift::get_u8_tag(record, b"fi");
-    let r_ip = bamlift::get_u8_tag(record, b"ri")
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>();
-    let f_pw = bamlift::get_u8_tag(record, b"fp");
-    let r_pw = bamlift::get_u8_tag(record, b"rp")
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>();
+    let mut f_ip = bamlift::get_u8_tag(record, b"fi");
+    let r_ip;
+    let f_pw;
+    let r_pw;
+    // check if we maybe are getting u16 input instead of u8
+    if f_ip.is_empty() {
+        f_ip = bamlift::get_pb_u16_tag_as_u8(record, b"fi");
+        if f_ip.is_empty() {
+            // missing u16 as well, set all to empty arrays
+            r_ip = vec![];
+            f_pw = vec![];
+            r_pw = vec![];
+        } else {
+            r_ip = bamlift::get_pb_u16_tag_as_u8(record, b"ri");
+            f_pw = bamlift::get_pb_u16_tag_as_u8(record, b"fp");
+            r_pw = bamlift::get_pb_u16_tag_as_u8(record, b"rp");
+        }
+    } else {
+        r_ip = bamlift::get_u8_tag(record, b"ri");
+        f_pw = bamlift::get_u8_tag(record, b"fp");
+        r_pw = bamlift::get_u8_tag(record, b"rp");
+    }
     // return if missing kinetics
     if f_ip.is_empty() || r_ip.is_empty() || f_pw.is_empty() || r_pw.is_empty() {
         log::debug!(
@@ -270,6 +282,9 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
         );
         return None;
     }
+    // reverse for reverse strand
+    let r_ip = r_ip.into_iter().rev().collect::<Vec<_>>();
+    let r_pw = r_pw.into_iter().rev().collect::<Vec<_>>();
 
     let mut seq = record.seq().as_bytes();
     if record.is_reverse() {
