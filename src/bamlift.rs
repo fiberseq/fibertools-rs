@@ -303,6 +303,32 @@ pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
     }
 }
 
+/// Convert the PacBio u16 tag into the u8 tag we normally expect.
+pub fn get_pb_u16_tag_as_u8(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
+    if let Ok(Aux::ArrayU16(array)) = record.aux(tag) {
+        let read_array = array.iter().collect::<Vec<_>>();
+        read_array
+            .iter()
+            .map(|&x| {
+                if x < 64 {
+                    x
+                } else if x < 191 {
+                    (x - 64) / 2 + 64
+                } else if x < 445 {
+                    (x - 192) / 4 + 128
+                } else if x < 953 {
+                    (x - 448) / 8 + 192
+                } else {
+                    255
+                }
+            })
+            .map(|x| x as u8)
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
 pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
     if let Ok(Aux::ArrayFloat(array)) = record.aux(tag) {
         let read_array = array.iter().collect::<Vec<_>>();
