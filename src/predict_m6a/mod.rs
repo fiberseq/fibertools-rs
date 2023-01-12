@@ -27,6 +27,7 @@ pub struct PredictOptions {
     pub cnn: bool,
     pub semi: bool,
     pub full_float: bool,
+    pub min_ml_score: Option<u8>,
     pub all_calls: bool,
     pub polymerase: PbChem,
     pub batch_size: usize,
@@ -34,11 +35,13 @@ pub struct PredictOptions {
 }
 
 impl PredictOptions {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
         cnn: bool,
         semi: bool,
         full_float: bool,
+        min_ml_score: Option<u8>,
         all_calls: bool,
         polymerase: PbChem,
         batch_size: usize,
@@ -64,6 +67,7 @@ impl PredictOptions {
             cnn,
             semi,
             full_float,
+            min_ml_score,
             all_calls,
             polymerase,
             batch_size,
@@ -100,6 +104,10 @@ impl PredictOptions {
 
     // values selected based on visualization of m6a distance curves
     pub fn recommended_ml_value(&self) -> u8 {
+        // return the user selected value
+        if let Some(min_ml_score) = self.min_ml_score {
+            return min_ml_score;
+        }
         // these values are picked based off of best autocorrelation seen with nucleosome distances.
         match self.polymerase {
             PbChem::Two => {

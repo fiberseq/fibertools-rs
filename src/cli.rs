@@ -110,6 +110,9 @@ pub enum Commands {
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
+        /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
+        #[clap(short, long)]
+        min_ml_score: Option<u8>,
         /// Keep all m6A calls regardless of how low the ML value is
         #[clap(short, long)]
         all_calls: bool,
