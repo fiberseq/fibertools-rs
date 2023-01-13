@@ -6,6 +6,7 @@ en
 fiber
 score
 strand
+sam_flag
 fiber_length
 fiber_sequence
 ec

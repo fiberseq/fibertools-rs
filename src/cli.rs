@@ -1,4 +1,6 @@
-use clap::{Command, CommandFactory, Parser, Subcommand};
+use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
+use clap_complete::{generate, Generator, Shell};
+use std::io;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -8,8 +10,7 @@ use clap::{Command, CommandFactory, Parser, Subcommand};
     propagate_version = true,
     subcommand_required = true,
     infer_subcommands = true,
-    arg_required_else_help = true,
-    help_expected = true
+    arg_required_else_help = true
 )]
 #[command(version = super::LONG_VERSION)]
 pub struct Cli {
@@ -42,13 +43,13 @@ pub struct Cli {
 ///
 /// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
 ///
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
     /// Extract fiberseq data into plain text files
     #[clap(visible_aliases = &["ex", "e"])]
     Extract {
         /// Fiberseq bam file
-        #[clap(default_value = "-")]
+        #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
         bam: String,
         /// Report in reference sequence coordinates
         #[clap(short, long)]
@@ -109,6 +110,12 @@ pub enum Commands {
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
+        /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
+        #[clap(short, long)]
+        min_ml_score: Option<u8>,
+        /// Keep all m6A calls regardless of how low the ML value is
+        #[clap(short, long)]
+        all_calls: bool,
         /// Use the CNN model for prediction instead of XGBoost
         #[clap(short, long, default_value_if("semi", "true", "true"))]
         cnn: bool,
@@ -123,14 +130,23 @@ pub enum Commands {
         /// Number of reads to include in batch prediction
         ///
         /// Increasing improved GPU performance at the cost of memory.
-        #[clap(
-            short,
-            long,
-            default_value = "1",
-            default_value_if("cnn", "true", "10")
-        )]
+        #[clap(short, long, default_value = "1", default_value_if("cnn", "true", "1"))]
         batch_size: usize,
     },
+    /// Make command line completions
+    Completions {
+        /// If provided, outputs the completion file for given shell
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+    /// Make a man page for fibertools-rs
+    ///
+    /// Writes file for `man` to stdout.
+    Man {},
+}
+
+pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
 }
 
 pub fn make_cli_parse() -> Cli {
