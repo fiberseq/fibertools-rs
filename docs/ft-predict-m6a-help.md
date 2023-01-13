@@ -18,6 +18,9 @@ Options:
   -k, --keep
           Keep hifi kinetics data
 
+  -m, --min-ml-score <MIN_ML_SCORE>
+          Set a minimum ML score to keep on instead of using the model specific minimum ML score
+
   -a, --all-calls
           Keep all m6A calls regardless of how low the ML value is
 
