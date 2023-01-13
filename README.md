@@ -47,9 +47,9 @@ We recommend filtering out ML scores less than 250 for the XGBoost model and ML 
 
 ### Installing with support for CNN m6A prediction
 To allow for m6A predictions with the CNN model you must follow these modified installation instructions.
-* Get `libtorch` **v1.12.0** from the [PyTorch website](https://pytorch.org/get-started/) download section and extract the content of the zip file.
+* Get `libtorch` **v1.13.0** from the [PyTorch website](https://pytorch.org/get-started/) download section and extract the content of the zip file.
     * On my linux system with a cuda gpu this is what I downloaded:
-    * ```wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.12.0%2Bcu116.zip```
+    * ```wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu116.zip```
 * Add the following to your `.bashrc` or equivalent, where `/path/to/libtorch` is the path to the directory that was created when unzipping the file:
 ```bash
 export LIBTORCH=/path/to/libtorch # e.g. export LIBTORCH=/Users/mrvollger/lib/libtorch
