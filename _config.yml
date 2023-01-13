@@ -1,7 +1,7 @@
 #theme: jekyll-theme-minimal
 #theme: minima
 remote_theme: jekyll/minima
-logo: /assets/img/logo.png
+logo: /assets/img/fiber_tools_grey.png
 
 minima:
   skin: dark

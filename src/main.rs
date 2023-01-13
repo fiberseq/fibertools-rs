@@ -1,8 +1,8 @@
 use anyhow::{Error, Ok};
 use colored::Colorize;
 use env_logger::{Builder, Target};
-use fibertools_rs::cli::Commands;
 use fibertools_rs::*;
+use fibertools_rs::{cli::Commands, predict_m6a::PredictOptions};
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
@@ -111,6 +111,8 @@ pub fn main() -> Result<(), Error> {
             bam,
             out,
             keep,
+            min_ml_score,
+            all_calls,
             cnn,
             semi,
             full_float,
@@ -119,16 +121,31 @@ pub fn main() -> Result<(), Error> {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
-            let predict_options = predict_m6a::PredictOptions {
-                keep: *keep,
-                cnn: *cnn,
-                semi: *semi,
-                full_float: *full_float,
-                polymerase: find_pb_polymerase(&header),
-                batch_size: *batch_size,
-            };
+            let predict_options = PredictOptions::new(
+                *keep,
+                *cnn,
+                *semi,
+                *full_float,
+                *min_ml_score,
+                *all_calls,
+                find_pb_polymerase(&header),
+                *batch_size,
+            );
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+        }
+        Some(Commands::Completions { shell }) => {
+            log::info!("Generating completion file for {:?}...", shell);
+            cli::print_completions(*shell, &mut cli::make_cli_app());
+        }
+        Some(Commands::Man {}) => {
+            let man = clap_mangen::Man::new(cli::make_cli_app());
+            //let mut buffer: Vec<u8> = Default::default();
+            let mut buffer = Box::new(std::io::stdout()) as Box<dyn std::io::Write>;
+            man.render(&mut buffer)?;
+            //man.render_subcommands_section(&mut buffer)?;
+            //man.render_description_section(&mut buffer)?;
+            //std::fs::write("ft.1", buffer)?;
         }
         None => {}
     };

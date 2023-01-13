@@ -2,6 +2,11 @@
 ---
 `fibertools-rs`
 ==============
+
+<img src="./assets/img/fiber_tools_teal.png#gh-dark-mode-only" alt="fibertools-rs dark logo" width="200"/>
+<img src="./assets/img/fiber_tools_grey.png#gh-light-mode-only" alt="fibertools-rs light logo" width="200"/>
+
+
 [![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/fibertools-rs/actions)
 [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
  [![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
@@ -80,8 +85,9 @@ cargo doc --open --features cnn
 ```
 and the docs will open in your browser.
 
-# TODO for v0.0.11
+# TODO items
 - [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
+- [ ] Set filters for ML depending on the model used
 - [ ] long format extract command
 - [ ] Add `rustybam` stats to ft `all` as an option
 - [ ] add option result to bamlift

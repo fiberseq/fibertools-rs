@@ -18,6 +18,9 @@ Options:
   -k, --keep
           Keep hifi kinetics data
 
+  -a, --all-calls
+          Keep all m6A calls regardless of how low the ML value is
+
   -c, --cnn
           Use the CNN model for prediction instead of XGBoost
 

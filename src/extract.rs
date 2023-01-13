@@ -6,6 +6,7 @@ use rayon::{current_num_threads, prelude::*};
 use rust_htslib::{
     bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView, bam::Read,
 };
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::time::Instant;
 
@@ -17,10 +18,11 @@ pub struct FiberseqData {
     pub ref_msp: Vec<(i64, i64)>,
     pub base_mods: BaseMods,
     pub ec: f32,
+    pub target_name: String,
 }
 
 impl FiberseqData {
-    pub fn new(record: &bam::Record, min_ml_score: u8) -> Self {
+    pub fn new(record: &bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
         let mut nuc_starts = get_u32_tag(record, b"ns");
         let mut msp_starts = get_u32_tag(record, b"as");
         let mut nuc_length = get_u32_tag(record, b"nl");
@@ -72,6 +74,10 @@ impl FiberseqData {
         } else {
             0.0
         };
+        let target_name = match target_name {
+            Some(t) => t.clone(),
+            None => ".".to_string(),
+        };
         //
         FiberseqData {
             record: record.clone(),
@@ -89,13 +95,38 @@ impl FiberseqData {
             ref_msp,
             base_mods: BaseMods::new(record, min_ml_score),
             ec,
+            target_name,
         }
     }
 
-    pub fn from_records(records: &Vec<bam::Record>, min_ml_score: u8) -> Vec<Self> {
+    pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
+        let target_u8s = head_view.target_names();
+        let tids = target_u8s
+            .iter()
+            .map(|t| head_view.tid(t).expect("Unable to get tid"));
+        let target_names = target_u8s
+            .iter()
+            .map(|&a| String::from_utf8_lossy(a).to_string());
+
+        tids.zip(target_names)
+            .map(|(id, t)| (id as i32, t))
+            .collect()
+    }
+
+    pub fn target_name_from_tid(tid: i32, target_dict: &HashMap<i32, String>) -> Option<&String> {
+        target_dict.get(&tid)
+    }
+
+    pub fn from_records(
+        records: &Vec<bam::Record>,
+        head_view: &HeaderView,
+        min_ml_score: u8,
+    ) -> Vec<Self> {
+        let target_dict = Self::dict_from_head_view(head_view);
         records
             .par_iter()
-            .map(|x| FiberseqData::new(x, min_ml_score))
+            .map(|r| (r, Self::target_name_from_tid(r.tid(), &target_dict)))
+            .map(|(r, target_name)| Self::new(r, target_name, min_ml_score))
             .collect::<Vec<_>>()
     }
 
@@ -125,44 +156,44 @@ impl FiberseqData {
         }
     }
 
-    pub fn write_msp(&self, reference: bool, head_view: &HeaderView) -> String {
+    pub fn write_msp(&self, reference: bool) -> String {
         let color = "255,0,255";
         let starts = self.get_msp(reference, true);
         let lengths = self.get_msp(reference, false);
         if starts.is_empty() {
             return "".to_string();
         }
-        self.to_bed12(reference, &starts, &lengths, head_view, color)
+        self.to_bed12(reference, &starts, &lengths, color)
     }
 
-    pub fn write_nuc(&self, reference: bool, head_view: &HeaderView) -> String {
+    pub fn write_nuc(&self, reference: bool) -> String {
         let color = "169,169,169";
         let starts = self.get_nuc(reference, true);
         let lengths = self.get_nuc(reference, false);
         if starts.is_empty() {
             return "".to_string();
         }
-        self.to_bed12(reference, &starts, &lengths, head_view, color)
+        self.to_bed12(reference, &starts, &lengths, color)
     }
 
-    pub fn write_m6a(&self, reference: bool, head_view: &HeaderView) -> String {
+    pub fn write_m6a(&self, reference: bool) -> String {
         let color = "128,0,128";
         let starts = self.base_mods.m6a_positions(reference);
         if starts.is_empty() {
             return "".to_string();
         }
         let lengths = vec![1; starts.len()];
-        self.to_bed12(reference, &starts, &lengths, head_view, color)
+        self.to_bed12(reference, &starts, &lengths, color)
     }
 
-    pub fn write_cpg(&self, reference: bool, head_view: &HeaderView) -> String {
+    pub fn write_cpg(&self, reference: bool) -> String {
         let color = "139,69,19";
         let starts = self.base_mods.cpg_positions(reference);
         if starts.is_empty() {
             return "".to_string();
         }
         let lengths = vec![1; starts.len()];
-        self.to_bed12(reference, &starts, &lengths, head_view, color)
+        self.to_bed12(reference, &starts, &lengths, color)
     }
 
     pub fn get_rq(&self) -> Option<f32> {
@@ -174,8 +205,8 @@ impl FiberseqData {
     }
     pub fn all_header(simplify: bool, quality: bool) -> String {
         let mut x = format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            "ct", "st", "en", "fiber", "score", "strand", "fiber_length",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "ct", "st", "en", "fiber", "score", "strand", "sam_flag", "fiber_length",
         );
         if !simplify {
             x.push_str("fiber_sequence\t")
@@ -209,13 +240,7 @@ impl FiberseqData {
         x
     }
 
-    pub fn write_all(
-        &self,
-        head_view: &HeaderView,
-        simplify: bool,
-        quality: bool,
-        full_float: bool,
-    ) -> String {
+    pub fn write_all(&self, simplify: bool, quality: bool, full_float: bool) -> String {
         // PB features
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;
@@ -235,11 +260,12 @@ impl FiberseqData {
             end = 0;
             strand = '.';
         } else {
-            ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
+            ct = &self.target_name;
             start = self.record.reference_start();
             end = self.record.reference_end();
             strand = if self.record.is_reverse() { '-' } else { '+' };
         }
+        let sam_flag = self.record.flags();
         // fiber features
         let nuc_starts = self.get_nuc(false, true);
         let nuc_lengths = self.get_nuc(false, false);
@@ -263,14 +289,14 @@ impl FiberseqData {
         let (mut m6a, ref_m6a, m6a_qual) = self.base_mods.m6a();
         let m6a_count = m6a.len();
         let mut m6a_qual: Vec<i64> = m6a_qual.into_iter().map(|a| a as i64).collect();
-        // replace with full quality when possible
+        // replace with full quality when requested
         if full_float {
             let m6a_full = self.base_mods.m6a_full_probabilities(&self.record);
             let (z_m6a, z_m6a_qual) = unzip_to_vectors(m6a_full);
             m6a = z_m6a;
             m6a_qual = z_m6a_qual
                 .into_iter()
-                .map(|x| (x * 255.0).round() as i64)
+                .map(|x| (x * 10_000.0).round() as i64)
                 .collect();
         }
 
@@ -282,8 +308,8 @@ impl FiberseqData {
         let mut rtn = String::with_capacity(0);
         // add first things 7
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            ct, start, end, name, score, strand, q_len
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            ct, start, end, name, score, strand, sam_flag, q_len
         ))
         .unwrap();
         // add sequence
@@ -353,7 +379,6 @@ impl FiberseqData {
         reference: bool,
         starts: &[i64],
         lengths: &[i64],
-        head_view: &HeaderView,
         color: &str,
     ) -> String {
         // skip if no alignments are here
@@ -364,14 +389,14 @@ impl FiberseqData {
         let ct;
         let start;
         let end;
-        let name = std::str::from_utf8(self.record.qname()).unwrap();
+        let name = String::from_utf8_lossy(self.record.qname()).to_string();
         let mut rtn: String = String::with_capacity(0);
         if reference {
-            ct = std::str::from_utf8(head_view.tid2name(self.record.tid() as u32)).unwrap();
+            ct = &self.target_name;
             start = self.record.reference_start();
             end = self.record.reference_end();
         } else {
-            ct = name;
+            ct = &name;
             start = 0;
             end = self.record.seq_len() as i64;
         }
@@ -404,7 +429,7 @@ impl FiberseqData {
         rtn.push('\t');
         rtn.push_str(&end.to_string());
         rtn.push('\t');
-        rtn.push_str(name);
+        rtn.push_str(&name);
         rtn.push('\t');
         rtn.push_str(&score.to_string());
         rtn.push('\t');
@@ -434,13 +459,13 @@ pub fn process_bam_chunk(
     head_view: &HeaderView,
 ) {
     let start = Instant::now();
-    let mut fiber_data = FiberseqData::from_records(records, out_files.min_ml_score);
+    let fiber_data = FiberseqData::from_records(records, head_view, out_files.min_ml_score);
 
     match &mut out_files.m6a {
         Some(m6a) => {
             let out: Vec<String> = fiber_data
-                .iter_mut()
-                .map(|r| r.write_m6a(out_files.reference, head_view))
+                .par_iter()
+                .map(|r| r.write_m6a(out_files.reference))
                 .collect();
             for line in out {
                 write_to_file(&line, m6a);
@@ -451,8 +476,8 @@ pub fn process_bam_chunk(
     match &mut out_files.cpg {
         Some(cpg) => {
             let out: Vec<String> = fiber_data
-                .iter_mut()
-                .map(|r| r.write_cpg(out_files.reference, head_view))
+                .par_iter()
+                .map(|r| r.write_cpg(out_files.reference))
                 .collect();
             for line in out {
                 write_to_file(&line, cpg);
@@ -463,8 +488,8 @@ pub fn process_bam_chunk(
     match &mut out_files.msp {
         Some(msp) => {
             let out: Vec<String> = fiber_data
-                .iter_mut()
-                .map(|r| r.write_msp(out_files.reference, head_view))
+                .par_iter()
+                .map(|r| r.write_msp(out_files.reference))
                 .collect();
             for line in out {
                 write_to_file(&line, msp);
@@ -475,8 +500,8 @@ pub fn process_bam_chunk(
     match &mut out_files.nuc {
         Some(nuc) => {
             let out: Vec<String> = fiber_data
-                .iter_mut()
-                .map(|r| r.write_nuc(out_files.reference, head_view))
+                .par_iter()
+                .map(|r| r.write_nuc(out_files.reference))
                 .collect();
             for line in out {
                 write_to_file(&line, nuc);
@@ -487,15 +512,8 @@ pub fn process_bam_chunk(
     match &mut out_files.all {
         Some(all) => {
             let out: Vec<String> = fiber_data
-                .iter_mut()
-                .map(|r| {
-                    r.write_all(
-                        head_view,
-                        out_files.simplify,
-                        out_files.quality,
-                        out_files.full_float,
-                    )
-                })
+                .par_iter()
+                .map(|r| r.write_all(out_files.simplify, out_files.quality, out_files.full_float))
                 .collect();
             for line in out {
                 write_to_file(&line, all);
@@ -535,22 +553,14 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let bin_size = current_num_threads() * 500;
-    //
-    let mut cur_count = 0;
-    let mut cur_vec = vec![];
-    let mut proccesed_reads = 0;
-    for r in bam.records() {
-        let record = r.unwrap();
-        cur_vec.push(record);
-        cur_count += 1;
-        if cur_count == bin_size {
-            process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
-            proccesed_reads += cur_vec.len();
-            cur_vec.clear();
-            cur_count = 0;
-        }
+    let chunk_size = current_num_threads() * 500;
+    let bam_chunk_iter = BamChunk {
+        bam: bam.records(),
+        chunk_size,
+    };
+    let mut processed_reads = 0;
+    for chunk in bam_chunk_iter {
+        process_bam_chunk(&chunk, processed_reads, &mut out_files, &head_view);
+        processed_reads += chunk.len();
     }
-    // clear any unprocessed recs not big enough to make a full chunk
-    process_bam_chunk(&cur_vec, proccesed_reads, &mut out_files, &head_view);
 }
