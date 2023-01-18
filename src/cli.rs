@@ -94,6 +94,9 @@ pub enum Commands {
         /// Minium score in the ML tag to include in the output
         #[clap(short, long, default_value = "150")]
         min_ml_score: u8,
+        /// Set a maximum distance from the start of the motif to keep a feature
+        #[clap(short, long)]
+        dist: Option<i64>,
         /// Provide data in wide format, one row per read
         #[clap(short, long)]
         wide: bool,

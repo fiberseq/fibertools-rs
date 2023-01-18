@@ -20,6 +20,7 @@ pub struct CenteredFiberData {
     fiber: FiberseqData,
     record: record::Record,
     offset: i64,
+    pub dist: Option<i64>,
     center_position: CenterPosition,
 }
 
@@ -28,12 +29,14 @@ impl CenteredFiberData {
         fiber: FiberseqData,
         record: bam::Record,
         center_position: CenterPosition,
+        dist: Option<i64>,
     ) -> Option<Self> {
         let offset = CenteredFiberData::find_offset(&record, center_position.position);
         offset.map(|offset| CenteredFiberData {
             fiber,
             record,
             offset,
+            dist,
             center_position,
         })
     }
@@ -216,10 +219,19 @@ impl CenteredFiberData {
                 None => starts.iter().map(|&st| st + 1).collect(),
             };
             for (&st, &en) in starts.iter().zip(ends.iter()) {
-                // add the leading data
-                rtn.push_str(&self.leading_columns());
-                // add the long form data
-                write!(&mut rtn, "{}", format_args!("{}\t{}\t{}\n", t, st, en)).unwrap();
+                let mut write = true;
+                if let Some(dist) = self.dist {
+                    // skip writing if we are outside the motif range
+                    if en < -dist || st > dist {
+                        write = false;
+                    }
+                };
+                if write {
+                    // add the leading data
+                    rtn.push_str(&self.leading_columns());
+                    // add the long form data
+                    write!(&mut rtn, "{}", format_args!("{}\t{}\t{}\n", t, st, en)).unwrap();
+                }
             }
         }
 
@@ -233,13 +245,14 @@ pub fn center(
     center_position: CenterPosition,
     min_ml_score: u8,
     wide: bool,
+    dist: Option<i64>,
 ) {
     let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     let mut total = 0;
     let mut missing = 0;
     for (fiber, record) in iter {
-        let out = match CenteredFiberData::new(fiber, record, center_position.clone()) {
+        let out = match CenteredFiberData::new(fiber, record, center_position.clone(), dist) {
             Some(centered_fiber) => {
                 total += 1;
                 if wide {
@@ -273,6 +286,7 @@ pub fn center_fiberdata(
     center_positions: Vec<CenterPosition>,
     min_ml_score: u8,
     wide: bool,
+    dist: Option<i64>,
 ) {
     // header needed for the contig name...
     let header = bam::Header::from_template(bam.header());
@@ -301,7 +315,14 @@ pub fn center_fiberdata(
         ))
         .expect("Failed to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        center(records, &header_view, center_position, min_ml_score, wide);
+        center(
+            records,
+            &header_view,
+            center_position,
+            min_ml_score,
+            wide,
+            dist,
+        );
         pb.inc(1);
     }
     pb.finish_with_message("done");

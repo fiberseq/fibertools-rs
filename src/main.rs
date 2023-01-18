@@ -99,13 +99,14 @@ pub fn main() -> Result<(), Error> {
             bam,
             bed,
             min_ml_score,
+            dist,
             wide,
         }) => {
             // read in the bam from stdin or from a file
             let mut bam = bam::IndexedReader::from_path(bam)?;
             bam.set_threads(args.threads).unwrap();
             let center_positions = center::read_center_positions(bed)?;
-            center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide);
+            center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide, *dist);
         }
         Some(Commands::PredictM6A {
             bam,
