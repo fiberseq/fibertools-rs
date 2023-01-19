@@ -1,7 +1,7 @@
 use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
-use indicatif::{style, ParallelProgressIterator};
+use indicatif::{style, ParallelProgressIterator, ProgressBar};
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -505,6 +505,12 @@ pub fn read_bam_into_fiberdata(
 }
 
 pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
+    let bar = ProgressBar::new(1);
+    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:.green})";
+    let style = style::ProgressStyle::with_template(style_str)
+        .unwrap()
+        .progress_chars("##-");
+    bar.set_style(style);
     for rec in bam.records() {
         let mut record = rec.unwrap();
         record.remove_aux(b"fp").unwrap_or(());
@@ -512,5 +518,7 @@ pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
         record.remove_aux(b"rp").unwrap_or(());
         record.remove_aux(b"ri").unwrap_or(());
         out.write(&record).unwrap();
+        bar.inc(1);
     }
+    bar.finish();
 }
