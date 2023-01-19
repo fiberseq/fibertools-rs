@@ -135,6 +135,11 @@ pub fn main() -> Result<(), Error> {
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
+        Some(Commands::ClearKinetics { bam, out }) => {
+            let mut bam = fibertools_rs::bam_reader(bam, args.threads);
+            let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
+            predict_m6a::clear_kinetics(&mut bam, &mut out);
+        }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);
             cli::print_completions(*shell, &mut cli::make_cli_app());

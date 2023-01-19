@@ -136,6 +136,15 @@ pub enum Commands {
         #[clap(short, long, default_value = "1", default_value_if("cnn", "true", "1"))]
         batch_size: usize,
     },
+    /// Remove HiFi kinetics tags from the input bam file
+    ClearKinetics {
+        /// Bam HiFi file with kinetics
+        #[clap(default_value = "-")]
+        bam: String,
+        /// Output bam file without hifi kinetics
+        #[clap(default_value = "-")]
+        out: String,
+    },
     /// Make command line completions
     Completions {
         /// If provided, outputs the completion file for given shell
