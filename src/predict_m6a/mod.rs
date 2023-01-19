@@ -506,7 +506,7 @@ pub fn read_bam_into_fiberdata(
 
 pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
     let bar = ProgressBar::new(1);
-    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:.green})";
+    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:.green})";
     let style = style::ProgressStyle::with_template(style_str)
         .unwrap()
         .progress_chars("##-");
