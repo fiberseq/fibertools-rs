@@ -503,3 +503,14 @@ pub fn read_bam_into_fiberdata(
         log::info!("Finished predicting m6A for {} reads", total_read);
     }
 }
+
+pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
+    for rec in bam.records() {
+        let mut record = rec.unwrap();
+        record.remove_aux(b"fp").unwrap_or(());
+        record.remove_aux(b"fi").unwrap_or(());
+        record.remove_aux(b"rp").unwrap_or(());
+        record.remove_aux(b"ri").unwrap_or(());
+        out.write(&record).unwrap();
+    }
+}
