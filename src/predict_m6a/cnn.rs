@@ -11,9 +11,11 @@ static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
 static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
 static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
+static SEMI_REVIO: &[u8] = include_bytes!("../../models/Revio_semi_torch.pt");
 // json precision tables
 pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
 pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
+pub static SEMI_JSON_REVIO: &str = include_str!("../../models/Revio_semi_torch.json");
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
@@ -37,6 +39,15 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
                 if predict_options.semi {
                     SEMI_2_2
                 } else {
+                    PT_2_2
+                }
+            }
+            PbChem::Revio => {
+                if predict_options.semi {
+                    log::info!("Loading CNN model for Revio chemistry");
+                    SEMI_REVIO
+                } else {
+                    log::info!("Loading CNN model for 2.2 chemistry");
                     PT_2_2
                 }
             }
