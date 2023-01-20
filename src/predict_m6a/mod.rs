@@ -132,11 +132,11 @@ impl PredictOptions {
             }
             PbChem::Revio => {
                 if self.semi {
-                    254
+                    253
                 } else if self.cnn {
                     215
                 } else {
-                    251
+                    245
                 }
             }
         }
