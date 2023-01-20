@@ -53,6 +53,7 @@ impl PredictOptions {
             let json = match polymerase {
                 PbChem::Two => cnn::SEMI_JSON_2_0,
                 PbChem::TwoPointTwo => cnn::SEMI_JSON_2_2,
+                PbChem::Revio => cnn::SEMI_JSON_REVIO,
             };
             let precision_table: cnn::PrecisionTable =
                 serde_json::from_str(json).expect("Precision table JSON was not well-formatted");
@@ -121,6 +122,15 @@ impl PredictOptions {
                 }
             }
             PbChem::TwoPointTwo => {
+                if self.semi {
+                    244
+                } else if self.cnn {
+                    215
+                } else {
+                    245
+                }
+            }
+            PbChem::Revio => {
                 if self.semi {
                     244
                 } else if self.cnn {

@@ -21,6 +21,10 @@ pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
                 log::info!("Loading XGBoost model for 2.2 chemistry");
                 JSON_2_2
             }
+            PbChem::Revio => {
+                log::info!("Loading XGBoost model for 2.2 chemistry");
+                JSON_2_2
+            }
         };
         let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
         let temp_file_name = temp_file

@@ -247,6 +247,7 @@ impl<'a> Iterator for BamChunk<'a> {
 pub enum PbChem {
     Two,
     TwoPointTwo,
+    Revio,
 }
 
 pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
@@ -263,7 +264,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
             // is really 3.2 but has polymerase of 2.2
             ("102-194-100".to_string(), PbChem::TwoPointTwo),
             // Revio has kinetics most similar to 2.2
-            ("102-739-100".to_string(), PbChem::TwoPointTwo)
+            ("102-739-100".to_string(), PbChem::Revio)
         ]);
     }
     lazy_static! {
