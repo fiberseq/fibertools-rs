@@ -75,6 +75,26 @@ impl CenteredFiberData {
         }
     }
 
+    /// Get the sequence
+    pub fn subset_sequence(&self) -> String {
+        let dist = if let Some(dist) = self.dist { dist } else { 0 };
+        let seq = self.record.seq().as_bytes();
+        let mut out_seq: Vec<u8> = vec![];
+        for pos in (self.offset - dist)..(self.offset + dist + 1) {
+            if pos < 0 || pos as usize >= seq.len() {
+                out_seq.push(b'N');
+            } else {
+                out_seq.push(seq[pos as usize]);
+            }
+        }
+
+        if self.center_position.strand != '+' {
+            out_seq.reverse();
+        }
+        assert_eq!(out_seq.len() as i64, dist * 2 + 1);
+        String::from_utf8_lossy(&out_seq).to_string()
+    }
+
     pub fn m6a_positions(&self) -> Vec<i64> {
         self.apply_offset(&self.fiber.base_mods.m6a_positions(false))
     }
@@ -132,10 +152,11 @@ impl CenteredFiberData {
 
     pub fn leading_columns(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.center_position.chrom,
             self.center_position.position,
             self.center_position.strand,
+            self.subset_sequence(),
             self.record.reference_start(),
             self.record.reference_end(),
             std::str::from_utf8(self.record.qname()).unwrap(),
@@ -165,10 +186,11 @@ impl CenteredFiberData {
 
     pub fn leading_header() -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             "chrom",
             "centering_position",
             "strand",
+            "subset_sequence",
             "reference_start",
             "reference_end",
             "query_name",
@@ -222,7 +244,7 @@ impl CenteredFiberData {
                 let mut write = true;
                 if let Some(dist) = self.dist {
                     // skip writing if we are outside the motif range
-                    if en < -dist || st > dist {
+                    if en <= -dist || st > dist {
                         write = false;
                     }
                 };
