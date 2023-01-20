@@ -136,7 +136,7 @@ impl PredictOptions {
                 } else if self.cnn {
                     215
                 } else {
-                    245
+                    251
                 }
             }
         }
