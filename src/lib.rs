@@ -264,6 +264,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
             // is really 3.2 but has polymerase of 2.2
             ("102-194-100".to_string(), PbChem::TwoPointTwo),
             // Revio has kinetics most similar to 2.2
+            // BINDINGKIT=101-894-200
             ("102-739-100".to_string(), PbChem::Revio)
         ]);
     }
@@ -284,6 +285,10 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
                 }
             }
         }
+    }
+    // force revio model
+    if env::var("FT_REVIO").is_ok() {
+        binding_kit = "102-739-100";
     }
     // make sure read-type is CCS
     assert_eq!(read_type, "CCS");
