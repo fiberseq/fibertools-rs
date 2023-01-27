@@ -87,7 +87,7 @@ pub enum Commands {
     Center {
         /// Fiberseq bam file, must be aligned and have an index
         bam: String,
-        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if a 4th strand column is included
+        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.
         ///
         /// If you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
         bed: String,
