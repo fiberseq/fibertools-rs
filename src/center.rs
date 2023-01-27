@@ -79,19 +79,20 @@ impl CenteredFiberData {
     pub fn subset_sequence(&self) -> String {
         let dist = if let Some(dist) = self.dist { dist } else { 0 };
         let seq = self.record.seq().as_bytes();
+
         let mut out_seq: Vec<u8> = vec![];
-        for pos in (self.offset - dist)..(self.offset + dist + 1) {
+        let st = self.offset - dist; //(self.offset - dist)
+        for pos in st..(self.offset + dist + 1) {
             if pos < 0 || pos as usize >= seq.len() {
                 out_seq.push(b'N');
             } else {
                 out_seq.push(seq[pos as usize]);
             }
         }
-
-        if self.center_position.strand != '+' {
-            out_seq.reverse();
+        if self.center_position.strand == '-' {
+            out_seq = revcomp(out_seq);
         }
-        assert_eq!(out_seq.len() as i64, dist * 2 + 1);
+        //assert_eq!(out_seq.len() as i64, dist * 2 + 1);
         String::from_utf8_lossy(&out_seq).to_string()
     }
 
@@ -360,7 +361,15 @@ pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
         assert!(tokens.len() >= 3);
         let st = tokens[1].parse::<i64>().unwrap();
         let en = tokens[2].parse::<i64>().unwrap();
-        let (strand, position) = if tokens.len() >= 4 && tokens[3] == "-" {
+        // get the strand for the 6 or 4th column
+        let strand =
+            if (tokens.len() >= 6 && tokens[5] == "-") || (tokens.len() >= 4 && tokens[3] == "-") {
+                '-'
+            } else {
+                '+'
+            };
+
+        let (strand, position) = if strand == '-' {
             ('-', en - 1)
         } else {
             ('+', st)

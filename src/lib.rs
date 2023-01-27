@@ -1,4 +1,4 @@
-/// Lift over coordinates using the CIGAR string
+// Lift over coordinates using the CIGAR string
 pub mod bamlift;
 /// Add and remove base modifications from a bam record
 pub mod basemods;
