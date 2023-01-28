@@ -114,26 +114,46 @@ pub enum Commands {
         #[clap(short, long)]
         keep: bool,
         /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
-        #[clap(short, long)]
+        #[clap(short, long, help_heading = "Developer-Options")]
         min_ml_score: Option<u8>,
         /// Keep all m6A calls regardless of how low the ML value is
-        #[clap(short, long)]
+        #[clap(short, long, help_heading = "Developer-Options")]
         all_calls: bool,
-        /// Use the CNN model for prediction instead of XGBoost
-        #[clap(short, long, default_value_if("semi", "true", "true"))]
-        cnn: bool,
-        /// Use the semi-supervised CNN model for prediction
+        /// Use the XGBoost model for prediction
         #[clap(short, long)]
+        xgb: bool,
+        /// Use the CNN model for prediction
+        #[clap(
+            short,
+            long,
+            default_value_if("semi", "true", "true"),
+            default_value_if("xgb", "false", "true"),
+            help_heading = "Developer-Options"
+        )]
+        cnn: bool,
+        /// Use the semi-supervised CNN model for prediction [default: true]
+        #[clap(
+            short,
+            long,
+            default_value_if("xgb", "false", "true"),
+            default_value_if("cnn", "true", "false")
+        )]
         semi: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
         ///
         /// For debugging only.
-        #[clap(short, long)]
+        #[clap(short, long, help_heading = "Developer-Options")]
         full_float: bool,
         /// Number of reads to include in batch prediction
         ///
-        /// Increasing improved GPU performance at the cost of memory.
-        #[clap(short, long, default_value = "1", default_value_if("cnn", "true", "1"))]
+        /// Increasing improves GPU performance at the cost of memory.
+        #[clap(
+            short,
+            long,
+            default_value = "1",
+            default_value_if("cnn", "true", "1"),
+            help_heading = "Developer-Options"
+        )]
         batch_size: usize,
     },
     /// Remove HiFi kinetics tags from the input bam file

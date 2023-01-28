@@ -38,6 +38,7 @@ impl PredictOptions {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
+        _xgb: bool,
         cnn: bool,
         semi: bool,
         full_float: bool,

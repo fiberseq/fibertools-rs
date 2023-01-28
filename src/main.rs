@@ -114,6 +114,7 @@ pub fn main() -> Result<(), Error> {
             keep,
             min_ml_score,
             all_calls,
+            xgb,
             cnn,
             semi,
             full_float,
@@ -124,6 +125,7 @@ pub fn main() -> Result<(), Error> {
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
             let predict_options = PredictOptions::new(
                 *keep,
+                *xgb,
                 *cnn,
                 *semi,
                 *full_float,
@@ -132,6 +134,7 @@ pub fn main() -> Result<(), Error> {
                 find_pb_polymerase(&header),
                 *batch_size,
             );
+            log::info!("{} {} {}", xgb, cnn, semi);
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
