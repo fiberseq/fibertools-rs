@@ -18,6 +18,19 @@ Options:
   -k, --keep
           Keep hifi kinetics data
 
+  -x, --xgb
+          Use the XGBoost model for prediction
+
+  -s, --semi
+          Use the semi-supervised CNN model for prediction [default: true]
+
+  -h, --help
+          Print help information (use `-h` for a summary)
+
+  -V, --version
+          Print version information
+
+Developer-Options:
   -m, --min-ml-score <MIN_ML_SCORE>
           Set a minimum ML score to keep on instead of using the model specific minimum ML score
 
@@ -25,10 +38,7 @@ Options:
           Keep all m6A calls regardless of how low the ML value is
 
   -c, --cnn
-          Use the CNN model for prediction instead of XGBoost
-
-  -s, --semi
-          Use the semi-supervised CNN model for prediction
+          Use the CNN model for prediction
 
   -f, --full-float
           Add a bam tag (mp) with the full floating point predictions of the ML model
@@ -38,15 +48,9 @@ Options:
   -b, --batch-size <BATCH_SIZE>
           Number of reads to include in batch prediction
 
-          Increasing improved GPU performance at the cost of memory.
+          Increasing improves GPU performance at the cost of memory.
 
           [default: 1]
-
-  -h, --help
-          Print help information (use `-h` for a summary)
-
-  -V, --version
-          Print version information
 
 Global-Options:
   -t, --threads <THREADS>
