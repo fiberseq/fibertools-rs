@@ -123,20 +123,16 @@ pub enum Commands {
         #[clap(short, long)]
         xgb: bool,
         /// Use the CNN model for prediction
-        #[clap(
-            short,
-            long,
-            default_value_if("semi", "true", "true"),
-            default_value_if("xgb", "false", "true"),
-            help_heading = "Developer-Options"
-        )]
+        #[clap(short, long, help_heading = "Developer-Options")]
         cnn: bool,
         /// Use the semi-supervised CNN model for prediction [default: true]
         #[clap(
             short,
             long,
-            default_value_if("xgb", "false", "true"),
-            default_value_if("cnn", "true", "false")
+            default_value_ifs([
+                ("cnn", "true", "false"),
+                ("xgb", "false", "true"),
+            ]),
         )]
         semi: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
