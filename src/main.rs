@@ -120,6 +120,9 @@ pub fn main() -> Result<(), Error> {
             full_float,
             batch_size,
         }) => {
+            // cnn must be set to true if using semi
+            let cnn = if *semi { &true } else { cnn };
+            // read bam
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
@@ -134,6 +137,7 @@ pub fn main() -> Result<(), Error> {
                 find_pb_polymerase(&header),
                 *batch_size,
             );
+
             log::info!("{} {} {}", xgb, cnn, semi);
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
