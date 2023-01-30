@@ -87,7 +87,7 @@ and the docs will open in your browser.
 
 # TODO items
 - [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
-- [ ] Set filters for ML depending on the model used
+- [x] Set filters for ML depending on the model used
 - [ ] long format extract command
 - [ ] Add `rustybam` stats to ft `all` as an option
 - [ ] add option result to bamlift
