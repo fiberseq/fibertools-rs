@@ -42,11 +42,8 @@ ft --help
 # Subcommands for `fibertools-rs`
 ## `ft predict-m6a`
 [Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
-
-We recommend filtering out ML scores less than 250 for the XGBoost model.
-
-### Installing with support for CNN m6A prediction
-To allow for m6A predictions with the CNN model you must follow these modified installation instructions.
+### Installing with support for m6A prediction
+To allow for m6A predictions with  you must follow these modified installation instructions.
 * Get `libtorch` **v1.13.0** from the [PyTorch website](https://pytorch.org/get-started/) download section and extract the content of the zip file.
     * On my linux system with a cuda gpu this is what I downloaded:
     * ```wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu116.zip```
@@ -58,7 +55,7 @@ export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 ```
 And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
 ```bash
-cargo install --git https://github.com/mrvollger/fibertools-rs --features cnn
+cargo install --git https://github.com/mrvollger/fibertools-rs --features predict
 ```
 
 ### Adding nucleosome calls to the BAM files

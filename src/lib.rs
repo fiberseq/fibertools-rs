@@ -8,10 +8,12 @@ pub mod center;
 pub mod cli;
 /// Extract fiberseq data into plain text formats
 pub mod extract;
+#[cfg(feature = "predict")]
 /// m6A prediction
 pub mod predict_m6a;
 
 use anyhow::Result;
+use indicatif::{style, ProgressBar};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -301,4 +303,24 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         &PbChem::TwoPointTwo
     });
     chemistry.clone()
+}
+
+/// clear kinetics from a hifi bam
+pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
+    let bar = ProgressBar::new(1);
+    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:>5.green})";
+    let style = style::ProgressStyle::with_template(style_str)
+        .unwrap()
+        .progress_chars("##-");
+    bar.set_style(style);
+    for rec in bam.records() {
+        let mut record = rec.unwrap();
+        record.remove_aux(b"fp").unwrap_or(());
+        record.remove_aux(b"fi").unwrap_or(());
+        record.remove_aux(b"rp").unwrap_or(());
+        record.remove_aux(b"ri").unwrap_or(());
+        out.write(&record).unwrap();
+        bar.inc(1);
+    }
+    bar.finish();
 }

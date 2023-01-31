@@ -1,7 +1,7 @@
 use super::bamlift;
 use super::*;
 use bio::alphabets::dna::revcomp;
-use indicatif::{style, ParallelProgressIterator, ProgressBar};
+use indicatif::{style, ParallelProgressIterator};
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -14,7 +14,6 @@ use rust_htslib::{
 use std::collections::BTreeMap;
 
 // sub modules
-#[cfg(feature = "cnn")]
 pub mod cnn;
 mod xgb;
 
@@ -49,7 +48,6 @@ impl PredictOptions {
     ) -> Self {
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
-        #[cfg(feature = "cnn")]
         {
             let json = match polymerase {
                 PbChem::Two => cnn::SEMI_JSON_2_0,
@@ -164,7 +162,6 @@ impl PredictOptions {
 }
 enum WhichML {
     Xgb,
-    #[cfg(feature = "cnn")]
     Cnn,
 }
 
@@ -457,7 +454,6 @@ pub fn predict_m6a_on_records(
 
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
     let _which_ml = WhichML::Xgb;
-    #[cfg(feature = "cnn")]
     let _which_ml = if predict_options.cnn {
         WhichML::Cnn
     } else {
@@ -466,7 +462,6 @@ pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptio
 
     match _which_ml {
         WhichML::Xgb => xgb::predict_with_xgb(windows, count, predict_options),
-        #[cfg(feature = "cnn")]
         WhichML::Cnn => cnn::predict_with_cnn(windows, count, predict_options),
     }
 }
@@ -513,23 +508,4 @@ pub fn read_bam_into_fiberdata(
         total_read += chunk.len();
         log::info!("Finished predicting m6A for {} reads", total_read);
     }
-}
-
-pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
-    let bar = ProgressBar::new(1);
-    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:>5.green})";
-    let style = style::ProgressStyle::with_template(style_str)
-        .unwrap()
-        .progress_chars("##-");
-    bar.set_style(style);
-    for rec in bam.records() {
-        let mut record = rec.unwrap();
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
-        out.write(&record).unwrap();
-        bar.inc(1);
-    }
-    bar.finish();
 }
