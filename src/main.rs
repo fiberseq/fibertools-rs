@@ -1,8 +1,10 @@
 use anyhow::{Error, Ok};
 use colored::Colorize;
 use env_logger::{Builder, Target};
+use fibertools_rs::cli::Commands;
+#[cfg(feature = "predict")]
+use fibertools_rs::predict_m6a::PredictOptions;
 use fibertools_rs::*;
-use fibertools_rs::{cli::Commands, predict_m6a::PredictOptions};
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
@@ -108,6 +110,7 @@ pub fn main() -> Result<(), Error> {
             let center_positions = center::read_center_positions(bed)?;
             center::center_fiberdata(&mut bam, center_positions, *min_ml_score, *wide, *dist);
         }
+        #[cfg(feature = "predict")]
         Some(Commands::PredictM6A {
             bam,
             out,
@@ -145,7 +148,7 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::ClearKinetics { bam, out }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
-            predict_m6a::clear_kinetics(&mut bam, &mut out);
+            fibertools_rs::clear_kinetics(&mut bam, &mut out);
         }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);

@@ -101,6 +101,7 @@ pub enum Commands {
         #[clap(short, long)]
         wide: bool,
     },
+    #[cfg(feature = "predict")]
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
