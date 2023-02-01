@@ -54,10 +54,10 @@ jobs:
 
       - name: Run test
         run: |
-          cargo test -- --test-threads=1
-          cargo run -- -v extract --all - .test/all.bam | cut -f 1-7 | head
-          cargo run -- -v extract --msp - .test/all.bam | cut -f 1-7 | head
-          cargo run -- -v extract --nuc - .test/all.bam | cut -f 1-7 | head
-          cargo run -- -v extract --m6a - .test/all.bam | cut -f 1-7 | head
-          cargo run -- -v extract --cpg - .test/all.bam | cut -f 1-7 | head
-          cargo run -- center .test/all.bam .test/center.bed | head
+          cargo test --no-default-features -- --test-threads=1
+          cargo run --no-default-features -- -v extract --all - .test/all.bam | cut -f 1-7 | head
+          cargo run --no-default-features -- -v extract --msp - .test/all.bam | cut -f 1-7 | head
+          cargo run --no-default-features -- -v extract --nuc - .test/all.bam | cut -f 1-7 | head
+          cargo run --no-default-features -- -v extract --m6a - .test/all.bam | cut -f 1-7 | head
+          cargo run --no-default-features -- -v extract --cpg - .test/all.bam | cut -f 1-7 | head
+          cargo run --no-default-features -- center .test/all.bam .test/center.bed | head

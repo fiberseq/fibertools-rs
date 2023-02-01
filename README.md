@@ -17,6 +17,22 @@
 `fibertools-rs` a CLI tool for creating and interacting with fiberseq bam files.
 
 # Install
+## First install `libtorch`
+Get `libtorch` **v1.13.0** from the [PyTorch website](https://pytorch.org/get-started/) and extract the content of the zip file.
+- On Linux/Unix system you can download with:
+    * ```wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-1.13.0%2Bcpu.zip```
+- On macOS you can download with:
+    * ```wget https://download.pytorch.org/libtorch/cpu/libtorch-macos-1.13.0.zip```
+- Windows is not supported and will not be.
+
+Then add the following to your `.bashrc` or equivalent, where `/path/to/libtorch` is the path to the directory that was created when unzipping the file:
+```bash
+export LIBTORCH_CXX11_ABI=0
+export LIBTORCH=/path/to/libtorch # e.g. export LIBTORCH=/Users/mrvollger/lib/libtorch
+export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
+```
+
 ## From `crates.io` [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
 Installation from `crates.io` requires the rust package manager `cargo`. You can find [how to install `cargo` here.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 Furthermore, a recent version of `gcc` and `cmake` is required. I have tested and recommend `gcc v10.2.0` and `cmake v3.21.1`, though other versions may work.
@@ -42,22 +58,6 @@ ft --help
 # Subcommands for `fibertools-rs`
 ## `ft predict-m6a`
 [Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
-### Installing with support for m6A prediction
-To allow for m6A predictions with  you must follow these modified installation instructions.
-* Get `libtorch` **v1.13.0** from the [PyTorch website](https://pytorch.org/get-started/) download section and extract the content of the zip file.
-    * On my linux system with a cuda gpu this is what I downloaded:
-    * ```wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu116.zip```
-* Add the following to your `.bashrc` or equivalent, where `/path/to/libtorch` is the path to the directory that was created when unzipping the file:
-```bash
-export LIBTORCH=/path/to/libtorch # e.g. export LIBTORCH=/Users/mrvollger/lib/libtorch
-export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
-export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
-```
-And install `fibertools-rs` from `cargo` with the `cnn` feature enabled:
-```bash
-cargo install --git https://github.com/mrvollger/fibertools-rs --features predict
-```
-
 ### Adding nucleosome calls to the BAM files
 To add nucleosome calls to the BAM files you can use the python package [fibertools](https://github.com/mrvollger/fibertools#add-nucleosomes-and-msps-to-a-fibertools-rs-m6a-bam). See that repository for installation and instructions.
 
