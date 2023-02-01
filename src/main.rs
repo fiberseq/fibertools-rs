@@ -1,4 +1,4 @@
-use anyhow::{Error, Ok};
+use anyhow::{bail, Error, Ok, Result};
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::Commands;
@@ -8,7 +8,6 @@ use fibertools_rs::*;
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
-
 /*
 use std::path::Path;
 // TODO FINISH THIS CHECK
@@ -123,6 +122,8 @@ pub fn main() -> Result<(), Error> {
             full_float,
             batch_size,
         }) => {
+            check_torch_env_vars()?;
+
             // cnn must be set to true if using semi
             let cnn = if *semi { &true } else { cnn };
             // read bam
@@ -141,7 +142,6 @@ pub fn main() -> Result<(), Error> {
                 *batch_size,
             );
 
-            log::info!("{} {} {}", xgb, cnn, semi);
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
@@ -171,5 +171,47 @@ pub fn main() -> Result<(), Error> {
         subcommand.bright_green().bold(),
         format!("{:.2?}", duration).bright_yellow().bold()
     );
+    Ok(())
+}
+
+fn help_check_torch_env_vars() -> Result<()> {
+    //std::env::set_var("LIBTORCH", "");
+    //std::env::remove_var("LIBTORCH");
+    //std::env::set_var("LD_LIBRARY_PATH", "aa");
+    let lib = std::env::var("LIBTORCH")?;
+    let ld_path = std::env::var("LD_LIBRARY_PATH")?;
+    let dy_path = std::env::var("DYLD_LIBRARY_PATH")?;
+    // make sure vars are not empty
+    for v in [&lib, &ld_path, &dy_path] {
+        if v.is_empty() {
+            bail!("\t{}\n\t{}\n\t{}", lib, ld_path, dy_path)
+        }
+    }
+    // make sure paths contain libtorch
+    for path in [&ld_path, &dy_path] {
+        if !path.contains(&lib) {
+            bail!("\t{}\n\t{}\n\t{}", lib, ld_path, dy_path)
+        }
+    }
+    Ok(())
+}
+
+fn check_torch_env_vars() -> Result<()> {
+    if let Err(e) = help_check_torch_env_vars() {
+        let msg = "\nEnvironment variable LIBTORCH is missing or is missing from LD_LIBRARY_PATH or DYLD_LIBRARY_PATH.".red().bold();
+        let download_msg = "
+Please download libtorch v1.13.0 from https://pytorch.org/get-started/ and extract the content of the zip file.
+
+On a linux system you can download:
+    wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu116.zip
+    
+Then add the following to your .bashrc or equivalent:
+    export LIBTORCH=/path/to/libtorch
+    export LD_LIBRARY_PATH=${{LIBTORCH}}/lib:$LD_LIBRARY_PATH
+    export DYLD_LIBRARY_PATH=${{LIBTORCH}}/lib:$LD_LIBRARY_PATH
+            ".bold();
+        let env_vars = format!("\nYour library variables:\n{}", e).yellow();
+        bail!("{}\n{}\n{}", msg, env_vars, download_msg)
+    };
     Ok(())
 }
