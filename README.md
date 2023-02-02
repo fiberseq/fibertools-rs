@@ -16,38 +16,14 @@
 
 `fibertools-rs` a CLI tool for creating and interacting with fiberseq bam files.
 
-# Install
-## First install `libtorch`
-Get `libtorch` **v1.13.0** from the [PyTorch website](https://pytorch.org/get-started/) and extract the content of the zip file.
-- On Linux/Unix system you can download with:
-    * ```wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-1.13.0%2Bcpu.zip```
-- On macOS you can download with:
-    * ```wget https://download.pytorch.org/libtorch/cpu/libtorch-macos-1.13.0.zip```
-- Windows is not supported and will not be.
+# Install [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
 
-Then add the following to your `.bashrc` or equivalent, where `/path/to/libtorch` is the path to the directory that was created when unzipping the file:
+`fibertools-rs` is avalible through `bioconda` and can be installed with the following command:
 ```bash
-export LIBTORCH_CXX11_ABI=0
-export LIBTORCH=/path/to/libtorch # e.g. export LIBTORCH=/Users/mrvollger/lib/libtorch
-export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
-export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
-```
-
-## From `crates.io` [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
-Installation from `crates.io` requires the rust package manager `cargo`. You can find [how to install `cargo` here.](https://doc.rust-lang.org/cargo/getting-started/installation.html)
-Furthermore, a recent version of `gcc` and `cmake` is required. I have tested and recommend `gcc v10.2.0` and `cmake v3.21.1`, though other versions may work.
-```
-cargo install fibertools-rs
-```
-
-## From `bioconda` [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
-```
 mamba install -c conda-forge -c bioconda fibertools-rs
 ```
-## From `github` (active development)
-```
-cargo install --git https://github.com/mrvollger/fibertools-rs
-```
+Other installation methods are available in the [INSTALL.md](/INSTALL.md) file.
+
 
 # Usage
 ```bash
@@ -78,7 +54,7 @@ You can find the docs for the latest release here:
 [https://docs.rs/fibertools-rs/latest/fibertools_rs/](https://docs.rs/fibertools-rs/latest/fibertools_rs/)
 or download from source and run:
 ```
-cargo doc --open --features cnn
+cargo doc --open
 ```
 and the docs will open in your browser.
 
@@ -89,7 +65,7 @@ and the docs will open in your browser.
 - [ ] Add `rustybam` stats to ft `all` as an option
 - [ ] add option result to bamlift
 - [ ] Add more test cases, learn about test modules in folders
-- [ ] Test GPU support, see if I can simplify or statically link PyTorch.
+- [x] Test GPU support, see if I can simplify or statically link PyTorch.
 - [ ] Improve progress bar for predict-m6a.
     - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
 - [ ] Add unaligned, secondary, supplemental reads to the test bam.
