@@ -7,7 +7,7 @@
 <img src="./assets/img/fiber_tools_grey.png#gh-light-mode-only" alt="fibertools-rs light logo" width="200"/>
 
 
-[![Actions Status](https://github.com/mrvollger/fibertools-rs/workflows/CI/badge.svg)](https://github.com/mrvollger/fibertools-rs/actions)
+[![Actions Status](https://github.com/fiberseq/fibertools-rs/workflows/CI/badge.svg)](https://github.com/fiberseq/fibertools-rs/actions)
 [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
  [![Downloads](https://img.shields.io/conda/dn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
 [![crates.io version](https://img.shields.io/crates/v/fibertools-rs)](https://crates.io/crates/fibertools-rs)
@@ -35,7 +35,7 @@ ft --help
 ## `ft predict-m6a`
 [Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
 ### Adding nucleosome calls to the BAM files
-To add nucleosome calls to the BAM files you can use the python package [fibertools](https://github.com/mrvollger/fibertools#add-nucleosomes-and-msps-to-a-fibertools-rs-m6a-bam). See that repository for installation and instructions.
+To add nucleosome calls to the BAM files you can use the python package [fibertools](https://github.com/fiberseq/fibertools#add-nucleosomes-and-msps-to-a-fibertools-rs-m6a-bam). See that repository for installation and instructions.
 
 ## `ft extract`
 [Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
