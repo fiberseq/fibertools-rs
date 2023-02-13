@@ -122,7 +122,7 @@ pub fn main() -> Result<(), Error> {
             full_float,
             batch_size,
         }) => {
-            check_torch_env_vars()?;
+            //check_torch_env_vars()?;
 
             // cnn must be set to true if using semi
             let cnn = if *semi { &true } else { cnn };
@@ -174,7 +174,7 @@ pub fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn help_check_torch_env_vars() -> Result<()> {
+fn _help_check_torch_env_vars() -> Result<()> {
     //std::env::set_var("LIBTORCH", "");
     //std::env::remove_var("LIBTORCH");
     //std::env::set_var("LD_LIBRARY_PATH", "aa");
@@ -196,8 +196,8 @@ fn help_check_torch_env_vars() -> Result<()> {
     Ok(())
 }
 
-fn check_torch_env_vars() -> Result<()> {
-    if let Err(e) = help_check_torch_env_vars() {
+fn _check_torch_env_vars() -> Result<()> {
+    if let Err(e) = _help_check_torch_env_vars() {
         let msg = "\nEnvironment variable LIBTORCH is missing or is missing from LD_LIBRARY_PATH or DYLD_LIBRARY_PATH.".red().bold();
         let download_msg = "
 Please download libtorch v1.13.0 from https://pytorch.org/get-started/ and extract the content of the zip file.
