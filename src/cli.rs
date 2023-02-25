@@ -14,7 +14,7 @@ use std::io;
 )]
 #[command(version = super::LONG_VERSION)]
 pub struct Cli {
-    /// Threads for decompression
+    /// Threads
     #[clap(
         global = true,
         short,
