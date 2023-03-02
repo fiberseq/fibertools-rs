@@ -48,17 +48,24 @@ impl PredictOptions {
     ) -> Self {
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
-        {
-            let json = match polymerase {
+
+        let json = match std::env::var("FT_JSON") {
+            Ok(file) => {
+                log::info!("Loading precision table from environment variable.");
+                std::fs::read_to_string(file).expect("Unable to read file specified by FT_JSON")
+            }
+            _ => (match polymerase {
                 PbChem::Two => cnn::SEMI_JSON_2_0,
                 PbChem::TwoPointTwo => cnn::SEMI_JSON_2_2,
                 PbChem::Revio => cnn::SEMI_JSON_REVIO,
-            };
-            let precision_table: cnn::PrecisionTable =
-                serde_json::from_str(json).expect("Precision table JSON was not well-formatted");
-            for (cnn_score, precision) in precision_table.data {
-                map.insert(OrderedFloat(cnn_score), precision);
-            }
+            })
+            .to_string(),
+        };
+
+        let precision_table: cnn::PrecisionTable =
+            serde_json::from_str(&json).expect("Precision table JSON was not well-formatted");
+        for (cnn_score, precision) in precision_table.data {
+            map.insert(OrderedFloat(cnn_score), precision);
         }
 
         // return prediction options
