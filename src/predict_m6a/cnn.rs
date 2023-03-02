@@ -57,8 +57,17 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
         }
         let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
         let temp_file_name = temp_file.path();
-        fs::write(temp_file_name, model_str).expect("Unable to write file");
-        let mut temp_path = fs::File::open(temp_file_name).expect("Unable to open model file.");
+        fs::write(temp_file.path(), model_str).expect("Unable to write file");
+
+        // Model the model file from the ENV if set
+        let mut temp_path = match std::env::var("FT_MODEL") {
+            Ok(env_model_path) => {
+                log::info!("Loading model from environment variable.");
+                std::fs::File::open(env_model_path).expect("Unable to open model file in FT_MODEL")
+            }
+            _ => fs::File::open(temp_file_name).expect("Unable to open model file."),
+        };
+        // load the model from the path
         let model = tch::CModule::load_data_on_device(&mut temp_path, device)
             .expect("Unable to load PyTorch model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
