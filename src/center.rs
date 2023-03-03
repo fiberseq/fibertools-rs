@@ -22,6 +22,7 @@ pub struct CenteredFiberData {
     offset: i64,
     pub dist: Option<i64>,
     center_position: CenterPosition,
+    pub reference: bool,
 }
 
 impl CenteredFiberData {
@@ -30,14 +31,20 @@ impl CenteredFiberData {
         record: bam::Record,
         center_position: CenterPosition,
         dist: Option<i64>,
+        reference: bool,
     ) -> Option<Self> {
-        let offset = CenteredFiberData::find_offset(&record, center_position.position);
+        let offset = if reference {
+            Some(center_position.position)
+        } else {
+            CenteredFiberData::find_offset(&record, center_position.position)
+        };
         offset.map(|offset| CenteredFiberData {
             fiber,
             record,
             offset,
             dist,
             center_position,
+            reference,
         })
     }
 
@@ -97,11 +104,11 @@ impl CenteredFiberData {
     }
 
     pub fn m6a_positions(&self) -> Vec<i64> {
-        self.apply_offset(&self.fiber.base_mods.m6a_positions(false))
+        self.apply_offset(&self.fiber.base_mods.m6a_positions(self.reference))
     }
 
     pub fn cpg_positions(&self) -> Vec<i64> {
-        self.apply_offset(&self.fiber.base_mods.cpg_positions(false))
+        self.apply_offset(&self.fiber.base_mods.cpg_positions(self.reference))
     }
 
     fn get_start_end_positions(&self, starts: Vec<i64>, lengths: Vec<i64>) -> Vec<(i64, i64)> {
@@ -130,15 +137,15 @@ impl CenteredFiberData {
 
     pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
         self.get_start_end_positions(
-            self.fiber.get_nuc(false, true),
-            self.fiber.get_nuc(false, false),
+            self.fiber.get_nuc(self.reference, true),
+            self.fiber.get_nuc(self.reference, false),
         )
     }
 
     pub fn msp_positions(&self) -> Vec<(i64, i64)> {
         self.get_start_end_positions(
-            self.fiber.get_msp(false, true),
-            self.fiber.get_msp(false, false),
+            self.fiber.get_msp(self.reference, true),
+            self.fiber.get_msp(self.reference, false),
         )
     }
 
@@ -269,27 +276,29 @@ pub fn center(
     min_ml_score: u8,
     wide: bool,
     dist: Option<i64>,
+    reference: bool,
 ) {
     let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
     let iter = fiber_data.into_iter().zip(records.into_iter());
     let mut total = 0;
     let mut missing = 0;
     for (fiber, record) in iter {
-        let out = match CenteredFiberData::new(fiber, record, center_position.clone(), dist) {
-            Some(centered_fiber) => {
-                total += 1;
-                if wide {
-                    centered_fiber.write()
-                } else {
-                    centered_fiber.write_long()
+        let out =
+            match CenteredFiberData::new(fiber, record, center_position.clone(), dist, reference) {
+                Some(centered_fiber) => {
+                    total += 1;
+                    if wide {
+                        centered_fiber.write()
+                    } else {
+                        centered_fiber.write_long()
+                    }
                 }
-            }
-            None => {
-                total += 1;
-                missing += 1;
-                "".to_string()
-            }
-        };
+                None => {
+                    total += 1;
+                    missing += 1;
+                    "".to_string()
+                }
+            };
         //print!("{}", out);
         write_to_stdout(&out);
     }
@@ -310,6 +319,7 @@ pub fn center_fiberdata(
     min_ml_score: u8,
     wide: bool,
     dist: Option<i64>,
+    reference: bool,
 ) {
     // header needed for the contig name...
     let header = bam::Header::from_template(bam.header());
@@ -345,6 +355,7 @@ pub fn center_fiberdata(
             min_ml_score,
             wide,
             dist,
+            reference,
         );
         pb.inc(1);
     }

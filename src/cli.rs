@@ -100,6 +100,9 @@ pub enum Commands {
         /// Provide data in wide format, one row per read
         #[clap(short, long)]
         wide: bool,
+        /// Return relative reference position instead of relative molecular position
+        #[clap(short, long)]
+        reference: bool,
     },
     #[cfg(feature = "predict")]
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags
