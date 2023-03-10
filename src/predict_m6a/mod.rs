@@ -52,24 +52,6 @@ impl PredictOptions {
         // set up a precision table
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
-        let json = match std::env::var("FT_JSON") {
-            Ok(file) => {
-                log::info!("Loading precision table from environment variable.");
-                std::fs::read_to_string(file).expect("Unable to read file specified by FT_JSON")
-            }
-            _ => (match polymerase {
-                PbChem::Two => cnn::SEMI_JSON_2_0,
-                PbChem::TwoPointTwo => cnn::SEMI_JSON_2_2,
-                PbChem::Revio => cnn::SEMI_JSON_REVIO,
-            })
-            .to_string(),
-        };
-
-        let precision_table: cnn::PrecisionTable =
-            serde_json::from_str(&json).expect("Precision table JSON was not well-formatted");
-        for (cnn_score, precision) in precision_table.data {
-            map.insert(OrderedFloat(cnn_score), precision);
-        }
 
         // return prediction options
         let mut options = PredictOptions {
@@ -92,6 +74,8 @@ impl PredictOptions {
     fn add_model(&mut self) -> Result<()> {
         let mut model: Vec<u8> = vec![];
         let mut min_ml = 0;
+        let mut precision_json = "".to_string();
+
         if let Ok(file) = std::env::var("FT_MODEL") {
             log::info!("Loading model from environment variable.");
             model = std::fs::read(file).expect("Unable to open model file in FT_MODEL");
@@ -101,14 +85,22 @@ impl PredictOptions {
             match self.polymerase {
                 PbChem::Two => {
                     model = cnn::SEMI.to_vec();
+                    precision_json = cnn::SEMI_JSON_2_0.to_string();
                     min_ml = 230;
                 }
                 PbChem::TwoPointTwo => {
                     model = cnn::SEMI_2_2.to_vec();
+                    precision_json = cnn::SEMI_JSON_2_2.to_string();
+                    min_ml = 244;
+                }
+                PbChem::ThreePointTwo => {
+                    model = cnn::SEMI_2_2.to_vec();
+                    precision_json = cnn::SEMI_JSON_2_2.to_string();
                     min_ml = 244;
                 }
                 PbChem::Revio => {
                     model = cnn::SEMI_REVIO.to_vec();
+                    precision_json = cnn::SEMI_JSON_REVIO.to_string();
                     min_ml = 251;
                 }
             }
@@ -140,6 +132,21 @@ impl PredictOptions {
             }
         };
 
+        // load precision json from env var if needed
+        if let Ok(json) = std::env::var("FT_JSON") {
+            log::info!("Loading precision table from environment variable.");
+            precision_json =
+                std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
+        }
+        // load the precision table
+        if self.semi {
+            let precision_table: cnn::PrecisionTable = serde_json::from_str(&precision_json)
+                .expect("Precision table JSON was not well-formatted");
+            for (cnn_score, precision) in precision_table.data {
+                self.map.insert(OrderedFloat(cnn_score), precision);
+            }
+        }
+
         // error if no model is found
         if model.is_empty() {
             return Err(anyhow!(
@@ -150,6 +157,7 @@ impl PredictOptions {
         let chem = match self.polymerase {
             PbChem::Two => "2.0",
             PbChem::TwoPointTwo => "2.2",
+            PbChem::ThreePointTwo => "3.2",
             PbChem::Revio => "Revio",
         };
         log::info!("Using model trained on {} PacBio chemistry.", chem);
