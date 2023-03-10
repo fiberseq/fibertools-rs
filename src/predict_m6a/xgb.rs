@@ -1,4 +1,4 @@
-use super::{PbChem, PredictOptions};
+use super::PredictOptions;
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use spin;
@@ -7,25 +7,13 @@ use tempfile::NamedTempFile;
 
 // make sure file exists for cargo
 static INIT: spin::Once<GBDT> = spin::Once::new();
-static JSON: &str = include_str!("../../models/gbdt_0.81_p2.0.json");
-static JSON_2_2: &str = include_str!("../../models/gbdt_0.81_p2.2.json");
+pub static JSON: &str = include_str!("../../models/gbdt_0.81_p2.0.json");
+pub static JSON_2_2: &str = include_str!("../../models/gbdt_0.81_p2.2.json");
 
 pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
     INIT.call_once(|| {
-        let json = match predict_options.polymerase {
-            PbChem::Two => {
-                log::info!("Loading XGBoost model for 2.0 chemistry");
-                JSON
-            }
-            PbChem::TwoPointTwo => {
-                log::info!("Loading XGBoost model for 2.2 chemistry");
-                JSON_2_2
-            }
-            PbChem::Revio => {
-                log::info!("Loading XGBoost model for 2.2 chemistry");
-                JSON_2_2
-            }
-        };
+        let json =
+            std::str::from_utf8(&predict_options.model).expect("Unable to read XGBoost JSON.");
         let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
         let temp_file_name = temp_file
             .path()
