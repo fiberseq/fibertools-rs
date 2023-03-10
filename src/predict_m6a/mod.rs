@@ -1,5 +1,6 @@
 use super::bamlift;
 use super::*;
+use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
 use ordered_float::OrderedFloat;
@@ -31,6 +32,8 @@ pub struct PredictOptions {
     pub polymerase: PbChem,
     pub batch_size: usize,
     map: BTreeMap<OrderedFloat<f32>, u8>,
+    pub model: Vec<u8>,
+    pub min_ml: u8,
 }
 
 impl PredictOptions {
@@ -46,9 +49,9 @@ impl PredictOptions {
         polymerase: PbChem,
         batch_size: usize,
     ) -> Self {
+        // set up a precision table
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
-
         let json = match std::env::var("FT_JSON") {
             Ok(file) => {
                 log::info!("Loading precision table from environment variable.");
@@ -69,7 +72,7 @@ impl PredictOptions {
         }
 
         // return prediction options
-        PredictOptions {
+        let mut options = PredictOptions {
             keep,
             cnn,
             semi,
@@ -79,7 +82,82 @@ impl PredictOptions {
             polymerase,
             batch_size,
             map,
+            model: vec![],
+            min_ml: 0,
+        };
+        options.add_model().expect("Error loading model");
+        options
+    }
+
+    fn add_model(&mut self) -> Result<()> {
+        let mut model: Vec<u8> = vec![];
+        let mut min_ml = 0;
+        if let Ok(file) = std::env::var("FT_MODEL") {
+            log::info!("Loading model from environment variable.");
+            model = std::fs::read(file).expect("Unable to open model file in FT_MODEL");
+            min_ml = 244;
+        } else if self.semi {
+            log::info!("Using semi-supervised CNN m6A model.");
+            match self.polymerase {
+                PbChem::Two => {
+                    model = cnn::SEMI.to_vec();
+                    min_ml = 230;
+                }
+                PbChem::TwoPointTwo => {
+                    model = cnn::SEMI_2_2.to_vec();
+                    min_ml = 244;
+                }
+                PbChem::Revio => {
+                    model = cnn::SEMI_REVIO.to_vec();
+                    min_ml = 251;
+                }
+            }
+        } else if self.cnn {
+            log::info!("Using CNN m6A model.");
+            match self.polymerase {
+                PbChem::Two => {
+                    model = cnn::PT.to_vec();
+                    min_ml = 200;
+                }
+                PbChem::TwoPointTwo => {
+                    model = cnn::PT_2_2.to_vec();
+                    min_ml = 215;
+                }
+                _ => (),
+            }
+        } else {
+            log::info!("Using XGBoost m6A model.");
+            match self.polymerase {
+                PbChem::Two => {
+                    model = xgb::JSON.as_bytes().to_vec();
+                    min_ml = 250;
+                }
+                PbChem::TwoPointTwo => {
+                    model = xgb::JSON_2_2.as_bytes().to_vec();
+                    min_ml = 245;
+                }
+                _ => (),
+            }
+        };
+
+        // error if no model is found
+        if model.is_empty() {
+            return Err(anyhow!(
+                "Selected model chemistry combination is not available."
+            ));
         }
+        // log the chem being used
+        let chem = match self.polymerase {
+            PbChem::Two => "2.0",
+            PbChem::TwoPointTwo => "2.2",
+            PbChem::Revio => "Revio",
+        };
+        log::info!("Using model trained on {} PacBio chemistry.", chem);
+
+        // set the variables for ML
+        self.min_ml = min_ml;
+        self.model = model;
+        Ok(())
     }
 
     pub fn progress_style(&self) -> &str {
@@ -109,58 +187,16 @@ impl PredictOptions {
         }
     }
 
-    // values selected based on visualization of m6a distance curves
-    pub fn recommended_ml_value(&self) -> u8 {
-        // return the user selected value
-        if let Some(min_ml_score) = self.min_ml_score {
-            return min_ml_score;
-        }
-        // these values are picked based off of best autocorrelation seen with nucleosome distances.
-        match self.polymerase {
-            PbChem::Two => {
-                if self.semi {
-                    230
-                } else if self.cnn {
-                    200
-                } else {
-                    // xgboost model
-                    250
-                }
-            }
-            PbChem::TwoPointTwo => {
-                if self.semi {
-                    244
-                } else if self.cnn {
-                    215
-                } else {
-                    245
-                }
-            }
-            PbChem::Revio => {
-                if self.semi {
-                    251
-                } else if self.cnn {
-                    215
-                } else {
-                    245
-                }
-            }
-        }
-    }
-
     pub fn min_ml_value(&self) -> u8 {
         if self.all_calls {
             0
         } else {
-            self.recommended_ml_value()
+            self.min_ml
         }
     }
 
     pub fn float_to_u8(&self, x: f32) -> u8 {
         if self.semi {
-            // TODO different offsets for different semi models
-            //let offset = 200.0;
-            //((x / (1.0 - x)).log2() + offset) as u8
             self.precision_from_float(x)
         } else {
             (x * 255.0).round() as u8

@@ -1,5 +1,5 @@
 use super::predict_m6a::{LAYERS, WINDOW};
-use super::{PbChem, PredictOptions};
+use super::PredictOptions;
 use spin;
 use std::fs;
 use tch;
@@ -7,11 +7,12 @@ use tempfile::NamedTempFile;
 
 // make sure file exists for cargo
 static INIT_PT: spin::Once<tch::CModule> = spin::Once::new();
-static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
-static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
-static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
-static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
-static SEMI_REVIO: &[u8] = include_bytes!("../../models/Revio_semi_torch.2.pt");
+pub static PT: &[u8] = include_bytes!("../../models/2.0_torch.pt");
+pub static PT_2_2: &[u8] = include_bytes!("../../models/2.2_torch.pt");
+pub static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
+pub static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
+pub static SEMI_REVIO: &[u8] = include_bytes!("../../models/Revio_semi_torch.2.pt");
+
 // json precision tables
 pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
 pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
@@ -19,58 +20,21 @@ pub static SEMI_JSON_REVIO: &str = include_str!("../../models/Revio_semi_torch.2
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
-        let device = tch::Device::cuda_if_available();
         // set threads to one, since rayon will dispatch multiple at once anyways
-        //if !device.is_cuda() {
         tch::set_num_threads(1);
-        //}
+        let device = tch::Device::cuda_if_available();
         log::info!("Using {:?} for Torch device.", device);
-        let model_str = match predict_options.polymerase {
-            PbChem::Two => {
-                log::info!("Loading CNN model for 2.0 chemistry");
-                if predict_options.semi {
-                    SEMI
-                } else {
-                    PT
-                }
-            }
-            PbChem::TwoPointTwo => {
-                log::info!("Loading CNN model for 2.2 chemistry");
-                if predict_options.semi {
-                    SEMI_2_2
-                } else {
-                    PT_2_2
-                }
-            }
-            PbChem::Revio => {
-                if predict_options.semi {
-                    log::info!("Loading CNN model for Revio chemistry");
-                    SEMI_REVIO
-                } else {
-                    log::info!("Loading CNN model for 2.2 chemistry");
-                    PT_2_2
-                }
-            }
-        };
-        if predict_options.semi {
-            log::info!("Using semi-supervised CNN");
-        }
+        // loading the model
+        let model_str = &predict_options.model;
+        // write model to a temp file
         let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
-        let temp_file_name = temp_file.path();
         fs::write(temp_file.path(), model_str).expect("Unable to write file");
-
-        // Model the model file from the ENV if set
-        let mut temp_path = match std::env::var("FT_MODEL") {
-            Ok(env_model_path) => {
-                log::info!("Loading model from environment variable.");
-                std::fs::File::open(env_model_path).expect("Unable to open model file in FT_MODEL")
-            }
-            _ => fs::File::open(temp_file_name).expect("Unable to open model file."),
-        };
-        // load the model from the path
+        // load model into tch
+        let mut temp_path = fs::File::open(temp_file.path()).expect("Unable to open model file.");
         let model = tch::CModule::load_data_on_device(&mut temp_path, device)
             .expect("Unable to load PyTorch model");
-        fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
+        // clean up
+        fs::remove_file(temp_file.path()).expect("Unable to remove temp model file");
         model
     })
 }
