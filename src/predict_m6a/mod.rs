@@ -94,8 +94,8 @@ impl PredictOptions {
                     min_ml = 244;
                 }
                 PbChem::ThreePointTwo => {
-                    model = cnn::SEMI_2_2.to_vec();
-                    precision_json = cnn::SEMI_JSON_2_2.to_string();
+                    model = cnn::SEMI_3_2.to_vec();
+                    precision_json = cnn::SEMI_JSON_3_2.to_string();
                     min_ml = 244;
                 }
                 PbChem::Revio => {
