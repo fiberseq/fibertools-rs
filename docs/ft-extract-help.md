@@ -23,7 +23,7 @@ All-Format-Options:
   -s, --simplify    Simplify output by remove fiber sequence
 
 Global-Options:
-  -t, --threads <THREADS>  Threads for decompression [default: 8]
+  -t, --threads <THREADS>  Threads [default: 8]
 
 Debug-Options:
   -v, --verbose...  Logging level [-v: Info, -vv: Debug, -vvv: Trace]

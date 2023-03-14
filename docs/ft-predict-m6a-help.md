@@ -6,12 +6,12 @@ Usage: ft predict-m6a [OPTIONS] [BAM] [OUT]
 Arguments:
   [BAM]
           Bam HiFi file with kinetics
-
+          
           [default: -]
 
   [OUT]
           Output bam file with m6A calls in new/extended MM and ML bam tags
-
+          
           [default: -]
 
 Options:
@@ -42,20 +42,20 @@ Developer-Options:
 
   -f, --full-float
           Add a bam tag (mp) with the full floating point predictions of the ML model
-
+          
           For debugging only.
 
   -b, --batch-size <BATCH_SIZE>
           Number of reads to include in batch prediction
-
+          
           Increasing improves GPU performance at the cost of memory.
-
+          
           [default: 1]
 
 Global-Options:
   -t, --threads <THREADS>
-          Threads for decompression
-
+          Threads
+          
           [default: 8]
 
 Debug-Options:
