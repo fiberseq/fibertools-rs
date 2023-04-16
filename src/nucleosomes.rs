@@ -149,7 +149,6 @@ pub fn add_nucleosomes_to_bam(bam: &mut bam::Reader, out: &mut bam::Writer) {
     let progress_format = "[Adding nucleosomes] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (reads/s {per_sec:.green})";
 
     // iterate over chunks
-    let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
         let style = style::ProgressStyle::with_template(progress_format)
             .unwrap()
@@ -170,7 +169,5 @@ pub fn add_nucleosomes_to_bam(bam: &mut bam::Reader, out: &mut bam::Writer) {
         records
             .into_iter()
             .for_each(|record| out.write(record).unwrap());
-        total_read += chunk.len();
-        log::info!("Finished adding nucleosomes for {} reads", total_read);
     }
 }
