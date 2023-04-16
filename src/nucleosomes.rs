@@ -10,7 +10,7 @@ use rust_htslib::{
 };
 
 pub const MIN_NUC_LENGTH: i64 = 85;
-pub const MIN_PAIR_NUC_LENGTH: i64 = 85;
+pub const MIN_PAIR_NUC_LENGTH: i64 = 100;
 pub const MIN_DIST_FROM_END: i64 = 46;
 
 /// Example
@@ -32,14 +32,14 @@ pub const MIN_DIST_FROM_END: i64 = 46;
 /// let m6a = vec![0, 84];
 /// assert_eq!(find_nucleosomes(&m6a), vec![]);
 /// // single complex case
-/// let m6a = vec![0, 20, 86];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(1,85)]);
+/// let m6a = vec![0, 20, MIN_PAIR_NUC_LENGTH+1];
+/// assert_eq!(find_nucleosomes(&m6a), vec![(1,MIN_PAIR_NUC_LENGTH)]);
 /// // mixed complex case
-/// let m6a = vec![0, 86, 96, 106, 126, 200, 201, 202, 203, 204, 295, 300];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(1,85), (107,93), (205,90)]);
+/// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
+/// assert_eq!(find_nucleosomes(&m6a), vec![(1,85), (107,103), (215,90)]);
 /// // mixed complex case
-/// let m6a = vec![20, 22, 86, 96, 106, 126, 200, 201, 202, 203, 204, 295, 300];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(107,93), (205,90)]);
+/// let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
+/// assert_eq!(find_nucleosomes(&m6a), vec![(107,103), (215,90)]);
 ///
 /// ```
 pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
