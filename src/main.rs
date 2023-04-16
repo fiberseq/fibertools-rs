@@ -158,6 +158,11 @@ pub fn main() -> Result<(), Error> {
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
             fibertools_rs::clear_kinetics(&mut bam, &mut out);
         }
+        Some(Commands::AddNucleosomes { bam, out }) => {
+            let mut bam = fibertools_rs::bam_reader(bam, args.threads);
+            let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
+            fibertools_rs::nucleosomes::add_nucleosomes_to_bam(&mut bam, &mut out);
+        }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);
             cli::print_completions(*shell, &mut cli::make_cli_app());

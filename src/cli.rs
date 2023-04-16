@@ -165,6 +165,15 @@ pub enum Commands {
         #[clap(default_value = "-")]
         out: String,
     },
+    /// Add nucleosomes to a bam file with m6a predictions
+    AddNucleosomes {
+        /// Bam HiFi file with m6A calls
+        #[clap(default_value = "-")]
+        bam: String,
+        /// Output bam file with nucleosome calls
+        #[clap(default_value = "-")]
+        out: String,
+    },
     /// Make command line completions
     Completions {
         /// If provided, outputs the completion file for given shell
