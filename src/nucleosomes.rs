@@ -62,7 +62,6 @@ pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
         {
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
             m6a_clear_stretch = cur - new_start;
-            eprintln!("here");
             nucs.push((new_start, m6a_clear_stretch));
         }
 
