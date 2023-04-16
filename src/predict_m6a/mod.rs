@@ -3,6 +3,7 @@ use super::*;
 use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
+use nucleosomes;
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -260,6 +261,9 @@ pub fn basemod_from_ml(
         .map(|(&x, &pos)| (predict_options.float_to_u8(x), x, pos as i64))
         .filter(|(ml, _, _)| *ml >= predict_options.min_ml_value())
         .multiunzip();
+
+    // adding the nucleosomes
+    nucleosomes::add_nucleosomes_to_record(record, &modified_bases_forward);
 
     log::debug!(
         "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
