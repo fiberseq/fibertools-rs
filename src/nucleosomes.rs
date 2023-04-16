@@ -22,6 +22,9 @@ pub const MIN_DIST_FROM_END: i64 = 46;
 /// // simple case
 /// let m6a = vec![100];
 /// assert_eq!(find_nucleosomes(&m6a), vec![(0,100)]);
+/// // simple case
+/// let m6a = vec![84];
+/// assert_eq!(find_nucleosomes(&m6a), vec![]);
 /// // simple case 2
 /// let m6a = vec![0, 86];
 /// assert_eq!(find_nucleosomes(&m6a), vec![(1,85)]);
@@ -51,13 +54,15 @@ pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
         if m6a_clear_stretch >= MIN_NUC_LENGTH
         // add a nucleosome if we have a long blank stretch
         {
-            nucs.push((pre + 1, m6a_clear_stretch))
+            nucs.push((pre + 1, m6a_clear_stretch));
         } else if pre_m6a_clear_stretch < MIN_NUC_LENGTH // previous stretch wasn't a nuc
-            && pre_m6a_clear_stretch + m6a_clear_stretch +1>= MIN_PAIR_NUC_LENGTH
+            && pre > 0 // don't enter this case in the first loop
+            && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= MIN_PAIR_NUC_LENGTH
         // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
         {
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
             m6a_clear_stretch = cur - new_start;
+            eprintln!("here");
             nucs.push((new_start, m6a_clear_stretch));
         }
 
