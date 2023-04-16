@@ -64,16 +64,18 @@ pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
         pre_m6a_clear_stretch = m6a_clear_stretch;
         pre = cur;
     }
-    check_nucleosomes(&nucs);
+    check_nucleosomes(&nucs, m6a);
     //eprintln!("{:?}", &nucs);
     //eprintln!("{:?}\n", make_mps(&nucs, &m6a));
     nucs
 }
 
-pub fn check_nucleosomes(nucs: &[(i64, i64)]) {
+pub fn check_nucleosomes(nucs: &[(i64, i64)], m6a: &[i64]) {
     let mut pre_nuc_end = -1;
     for (nuc_start, nuc_length) in nucs {
-        //eprintln!("{:?}", nucs);
+        if *nuc_start < 0 {
+            eprintln!("{:?}\n{:?}", nucs, m6a);
+        }
         assert!(*nuc_start >= 0);
         assert!(*nuc_start > pre_nuc_end);
         pre_nuc_end = *nuc_start + *nuc_length;
