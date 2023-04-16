@@ -263,7 +263,11 @@ pub fn basemod_from_ml(
         .multiunzip();
 
     // adding the nucleosomes
-    nucleosomes::add_nucleosomes_to_record(record, &modified_bases_forward);
+    nucleosomes::add_nucleosomes_to_record(
+        record,
+        &modified_bases_forward,
+        &nucleosomes::default_nucleosome_options(),
+    );
 
     log::debug!(
         "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",

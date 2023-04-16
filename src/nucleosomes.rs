@@ -9,40 +9,51 @@ use rust_htslib::{
     bam::Record,
 };
 
-pub const MIN_NUC_LENGTH: i64 = 85;
-pub const MIN_PAIR_NUC_LENGTH: i64 = 100;
-pub const MIN_DIST_FROM_END: i64 = 46;
+pub struct NucleosomeOptions {
+    nucleosome_length: i64,
+    combined_nucleosome_length: i64,
+    distance_from_end: i64,
+}
+
+pub fn default_nucleosome_options() -> NucleosomeOptions {
+    NucleosomeOptions {
+        nucleosome_length: 85,
+        combined_nucleosome_length: 100,
+        distance_from_end: 46,
+    }
+}
 
 /// Example
 /// ```
 /// use fibertools_rs::nucleosomes::*;
 /// // base case
 /// let m6a = vec![];
-/// assert_eq!(find_nucleosomes(&m6a), vec![]);
+/// let o = default_nucleosome_options();
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
 /// // simple case
 /// let m6a = vec![100];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(0,100)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(0,100)]);
 /// // simple case
 /// let m6a = vec![84];
-/// assert_eq!(find_nucleosomes(&m6a), vec![]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
 /// // simple case 2
 /// let m6a = vec![0, 86];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(1,85)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85)]);
 /// // simple nothing case
 /// let m6a = vec![0, 84];
-/// assert_eq!(find_nucleosomes(&m6a), vec![]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
 /// // single complex case
 /// let m6a = vec![0, 20, MIN_PAIR_NUC_LENGTH+1];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(1,MIN_PAIR_NUC_LENGTH)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,MIN_PAIR_NUC_LENGTH)]);
 /// // mixed complex case
 /// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(1,85), (107,103), (215,90)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,90)]);
 /// // mixed complex case
 /// let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-/// assert_eq!(find_nucleosomes(&m6a), vec![(107,103), (215,90)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(107,103), (215,90)]);
 ///
 /// ```
-pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
+pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
     // previous m6a mark position
     let mut pre = -1;
@@ -51,13 +62,13 @@ pub fn find_nucleosomes(m6a: &[i64]) -> Vec<(i64, i64)> {
     // find nucleosomes
     for &cur in m6a {
         let mut m6a_clear_stretch = cur - pre - 1;
-        if m6a_clear_stretch >= MIN_NUC_LENGTH
+        if m6a_clear_stretch >= options.nucleosome_length
         // add a nucleosome if we have a long blank stretch
         {
             nucs.push((pre + 1, m6a_clear_stretch));
-        } else if pre_m6a_clear_stretch < MIN_NUC_LENGTH // previous stretch wasn't a nuc
+        } else if pre_m6a_clear_stretch < options.nucleosome_length // previous stretch wasn't a nuc
             && pre > 0 // don't enter this case in the first loop
-            && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= MIN_PAIR_NUC_LENGTH
+            && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= options.combined_nucleosome_length
         // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
         {
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
@@ -103,25 +114,33 @@ pub fn find_msps(nucs: &[(i64, i64)], m6a: &[i64]) -> Vec<(i64, i64)> {
     msps
 }
 
-pub fn filter_for_end(record: &bam::Record, spans: &[(i64, i64)]) -> (Vec<u32>, Vec<u32>) {
+pub fn filter_for_end(
+    record: &bam::Record,
+    spans: &[(i64, i64)],
+    distance_from_end: i64,
+) -> (Vec<u32>, Vec<u32>) {
     let length = record.seq_len() as i64;
     spans
         .iter()
-        .filter(|(s, l)| *s >= MIN_DIST_FROM_END && s + l <= length - MIN_DIST_FROM_END)
+        .filter(|(s, l)| *s >= distance_from_end && s + l <= length - distance_from_end)
         .map(|(s, l)| (*s as u32, *l as u32))
         .unzip()
 }
 
-pub fn add_nucleosomes_to_record(record: &mut bam::Record, m6a: &[i64]) {
+pub fn add_nucleosomes_to_record(
+    record: &mut bam::Record,
+    m6a: &[i64],
+    options: &NucleosomeOptions,
+) {
     record.remove_aux(b"ns").unwrap_or(());
     record.remove_aux(b"nl").unwrap_or(());
     record.remove_aux(b"as").unwrap_or(());
     record.remove_aux(b"al").unwrap_or(());
 
-    let nucs = find_nucleosomes(m6a);
+    let nucs = find_nucleosomes(m6a, options);
     let msps = find_msps(&nucs, m6a);
-    let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs);
-    let (msp_starts, msp_lengths) = filter_for_end(record, &msps);
+    let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
+    let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
 
     for (&tag, array) in
         [b"ns", b"nl", b"as", b"al"]
@@ -137,9 +156,21 @@ pub fn add_nucleosomes_to_record(record: &mut bam::Record, m6a: &[i64]) {
     }
 }
 
-pub fn add_nucleosomes_to_bam(bam: &mut bam::Reader, out: &mut bam::Writer) {
+pub fn add_nucleosomes_to_bam(
+    bam: &mut bam::Reader,
+    out: &mut bam::Writer,
+    nucleosome_length: i64,
+    combined_nucleosome_length: i64,
+    distance_from_end: i64,
+) {
+    // options for nuc calling
+    let options = NucleosomeOptions {
+        nucleosome_length,
+        combined_nucleosome_length,
+        distance_from_end,
+    };
     // read in bam data
-    let chunk_size = current_num_threads() * 1000;
+    let chunk_size = current_num_threads() * 500;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
@@ -161,7 +192,7 @@ pub fn add_nucleosomes_to_bam(bam: &mut bam::Reader, out: &mut bam::Writer) {
             .map(|record| {
                 let fd = extract::FiberseqData::new(record, None, 0);
                 let m6a = fd.base_mods.m6a();
-                add_nucleosomes_to_record(record, &m6a.0);
+                add_nucleosomes_to_record(record, &m6a.0, &options);
                 record
             })
             .collect();
