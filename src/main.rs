@@ -158,10 +158,22 @@ pub fn main() -> Result<(), Error> {
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
             fibertools_rs::clear_kinetics(&mut bam, &mut out);
         }
-        Some(Commands::AddNucleosomes { bam, out }) => {
+        Some(Commands::AddNucleosomes {
+            bam,
+            out,
+            nucleosome_length,
+            combined_nucleosome_length,
+            distance_from_end,
+        }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
-            fibertools_rs::nucleosomes::add_nucleosomes_to_bam(&mut bam, &mut out);
+            fibertools_rs::nucleosomes::add_nucleosomes_to_bam(
+                &mut bam,
+                &mut out,
+                *nucleosome_length,
+                *combined_nucleosome_length,
+                *distance_from_end,
+            );
         }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);
