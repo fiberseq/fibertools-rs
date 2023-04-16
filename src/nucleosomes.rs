@@ -133,7 +133,7 @@ pub fn add_nucleosomes_to_record(record: &mut bam::Record, m6a: &[i64]) {
 
 pub fn add_nucleosomes_to_bam(bam: &mut bam::Reader, out: &mut bam::Writer) {
     // read in bam data
-    let chunk_size = current_num_threads() * 500;
+    let chunk_size = current_num_threads() * 50;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
