@@ -124,6 +124,7 @@ pub fn main() -> Result<(), Error> {
             nucleosome_length,
             combined_nucleosome_length,
             distance_from_end,
+            allowed_m6a_skips,
             keep,
             min_ml_score,
             all_calls,
@@ -146,7 +147,7 @@ pub fn main() -> Result<(), Error> {
                 nucleosome_length: *nucleosome_length,
                 combined_nucleosome_length: *combined_nucleosome_length,
                 distance_from_end: *distance_from_end,
-                allowed_m6a_skips: 2,
+                allowed_m6a_skips: *allowed_m6a_skips,
             };
             let predict_options = PredictOptions::new(
                 *keep,
@@ -174,6 +175,7 @@ pub fn main() -> Result<(), Error> {
             nucleosome_length,
             combined_nucleosome_length,
             distance_from_end,
+            allowed_m6a_skips,
         }) => {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
@@ -183,6 +185,7 @@ pub fn main() -> Result<(), Error> {
                 *nucleosome_length,
                 *combined_nucleosome_length,
                 *distance_from_end,
+                *allowed_m6a_skips,
             );
         }
         Some(Commands::Completions { shell }) => {
