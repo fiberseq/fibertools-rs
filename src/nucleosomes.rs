@@ -14,6 +14,7 @@ pub struct NucleosomeOptions {
     pub nucleosome_length: i64,
     pub combined_nucleosome_length: i64,
     pub distance_from_end: i64,
+    pub allowed_m6a_skips: i64,
 }
 
 pub fn default_nucleosome_options() -> NucleosomeOptions {
@@ -21,6 +22,7 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
         nucleosome_length: 75,
         combined_nucleosome_length: 100,
         distance_from_end: 45,
+        allowed_m6a_skips: 2,
     }
 }
 
@@ -31,7 +33,8 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
 /// let o = NucleosomeOptions{
 ///     nucleosome_length:85,
 ///     combined_nucleosome_length:100,
-///     distance_from_end:45
+///     distance_from_end:45,
+///     allowed_m6a_skips: 2
 /// };
 /// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
 /// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,90)]);
@@ -62,6 +65,61 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
         pre_m6a_clear_stretch = m6a_clear_stretch;
         pre = cur;
     }
+    check_nucleosomes(&nucs, m6a);
+    nucs
+}
+/// Example
+/// ```
+/// use fibertools_rs::nucleosomes::*;
+/// // base case
+/// let o = NucleosomeOptions{
+///     nucleosome_length:85,
+///     combined_nucleosome_length:100,
+///     distance_from_end: 45,
+///     allowed_m6a_skips: 3,
+/// };
+/// let m6a = vec![1, 90, 130,135,140, 190, 191,192,193, 340];
+/// assert_eq!(d_segment_nucleosomes(&m6a,&o), vec![(2,88), (91,99), (194,146)]);
+/// ```
+pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
+    // make scores for d-segment
+    let mut pre_m6a = -1;
+    let mut scores = vec![];
+    for &cur_m6a in m6a {
+        let m6a_clear_stretch = cur_m6a - pre_m6a - 1;
+        scores.push((m6a_clear_stretch, pre_m6a + 1, cur_m6a));
+        scores.push((-1, cur_m6a, cur_m6a + 1));
+        pre_m6a = cur_m6a;
+    }
+    // init d-segment
+    let mut nucs = vec![];
+    let mut cumulative = 0;
+    let mut max = 0;
+    let mut start = 0;
+    let mut end = 1;
+    let s = options.nucleosome_length;
+    let d = options.allowed_m6a_skips - 1;
+    let length = scores.len();
+    // run d-segment
+    for (idx, (score, _start_index, end_index)) in scores.into_iter().enumerate() {
+        cumulative += score;
+        if cumulative >= max {
+            max = cumulative;
+            end = end_index;
+        }
+        //eprintln!("{}\t{}\t{}\t{}", cumulative, start, end, max);
+        if cumulative <= 0 || cumulative <= max - d || idx == length - 1 || (score < 0 && max >= s)
+        {
+            if max >= s {
+                nucs.push((start, end - start));
+            }
+            max = 0;
+            cumulative = 0;
+            start = end_index;
+            end = end_index + 1;
+        }
+    }
+    //eprintln!("{:?}", nucs);
     check_nucleosomes(&nucs, m6a);
     nucs
 }
@@ -118,7 +176,8 @@ pub fn add_nucleosomes_to_record(
     record.remove_aux(b"as").unwrap_or(());
     record.remove_aux(b"al").unwrap_or(());
 
-    let nucs = find_nucleosomes(m6a, options);
+    //let nucs = find_nucleosomes(m6a, options);
+    let nucs = d_segment_nucleosomes(m6a, options);
     let msps = find_msps(&nucs, m6a);
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
@@ -144,11 +203,13 @@ pub fn add_nucleosomes_to_bam(
     combined_nucleosome_length: i64,
     distance_from_end: i64,
 ) {
+    let allowed_m6a_skips = 2;
     // options for nuc calling
     let options = NucleosomeOptions {
         nucleosome_length,
         combined_nucleosome_length,
         distance_from_end,
+        allowed_m6a_skips,
     };
     // read in bam data
     let chunk_size = current_num_threads() * 500;
@@ -194,6 +255,7 @@ mod tests {
             nucleosome_length: 85,
             combined_nucleosome_length: 100,
             distance_from_end: 45,
+            allowed_m6a_skips: 2,
         };
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // simple case
