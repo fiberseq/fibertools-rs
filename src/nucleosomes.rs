@@ -68,6 +68,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     check_nucleosomes(&nucs, m6a);
     nucs
 }
+
 /// Example
 /// ```
 /// use fibertools_rs::nucleosomes::*;
@@ -202,8 +203,8 @@ pub fn add_nucleosomes_to_bam(
     nucleosome_length: i64,
     combined_nucleosome_length: i64,
     distance_from_end: i64,
+    allowed_m6a_skips: i64,
 ) {
-    let allowed_m6a_skips = 2;
     // options for nuc calling
     let options = NucleosomeOptions {
         nucleosome_length,

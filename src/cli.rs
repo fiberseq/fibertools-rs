@@ -123,6 +123,9 @@ pub enum Commands {
         /// Minimum distance from the end of a fiber to call a nucleosome or MSP
         #[clap(short, long, default_value = "45")]
         distance_from_end: i64,
+        /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm
+        #[clap(short, long, default_value = "45")]
+        allowed_m6a_skips: i64,
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
@@ -192,6 +195,9 @@ pub enum Commands {
         /// Minimum distance from the end of a fiber to call a nucleosome or MSP
         #[clap(short, long, default_value = "45")]
         distance_from_end: i64,
+        /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm
+        #[clap(short, long, default_value = "45")]
+        allowed_m6a_skips: i64,
     },
     /// Make command line completions
     Completions {
