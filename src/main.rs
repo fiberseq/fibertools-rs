@@ -146,6 +146,7 @@ pub fn main() -> Result<(), Error> {
                 nucleosome_length: *nucleosome_length,
                 combined_nucleosome_length: *combined_nucleosome_length,
                 distance_from_end: *distance_from_end,
+                allowed_m6a_skips: 2,
             };
             let predict_options = PredictOptions::new(
                 *keep,
