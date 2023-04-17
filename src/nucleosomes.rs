@@ -79,7 +79,12 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
 ///     distance_from_end: 45,
 ///     allowed_m6a_skips: 3,
 /// };
-/// let m6a = vec![1, 90, 130,135,140, 190, 191,192,193, 340];
+/// let m6a = vec![1, 90,
+///  130,135,140, 190,
+///  191,192,193,
+///  340,
+///  401,402,403,404,
+///  450];
 /// assert_eq!(d_segment_nucleosomes(&m6a,&o), vec![(2,88), (91,99), (194,146)]);
 /// ```
 pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
@@ -99,7 +104,7 @@ pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i
     let mut start = 0;
     let mut end = 1;
     let s = options.nucleosome_length;
-    let d = options.allowed_m6a_skips;
+    let d = options.allowed_m6a_skips - 1;
     let length = scores.len();
     // run d-segment
     for (idx, (score, _start_index, end_index)) in scores.into_iter().enumerate() {
@@ -109,7 +114,8 @@ pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i
             end = end_index;
         }
         //eprintln!("{}\t{}\t{}\t{}", cumulative, start, end, max);
-        if cumulative <= 0 || cumulative < max - d || idx == length - 1 || (score < 0 && max >= s) {
+        if cumulative <= 0 || cumulative <= max - d || idx == length - 1 || (score < 0 && max >= s)
+        {
             if max >= s {
                 nucs.push((start, end - start));
             }
