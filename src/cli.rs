@@ -174,7 +174,7 @@ pub enum Commands {
         #[clap(default_value = "-")]
         out: String,
         /// Minium nucleosome length
-        #[clap(short, long, default_value = "85")]
+        #[clap(short, long, default_value = "75")]
         nucleosome_length: i64,
         /// Minium nucleosome length when combining over a single m6A
         #[clap(short, long, default_value = "100")]

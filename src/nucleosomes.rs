@@ -10,16 +10,16 @@ use rust_htslib::{
 };
 
 pub struct NucleosomeOptions {
-    nucleosome_length: i64,
-    combined_nucleosome_length: i64,
-    distance_from_end: i64,
+    pub nucleosome_length: i64,
+    pub combined_nucleosome_length: i64,
+    pub distance_from_end: i64,
 }
 
 pub fn default_nucleosome_options() -> NucleosomeOptions {
     NucleosomeOptions {
-        nucleosome_length: 85,
+        nucleosome_length: 75,
         combined_nucleosome_length: 100,
-        distance_from_end: 46,
+        distance_from_end: 45,
     }
 }
 
@@ -28,7 +28,7 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
 /// use fibertools_rs::nucleosomes::*;
 /// // base case
 /// let m6a = vec![];
-/// let o = default_nucleosome_options();
+/// let o = NucleosomeOptions{nucleosome_length:85,combined_nucleosome_length:100,distance_from_end:45};
 /// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
 /// // simple case
 /// let m6a = vec![100];
@@ -43,8 +43,8 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
 /// let m6a = vec![0, 84];
 /// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
 /// // single complex case
-/// let m6a = vec![0, 20, MIN_PAIR_NUC_LENGTH+1];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,MIN_PAIR_NUC_LENGTH)]);
+/// let m6a = vec![0, 20, 100+1];
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,100)]);
 /// // mixed complex case
 /// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
 /// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,90)]);
