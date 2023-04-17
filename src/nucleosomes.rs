@@ -9,6 +9,7 @@ use rust_htslib::{
     bam::Record,
 };
 
+#[derive(Debug, Clone)]
 pub struct NucleosomeOptions {
     pub nucleosome_length: i64,
     pub combined_nucleosome_length: i64,

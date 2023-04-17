@@ -114,6 +114,15 @@ pub enum Commands {
         /// Output bam file with m6A calls in new/extended MM and ML bam tags
         #[clap(default_value = "-")]
         out: String,
+        /// Minium nucleosome length
+        #[clap(short, long, default_value = "75")]
+        nucleosome_length: i64,
+        /// Minium nucleosome length when combining over a single m6A
+        #[clap(short, long, default_value = "100")]
+        combined_nucleosome_length: i64,
+        /// Minimum distance from the end of a fiber to call a nucleosome or MSP
+        #[clap(short, long, default_value = "45")]
+        distance_from_end: i64,
         /// Keep hifi kinetics data
         #[clap(short, long)]
         keep: bool,
