@@ -177,8 +177,11 @@ pub fn add_nucleosomes_to_record(
     record.remove_aux(b"as").unwrap_or(());
     record.remove_aux(b"al").unwrap_or(());
 
-    //let nucs = find_nucleosomes(m6a, options);
-    let nucs = d_segment_nucleosomes(m6a, options);
+    let nucs = if options.allowed_m6a_skips <= 0 {
+        find_nucleosomes(m6a, options)
+    } else {
+        d_segment_nucleosomes(m6a, options)
+    };
     let msps = find_msps(&nucs, m6a);
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
