@@ -133,10 +133,10 @@ pub enum Commands {
         #[clap(short, long, help_heading = "Developer-Options")]
         all_calls: bool,
         /// Use the XGBoost model for prediction
-        #[clap(short, long)]
+        #[clap(long, help_heading = "Developer-Options")]
         xgb: bool,
         /// Use the CNN model for prediction
-        #[clap(short, long, help_heading = "Developer-Options")]
+        #[clap(long, help_heading = "Developer-Options")]
         cnn: bool,
         /// Use the semi-supervised CNN model for prediction [default: true]
         #[clap(
@@ -146,6 +146,7 @@ pub enum Commands {
                 ("cnn", "true", "false"),
                 ("xgb", "false", "true"),
             ]),
+            help_heading = "Developer-Options",
         )]
         semi: bool,
         /// Add a bam tag (mp) with the full floating point predictions of the ML model
