@@ -35,6 +35,7 @@ pub struct PredictOptions {
     map: BTreeMap<OrderedFloat<f32>, u8>,
     pub model: Vec<u8>,
     pub min_ml: u8,
+    pub nuc_opts: nucleosomes::NucleosomeOptions,
 }
 
 impl PredictOptions {
@@ -49,6 +50,7 @@ impl PredictOptions {
         all_calls: bool,
         polymerase: PbChem,
         batch_size: usize,
+        nuc_opts: nucleosomes::NucleosomeOptions,
     ) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();
@@ -67,6 +69,7 @@ impl PredictOptions {
             map,
             model: vec![],
             min_ml: 0,
+            nuc_opts,
         };
         options.add_model().expect("Error loading model");
         options
@@ -266,7 +269,7 @@ pub fn basemod_from_ml(
     nucleosomes::add_nucleosomes_to_record(
         record,
         &modified_bases_forward,
-        &nucleosomes::default_nucleosome_options(),
+        &predict_options.nuc_opts,
     );
 
     log::debug!(

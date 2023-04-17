@@ -121,6 +121,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::PredictM6A {
             bam,
             out,
+            nucleosome_length,
+            combined_nucleosome_length,
+            distance_from_end,
             keep,
             min_ml_score,
             all_calls,
@@ -138,6 +141,12 @@ pub fn main() -> Result<(), Error> {
             let mut bam = fibertools_rs::bam_reader(bam, args.threads);
             let header = bam::Header::from_template(bam.header());
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
+            // set up options
+            let nuc_opts = fibertools_rs::nucleosomes::NucleosomeOptions {
+                nucleosome_length: *nucleosome_length,
+                combined_nucleosome_length: *combined_nucleosome_length,
+                distance_from_end: *distance_from_end,
+            };
             let predict_options = PredictOptions::new(
                 *keep,
                 *xgb,
@@ -148,8 +157,8 @@ pub fn main() -> Result<(), Error> {
                 *all_calls,
                 find_pb_polymerase(&header),
                 *batch_size,
+                nuc_opts,
             );
-
             log::info!("{} reads included at once in batch prediction.", batch_size);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
         }
