@@ -27,31 +27,13 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
 /// ```
 /// use fibertools_rs::nucleosomes::*;
 /// // base case
-/// let m6a = vec![];
-/// let o = NucleosomeOptions{nucleosome_length:85,combined_nucleosome_length:100,distance_from_end:45};
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
-/// // simple case
-/// let m6a = vec![100];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(0,100)]);
-/// // simple case
-/// let m6a = vec![84];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
-/// // simple case 2
-/// let m6a = vec![0, 86];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85)]);
-/// // simple nothing case
-/// let m6a = vec![0, 84];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![]);
-/// // single complex case
-/// let m6a = vec![0, 20, 100+1];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,100)]);
-/// // mixed complex case
+/// let o = NucleosomeOptions{
+///     nucleosome_length:85,
+///     combined_nucleosome_length:100,
+///     distance_from_end:45
+/// };
 /// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
 /// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,90)]);
-/// // mixed complex case
-/// let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(107,103), (215,90)]);
-///
 /// ```
 pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
@@ -66,8 +48,8 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
         // add a nucleosome if we have a long blank stretch
         {
             nucs.push((pre + 1, m6a_clear_stretch));
-        } else if pre_m6a_clear_stretch < options.nucleosome_length // previous stretch wasn't a nuc
-            && pre > 0 // don't enter this case in the first loop
+        } else if pre > 0 // don't enter this case in the first loop
+            && pre_m6a_clear_stretch < options.nucleosome_length // previous stretch wasn't a nuc
             && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= options.combined_nucleosome_length
         // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
         {
@@ -80,8 +62,6 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
         pre = cur;
     }
     check_nucleosomes(&nucs, m6a);
-    //eprintln!("{:?}", &nucs);
-    //eprintln!("{:?}\n", make_mps(&nucs, &m6a));
     nucs
 }
 
@@ -200,5 +180,44 @@ pub fn add_nucleosomes_to_bam(
         records
             .into_iter()
             .for_each(|record| out.write(record).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_nucleosomes() {
+        let m6a = vec![];
+        let o = NucleosomeOptions {
+            nucleosome_length: 85,
+            combined_nucleosome_length: 100,
+            distance_from_end: 45,
+        };
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
+        // simple case
+        let m6a = vec![100];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(0, 100)]);
+        // simple case
+        let m6a = vec![84];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
+        // simple case 2
+        let m6a = vec![0, 86];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 85)]);
+        // simple nothing case
+        let m6a = vec![0, 84];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
+        // single complex case
+        let m6a = vec![0, 20, 100 + 1];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 100)]);
+        // mixed complex case
+        let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
+        assert_eq!(
+            find_nucleosomes(&m6a, &o),
+            vec![(1, 85), (107, 103), (215, 90)]
+        );
+        // mixed complex case
+        let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(107, 103), (215, 90)]);
     }
 }
