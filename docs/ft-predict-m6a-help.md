@@ -15,14 +15,23 @@ Arguments:
           [default: -]
 
 Options:
+  -n, --nucleosome-length <NUCLEOSOME_LENGTH>
+          Minium nucleosome length
+          
+          [default: 75]
+
+  -c, --combined-nucleosome-length <COMBINED_NUCLEOSOME_LENGTH>
+          Minium nucleosome length when combining over a single m6A
+          
+          [default: 100]
+
+  -d, --distance-from-end <DISTANCE_FROM_END>
+          Minimum distance from the end of a fiber to call a nucleosome or MSP
+          
+          [default: 45]
+
   -k, --keep
           Keep hifi kinetics data
-
-  -x, --xgb
-          Use the XGBoost model for prediction
-
-  -s, --semi
-          Use the semi-supervised CNN model for prediction [default: true]
 
   -h, --help
           Print help information (use `-h` for a summary)
@@ -37,8 +46,14 @@ Developer-Options:
   -a, --all-calls
           Keep all m6A calls regardless of how low the ML value is
 
-  -c, --cnn
+      --xgb
+          Use the XGBoost model for prediction
+
+      --cnn
           Use the CNN model for prediction
+
+  -s, --semi
+          Use the semi-supervised CNN model for prediction [default: true]
 
   -f, --full-float
           Add a bam tag (mp) with the full floating point predictions of the ML model
