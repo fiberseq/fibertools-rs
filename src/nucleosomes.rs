@@ -164,7 +164,7 @@ pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i
 pub fn check_nucleosomes(nucs: &[(i64, i64)], m6a: &[i64]) {
     let mut pre_nuc_end = -1;
     for (nuc_start, nuc_length) in nucs {
-        if *nuc_start < 0 {
+        if *nuc_start < 0 || pre_nuc_end >= *nuc_start {
             eprintln!("{:?}\n{:?}", nucs, m6a);
         }
         assert!(*nuc_start >= 0);
