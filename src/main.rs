@@ -123,6 +123,7 @@ pub fn main() -> Result<(), Error> {
             out,
             nucleosome_length,
             combined_nucleosome_length,
+            min_distance_added,
             distance_from_end,
             allowed_m6a_skips,
             keep,
@@ -146,6 +147,7 @@ pub fn main() -> Result<(), Error> {
             let nuc_opts = fibertools_rs::nucleosomes::NucleosomeOptions {
                 nucleosome_length: *nucleosome_length,
                 combined_nucleosome_length: *combined_nucleosome_length,
+                min_distance_added: *min_distance_added,
                 distance_from_end: *distance_from_end,
                 allowed_m6a_skips: *allowed_m6a_skips,
             };
@@ -174,6 +176,7 @@ pub fn main() -> Result<(), Error> {
             out,
             nucleosome_length,
             combined_nucleosome_length,
+            min_distance_added,
             distance_from_end,
             allowed_m6a_skips,
         }) => {
@@ -184,6 +187,7 @@ pub fn main() -> Result<(), Error> {
                 &mut out,
                 *nucleosome_length,
                 *combined_nucleosome_length,
+                *min_distance_added,
                 *distance_from_end,
                 *allowed_m6a_skips,
             );
