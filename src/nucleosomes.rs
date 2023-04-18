@@ -46,7 +46,8 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     // length of previous distance between m6a marks
     let mut pre_m6a_clear_stretch = 0;
     // find nucleosomes
-    for idx in 0..m6a.len() {
+    let mut idx = 0;
+    while idx < m6a.len() {
         let cur = m6a[idx];
         let mut m6a_clear_stretch = cur - pre - 1;
         // get next stretch
@@ -71,10 +72,29 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
             m6a_clear_stretch = cur - new_start;
             nucs.push((new_start, m6a_clear_stretch));
+            // check if we can skip over two m6a to get a combined nucleosome
+        } else if pre > 0 // don't enter this case in the first loop
+            // real next m6a stretch 
+            && next_m6a_clear_stretch > 0
+            // previous stretch wasn't a nuc
+            && pre_m6a_clear_stretch < options.nucleosome_length
+            // pre stretch + cur stretch + next stretch is enough for a nuc with 2 m6a in the middle
+            && pre_m6a_clear_stretch + m6a_clear_stretch + next_m6a_clear_stretch + 2 >= options.combined_nucleosome_length
+            // make sure next stretch would not be a nucleosome by itself
+            && next_m6a_clear_stretch < options.nucleosome_length
+            // make sure next two stretches would not be enough for a nuc by itself
+            && m6a_clear_stretch + next_m6a_clear_stretch + 1 < options.combined_nucleosome_length
+        {
+            log::info!("combing over two m6a");
+            let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
+            m6a_clear_stretch = m6a[idx + 1] - new_start;
+            nucs.push((new_start, m6a_clear_stretch));
+            idx += 1;
         }
 
         pre_m6a_clear_stretch = m6a_clear_stretch;
         pre = cur;
+        idx += 1;
     }
     check_nucleosomes(&nucs, m6a);
     nucs
