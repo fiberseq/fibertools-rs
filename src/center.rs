@@ -19,6 +19,7 @@ pub struct CenterPosition {
 pub struct CenteredFiberData {
     fiber: FiberseqData,
     record: record::Record,
+    rg: String,
     offset: i64,
     pub dist: Option<i64>,
     center_position: CenterPosition,
@@ -38,9 +39,18 @@ impl CenteredFiberData {
         } else {
             CenteredFiberData::find_offset(&record, center_position.position)
         };
+        // get RG
+        let rg = if let Ok(bam::record::Aux::String(f)) = record.aux(b"RG") {
+            f
+        } else {
+            "."
+        }
+        .to_string();
+
         offset.map(|offset| CenteredFiberData {
             fiber,
             record,
+            rg,
             offset,
             dist,
             center_position,
@@ -160,7 +170,7 @@ impl CenteredFiberData {
 
     pub fn leading_columns(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.center_position.chrom,
             self.center_position.position,
             self.center_position.strand,
@@ -168,6 +178,7 @@ impl CenteredFiberData {
             self.record.reference_start(),
             self.record.reference_end(),
             std::str::from_utf8(self.record.qname()).unwrap(),
+            self.rg,
             -self.offset,
             self.record.seq_len() as i64 - self.offset,
             self.record.seq_len()
@@ -194,7 +205,7 @@ impl CenteredFiberData {
 
     pub fn leading_header() -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             "chrom",
             "centering_position",
             "strand",
@@ -202,6 +213,7 @@ impl CenteredFiberData {
             "reference_start",
             "reference_end",
             "query_name",
+            "RG",
             "centered_query_start",
             "centered_query_end",
             "query_length",
@@ -302,6 +314,7 @@ pub fn center(
         //print!("{}", out);
         write_to_stdout(&out);
     }
+
     if missing > 1 {
         log::warn!(
             "Unable to exactly map {}/{} reads at position {}:{}",
