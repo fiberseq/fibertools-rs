@@ -48,7 +48,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     // find nucleosomes
     let mut idx = 0;
     while idx < m6a.len() {
-        let cur = m6a[idx];
+        let mut cur = m6a[idx];
         let mut m6a_clear_stretch = cur - pre - 1;
         // get next stretch
         let next_m6a_clear_stretch = if idx == m6a.len() - 1 {
@@ -87,7 +87,8 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
         {
             log::info!("combing over two m6a");
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
-            m6a_clear_stretch = m6a[idx + 1] - new_start;
+            cur = m6a[idx + 1];
+            m6a_clear_stretch = cur - new_start;
             nucs.push((new_start, m6a_clear_stretch));
             idx += 1;
         }
@@ -161,12 +162,13 @@ pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i
     nucs
 }
 
-pub fn check_nucleosomes(nucs: &[(i64, i64)], m6a: &[i64]) {
+pub fn check_nucleosomes(nucs: &[(i64, i64)], _m6a: &[i64]) {
     let mut pre_nuc_end = -1;
     for (nuc_start, nuc_length) in nucs {
         if *nuc_start < 0 || pre_nuc_end >= *nuc_start {
             eprintln!("{} {}", pre_nuc_end, nuc_start);
-            eprintln!("{:?}\n{:?}", nucs, m6a);
+            eprintln!("{:?}", nucs);
+            //eprintln!("{:?}", _m6a);
         }
         assert!(*nuc_start >= 0);
         assert!(*nuc_start > pre_nuc_end);
