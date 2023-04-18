@@ -46,16 +46,27 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     // length of previous distance between m6a marks
     let mut pre_m6a_clear_stretch = 0;
     // find nucleosomes
-    for &cur in m6a {
+    for idx in 0..m6a.len() {
+        let cur = m6a[idx];
         let mut m6a_clear_stretch = cur - pre - 1;
-        if m6a_clear_stretch >= options.nucleosome_length
+        // get next stretch
+        let next_m6a_clear_stretch = if idx == m6a.len() - 1 {
+            0
+        } else {
+            m6a[idx + 1] - cur - 1
+        };
+
         // add a nucleosome if we have a long blank stretch
-        {
+        if m6a_clear_stretch >= options.nucleosome_length {
             nucs.push((pre + 1, m6a_clear_stretch));
+        // check if we can make a combine nucleosome by going over one m6a
         } else if pre > 0 // don't enter this case in the first loop
-            && pre_m6a_clear_stretch < options.nucleosome_length // previous stretch wasn't a nuc
+            // previous stretch wasn't a nuc
+            && pre_m6a_clear_stretch < options.nucleosome_length
+            // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
             && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= options.combined_nucleosome_length
-        // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
+            // skip to the next m6a stretch if it would make for a larger nucleosome
+            && !(next_m6a_clear_stretch > pre_m6a_clear_stretch && next_m6a_clear_stretch < options.nucleosome_length)
         {
             let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
             m6a_clear_stretch = cur - new_start;
