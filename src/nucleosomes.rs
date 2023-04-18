@@ -13,6 +13,7 @@ use rust_htslib::{
 pub struct NucleosomeOptions {
     pub nucleosome_length: i64,
     pub combined_nucleosome_length: i64,
+    pub min_distance_added: i64,
     pub distance_from_end: i64,
     pub allowed_m6a_skips: i64,
 }
@@ -21,6 +22,7 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
     NucleosomeOptions {
         nucleosome_length: 75,
         combined_nucleosome_length: 100,
+        min_distance_added: 20,
         distance_from_end: 45,
         allowed_m6a_skips: 2,
     }
@@ -33,11 +35,12 @@ pub fn default_nucleosome_options() -> NucleosomeOptions {
 /// let o = NucleosomeOptions{
 ///     nucleosome_length:85,
 ///     combined_nucleosome_length:100,
+///     min_distance_added: 20,
 ///     distance_from_end:45,
 ///     allowed_m6a_skips: 2
 /// };
 /// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,90)]);
+/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,125)]);
 /// ```
 pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
@@ -47,6 +50,8 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     let mut pre_m6a_clear_stretch = 0;
     // find nucleosomes
     let mut idx = 0;
+    // previous iteration added a nucleosome
+    let mut pre_added_nuc = false;
     while idx < m6a.len() {
         let mut cur = m6a[idx];
         let mut m6a_clear_stretch = cur - pre - 1;
@@ -57,23 +62,48 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
             m6a[idx + 1] - cur - 1
         };
 
+        // some reused conditions and variables
+        // could combine the previous and current stretch over 1 m6a
+        let could_combine = pre_m6a_clear_stretch + m6a_clear_stretch + 1
+            >= options.combined_nucleosome_length
+            && pre > 0;
+        // new start position if we can combine with previous stretch
+        let combine_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
+
+        // check the cases for nucleosomes
+        if could_combine
+            // individually one isn't long enough for a nucleosome
+            && (m6a_clear_stretch < options.nucleosome_length
+                || pre_m6a_clear_stretch < options.nucleosome_length)
+            // enough bases are added
+            && std::cmp::min(m6a_clear_stretch, pre_m6a_clear_stretch) >= options.min_distance_added
+        {
+            // clear if previous was already made a nuc
+            if pre_added_nuc {
+                nucs.pop();
+            }
+            m6a_clear_stretch = cur - combine_start;
+            nucs.push((combine_start, m6a_clear_stretch));
+            pre_added_nuc = true;
+        }
         // add a nucleosome if we have a long blank stretch
-        if m6a_clear_stretch >= options.nucleosome_length {
+        else if m6a_clear_stretch >= options.nucleosome_length {
             nucs.push((pre + 1, m6a_clear_stretch));
+            pre_added_nuc = true;
+        }
         // check if we can make a combine nucleosome by going over one m6a
-        } else if pre > 0 // don't enter this case in the first loop
+        else if could_combine
             // previous stretch wasn't a nuc
             && pre_m6a_clear_stretch < options.nucleosome_length
-            // pre stretch + cur stretch is long enough for a nuc with just 1 m6a in the middle
-            && pre_m6a_clear_stretch + m6a_clear_stretch + 1 >= options.combined_nucleosome_length
             // skip to the next m6a stretch if it would make for a larger nucleosome
             && !(next_m6a_clear_stretch > pre_m6a_clear_stretch && next_m6a_clear_stretch < options.nucleosome_length)
         {
-            let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
-            m6a_clear_stretch = cur - new_start;
-            nucs.push((new_start, m6a_clear_stretch));
-            // check if we can skip over two m6a to get a combined nucleosome
-        } else if pre > 0 // don't enter this case in the first loop
+            m6a_clear_stretch = cur - combine_start;
+            nucs.push((combine_start, m6a_clear_stretch));
+            pre_added_nuc = true;
+        }
+        // check if we can skip over two m6a to get a combined nucleosome
+        else if pre > 0 // don't enter this case in the first loop
             // real next m6a stretch 
             && next_m6a_clear_stretch > 0
             // previous stretch wasn't a nuc
@@ -86,11 +116,13 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
             && m6a_clear_stretch + next_m6a_clear_stretch + 1 < options.combined_nucleosome_length
         {
             log::info!("combing over two m6a");
-            let new_start = cur - pre_m6a_clear_stretch - m6a_clear_stretch - 1;
             cur = m6a[idx + 1];
-            m6a_clear_stretch = cur - new_start;
-            nucs.push((new_start, m6a_clear_stretch));
+            m6a_clear_stretch = cur - combine_start;
+            nucs.push((combine_start, m6a_clear_stretch));
             idx += 1;
+            pre_added_nuc = true;
+        } else {
+            pre_added_nuc = false;
         }
 
         pre_m6a_clear_stretch = m6a_clear_stretch;
@@ -108,6 +140,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
 /// let o = NucleosomeOptions{
 ///     nucleosome_length:85,
 ///     combined_nucleosome_length:100,
+///     min_distance_added: 20,
 ///     distance_from_end: 45,
 ///     allowed_m6a_skips: 3,
 /// };
@@ -244,6 +277,7 @@ pub fn add_nucleosomes_to_bam(
     out: &mut bam::Writer,
     nucleosome_length: i64,
     combined_nucleosome_length: i64,
+    min_distance_added: i64,
     distance_from_end: i64,
     allowed_m6a_skips: i64,
 ) {
@@ -251,6 +285,7 @@ pub fn add_nucleosomes_to_bam(
     let options = NucleosomeOptions {
         nucleosome_length,
         combined_nucleosome_length,
+        min_distance_added,
         distance_from_end,
         allowed_m6a_skips,
     };
@@ -297,6 +332,7 @@ mod tests {
         let o = NucleosomeOptions {
             nucleosome_length: 85,
             combined_nucleosome_length: 100,
+            min_distance_added: 20,
             distance_from_end: 45,
             allowed_m6a_skips: 2,
         };
@@ -320,10 +356,10 @@ mod tests {
         let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
         assert_eq!(
             find_nucleosomes(&m6a, &o),
-            vec![(1, 85), (107, 103), (215, 90)]
+            vec![(1, 85), (107, 103), (215, 125)]
         );
         // mixed complex case
         let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(107, 103), (215, 90)]);
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(107, 103), (215, 125)]);
     }
 }
