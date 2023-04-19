@@ -297,7 +297,7 @@ pub fn add_nucleosomes_to_bam(
         allowed_m6a_skips,
     };
     // read in bam data
-    let chunk_size = current_num_threads() * 500;
+    let chunk_size = current_num_threads() * 1000;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
