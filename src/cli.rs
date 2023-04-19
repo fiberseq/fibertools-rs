@@ -49,7 +49,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
     #[cfg(feature = "predict")]
-    /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags
+    /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
         /// Bam HiFi file with kinetics
