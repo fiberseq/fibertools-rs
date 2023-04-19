@@ -9,6 +9,14 @@ use rust_htslib::{
     bam::Record,
 };
 
+pub static DEFAULT_NUC_OPTIONS: NucleosomeOptions = NucleosomeOptions {
+    nucleosome_length: 75,
+    combined_nucleosome_length: 100,
+    min_distance_added: 25,
+    distance_from_end: 45,
+    allowed_m6a_skips: -1,
+};
+
 #[derive(Debug, Clone)]
 pub struct NucleosomeOptions {
     pub nucleosome_length: i64,
@@ -19,13 +27,7 @@ pub struct NucleosomeOptions {
 }
 
 pub fn default_nucleosome_options() -> NucleosomeOptions {
-    NucleosomeOptions {
-        nucleosome_length: 75,
-        combined_nucleosome_length: 100,
-        min_distance_added: 20,
-        distance_from_end: 45,
-        allowed_m6a_skips: 2,
-    }
+    DEFAULT_NUC_OPTIONS.clone()
 }
 
 /// Example
@@ -328,40 +330,35 @@ pub fn add_nucleosomes_to_bam(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_nucleosomes() {
         let m6a = vec![];
-        let o = NucleosomeOptions {
-            nucleosome_length: 85,
-            combined_nucleosome_length: 100,
-            min_distance_added: 20,
-            distance_from_end: 45,
-            allowed_m6a_skips: 2,
-        };
+        let o = default_nucleosome_options();
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // simple case
         let m6a = vec![100];
         assert_eq!(find_nucleosomes(&m6a, &o), vec![(0, 100)]);
         // simple case
-        let m6a = vec![84];
+        let m6a = vec![74];
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // simple case 2
         let m6a = vec![0, 86];
         assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 85)]);
         // simple nothing case
-        let m6a = vec![0, 84];
+        let m6a = vec![0, 74];
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // single complex case
-        let m6a = vec![0, 20, 100 + 1];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 100)]);
+        let m6a = vec![0, 26, 105];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 104)]);
         // mixed complex case
-        let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
+        let m6a = vec![0, 86, 96, 100, 126, 210, 211, 212, 213, 214, 305, 340];
         assert_eq!(
             find_nucleosomes(&m6a, &o),
-            vec![(1, 85), (107, 103), (215, 125)]
+            vec![(1, 85), (101, 109), (215, 125)]
         );
-        // mixed complex case
-        let m6a = vec![20, 22, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(107, 103), (215, 125)]);
+        // two m6a case
+        let m6a = vec![5, 40, 101];
+        assert_eq!(find_nucleosomes(&m6a, &o), vec![(0, 101)]);
     }
 }
