@@ -1,3 +1,4 @@
+use super::nucleosomes::*;
 use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
@@ -56,19 +57,19 @@ pub enum Commands {
         #[clap(default_value = "-")]
         out: String,
         /// Minium nucleosome length
-        #[clap(short, long, default_value = "75")]
+        #[clap(short, long, default_value = NUC_LEN)]
         nucleosome_length: i64,
         /// Minium nucleosome length when combining over a single m6A
-        #[clap(short, long, default_value = "100")]
+        #[clap(short, long, default_value = COMBO_NUC_LEN)]
         combined_nucleosome_length: i64,
         /// Minium distance needed to add to an already existing nuc by crossing an m6a
-        #[clap(long, default_value = "25")]
+        #[clap(long, default_value = MIN_DIST_ADDED)]
         min_distance_added: i64,
         /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-        #[clap(short, long, default_value = "45")]
+        #[clap(short, long, default_value = DIST_FROM_END)]
         distance_from_end: i64,
         /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
-        #[clap(long, default_value = "-1", hide = true)]
+        #[clap(long, default_value = ALLOWED_SKIPS, hide = true)]
         allowed_m6a_skips: i64,
         /// Keep hifi kinetics data
         #[clap(short, long)]
@@ -122,19 +123,19 @@ pub enum Commands {
         #[clap(default_value = "-")]
         out: String,
         /// Minium nucleosome length
-        #[clap(short, long, default_value = "75")]
+        #[clap(short, long, default_value = NUC_LEN)]
         nucleosome_length: i64,
         /// Minium nucleosome length when combining over a single m6A
-        #[clap(short, long, default_value = "100")]
+        #[clap(short, long, default_value = COMBO_NUC_LEN)]
         combined_nucleosome_length: i64,
         /// Minium distance needed to add to an already existing nuc by crossing an m6a
-        #[clap(short, long, default_value = "25")]
+        #[clap(short, long, default_value = MIN_DIST_ADDED)]
         min_distance_added: i64,
         /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-        #[clap(short, long, default_value = "45")]
+        #[clap(short, long, default_value = DIST_FROM_END)]
         distance_from_end: i64,
         /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
-        #[clap(short, long, default_value = "-1", hide = true)]
+        #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
         allowed_m6a_skips: i64,
     },
     /// Extract fiberseq data into plain text files
