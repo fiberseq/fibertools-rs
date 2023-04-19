@@ -8,14 +8,11 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Record,
 };
-
-pub static DEFAULT_NUC_OPTIONS: NucleosomeOptions = NucleosomeOptions {
-    nucleosome_length: 75,
-    combined_nucleosome_length: 100,
-    min_distance_added: 25,
-    distance_from_end: 45,
-    allowed_m6a_skips: -1,
-};
+pub static NUC_LEN: &str = "75";
+pub static COMBO_NUC_LEN: &str = "100";
+pub static MIN_DIST_ADDED: &str = "25";
+pub static DIST_FROM_END: &str = "45";
+pub static ALLOWED_SKIPS: &str = "-1";
 
 #[derive(Debug, Clone)]
 pub struct NucleosomeOptions {
@@ -27,7 +24,13 @@ pub struct NucleosomeOptions {
 }
 
 pub fn default_nucleosome_options() -> NucleosomeOptions {
-    DEFAULT_NUC_OPTIONS.clone()
+    NucleosomeOptions {
+        nucleosome_length: NUC_LEN.parse().unwrap(),
+        combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
+        min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
+        distance_from_end: DIST_FROM_END.parse().unwrap(),
+        allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
+    }
 }
 
 /// Example
