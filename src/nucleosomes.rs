@@ -105,7 +105,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
         // check if we can skip over two m6a to get a combined nucleosome
         else if pre > 0 // don't enter this case in the first loop
             // real next m6a stretch 
-            && next_m6a_clear_stretch > 0 && 1<0
+            && next_m6a_clear_stretch > 0
             // previous stretch wasn't a nuc
             && pre_m6a_clear_stretch < options.nucleosome_length
             // pre stretch + cur stretch + next stretch is enough for a nuc with 2 m6a in the middle
