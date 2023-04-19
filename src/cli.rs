@@ -45,65 +45,6 @@ pub struct Cli {
 ///
 #[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
-    /// Extract fiberseq data into plain text files
-    #[clap(visible_aliases = &["ex", "e"])]
-    Extract {
-        /// Fiberseq bam file
-        #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
-        bam: String,
-        /// Report in reference sequence coordinates
-        #[clap(short, long)]
-        reference: bool,
-        /// Minium score in the ML tag to include in the output
-        #[clap(short, long, default_value = "150")]
-        min_ml_score: u8,
-        /// Output path for m6a bed12
-        #[clap(long)]
-        m6a: Option<String>,
-        /// Output path for 5mC (CpG, primrose) bed12
-        #[clap(short, long)]
-        cpg: Option<String>,
-        /// Output path for methylation sensitive patch (msp) bed12
-        #[clap(long)]
-        msp: Option<String>,
-        /// Output path for nucleosome bed12
-        #[clap(short, long)]
-        nuc: Option<String>,
-        /// Output path for a tabular format including "all" fiberseq information in the bam
-        #[clap(short, long)]
-        all: Option<String>,
-        /// Include per base quality scores in "fiber_qual"
-        #[clap(short, long, help_heading = "All-Format-Options")]
-        quality: bool,
-        /// Add the full floating point predictions of the ML model
-        #[clap(short, long, help_heading = "All-Format-Options")]
-        full_float: bool,
-        /// Simplify output by remove fiber sequence
-        #[clap(short, long, help_heading = "All-Format-Options")]
-        simplify: bool,
-    },
-    /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs
-    #[clap(visible_aliases = &["c", "ct"])]
-    Center {
-        /// Fiberseq bam file, must be aligned and have an index
-        bam: String,
-        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.
-        ///
-        /// If you include strand information in the 4th column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
-        bed: String,
-        /// Minium score in the ML tag to include in the output
-        #[clap(short, long, default_value = "150")]
-        min_ml_score: u8,
-        /// Set a maximum distance from the start of the motif to keep a feature
-        #[clap(short, long)]
-        dist: Option<i64>,
-        /// Provide data in wide format, one row per read
-        #[clap(short, long)]
-        wide: bool,
-        /// Return relative reference position instead of relative molecular position
-        #[clap(short, long)]
-        reference: bool,
-    },
     #[cfg(feature = "predict")]
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags
     #[clap(visible_aliases = &["m6A", "m6a"])]
@@ -172,15 +113,6 @@ pub enum Commands {
         )]
         batch_size: usize,
     },
-    /// Remove HiFi kinetics tags from the input bam file
-    ClearKinetics {
-        /// Bam HiFi file with kinetics
-        #[clap(default_value = "-")]
-        bam: String,
-        /// Output bam file without hifi kinetics
-        #[clap(default_value = "-")]
-        out: String,
-    },
     /// Add nucleosomes to a bam file with m6a predictions
     AddNucleosomes {
         /// Bam HiFi file with m6A calls
@@ -204,6 +136,74 @@ pub enum Commands {
         /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
         #[clap(short, long, default_value = "-1", hide = true)]
         allowed_m6a_skips: i64,
+    },
+    /// Extract fiberseq data into plain text files
+    #[clap(visible_aliases = &["ex", "e"])]
+    Extract {
+        /// Fiberseq bam file
+        #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
+        bam: String,
+        /// Report in reference sequence coordinates
+        #[clap(short, long)]
+        reference: bool,
+        /// Minium score in the ML tag to include in the output
+        #[clap(short, long, default_value = "150")]
+        min_ml_score: u8,
+        /// Output path for m6a bed12
+        #[clap(long)]
+        m6a: Option<String>,
+        /// Output path for 5mC (CpG, primrose) bed12
+        #[clap(short, long)]
+        cpg: Option<String>,
+        /// Output path for methylation sensitive patch (msp) bed12
+        #[clap(long)]
+        msp: Option<String>,
+        /// Output path for nucleosome bed12
+        #[clap(short, long)]
+        nuc: Option<String>,
+        /// Output path for a tabular format including "all" fiberseq information in the bam
+        #[clap(short, long)]
+        all: Option<String>,
+        /// Include per base quality scores in "fiber_qual"
+        #[clap(short, long, help_heading = "All-Format-Options")]
+        quality: bool,
+        /// Add the full floating point predictions of the ML model
+        #[clap(short, long, help_heading = "All-Format-Options")]
+        full_float: bool,
+        /// Simplify output by remove fiber sequence
+        #[clap(short, long, help_heading = "All-Format-Options")]
+        simplify: bool,
+    },
+    /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs
+    #[clap(visible_aliases = &["c", "ct"])]
+    Center {
+        /// Fiberseq bam file, must be aligned and have an index
+        bam: String,
+        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.
+        ///
+        /// If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
+        bed: String,
+        /// Minium score in the ML tag to include in the output
+        #[clap(short, long, default_value = "150")]
+        min_ml_score: u8,
+        /// Set a maximum distance from the start of the motif to keep a feature
+        #[clap(short, long)]
+        dist: Option<i64>,
+        /// Provide data in wide format, one row per read
+        #[clap(short, long)]
+        wide: bool,
+        /// Return relative reference position instead of relative molecular position
+        #[clap(short, long)]
+        reference: bool,
+    },
+    /// Remove HiFi kinetics tags from the input bam file
+    ClearKinetics {
+        /// Bam HiFi file with kinetics
+        #[clap(default_value = "-")]
+        bam: String,
+        /// Output bam file without hifi kinetics
+        #[clap(default_value = "-")]
+        out: String,
     },
     /// Make command line completions
     Completions {
