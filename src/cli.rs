@@ -3,6 +3,8 @@ use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
 
+pub static MIN_ML_SCORE: &str = "150";
+
 #[derive(Parser, Debug)]
 #[clap(
     author,
@@ -148,7 +150,7 @@ pub enum Commands {
         #[clap(short, long)]
         reference: bool,
         /// Minium score in the ML tag to include in the output
-        #[clap(short, long, default_value = "150")]
+        #[clap(short, long, default_value = MIN_ML_SCORE)]
         min_ml_score: u8,
         /// Output path for m6a bed12
         #[clap(long)]
@@ -185,7 +187,7 @@ pub enum Commands {
         /// If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
         bed: String,
         /// Minium score in the ML tag to include in the output
-        #[clap(short, long, default_value = "150")]
+        #[clap(short, long, default_value = MIN_ML_SCORE)]
         min_ml_score: u8,
         /// Set a maximum distance from the start of the motif to keep a feature
         #[clap(short, long)]
