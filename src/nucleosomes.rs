@@ -75,6 +75,8 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
             // individually one isn't long enough for a nucleosome
             && (m6a_clear_stretch < options.nucleosome_length
                 || pre_m6a_clear_stretch < options.nucleosome_length)
+            // the longer of the two is not extra long
+            && std::cmp::max(m6a_clear_stretch, pre_m6a_clear_stretch) <= options.combined_nucleosome_length
             // enough bases are added
             && std::cmp::min(m6a_clear_stretch, pre_m6a_clear_stretch) >= options.min_distance_added
         {
