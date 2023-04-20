@@ -33,20 +33,17 @@ ft --help
 
 # Subcommands for `fibertools-rs`
 ## `ft predict-m6a`
-[Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
+Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. [Help page for predict-m6a](/docs/ft-predict-m6a-help.md).
 ## `ft add-nucleosomes`
-Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling.
+Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling. [Help page for add-nucleosomes](/docs/ft-add-nucleosomes-help.md).
 ## `ft extract`
-[Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
+Extracts fiberseq data from a bam file into plain text. [Help page for extract](/docs/ft-extract-help.md). 
 ### `ft extract --all`
 The extract all option is a special option that tries to extract all the fiberseq data into a tabular format. The following is an image of the output. Note that the [column names](/docs/ft-all-columns.md) will be preserved across different software versions (unless otherwise noted); however, the order may change and new columns may be added. Therefore, when loading the data (with `pandas` e.g.) be sure to use the column names as opposed to indexes for manipulation.
 ![ft-extract all](/assets/img/ft-extract-all.png)
-
-
 ## `ft center`
-[Help page for center](/docs/ft-center-help.md). Center fiberseq reads (bam) around reference position(s).
+Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/ft-center-help.md).
 ![Center](/assets/img/center.png)
-
 
 # Read the fibertools docs
 You can find the docs for the latest release here:
