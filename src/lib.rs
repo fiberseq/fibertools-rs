@@ -305,6 +305,19 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         );
         &PbChem::TwoPointTwo
     });
+
+    // log the chem being used
+    let chem = match chemistry {
+        PbChem::Two => "2.0",
+        PbChem::TwoPointTwo => "2.2",
+        PbChem::ThreePointTwo => "3.2",
+        PbChem::Revio => "Revio",
+    };
+    log::info!(
+        "Bam file contains PacBio chemistry {} binding kit {}.",
+        chem,
+        binding_kit
+    );
     chemistry.clone()
 }
 

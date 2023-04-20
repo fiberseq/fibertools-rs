@@ -142,6 +142,7 @@ impl PredictOptions {
             precision_json =
                 std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
         }
+
         // load the precision table
         if self.semi {
             let precision_table: cnn::PrecisionTable = serde_json::from_str(&precision_json)
@@ -157,14 +158,6 @@ impl PredictOptions {
                 "Selected model chemistry combination is not available."
             ));
         }
-        // log the chem being used
-        let chem = match self.polymerase {
-            PbChem::Two => "2.0",
-            PbChem::TwoPointTwo => "2.2",
-            PbChem::ThreePointTwo => "3.2",
-            PbChem::Revio => "Revio",
-        };
-        log::info!("Using model trained on {} PacBio chemistry.", chem);
 
         // set the variables for ML
         self.min_ml = min_ml;

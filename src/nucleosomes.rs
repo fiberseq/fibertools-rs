@@ -122,7 +122,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
             // make sure next two stretches would not be enough for a nuc by itself
             && m6a_clear_stretch + next_m6a_clear_stretch + 1 < options.combined_nucleosome_length
         {
-            log::info!("combing over two m6a");
+            log::trace!("combing over two m6a");
             cur = m6a[idx + 1];
             m6a_clear_stretch = cur - combine_start;
             nucs.push((combine_start, m6a_clear_stretch));
