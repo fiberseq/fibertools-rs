@@ -34,9 +34,8 @@ ft --help
 # Subcommands for `fibertools-rs`
 ## `ft predict-m6a`
 [Help page for predict-m6a](/docs/ft-predict-m6a-help.md). Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
-### Adding nucleosome calls to the BAM files
-To add nucleosome calls to the BAM files you can use the python package [fibertools](https://github.com/fiberseq/fibertools#add-nucleosomes-and-msps-to-a-fibertools-rs-m6a-bam). See that repository for installation and instructions.
-
+## `ft add-nucleosomes`
+Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling.
 ## `ft extract`
 [Help page for extract](/docs/ft-extract-help.md). Extracts fiberseq data from a bam file into plain text.
 ### `ft extract --all`
