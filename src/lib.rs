@@ -314,7 +314,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         PbChem::Revio => "Revio",
     };
     log::info!(
-        "Bam file contains PacBio chemistry {} binding kit {}.",
+        "Bam header implies PacBio chemistry {} binding kit {}.",
         chem,
         binding_kit
     );
