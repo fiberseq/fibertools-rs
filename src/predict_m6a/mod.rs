@@ -160,7 +160,13 @@ impl PredictOptions {
         }
 
         // set the variables for ML
-        self.min_ml = min_ml;
+        self.min_ml = match self.min_ml_score {
+            Some(x) => {
+                log::info!("Using provided minimum ML tag score: {}", x);
+                x
+            }
+            None => min_ml,
+        };
         self.model = model;
         Ok(())
     }
