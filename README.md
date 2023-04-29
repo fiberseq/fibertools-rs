@@ -45,7 +45,10 @@ The extract all option is a special option that tries to extract all the fiberse
 Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/ft-center-help.md).
 ![Center](/assets/img/center.png)
 
-# Read the fibertools docs
+# Cite
+**Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Finkbeiner, C., Li, T., Whittington, D., Stergachis, A. B., & **Vollger, M. R.** (2023). Fibertools: fast and accurate DNA-m6A calling using single-molecule long-read sequencing. *bioRxiv*. https://doi.org/10.1101/2023.04.20.537673
+
+# Read the fibertools library docs
 You can find the docs for the latest release here:
 [https://docs.rs/fibertools-rs/latest/fibertools_rs/](https://docs.rs/fibertools-rs/latest/fibertools_rs/)
 or download from source and run:
