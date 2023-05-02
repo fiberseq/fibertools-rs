@@ -105,7 +105,7 @@ impl PredictOptions {
                 PbChem::Revio => {
                     model = cnn::SEMI_REVIO.to_vec();
                     precision_json = cnn::SEMI_JSON_REVIO.to_string();
-                    min_ml = 251;
+                    min_ml = 254;
                 }
             }
         } else if self.cnn {
