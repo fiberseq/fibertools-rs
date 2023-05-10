@@ -205,7 +205,7 @@ impl FiberseqData {
     }
 
     pub fn get_hp(&self) -> String {
-        if let Ok(Aux::I16(f)) = self.record.aux(b"HP") {
+        if let Ok(Aux::U32(f)) = self.record.aux(b"HP") {
             format!("H{f}")
         } else {
             "UNK".to_string()
