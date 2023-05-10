@@ -203,10 +203,19 @@ impl FiberseqData {
             None
         }
     }
+
+    pub fn get_hp(&self) -> String {
+        if let Ok(Aux::I32(f)) = self.record.aux(b"HP") {
+            format!("H{f}")
+        } else {
+            "UNK".to_string()
+        }
+    }
+
     pub fn all_header(simplify: bool, quality: bool) -> String {
         let mut x = format!(
-            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            "ct", "st", "en", "fiber", "score", "strand", "sam_flag", "RG", "fiber_length",
+            "#{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "ct", "st", "en", "fiber", "score", "strand", "sam_flag", "HP", "RG", "fiber_length",
         );
         if !simplify {
             x.push_str("fiber_sequence\t")
@@ -266,6 +275,7 @@ impl FiberseqData {
             strand = if self.record.is_reverse() { '-' } else { '+' };
         }
         let sam_flag = self.record.flags();
+        let hp = self.get_hp();
         let rg = if let Ok(Aux::String(f)) = self.record.aux(b"RG") {
             log::trace!("{f}");
             f
@@ -315,8 +325,8 @@ impl FiberseqData {
         let mut rtn = String::with_capacity(0);
         // add first things 7
         rtn.write_fmt(format_args!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            ct, start, end, name, score, strand, sam_flag, rg, q_len
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            ct, start, end, name, score, strand, sam_flag, hp, rg, q_len
         ))
         .unwrap();
         // add sequence
