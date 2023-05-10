@@ -340,3 +340,7 @@ pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
     }
     bar.finish();
 }
+
+//pub mod Revio {
+//    include!(concat!(env!("OUT_DIR"), "/model/Revio.rs"));
+//}

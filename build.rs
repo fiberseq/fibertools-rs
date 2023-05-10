@@ -1,4 +1,3 @@
-/// build.rs
 use std::process::Command;
 
 fn main() {
@@ -13,4 +12,13 @@ fn main() {
         cargo:rustc-env=CARGO_LONG_VERSION={} commit:{}",
         git_hash, version, git_hash
     );
+
+    // Generate the model code and state file from the ONNX file.
+    /*
+    use burn_import::onnx::ModelGen;
+        ModelGen::new()
+            .input("src/model/Revio.onnx") // Path to the ONNX model
+            .out_dir("model/") // Directory for the generated Rust source file (under target/)
+            .run_from_script();
+         */
 }
