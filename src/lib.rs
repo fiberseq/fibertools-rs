@@ -94,7 +94,7 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
     let ft_count = header_string.matches("PN:fibertools-rs").count();
     header_rec.push_tag(b"ID", &format!("ft.{}", ft_count + 1));
     // PN
-    header_rec.push_tag(b"PN", &"fibertools-rs");
+    header_rec.push_tag(b"PN", "fibertools-rs");
     // PP
     let re_pp = Regex::new(r"@PG\tID:([^\t]+)").unwrap();
     let last_program = re_pp.captures_iter(&header_string).last();
@@ -104,7 +104,7 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
         header_rec.push_tag(b"PP", &last_program);
     };
     // VN
-    header_rec.push_tag(b"VN", &VERSION);
+    header_rec.push_tag(b"VN", VERSION);
     let cli = env::args().join(" ");
     // CL
     header_rec.push_tag(b"CL", &cli);
