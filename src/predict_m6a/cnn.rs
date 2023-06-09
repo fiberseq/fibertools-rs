@@ -48,14 +48,21 @@ pub fn predict_with_cnn(
 ) -> Vec<f32> {
     //log::debug!("{}", tch::get_num_threads());
     let model = get_saved_pytorch_model(predict_options);
-    let ts = tch::Tensor::of_slice(windows).to_device(tch::Device::cuda_if_available());
-    let ts = ts.reshape(&[count.try_into().unwrap(), LAYERS as i64, WINDOW as i64]);
+    let ts = tch::Tensor::from_slice(windows).to_device(tch::Device::cuda_if_available());
+    //log::debug!("this is the ts shape {:?}", ts);
+    let ts = ts.reshape([count.try_into().unwrap(), LAYERS as i64, WINDOW as i64]);
+    //log::debug!("this is the ts shape {:?}", ts);
 
-    let x: Vec<f32> = model
+    let ts_res = model
         .forward_ts(&[ts])
         .expect("Unable to run forward")
+        .flatten(0, -1);
+
+    //log::info!("this is the ts shape {:?}", ts_res);
+    let x: Vec<f32> = ts_res
         .try_into()
         .expect("Unable to convert tensor to Vec<f32>");
+
     // only interested in the probability of m6A being true, first column.
     x.chunks(2).map(|c| c[0]).collect()
 }
