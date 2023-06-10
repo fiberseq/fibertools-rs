@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.58"
-bio = "0.41.0"
+bio = "1.2.0"
 bio-types = "0.12.0"
 #burn = "0.7.0"
 clap = {version = "4.0.26", features = ["derive"]}
