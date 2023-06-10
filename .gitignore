@@ -11,3 +11,4 @@ Gemfile*
 _site/*
 models/backups/*
 get_json.sh
+src/models/**
