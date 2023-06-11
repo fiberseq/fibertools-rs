@@ -21,7 +21,9 @@ anyhow = "1.0.58"
 bio = "1.2.0"
 bio-types = "0.12.0"
 #burn = "0.7.0"
-clap = {version = "4.0.26", features = ["derive"]}
+#clap = {version = "4.0.26", features = ["derive"]}
+anstyle = "1.0.0"
+clap = {version = "4.3.3", features = ["cargo", "wrap_help", "color", "unstable-styles", "derive"]}
 clap-markdown = "0.1.3"
 clap_complete = "4.0.6"
 clap_mangen = "0.2.5"

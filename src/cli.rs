@@ -1,9 +1,31 @@
 use super::nucleosomes::*;
+use anstyle;
 use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
 
-pub static MIN_ML_SCORE: &str = "150";
+pub static MIN_ML_SCORE: &str = "125";
+
+pub fn get_styles() -> clap::builder::Styles {
+    let cmd_color = anstyle::AnsiColor::BrightMagenta;
+    let header_color = anstyle::AnsiColor::BrightGreen;
+    let placeholder_color = anstyle::AnsiColor::BrightCyan;
+    let header_style = anstyle::Style::new()
+        .bold()
+        .underline()
+        .fg_color(Some(anstyle::Color::Ansi(header_color)));
+    let cmd_style = anstyle::Style::new()
+        .bold()
+        .fg_color(Some(anstyle::Color::Ansi(cmd_color)));
+    let placeholder_style = anstyle::Style::new()
+        .bold()
+        .fg_color(Some(anstyle::Color::Ansi(placeholder_color)));
+    clap::builder::Styles::styled()
+        .header(header_style)
+        .literal(cmd_style)
+        .usage(header_style)
+        .placeholder(placeholder_style)
+}
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -16,6 +38,7 @@ pub static MIN_ML_SCORE: &str = "150";
     arg_required_else_help = true
 )]
 #[command(version = super::LONG_VERSION)]
+#[command(styles=get_styles())]
 pub struct Cli {
     /// Threads
     #[clap(
