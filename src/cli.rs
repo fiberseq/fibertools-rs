@@ -7,9 +7,9 @@ use std::io;
 pub static MIN_ML_SCORE: &str = "125";
 
 pub fn get_styles() -> clap::builder::Styles {
-    let cmd_color = anstyle::AnsiColor::BrightMagenta;
+    let cmd_color = anstyle::AnsiColor::Magenta;
     let header_color = anstyle::AnsiColor::BrightGreen;
-    let placeholder_color = anstyle::AnsiColor::BrightCyan;
+    let placeholder_color = anstyle::AnsiColor::Cyan;
     let header_style = anstyle::Style::new()
         .bold()
         .underline()
@@ -18,7 +18,7 @@ pub fn get_styles() -> clap::builder::Styles {
         .bold()
         .fg_color(Some(anstyle::Color::Ansi(cmd_color)));
     let placeholder_style = anstyle::Style::new()
-        .bold()
+        //.bold()
         .fg_color(Some(anstyle::Color::Ansi(placeholder_color)));
     clap::builder::Styles::styled()
         .header(header_style)
