@@ -232,6 +232,7 @@ pub enum Commands {
         out: String,
     },
     /// Make command line completions
+    #[clap(hide = true)]
     Completions {
         /// If provided, outputs the completion file for given shell
         #[arg(value_enum)]
@@ -240,6 +241,7 @@ pub enum Commands {
     /// Make a man page for fibertools-rs
     ///
     /// Writes file for `man` to stdout.
+    #[clap(hide = true)]
     Man {},
 }
 
