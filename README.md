@@ -22,7 +22,7 @@
 ```bash
 mamba install -c conda-forge -c bioconda fibertools-rs
 ```
-Other installation methods are available in the [INSTALL.md](/INSTALL.md) file.
+However, the `bioconda` version currently does not support GPU acceleration. If you would like to use GPU acceleration, you will need to install using the directions in the [INSTALL.md](/INSTALL.md) file.
 
 
 # Usage
