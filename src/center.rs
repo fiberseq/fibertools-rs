@@ -381,6 +381,9 @@ pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
     let mut rtn = vec![];
     for line in reader.lines() {
         let line = line?;
+        if line.starts_with('#') {
+            continue;
+        }
         let tokens = line.split('\t').collect::<Vec<_>>();
         assert!(tokens.len() >= 3);
         let st = tokens[1].parse::<i64>().unwrap();
