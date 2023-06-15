@@ -67,4 +67,4 @@ assert_cmd = "2.0.11"
 predicates = "3.0.3"
 
 [profile.dev]
-opt-level = 1
+opt-level = 2
