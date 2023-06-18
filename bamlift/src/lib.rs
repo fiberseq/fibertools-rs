@@ -130,6 +130,11 @@ where
 }
 
 fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
+    // skip unmapped
+    if record.is_unmapped() {
+        return positions.iter().map(|_x| -1).collect();
+    }
+    // real work
     let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
         .aligned_pairs()
         .map(|[q_pos, r_pos]| (q_pos, r_pos))
@@ -172,19 +177,11 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 /// }
 ///```
 pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    if record.is_unmapped() {
-        query_positions.iter().map(|_x| -1).collect()
-    } else {
-        liftover_closest(record, query_positions, true)
-    }
+    liftover_closest(record, query_positions, true)
 }
 
 pub fn closest_query_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    if record.is_unmapped() {
-        query_positions.iter().map(|_x| -1).collect()
-    } else {
-        liftover_closest(record, query_positions, false)
-    }
+    liftover_closest(record, query_positions, false)
 }
 
 pub fn get_closest_reference_range(
