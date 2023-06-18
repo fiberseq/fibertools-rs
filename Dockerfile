@@ -1,4 +1,5 @@
 FROM gitpod/workspace-full
+FROM rust:latest
 RUN sudo apt-get install --yes libgsl0-dev
 
 USER gitpod
