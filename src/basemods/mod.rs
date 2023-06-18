@@ -1,4 +1,4 @@
-use super::bamlift::*;
+use bamlift::*;
 use bio::alphabets::dna::revcomp;
 use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;

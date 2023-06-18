@@ -1,6 +1,6 @@
-use super::bamlift::*;
 use super::basemods::BaseMods;
 use super::*;
+use bamlift::*;
 use colored::Colorize;
 use rayon::{current_num_threads, prelude::*};
 use rust_htslib::{
