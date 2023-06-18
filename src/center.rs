@@ -1,6 +1,6 @@
-use super::bamlift::*;
 use super::extract::*;
 use super::*;
+use bamlift::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ProgressBar};
 use rust_htslib::bam::record;

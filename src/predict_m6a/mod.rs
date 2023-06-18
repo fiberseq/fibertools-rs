@@ -1,6 +1,6 @@
-use super::bamlift;
 use super::*;
 use anyhow::anyhow;
+use bamlift;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ParallelProgressIterator};
 use nucleosomes;
@@ -288,7 +288,7 @@ pub fn basemod_from_ml(
 
     // add full probabilities if needed requested
     if predict_options.full_float {
-        let mut mp = super::bamlift::get_f32_tag(record, b"mp");
+        let mut mp = bamlift::get_f32_tag(record, b"mp");
         record.remove_aux(b"mp").unwrap_or(());
         mp.extend(&full_probabilities_forward);
         let aux_array: AuxArray<f32> = (&mp).into();

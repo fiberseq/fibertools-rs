@@ -17,7 +17,7 @@ where
 /// Normal sort is supposed to be very fast on two sorted lists
 /// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
 /// ```
-/// use fibertools_rs::bamlift::*;
+/// use bamlift::*;
 /// let x = vec![1,3];
 /// let x_q = vec!["a","b"];
 /// let y = vec![2,4];
@@ -85,7 +85,7 @@ where
 /// a\[i-1\] <= v < a\[i\]
 /// <https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html>
 /// ```
-/// use fibertools_rs::bamlift::*;
+/// use bamlift::*;
 /// let a = vec![1, 2, 3, 5, 6, 7, 8, 9, 10];
 /// let v = vec![0, 1, 3, 4, 11, 11];
 /// let indexes = search_sorted(&a, &v);
@@ -159,12 +159,11 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 
 ///```
 /// use rust_htslib::{bam, bam::Read};
-/// use fibertools_rs::*;
-/// use fibertools_rs::bamlift::*;
+/// use bamlift::*;
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&".test/all.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&"../.test/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let seq_len = i64::try_from(record.seq_len()).unwrap();
@@ -271,11 +270,10 @@ pub fn get_exact_query_positions(record: &bam::Record, reference_positions: &[i6
 
 ///```
 /// use rust_htslib::{bam, bam::Read};
-/// use fibertools_rs::*;
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&".test/all.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&"../.test/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let n_s = bamlift::get_u32_tag(&record, b"ns");

@@ -1,0 +1,13 @@
+[package]
+edition = "2021"
+name = "bamlift"
+version = "0.1.0"
+
+[dependencies]
+#bio = "1.2.0"
+#lazy_static = "1.4.0"
+#ordered-float = "3.4.0"
+#rayon = "1.5"
+env_logger = "0.9.0"
+log = "0.4"
+rust-htslib = "0.43.1"
