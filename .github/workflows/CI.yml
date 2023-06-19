@@ -21,7 +21,7 @@ jobs:
           components: rustfmt
 
       - name: Check format
-        run: docker run -it $(docker build --pull -q .) cargo fmt -- --check
+        run: cargo fmt -- --check
 
   Linting:
      runs-on: ubuntu-latest
