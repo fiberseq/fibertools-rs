@@ -39,7 +39,7 @@ jobs:
            components: clippy
 
        - name: Lint with clippy
-         run: docker run -it $(docker build --pull -q .) cargo clippy
+         run: docker run -i $(docker build --pull -q .) cargo clippy
 
   Testing:
     needs: Formatting
@@ -57,5 +57,5 @@ jobs:
 
       - name: Run test
         run: |
-          docker run -it $(docker build --pull -q .) cargo test -- --test-threads=1
+          docker run -i $(docker build --pull -q .) cargo test -- --test-threads=1
  
