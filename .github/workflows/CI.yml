@@ -21,7 +21,7 @@ jobs:
           components: rustfmt
 
       - name: Check format
-        run: cargo fmt -- --check
+        run: docker run -it $(docker build --pull -q .) cargo fmt -- --check
 
   Linting:
      runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
            components: clippy
 
        - name: Lint with clippy
-         run: cargo clippy
+         run: docker run -it $(docker build --pull -q .) cargo clippy
 
   Testing:
     needs: Formatting
@@ -54,10 +54,5 @@ jobs:
 
       - name: Run test
         run: |
-          cargo test --no-default-features -- --test-threads=1
-          cargo run --no-default-features -- -v extract --all - .test/all.bam | cut -f 1-7 | head
-          cargo run --no-default-features -- -v extract --msp - .test/all.bam | cut -f 1-7 | head
-          cargo run --no-default-features -- -v extract --nuc - .test/all.bam | cut -f 1-7 | head
-          cargo run --no-default-features -- -v extract --m6a - .test/all.bam | cut -f 1-7 | head
-          cargo run --no-default-features -- -v extract --cpg - .test/all.bam | cut -f 1-7 | head
-          cargo run --no-default-features -- center .test/all.bam .test/center.bed | head
+          docker run -it $(docker build --pull -q .) cargo test -- --test-threads=1
+ 

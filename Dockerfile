@@ -5,21 +5,23 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER env.yaml /tmp/env.yaml
 RUN micromamba install -y -n base -f /tmp/env.yaml && \
     micromamba clean --all --yes 
 
+# build directory setup
+RUN mkdir -p /tmp/fibertools-rs
+RUN chown $MAMBA_USER /tmp/fibertools-rs
+USER $MAMBA_USER
+WORKDIR /tmp/fibertools-rs
+COPY --chown=$MAMBA_USER:$MAMBA_USER  . .
+
 # activate mamba in the build env  
 ARG MAMBA_DOCKERFILE_ACTIVATE=1 
-RUN python -c 'import uuid; print(uuid.uuid4())' > /tmp/my_uuid
 
-# env setup 
-RUN echo "LIBTORCH"
-RUN echo $LIBTORCH_USE_PYTORCH
-RUN export LIBTORCH_USE_PYTORCH=1
-RUN echo $LIBTORCH_USE_PYTORCH
-RUN echo "END LIBTORCH"
+# tell tch-rs to use python libtorch
+ARG LIBTORCH_USE_PYTORCH=1
 
-# rust setup
-WORKDIR /usr/src/myapp
-COPY . .
+# test pytorch
+RUN python -c "import torch"
 
-RUN cargo install --path .
-
-CMD ["myapp"]
+#RUN cargo build
+#RUN cargo clippy --release
+#RUN cargo test --release
+#CMD ["myapp"]
