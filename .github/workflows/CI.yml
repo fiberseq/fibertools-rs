@@ -11,8 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+        uses: actions/checkout@v3
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -25,29 +24,27 @@ jobs:
         run: cargo fmt -- --check
 
   Linting:
-     runs-on: ubuntu-latest
-     steps:
-       - name: Checkout repository
-       - uses: actions/checkout@v3
-       - uses: actions/setup-node@v3
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v3
 
-       - name: Install stable toolchain
-         uses: actions-rs/toolchain@v1
-         with:
-           toolchain: stable
-           override: true
-           components: clippy
+        - name: Install stable toolchain
+          uses: actions-rs/toolchain@v1
+          with:
+            toolchain: stable
+            override: true
+            components: clippy
 
-       - name: Lint with clippy
-         run: docker run -i $(docker build --pull -q .) cargo clippy
+        - name: Lint with clippy
+          run: docker run -i $(docker build --pull -q .) cargo clippy
 
   Testing:
     needs: Formatting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+        uses: actions/checkout@v3
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
