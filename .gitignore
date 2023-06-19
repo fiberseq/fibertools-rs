@@ -12,3 +12,4 @@ _site/*
 models/backups/*
 get_json.sh
 src/model
+.devcontainer/**
