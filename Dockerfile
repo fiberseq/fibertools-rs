@@ -16,7 +16,7 @@ COPY --chown=$MAMBA_USER:$MAMBA_USER  . .
 ARG MAMBA_DOCKERFILE_ACTIVATE=1 
 
 # tell tch-rs to use python libtorch
-ARG LIBTORCH_USE_PYTORCH=1
+ENV LIBTORCH_USE_PYTORCH=1
 
 # test pytorch
 RUN python -c "import torch"
