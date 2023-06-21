@@ -9,6 +9,9 @@ pub mod extract;
 /// Add nucleosomes to a bam file
 pub mod nucleosomes;
 
+///
+pub mod strip_basemods;
+
 #[cfg(feature = "predict")]
 /// m6A prediction
 pub mod predict_m6a;

@@ -171,6 +171,11 @@ pub fn main() -> Result<(), Error> {
             let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
             fibertools_rs::clear_kinetics(&mut bam, &mut out);
         }
+        Some(Commands::StripBasemods { bam, out, basemod }) => {
+            let mut bam = fibertools_rs::bam_reader(bam, args.threads);
+            let mut out = fibertools_rs::bam_writer(out, &bam, args.threads);
+            fibertools_rs::strip_basemods::strip_base_mods(&mut bam, &mut out, basemod);
+        }
         Some(Commands::AddNucleosomes {
             bam,
             out,
