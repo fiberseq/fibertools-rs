@@ -67,3 +67,16 @@ fn test_clear() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(predicate::str::contains("done! Time elapsed:"));
     Ok(())
 }
+
+#[test]
+fn test_strip_basemods() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ft")?;
+    cmd.arg("strip-basemods")
+        .arg("-v")
+        .arg(".test/all.bam")
+        .arg("/dev/null");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("done! Time elapsed:"));
+    Ok(())
+}
