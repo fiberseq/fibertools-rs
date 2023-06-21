@@ -231,6 +231,18 @@ pub enum Commands {
         #[clap(default_value = "-")]
         out: String,
     },
+    /// Strip out select base modifications
+    StripBasemods {
+        /// Bam HiFi file with base mods
+        #[clap(default_value = "-")]
+        bam: String,
+        /// Output bam file
+        #[clap(default_value = "-")]
+        out: String,
+        #[clap(short, long, default_value = "m6A",  value_parser(["m6A","6mA", "5mC","CpG"]))]
+        /// base modification to strip out of the bam file
+        basemod: String,
+    },
     /// Make command line completions
     #[clap(hide = true)]
     Completions {

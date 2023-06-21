@@ -211,6 +211,11 @@ impl BaseMods {
         self.base_mods.retain(|bm| !bm.is_m6a());
     }
 
+    /// remove cpg/5mc base mods from the struct
+    pub fn drop_cpg(&mut self) {
+        self.base_mods.retain(|bm| !bm.is_cpg());
+    }
+
     pub fn m6a_positions(&self, reference: bool) -> Vec<i64> {
         let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
         // skip if no m6a
