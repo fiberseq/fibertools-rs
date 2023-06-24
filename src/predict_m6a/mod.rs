@@ -264,13 +264,6 @@ pub fn basemod_from_ml(
         .filter(|(ml, _, _)| *ml >= predict_options.min_ml_value())
         .multiunzip();
 
-    // adding the nucleosomes
-    nucleosomes::add_nucleosomes_to_record(
-        record,
-        &modified_bases_forward,
-        &predict_options.nuc_opts,
-    );
-
     log::debug!(
         "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
         full_probabilities_forward
@@ -501,6 +494,15 @@ pub fn predict_m6a_on_records(
         }
         // write the ml and mm tags
         cur_basemods.add_mm_and_ml_tags(record);
+
+        let modified_bases_forward = cur_basemods.forward_m6a().0;
+        // adding the nucleosomes
+        nucleosomes::add_nucleosomes_to_record(
+            record,
+            &modified_bases_forward,
+            &predict_options.nuc_opts,
+        );
+
         // clear the existing data
         if !predict_options.keep {
             record.remove_aux(b"fp").unwrap_or(());
