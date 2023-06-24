@@ -1,6 +1,12 @@
 [package]
+authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
+categories = ["library"]
+description = "Liftover positions in a BAM file"
 edition = "2021"
+keywords = ["bam", "bfx"]
+license = "MIT"
 name = "bamlift"
+repository = "https://github.com/fiberseq/fibertools-rs"
 version = "0.1.0"
 
 [dependencies]
