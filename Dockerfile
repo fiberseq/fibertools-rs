@@ -33,7 +33,7 @@ ENV LIBTORCH_CXX11_ABI=0
 
 COPY . .
 
-#RUN cargo install --path .
+RUN cargo install --path .
 #FROM mambaorg/micromamba:1.4.4
 # mamba setup
 #COPY --chown=$MAMBA_USER:$MAMBA_USER env.yaml /tmp/env.yaml
