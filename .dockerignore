@@ -1,0 +1,17 @@
+**/target
+target/**
+*.code-workspace
+Cargo.lock
+tmp*
+temp*
+dists/**
+.vscode/
+.test/small_unaligned_fiberseq.bam
+Gemfile*
+_site/*
+models/backups/*
+get_json.sh
+src/model
+.devcontainer/**
+.dockerignore
+Dockerfile
