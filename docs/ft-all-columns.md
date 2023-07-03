@@ -7,6 +7,7 @@ fiber
 score
 strand
 sam_flag
+HP
 RG
 fiber_length
 fiber_sequence

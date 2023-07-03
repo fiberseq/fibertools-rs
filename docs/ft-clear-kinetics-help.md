@@ -8,8 +8,8 @@ Arguments:
   [OUT]  Output bam file without hifi kinetics [default: -]
 
 Options:
-  -h, --help     Print help information
-  -V, --version  Print version information
+  -h, --help     Print help
+  -V, --version  Print version
 
 Global-Options:
   -t, --threads <THREADS>  Threads [default: 8]
