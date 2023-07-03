@@ -1,5 +1,6 @@
 ```
-Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as)
+Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags.
+Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as)
 
 Usage: ft predict-m6a [OPTIONS] [BAM] [OUT]
 
@@ -39,10 +40,10 @@ Options:
           Keep hifi kinetics data
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (see a summary with '-h')
 
   -V, --version
-          Print version information
+          Print version
 
 Developer-Options:
   -m, --min-ml-score <MIN_ML_SCORE>

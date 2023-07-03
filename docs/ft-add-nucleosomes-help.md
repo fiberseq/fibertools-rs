@@ -17,9 +17,9 @@ Options:
   -d, --distance-from-end <DISTANCE_FROM_END>
           Minimum distance from the end of a fiber to call a nucleosome or MSP [default: 45]
   -h, --help
-          Print help information
+          Print help
   -V, --version
-          Print version information
+          Print version
 
 Global-Options:
   -t, --threads <THREADS>  Threads [default: 8]
