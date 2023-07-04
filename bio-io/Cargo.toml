@@ -1,0 +1,22 @@
+[package]
+authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
+categories = ["library"]
+description = "Liftover positions in a BAM file"
+edition = "2021"
+keywords = ["bam", "bfx"]
+license = "MIT"
+name = "bio-io"
+repository = "https://github.com/fiberseq/fibertools-rs"
+version = "0.1.0"
+
+[dependencies]
+anyhow = "1.0.58"
+colored = "2.0.0"
+env_logger = "0.9.0"
+indicatif = {version = "0.17.0", features = ["rayon"]}
+itertools = "0.10.5"
+lazy_static = "1.4.0"
+log = "0.4"
+niffler = {version = "2.5.0", default-features = false, features = ["gz"]}
+regex = "1.5.4"
+rust-htslib = "0.43.1"
