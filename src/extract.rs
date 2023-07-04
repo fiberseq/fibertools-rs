@@ -1,6 +1,7 @@
 use super::basemods::BaseMods;
 use super::*;
 use bamlift::*;
+use bio_io::*;
 use colored::Colorize;
 use rayon::{current_num_threads, prelude::*};
 use rust_htslib::{
