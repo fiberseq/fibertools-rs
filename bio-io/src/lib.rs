@@ -3,15 +3,18 @@ use colored::Colorize;
 //use indicatif::{style, ProgressBar};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use niffler::get_reader;
 use regex::Regex;
-use rust_htslib::{bam, bam::Read};
+use rust_htslib::bam;
+use rust_htslib::bam::Read;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, stdout, BufWriter, Write};
-use std::path::PathBuf;
+use std::io::{self, stdout, BufReader, BufWriter, Write};
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::time::Instant;
+
 const BUFFER_SIZE: usize = 32 * 1024;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -57,6 +60,32 @@ pub fn write_to_file(out: &str, file: &mut Box<dyn Write>) {
 pub fn write_to_stdout(out: &str) {
     let mut out_f = Box::new(std::io::stdout()) as Box<dyn Write>;
     write_to_file(out, &mut out_f);
+}
+
+/// a reader that can read compressed files but also stdin (indicated by -)
+/// ```
+/// use bio_io::buffer_from;
+/// use std::io;
+/// let reader = buffer_from(".test/test.txt.gz").expect("Error: cannot open file");
+/// let msg = io::read_to_string(reader).unwrap();
+/// assert_eq!(msg, "Hello World!\n");
+/// let reader = buffer_from(".test/test.txt").expect("Error: cannot open file");
+/// let msg = io::read_to_string(reader).unwrap();
+/// assert_eq!(msg, "Hello World!\n");
+/// ```
+pub fn buffer_from<P: AsRef<Path>>(
+    path: P,
+) -> Result<BufReader<Box<dyn std::io::Read>>, anyhow::Error> {
+    let path = path.as_ref();
+    let readable: Box<dyn std::io::Read> = if path == Path::new("-") {
+        Box::new(io::BufReader::new(io::stdin()))
+    } else {
+        Box::new(io::BufReader::new(std::fs::File::open(path)?))
+    };
+    let (reader, compression) = get_reader(readable)?;
+    log::debug!("Compression: {:?}", compression);
+    let buffer = BufReader::new(reader);
+    Ok(buffer)
 }
 
 /*

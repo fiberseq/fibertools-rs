@@ -2,13 +2,13 @@ use super::extract::*;
 use super::*;
 use bamlift::*;
 use bio::alphabets::dna::revcomp;
+use bio_io;
 use indicatif::{style, ProgressBar};
 use rust_htslib::bam::record;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Write;
-use std::fs::File;
-use std::io::{self, prelude::*, BufReader};
+use std::io::{self, prelude::*};
 
 #[derive(Clone)]
 pub struct CenterPosition {
@@ -376,8 +376,7 @@ pub fn center_fiberdata(
 }
 
 pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
-    let file = File::open(infile)?;
-    let reader = BufReader::new(file);
+    let reader = bio_io::buffer_from(infile).expect("Failed to open bed file");
     let mut rtn = vec![];
     for line in reader.lines() {
         let line = line?;
