@@ -104,29 +104,27 @@ pub fn buffer_from<P: AsRef<Path>>(
 BAM IO
 */
 
-/// Open bam file
-pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
-    let mut bam = if bam == "-" {
-        bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
-    } else {
-        bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-    };
-    bam.set_threads(threads).unwrap();
-    bam
-}
-
 /// Write to a bam file.
-pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
+pub fn program_bam_writer(
+    out: &str,
+    template_bam: &bam::Reader,
+    threads: usize,
+    program_name: &str,
+    program_id: &str,
+    program_version: &str,
+) -> bam::Writer {
     let mut header = bam::Header::from_template(template_bam.header());
 
     // add to the header
     let header_string = String::from_utf8_lossy(&header.to_bytes()).to_string();
     let mut header_rec = bam::header::HeaderRecord::new(b"PG");
     // ID
-    let ft_count = header_string.matches("PN:fibertools-rs").count();
-    header_rec.push_tag(b"ID", &format!("ft.{}", ft_count + 1));
+    let tag = format!("PN:{program_name}");
+    let program_count = header_string.matches(&tag).count();
+    let id_tag = format!("{}.{}", program_id, program_count + 1);
+    header_rec.push_tag(b"ID", &id_tag);
     // PN
-    header_rec.push_tag(b"PN", "fibertools-rs");
+    header_rec.push_tag(b"PN", program_name);
     // PP
     let re_pp = Regex::new(r"@PG\tID:([^\t]+)").unwrap();
     let last_program = re_pp.captures_iter(&header_string).last();
@@ -136,7 +134,7 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
         header_rec.push_tag(b"PP", &last_program);
     };
     // VN
-    header_rec.push_tag(b"VN", VERSION);
+    header_rec.push_tag(b"VN", program_version);
     let cli = env::args().join(" ");
     // CL
     header_rec.push_tag(b"CL", &cli);
@@ -153,6 +151,16 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
     out
 }
 
+/// Open bam file
+pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
+    let mut bam = if bam == "-" {
+        bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
+    } else {
+        bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+    };
+    bam.set_threads(threads).unwrap();
+    bam
+}
 // This is a bam chunk reader
 pub struct BamChunk<'a> {
     pub bam: bam::Records<'a, bam::Reader>,
