@@ -60,8 +60,8 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
 }
 
 /// write to a file, but don't error on broken pipes
-pub fn write_to_file(out: &str, file: &mut Box<dyn Write>) {
-    let out = write!(file, "{}", out);
+pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
+    let out = write!(buffer, "{}", out);
     if let Err(err) = out {
         if err.kind() == io::ErrorKind::BrokenPipe {
             exit(0);
