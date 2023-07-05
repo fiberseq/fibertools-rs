@@ -1,6 +1,7 @@
 use anyhow::Result;
 use colored::Colorize;
-//use indicatif::{style, ProgressBar};
+use gzp::deflate::Bgzf; //, Gzip, Mgzip, RawDeflate};
+use gzp::{Compression, ZBuilder};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use niffler::get_reader;
@@ -9,6 +10,7 @@ use rust_htslib::bam;
 use rust_htslib::bam::Read;
 use std::collections::HashMap;
 use std::env;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, stdout, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -37,12 +39,22 @@ fn get_output(path: Option<PathBuf>) -> Result<Box<dyn Write + Send + 'static>> 
     Ok(writer)
 }
 
-/// Write to stdout if - or the file specified by a path
+/// Write normal or compressed files seamlessly
+/// Uses the presence of a `.gz` extension to decide
+// Attempting to have a file writer too
 pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
-    //let ext = Path::new(filename).extension();
+    let ext = Path::new(filename).extension();
     let path = PathBuf::from(filename);
-    let buffer = get_output(Some(path))?; //.expect("Error: cannot create output file");
-    Ok(buffer)
+    let buffer = get_output(Some(path))?;
+    if ext == Some(OsStr::new("gz")) {
+        let writer = ZBuilder::<Bgzf, _>::new()
+            .num_threads(4)
+            .compression_level(Compression::new(6))
+            .from_writer(buffer);
+        Ok(Box::new(writer))
+    } else {
+        Ok(buffer)
+    }
 }
 
 /// write to a file, but don't error on broken pipes
