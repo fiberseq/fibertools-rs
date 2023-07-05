@@ -132,6 +132,17 @@ pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
     bar.finish();
 }
 
-//pub mod Revio {
-//    include!(concat!(env!("OUT_DIR"), "/model/Revio.rs"));
-//}
+/// Write to a bam file.
+pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
+    let program_name = "fibertools-rs";
+    let program_id = "ft";
+    let program_version = VERSION;
+    program_bam_writer(
+        out,
+        template_bam,
+        threads,
+        program_name,
+        program_id,
+        program_version,
+    )
+}
