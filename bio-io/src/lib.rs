@@ -18,6 +18,8 @@ use std::process::exit;
 use std::time::Instant;
 
 const BUFFER_SIZE: usize = 32 * 1024;
+const COMPRESSION_THREADS: usize = 8;
+const COMPRESSION_LEVEL: u32 = 6;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /*
@@ -48,8 +50,8 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
     let buffer = get_output(Some(path))?;
     if ext == Some(OsStr::new("gz")) {
         let writer = ZBuilder::<Bgzf, _>::new()
-            .num_threads(4)
-            .compression_level(Compression::new(6))
+            .num_threads(COMPRESSION_THREADS)
+            .compression_level(Compression::new(COMPRESSION_LEVEL))
             .from_writer(buffer);
         Ok(Box::new(writer))
     } else {
