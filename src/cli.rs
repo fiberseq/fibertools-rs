@@ -170,8 +170,16 @@ pub enum Commands {
         #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
         bam: String,
         /// Report in reference sequence coordinates
-        #[clap(short, long)]
+        #[clap(short, long, default_value = "true",
+            default_value_ifs([
+                ("molecular", "true", "false"),
+                ("molecular", "false", "true"),
+            ]))
+        ]
         reference: bool,
+        /// Report positions in the molecular sequence coordinates
+        #[clap(long, default_value = "false")]
+        molecular: bool,
         /// Minium score in the ML tag to include in the output
         #[clap(short, long, default_value = MIN_ML_SCORE)]
         min_ml_score: u8,
