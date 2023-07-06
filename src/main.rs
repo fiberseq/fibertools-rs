@@ -71,6 +71,7 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Extract {
             bam,
             reference,
+            molecular: _molecular,
             simplify,
             quality,
             min_ml_score,
