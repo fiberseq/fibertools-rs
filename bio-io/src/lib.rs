@@ -18,6 +18,8 @@ use std::process::exit;
 use std::time::Instant;
 
 const BUFFER_SIZE: usize = 32 * 1024;
+const COMPRESSION_THREADS: usize = 8;
+const COMPRESSION_LEVEL: u32 = 6;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /*
@@ -48,8 +50,8 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
     let buffer = get_output(Some(path))?;
     if ext == Some(OsStr::new("gz")) {
         let writer = ZBuilder::<Bgzf, _>::new()
-            .num_threads(4)
-            .compression_level(Compression::new(6))
+            .num_threads(COMPRESSION_THREADS)
+            .compression_level(Compression::new(COMPRESSION_LEVEL))
             .from_writer(buffer);
         Ok(Box::new(writer))
     } else {
@@ -58,8 +60,8 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
 }
 
 /// write to a file, but don't error on broken pipes
-pub fn write_to_file(out: &str, file: &mut Box<dyn Write>) {
-    let out = write!(file, "{}", out);
+pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
+    let out = write!(buffer, "{}", out);
     if let Err(err) = out {
         if err.kind() == io::ErrorKind::BrokenPipe {
             exit(0);
