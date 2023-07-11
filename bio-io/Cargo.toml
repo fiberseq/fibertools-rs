@@ -1,7 +1,7 @@
 [package]
 authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
 categories = ["library"]
-description = "Liftover positions in a BAM file"
+description = "My utilities for reading and writing bioinformatics file formats"
 edition = "2021"
 keywords = ["bam", "bfx"]
 license = "MIT"

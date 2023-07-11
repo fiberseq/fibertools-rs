@@ -20,7 +20,6 @@ use std::time::Instant;
 const BUFFER_SIZE: usize = 32 * 1024;
 const COMPRESSION_THREADS: usize = 8;
 const COMPRESSION_LEVEL: u32 = 6;
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /*
 STANDARD FILE IO
@@ -254,10 +253,10 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     // grab chemistry
     let chemistry = CHEMISTRY_MAP.get(binding_kit).unwrap_or_else(|| {
         log::warn!(
-            "Polymerase for BINDINGKIT={} not found. Defaulting to ML model made with 2.2",
+            "Polymerase for BINDINGKIT={} not found. Defaulting to ML model made for REVIO.",
             binding_kit
         );
-        &PbChem::TwoPointTwo
+        &PbChem::Revio
     });
 
     // log the chem being used
