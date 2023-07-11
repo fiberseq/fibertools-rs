@@ -1,7 +1,7 @@
 [package]
 authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
 categories = ["library"]
-description = "Liftover positions in a BAM file"
+description = "My utilities for reading and writing bioinformatics file formats"
 edition = "2021"
 keywords = ["bam", "bfx"]
 license = "MIT"
@@ -12,9 +12,9 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.58"
 colored = "2.0.0"
-env_logger = "0.9.0"
 gzp = "0.11.3"
-indicatif = {version = "0.17.0", features = ["rayon"]}
+#indicatif = {version = "0.17.0", features = ["rayon"]}
+#env_logger = "0.9.0"
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
