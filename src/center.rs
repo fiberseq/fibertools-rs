@@ -4,7 +4,7 @@ use bamlift::*;
 use bio::alphabets::dna::revcomp;
 use bio_io;
 use indicatif::{style, ProgressBar};
-use rust_htslib::bam::record;
+use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Write;
@@ -18,7 +18,7 @@ pub struct CenterPosition {
 }
 pub struct CenteredFiberData {
     fiber: FiberseqData,
-    record: record::Record,
+    //record: record::Record,
     rg: String,
     offset: i64,
     pub dist: Option<i64>,
@@ -29,7 +29,7 @@ pub struct CenteredFiberData {
 impl CenteredFiberData {
     pub fn new(
         fiber: FiberseqData,
-        record: bam::Record,
+        //record: bam::Record,
         center_position: CenterPosition,
         dist: Option<i64>,
         reference: bool,
@@ -37,10 +37,10 @@ impl CenteredFiberData {
         let offset = if reference {
             Some(center_position.position)
         } else {
-            CenteredFiberData::find_offset(&record, center_position.position)
+            CenteredFiberData::find_offset(&fiber.record, center_position.position)
         };
         // get RG
-        let rg = if let Ok(bam::record::Aux::String(f)) = record.aux(b"RG") {
+        let rg = if let Ok(bam::record::Aux::String(f)) = fiber.record.aux(b"RG") {
             f
         } else {
             "."
@@ -49,7 +49,6 @@ impl CenteredFiberData {
 
         offset.map(|offset| CenteredFiberData {
             fiber,
-            record,
             rg,
             offset,
             dist,
@@ -95,7 +94,7 @@ impl CenteredFiberData {
     /// Get the sequence
     pub fn subset_sequence(&self) -> String {
         let dist = if let Some(dist) = self.dist { dist } else { 0 };
-        let seq = self.record.seq().as_bytes();
+        let seq = self.fiber.record.seq().as_bytes();
 
         let mut out_seq: Vec<u8> = vec![];
         let st = self.offset - dist; //(self.offset - dist)
@@ -161,9 +160,9 @@ impl CenteredFiberData {
 
     pub fn get_sequence(&self) -> String {
         let forward_bases = if self.center_position.strand == '+' {
-            self.record.seq().as_bytes()
+            self.fiber.record.seq().as_bytes()
         } else {
-            revcomp(self.record.seq().as_bytes())
+            revcomp(self.fiber.record.seq().as_bytes())
         };
         String::from_utf8_lossy(&forward_bases).to_string()
     }
@@ -175,13 +174,13 @@ impl CenteredFiberData {
             self.center_position.position,
             self.center_position.strand,
             self.subset_sequence(),
-            self.record.reference_start(),
-            self.record.reference_end(),
-            std::str::from_utf8(self.record.qname()).unwrap(),
+            self.fiber.record.reference_start(),
+            self.fiber.record.reference_end(),
+            std::str::from_utf8(self.fiber.record.qname()).unwrap(),
             self.rg,
             -self.offset,
-            self.record.seq_len() as i64 - self.offset,
-            self.record.seq_len()
+            self.fiber.record.seq_len() as i64 - self.offset,
+            self.fiber.record.seq_len()
         )
     }
 
@@ -291,29 +290,30 @@ pub fn center(
     reference: bool,
 ) {
     let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
-    let iter = fiber_data.into_iter().zip(records.into_iter());
-    let mut total = 0;
+    let total = fiber_data.len();
     let mut missing = 0;
-    for (fiber, record) in iter {
-        let out =
-            match CenteredFiberData::new(fiber, record, center_position.clone(), dist, reference) {
+
+    fiber_data
+        .into_par_iter()
+        .map(|fiber| {
+            match CenteredFiberData::new(fiber, center_position.clone(), dist, reference) {
                 Some(centered_fiber) => {
-                    total += 1;
                     if wide {
                         centered_fiber.write()
                     } else {
                         centered_fiber.write_long()
                     }
                 }
-                None => {
-                    total += 1;
-                    missing += 1;
-                    "".to_string()
-                }
-            };
-        //print!("{}", out);
-        write_to_stdout(&out);
-    }
+                None => "".to_string(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .iter()
+        .filter(|x| !x.is_empty())
+        .for_each(|x| {
+            missing += 1;
+            write_to_stdout(x)
+        });
 
     if missing > 1 {
         log::warn!(
@@ -339,10 +339,8 @@ pub fn center_fiberdata(
     let header_view = bam::HeaderView::from_header(&header);
 
     if wide {
-        //print!("{}", CenteredFiberData::header());
         write_to_stdout(&CenteredFiberData::header());
     } else {
-        //print!("{}", CenteredFiberData::long_header());
         write_to_stdout(&CenteredFiberData::long_header());
     }
 
