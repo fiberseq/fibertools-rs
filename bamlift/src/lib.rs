@@ -134,6 +134,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
     if record.is_unmapped() {
         return positions.iter().map(|_x| -1).collect();
     }
+
     // real work
     let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
         .aligned_pairs()
