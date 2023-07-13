@@ -47,7 +47,7 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
     let ext = Path::new(filename).extension();
     let path = PathBuf::from(filename);
     let buffer = get_output(Some(path))?;
-    if ext == Some(OsStr::new("gz")) {
+    if ext == Some(OsStr::new("gz")) || ext == Some(OsStr::new("bgz")) {
         let writer = ZBuilder::<Bgzf, _>::new()
             .num_threads(COMPRESSION_THREADS)
             .compression_level(Compression::new(COMPRESSION_LEVEL))
