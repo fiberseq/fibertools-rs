@@ -291,7 +291,7 @@ pub fn center(
 ) {
     let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
     let total = fiber_data.len();
-    let mut missing = 0;
+    let mut seen = 0;
 
     fiber_data
         .into_par_iter()
@@ -311,14 +311,14 @@ pub fn center(
         .iter()
         .filter(|x| !x.is_empty())
         .for_each(|x| {
-            missing += 1;
+            seen += 1;
             write_to_stdout(x)
         });
 
-    if missing > 1 {
+    if total - seen > 1 {
         log::warn!(
             "Unable to exactly map {}/{} reads at position {}:{}",
-            missing,
+            total - seen,
             total,
             center_position.chrom.clone(),
             center_position.position
