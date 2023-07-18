@@ -223,7 +223,8 @@ pub fn find_msps(nucs: &[(i64, i64)], m6a: &[i64]) -> Vec<(i64, i64)> {
     // get the last m6a so we can have a msp that extends
     // from the end of the final nuc to the last msp
     let last_m6a = m6a.last().unwrap_or(&0);
-    for (nuc_start, nuc_length) in nucs.iter().chain([(*last_m6a, 0)].iter()) {
+    let last_nuc_start = if *last_m6a == 0 { 0 } else { last_m6a + 1 };
+    for (nuc_start, nuc_length) in nucs.iter().chain([(last_nuc_start, 0)].iter()) {
         let msp_length = nuc_start - pre_nuc_end;
         if pre_nuc_end > 0 && msp_length > 0 {
             msps.push((pre_nuc_end, msp_length))
