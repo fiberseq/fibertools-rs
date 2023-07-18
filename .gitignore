@@ -13,3 +13,4 @@ models/backups/*
 get_json.sh
 src/model
 .devcontainer/**
+issue_data/**
