@@ -49,6 +49,14 @@ impl FiberseqData {
                 positions_on_complimented_sequence(record, &msp_starts),
                 positions_on_complimented_sequence(record, &msp_ends),
             );
+
+            // because coordinates are [) we need to modify positions when complements so they remain [) instead of (]
+            nuc_starts = nuc_starts.iter().map(|&x| x + 1).collect::<Vec<_>>();
+            nuc_ends = nuc_ends.iter().map(|&x| x + 1).collect::<Vec<_>>();
+            msp_starts = msp_starts.iter().map(|&x| x + 1).collect::<Vec<_>>();
+            msp_ends = msp_ends.iter().map(|&x| x + 1).collect::<Vec<_>>();
+
+            // get the lengths
             nuc_length = nuc_starts
                 .iter()
                 .zip(nuc_ends.iter())
