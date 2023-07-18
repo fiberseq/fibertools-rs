@@ -28,7 +28,7 @@ fn test_msp_extract() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_many_msps() {
-    let fiber_records = get_fiber_data_from_test_bam(".test/all.2.bam");
+    let fiber_records = get_fiber_data_from_test_bam(".test/all.bam");
     for mut fiber_data in fiber_records {
         let m6a = fiber_data.base_mods.m6a_positions(false);
         if m6a.is_empty() {
