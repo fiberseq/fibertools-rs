@@ -169,7 +169,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&"../.test/all.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&"../tests/data/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let seq_len = i64::try_from(record.seq_len()).unwrap();
@@ -271,7 +271,7 @@ pub fn get_exact_query_positions(record: &bam::Record, reference_positions: &[i6
 /// use log;
 /// use env_logger::{Builder, Target};;
 /// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&"../.test/all.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&"../tests/data/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let n_s = bamlift::get_u32_tag(&record, b"ns");

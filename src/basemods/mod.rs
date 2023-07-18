@@ -391,7 +391,7 @@ mod tests {
             .target(Target::Stderr)
             .filter(None, log::LevelFilter::Debug)
             .init();
-        let mut bam = bam::Reader::from_path(&".test/all.bam").unwrap();
+        let mut bam = bam::Reader::from_path(&"tests/data/all.bam").unwrap();
         for rec in bam.records() {
             let mut rec = rec.unwrap();
             let mods = BaseMods::new(&rec, 0);
