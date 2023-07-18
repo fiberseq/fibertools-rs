@@ -18,7 +18,6 @@ pub struct CenterPosition {
 }
 pub struct CenteredFiberData {
     fiber: FiberseqData,
-    //record: record::Record,
     rg: String,
     offset: i64,
     pub dist: Option<i64>,
@@ -29,7 +28,6 @@ pub struct CenteredFiberData {
 impl CenteredFiberData {
     pub fn new(
         fiber: FiberseqData,
-        //record: bam::Record,
         center_position: CenterPosition,
         dist: Option<i64>,
         reference: bool,
