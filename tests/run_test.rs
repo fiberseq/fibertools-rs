@@ -7,7 +7,7 @@ fn test_m6a() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("m6a")
         .arg("-v")
-        .arg(".test/all.bam")
+        .arg("tests/data/all.bam")
         .arg("/dev/null");
     cmd.assert()
         .success()
@@ -20,8 +20,8 @@ fn test_center() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("center")
         .arg("-v")
-        .arg(".test/center.bam")
-        .arg(".test/center.bed");
+        .arg("tests/data/center.bam")
+        .arg("tests/data/center.bed");
     cmd.assert()
         .success()
         .stderr(predicate::str::contains("done! Time elapsed:"));
@@ -33,7 +33,7 @@ fn test_extract() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("extract")
         .arg("-v")
-        .arg(".test/all.bam")
+        .arg("tests/data/all.bam")
         .arg("--all")
         .arg("/dev/null");
     cmd.assert()
@@ -47,7 +47,7 @@ fn test_nucleosomes() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("add-nucleosomes")
         .arg("-v")
-        .arg(".test/all.bam")
+        .arg("tests/data/all.bam")
         .arg("/dev/null");
     cmd.assert()
         .success()
@@ -60,7 +60,7 @@ fn test_clear() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("clear")
         .arg("-v")
-        .arg(".test/all.bam")
+        .arg("tests/data/all.bam")
         .arg("/dev/null");
     cmd.assert()
         .success()
@@ -73,7 +73,7 @@ fn test_strip_basemods() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("ft")?;
     cmd.arg("strip-basemods")
         .arg("-v")
-        .arg(".test/all.bam")
+        .arg("tests/data/all.bam")
         .arg("/dev/null");
     cmd.assert()
         .success()

@@ -8,6 +8,7 @@ Arguments:
 
 Options:
   -r, --reference                    Report in reference sequence coordinates
+      --molecular                    Report positions in the molecular sequence coordinates
   -m, --min-ml-score <MIN_ML_SCORE>  Minium score in the ML tag to include in the output [default:
                                      125]
       --m6a <M6A>                    Output path for m6a bed12

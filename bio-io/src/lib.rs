@@ -79,10 +79,10 @@ pub fn write_to_stdout(out: &str) {
 /// ```
 /// use bio_io::buffer_from;
 /// use std::io;
-/// let reader = buffer_from(".test/test.txt.gz").expect("Error: cannot open file");
+/// let reader = buffer_from("../tests/data/test.txt.gz").expect("Error: cannot open file");
 /// let msg = io::read_to_string(reader).unwrap();
 /// assert_eq!(msg, "Hello World!\n");
-/// let reader = buffer_from(".test/test.txt").expect("Error: cannot open file");
+/// let reader = buffer_from("../tests/data/test.txt").expect("Error: cannot open file");
 /// let msg = io::read_to_string(reader).unwrap();
 /// assert_eq!(msg, "Hello World!\n");
 /// ```
