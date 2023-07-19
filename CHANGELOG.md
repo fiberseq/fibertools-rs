@@ -27,6 +27,14 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## v0.2.5 (2023-07-18)
 
+The default output for `ft extract`` is now in reference coordinates instead of molecular.
+
+`ft extract` can now produce compressed files by adding the gz extension. e.g.:
+```
+ft extract -t 16 --m6a m6a.bed.gz --cpg cpg.bed.gz --nuc nuc.bed.gz --msp msp.bed.gz --all all.bed.gz ../PS00243_ft.bam
+```
+And this is `bgzp` compression, so it is compatible with `tabix` indexing. 
+
 ### Chore
 
  - <csr-id-082190756233e077b692839f979df466fd5c7239/> Release fibertools-rs version 0.2.5
