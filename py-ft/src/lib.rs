@@ -19,5 +19,6 @@ fn read_fibertools_bam(a: usize, b: usize) -> PyResult<String> {
 fn py_ft(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_function(wrap_pyfunction!(read_fibertools_bam, m)?)?;
+    m.add_class::<fiberdata::FiberdataIter>()?;
     Ok(())
 }
