@@ -1,0 +1,22 @@
+[package]
+edition = "2021"
+name = "py-ft"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+name = "py_ft"
+
+[dependencies]
+pyo3 = "0.19.0"
+#fibertools-rs = { path = "../" }
+anyhow = "1.0.58"
+bamlift = {path = "../bamlift"}
+bio-io = {path = "../bio-io"}
+colored = "2.0.0"
+itertools = "0.10.5"
+lazy_static = "1.4.0"
+log = "0.4"
+regex = "1.5.4"
+rust-htslib = "0.43.1"
