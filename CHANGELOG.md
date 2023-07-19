@@ -27,7 +27,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## v0.2.5 (2023-07-18)
 
-The default output for `ft extract`` is now in reference coordinates instead of molecular.
+The default output for `ft extract` is now in reference coordinates instead of molecular.
 
 `ft extract` can now produce compressed files by adding the gz extension. e.g.:
 ```
