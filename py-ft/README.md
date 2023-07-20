@@ -14,7 +14,6 @@ for fiber in fiberdata:
     print(fiber)
     # print the fiber number of ccs passes
     print(fiber.ec)    
+    # print the mps start positions
+    print(fiber.msp.starts)    
 ```
-
-## Docs
-See the [docs](https://py-ft.readthedocs.io/en/latest/).
