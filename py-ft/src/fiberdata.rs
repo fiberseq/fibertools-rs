@@ -5,6 +5,34 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 //use rust_htslib::bam::Read;
 //use std::io::Result;
 
+/// Class for describing base modifications within fiberseq data.
+/// For example, m6a and 5mC (cpg) features.
+#[pyclass]
+#[derive(Clone)]
+pub struct Basemods {
+    /// Basemod starts
+    #[pyo3(get, set)]
+    pub starts: Vec<i64>,
+    /// Basemod reference starts
+    #[pyo3(get, set)]
+    pub reference_starts: Vec<i64>,
+    /// Basemod ML
+    #[pyo3(get, set)]
+    pub ml: Vec<u8>,
+}
+
+#[pymethods]
+impl Basemods {
+    #[new]
+    pub fn new(starts: Vec<i64>, reference_starts: Vec<i64>, ml: Vec<u8>) -> Self {
+        Self {
+            starts,
+            reference_starts,
+            ml,
+        }
+    }
+}
+
 /// Class for describing ranges within fiberseq data.
 /// For example, nucleosomes and msp features.
 #[pyclass]
@@ -96,9 +124,12 @@ pub struct Fiberdata {
     #[pyo3(get, set)]
     /// Read group
     pub rg: String,
-    /// m6a features, starts, reference starts, ML
+    /// m6a Basemods object
     #[pyo3(get, set)]
-    pub m6a: (Vec<i64>, Vec<i64>, Vec<u8>),
+    pub m6a: Basemods,
+    /// cpg Basemods object
+    #[pyo3(get, set)]
+    pub cpg: Basemods,
     /// Ranges object for msp features
     #[pyo3(get, set)]
     pub msp: Ranges,
@@ -154,6 +185,9 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
 
     // fiberseq features
     let m6a = fiber.base_mods.m6a();
+    let m6a = Basemods::new(m6a.0, m6a.1, m6a.2);
+    let cpg = fiber.base_mods.cpg();
+    let cpg = Basemods::new(cpg.0, cpg.1, cpg.2);
     let msp_starts = fiber.get_msp(false, true);
     let msp_lengths = fiber.get_msp(false, false);
     let ref_msp_starts = fiber.get_msp(true, true);
@@ -179,6 +213,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
         strand,
         rg: rg.to_string(),
         m6a,
+        cpg,
         msp,
         nuc,
     }
