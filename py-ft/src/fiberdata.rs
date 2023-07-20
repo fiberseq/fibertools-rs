@@ -7,23 +7,29 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 
 #[pyclass]
 #[derive(Clone)]
-pub struct Regions {
+pub struct Ranges {
+    /// Range starts
     #[pyo3(get, set)]
     pub starts: Vec<i64>,
+    /// Range ends
     #[pyo3(get, set)]
     pub ends: Vec<i64>,
+    /// Range lengths
     #[pyo3(get, set)]
     pub lengths: Vec<i64>,
+    /// Reference starts
     #[pyo3(get, set)]
     pub reference_starts: Vec<i64>,
+    /// Reference ends
     #[pyo3(get, set)]
     pub reference_ends: Vec<i64>,
+    /// Reference lengths
     #[pyo3(get, set)]
     pub reference_lengths: Vec<i64>,
 }
 
 #[pymethods]
-impl Regions {
+impl Ranges {
     #[new]
     pub fn new(
         starts: Vec<i64>,
@@ -91,12 +97,12 @@ pub struct PyFiberdata {
     /// m6a features, starts, reference starts, ML
     #[pyo3(get, set)]
     pub m6a: (Vec<i64>, Vec<i64>, Vec<u8>),
-    /// msp features, starts, lengths, reference starts, reference lengths
+    /// Ranges object for msp features
     #[pyo3(get, set)]
-    pub msp: Regions,
-    /// nuc features, starts, lengths, reference starts, reference lengths
+    pub msp: Ranges,
+    /// Ranges object for nuc features
     #[pyo3(get, set)]
-    pub nuc: Regions,
+    pub nuc: Ranges,
 }
 #[pymethods]
 impl PyFiberdata {
@@ -150,13 +156,13 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
     let msp_lengths = fiber.get_msp(false, false);
     let ref_msp_starts = fiber.get_msp(true, true);
     let ref_msp_lengths = fiber.get_msp(true, false);
-    let msp = Regions::new(msp_starts, msp_lengths, ref_msp_starts, ref_msp_lengths);
+    let msp = Ranges::new(msp_starts, msp_lengths, ref_msp_starts, ref_msp_lengths);
 
     let nuc_starts = fiber.get_nuc(false, true);
     let nuc_lengths = fiber.get_nuc(false, false);
     let ref_nuc_starts = fiber.get_nuc(true, true);
     let ref_nuc_lengths = fiber.get_nuc(true, false);
-    let nuc = Regions::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
+    let nuc = Ranges::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
 
     PyFiberdata {
         ec,
