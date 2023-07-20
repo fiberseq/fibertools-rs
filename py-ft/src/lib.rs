@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 #[pymodule]
 fn pyft(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-    m.add_class::<fiberdata::FiberdataIter>()?;
+    m.add_class::<fiberdata::FiberdataFetch>()?;
     m.add_class::<fiberdata::Fiberdata>()?;
     m.add_class::<fiberdata::Basemods>()?;
     m.add_class::<fiberdata::Ranges>()?;
