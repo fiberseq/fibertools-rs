@@ -29,7 +29,11 @@ extensions = [
     # "sphinx_rtd_theme",
     "sphinx.ext.intersphinx",
     # "edit_on_github",
+    "m2r2",
 ]
+
+# source_suffix = '.rst'
+source_suffix = [".rst", ".md"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]

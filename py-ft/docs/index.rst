@@ -11,6 +11,7 @@ Welcome to py-ft's documentation!
    :caption: Contents:
 
 
+.. mdinclude:: ../README.md
 
 Indices and tables
 ==================
