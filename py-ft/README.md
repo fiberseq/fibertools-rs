@@ -8,7 +8,7 @@
 ```python
 import pyft
 bam_f = "../tests/data/center.bam"
-fiberdata = pyft.FiberdataIter(bam_f, "chr1", 0, 1000)
+fiberdata = pyft.FiberdataFetch(bam_f, "chr1", 0, 1000)
 for fiber in fiberdata:
     # print some info about the fiber
     print(fiber)

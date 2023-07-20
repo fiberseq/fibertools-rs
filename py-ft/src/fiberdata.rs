@@ -140,13 +140,13 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
 /// Create a fibertools iterator from an indexed bam file.
 /// Must provide a valid chrom, start, and end.
 /// Returns an iterator over :class:`~pyft.Fiberdata` objects.
-pub struct FiberdataIter {
+pub struct FiberdataFetch {
     count: usize,
     fiberdata: Vec<FiberseqData>,
 }
 
 #[pymethods]
-impl FiberdataIter {
+impl FiberdataFetch {
     #[new]
     pub fn new(f: &str, chrom: &str, start: i64, end: i64) -> Self {
         let mut bam = bam::IndexedReader::from_path(f).expect("unable to open indexed bam file");
@@ -156,7 +156,7 @@ impl FiberdataIter {
             .expect("unable to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         let fiberdata = FiberseqData::from_records(&records, &head_view, 0);
-        FiberdataIter {
+        Self {
             count: 0,
             fiberdata,
         }
