@@ -49,3 +49,6 @@ html_css_files = [
     "css/rtd_dark.css",
 ]
 html_logo = "_static/img/fiber_tools_grey.png"
+
+# other options
+autodoc_member_order = 'bysource'
