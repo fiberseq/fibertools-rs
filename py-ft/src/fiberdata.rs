@@ -28,7 +28,7 @@ pub struct PyFiberdata {
     pub seq: String,
     /// Chromosome
     #[pyo3(get, set)]
-    pub ct: String,
+    pub chrom: String,
     /// Chromosome start
     #[pyo3(get, set)]
     pub start: i64,
@@ -54,7 +54,10 @@ pub struct PyFiberdata {
 #[pymethods]
 impl PyFiberdata {
     pub fn __str__(&self) -> String {
-        format!("{}\t{}\t{}\t{}", self.qname, self.ct, self.start, self.end,)
+        format!(
+            "{}\t{}\t{}\t{}",
+            self.qname, self.chrom, self.start, self.end,
+        )
     }
 
     /// return the length of the sequence
@@ -76,7 +79,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
     };
     let hp = fiber.get_hp();
     let seq = String::from_utf8_lossy(&fiber.record.seq().as_bytes()).to_string();
-    let (ct, start, end, strand): (&str, i64, i64, char) = if fiber.record.is_unmapped() {
+    let (chrom, start, end, strand): (&str, i64, i64, char) = if fiber.record.is_unmapped() {
         (".", 0, 0, '.')
     } else {
         let strand = if fiber.record.is_reverse() { '-' } else { '+' };
@@ -115,7 +118,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
         rq,
         hp,
         seq,
-        ct: ct.to_string(),
+        chrom: chrom.to_string(),
         start,
         end,
         strand,
@@ -127,7 +130,8 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
 }
 
 #[pyclass]
-/// An iterator over fiberseq data
+/// Create a fibertools iterator from an indexed bam file.
+/// Must provide a valid chrom, start, and end.
 pub struct FiberdataIter {
     count: usize,
     fiberdata: Vec<FiberseqData>,
@@ -136,8 +140,6 @@ pub struct FiberdataIter {
 #[pymethods]
 impl FiberdataIter {
     #[new]
-    /// Create a fibertools iterator from an indexed bam file.
-    /// Must provide a valid chrom, start, and end.
     pub fn new(f: &str, chrom: &str, start: i64, end: i64) -> Self {
         let mut bam = bam::IndexedReader::from_path(f).expect("unable to open indexed bam file");
         let header = bam::Header::from_template(bam.header());
