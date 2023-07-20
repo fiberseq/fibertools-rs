@@ -3,7 +3,7 @@
 version: 2
 
 conda:
-    environment: py-ft/docs/environment.yml
+    environment: docs/environment.yml
 
 sphinx:
   builder: html
