@@ -1,5 +1,5 @@
 /// A module for using fibertools-rs
-pub mod fiberdata;
+mod fiberdata;
 
 use pyo3::prelude::*;
 

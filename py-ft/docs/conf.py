@@ -48,4 +48,4 @@ html_static_path = ["_static"]
 # html_css_files = [
 #    "static/css/rtd_dark.css",
 # ]
-html_logo = "../assets/img/fiber_tools_grey.png"
+html_logo = "_static/img/fiber_tools_grey.png"
