@@ -6,6 +6,53 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 //use std::io::Result;
 
 #[pyclass]
+#[derive(Clone)]
+pub struct Regions {
+    #[pyo3(get, set)]
+    pub starts: Vec<i64>,
+    #[pyo3(get, set)]
+    pub ends: Vec<i64>,
+    #[pyo3(get, set)]
+    pub lengths: Vec<i64>,
+    #[pyo3(get, set)]
+    pub reference_starts: Vec<i64>,
+    #[pyo3(get, set)]
+    pub reference_ends: Vec<i64>,
+    #[pyo3(get, set)]
+    pub reference_lengths: Vec<i64>,
+}
+
+#[pymethods]
+impl Regions {
+    #[new]
+    pub fn new(
+        starts: Vec<i64>,
+        lengths: Vec<i64>,
+        reference_starts: Vec<i64>,
+        reference_lengths: Vec<i64>,
+    ) -> Self {
+        let ends = starts
+            .iter()
+            .zip(lengths.iter())
+            .map(|(s, l)| s + l)
+            .collect();
+        let reference_ends = reference_starts
+            .iter()
+            .zip(reference_lengths.iter())
+            .map(|(s, l)| s + l)
+            .collect();
+        Self {
+            starts,
+            ends,
+            lengths,
+            reference_starts,
+            reference_ends,
+            reference_lengths,
+        }
+    }
+}
+
+#[pyclass]
 /// Record class for fiberseq data, corresponding to a single bam record
 pub struct PyFiberdata {
     /// Number of ccs passes
@@ -46,10 +93,10 @@ pub struct PyFiberdata {
     pub m6a: (Vec<i64>, Vec<i64>, Vec<u8>),
     /// msp features, starts, lengths, reference starts, reference lengths
     #[pyo3(get, set)]
-    pub msp: (Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>),
+    pub msp: Regions,
     /// nuc features, starts, lengths, reference starts, reference lengths
     #[pyo3(get, set)]
-    pub nuc: (Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>),
+    pub nuc: Regions,
 }
 #[pymethods]
 impl PyFiberdata {
@@ -103,13 +150,13 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
     let msp_lengths = fiber.get_msp(false, false);
     let ref_msp_starts = fiber.get_msp(true, true);
     let ref_msp_lengths = fiber.get_msp(true, false);
-    let msp = (msp_starts, msp_lengths, ref_msp_starts, ref_msp_lengths);
+    let msp = Regions::new(msp_starts, msp_lengths, ref_msp_starts, ref_msp_lengths);
 
     let nuc_starts = fiber.get_nuc(false, true);
     let nuc_lengths = fiber.get_nuc(false, false);
     let ref_nuc_starts = fiber.get_nuc(true, true);
     let ref_nuc_lengths = fiber.get_nuc(true, false);
-    let nuc = (nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
+    let nuc = Regions::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
 
     PyFiberdata {
         ec,
