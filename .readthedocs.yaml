@@ -2,8 +2,8 @@
 
 version: 2
 
-conda:
-    environment: docs/environment.yml
+#conda:
+#    environment: docs/environment.yml
 
 sphinx:
   builder: html
@@ -16,6 +16,7 @@ build:
 
 python:
   install:
+    - requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
       
