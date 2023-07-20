@@ -8,35 +8,46 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 #[pyclass]
 /// Record class for fiberseq data, corresponding to a single bam record
 pub struct PyFiberdata {
-    // PB features
+    /// Number of ccs passes
     #[pyo3(get, set)]
     pub ec: i64,
-    // record features
+    /// Name of the read
     #[pyo3(get, set)]
     pub qname: String,
+    /// SAM flag
     #[pyo3(get, set)]
     pub sam_flag: u16,
+    /// Read quality
     #[pyo3(get, set)]
     pub rq: String,
+    /// Haplotype tag
     #[pyo3(get, set)]
     pub hp: String,
+    /// Read sequence
     #[pyo3(get, set)]
     pub seq: String,
+    /// Chromosome
     #[pyo3(get, set)]
     pub ct: String,
+    /// Chromosome start
     #[pyo3(get, set)]
     pub start: i64,
+    /// Chromosome end
     #[pyo3(get, set)]
     pub end: i64,
+    /// Strand
     #[pyo3(get, set)]
     pub strand: char,
     #[pyo3(get, set)]
+    /// Read group
     pub rg: String,
-    // fiberseq features
+    /// m6a features, starts, reference starts, ML
     #[pyo3(get, set)]
     pub m6a: (Vec<i64>, Vec<i64>, Vec<u8>),
+    /// msp features, starts, lengths, reference starts, reference lengths
     #[pyo3(get, set)]
     pub msp: (Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>),
+    /// nuc features, starts, lengths, reference starts, reference lengths
     #[pyo3(get, set)]
     pub nuc: (Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>),
 }
