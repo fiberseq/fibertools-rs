@@ -26,14 +26,14 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
-    # "sphinx_rtd_theme",
+    "sphinx_rtd_theme",
     "sphinx.ext.intersphinx",
     # "edit_on_github",
     "m2r2",
 ]
 
 # source_suffix = '.rst'
-source_suffix = [".rst", ".md"]
+source_suffix = [".rst", ".md", ".css"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
@@ -45,3 +45,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_css_files = [
+    "static/css/rtd_dark.css",
+]
+html_logo = "../../../assets/img/fiber_tools_grey.png"
