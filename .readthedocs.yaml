@@ -2,21 +2,22 @@
 
 version: 2
 
-#conda:
-#    environment: docs/environment.yml
-
 sphinx:
   builder: html
 
 build:
   os: "ubuntu-20.04"
+  apt_packages:
+    - cmake
   tools:
-    python: "3.9"
+    python: "mambaforge-4.10"
     rust: "1.70"
 
 python:
   install:
-    - requirements: py-ft/docs/requirements.txt
+    #- requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
       
+#conda:
+#    environment: py-ft/docs/environment.yml
