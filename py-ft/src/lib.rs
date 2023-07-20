@@ -3,7 +3,7 @@ pub mod fiberdata;
 
 use pyo3::prelude::*;
 
-/// A Python module implemented in Rust.
+/// A python module for using rust to access data from fiberseq BAM files.
 #[pymodule]
 fn py_ft(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
