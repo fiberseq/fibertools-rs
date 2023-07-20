@@ -69,7 +69,7 @@
 	}
 
 	.wy-table thead th, .rst-content table.docutils thead th, .rst-content table.field-list thead th {
-		border: solid 20px #e1e4e5;
+		border: solid 2px #e1e4e5;
 	}
 
 	.wy-table thead p, .rst-content table.docutils thead p, .rst-content table.field-list thead p {
