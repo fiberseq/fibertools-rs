@@ -45,7 +45,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
-# html_css_files = [
-#    "css/rtd_dark.css",
-# ]
+html_css_files = [
+    "css/rtd_dark.css",
+]
 html_logo = "_static/img/fiber_tools_grey.png"
