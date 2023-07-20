@@ -21,6 +21,8 @@ API Reference
    :members:
    :undoc-members:
    :show-inheritance:
+   :member-order: bysource
+
 
 Indices and tables
 ==================
