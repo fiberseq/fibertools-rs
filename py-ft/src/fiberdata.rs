@@ -6,6 +6,7 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 //use std::io::Result;
 
 #[pyclass]
+/// Record class for fiberseq data, corresponding to a single bam record
 pub struct PyFiberdata {
     // PB features
     #[pyo3(get, set)]
@@ -13,8 +14,6 @@ pub struct PyFiberdata {
     // record features
     #[pyo3(get, set)]
     pub qname: String,
-    #[pyo3(get, set)]
-    pub qlen: i64,
     #[pyo3(get, set)]
     pub sam_flag: u16,
     #[pyo3(get, set)]
@@ -46,6 +45,11 @@ impl PyFiberdata {
     pub fn __str__(&self) -> String {
         format!("{}\t{}\t{}\t{}", self.qname, self.ct, self.start, self.end,)
     }
+
+    /// return the length of the sequence
+    pub fn get_seq_length(&self) -> usize {
+        self.seq.len()
+    }
 }
 
 fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
@@ -54,7 +58,6 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
 
     // record features
     let qname = std::str::from_utf8(fiber.record.qname()).unwrap();
-    let qlen = fiber.record.seq_len() as i64;
     let sam_flag = fiber.record.flags();
     let rq = match fiber.get_rq() {
         Some(x) => format!("{}", x),
@@ -97,7 +100,6 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
     PyFiberdata {
         ec,
         qname: qname.to_string(),
-        qlen,
         sam_flag,
         rq,
         hp,
@@ -129,8 +131,7 @@ impl FiberdataIter {
         bam.fetch((chrom, start, end))
             .expect("unable to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        let fiberdata = FiberseqData::from_records(&records, &head_view, 150);
-
+        let fiberdata = FiberseqData::from_records(&records, &head_view, 0);
         FiberdataIter {
             count: 0,
             fiberdata,
