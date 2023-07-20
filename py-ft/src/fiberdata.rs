@@ -125,6 +125,8 @@ pub struct FiberdataIter {
 #[pymethods]
 impl FiberdataIter {
     #[new]
+    /// Create a fibertools iterator from an indexed bam file.
+    /// Must provide a valid chrom, start, and end.
     pub fn new(f: &str, chrom: &str, start: i64, end: i64) -> Self {
         let mut bam = bam::IndexedReader::from_path(f).expect("unable to open indexed bam file");
         let header = bam::Header::from_template(bam.header());
