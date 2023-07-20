@@ -33,7 +33,7 @@ extensions = [
 ]
 
 # source_suffix = '.rst'
-source_suffix = [".rst", ".md", ".css", ".png"]
+source_suffix = [".rst", ".md"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
@@ -46,6 +46,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 # html_css_files = [
-#    "static/css/rtd_dark.css",
+#    "css/rtd_dark.css",
 # ]
 html_logo = "_static/img/fiber_tools_grey.png"
