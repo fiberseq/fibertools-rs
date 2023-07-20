@@ -1,4 +1,4 @@
-# py_ft: Python bindings for fibertools-rs
+# py-ft: Python bindings for fibertools-rs
 [![Documentation Status](https://readthedocs.org/projects/py-ft/badge/?version=latest)](https://py-ft.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/py-ft.svg)](https://badge.fury.io/py/py-ft)
 ## Docs
