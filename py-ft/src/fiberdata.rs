@@ -62,7 +62,7 @@ impl Ranges {
 
 #[pyclass]
 /// Record class for fiberseq data, corresponding to a single bam record
-pub struct PyFiberdata {
+pub struct Fiberdata {
     /// Number of ccs passes
     #[pyo3(get, set)]
     pub ec: i64,
@@ -107,7 +107,7 @@ pub struct PyFiberdata {
     pub nuc: Ranges,
 }
 #[pymethods]
-impl PyFiberdata {
+impl Fiberdata {
     pub fn __str__(&self) -> String {
         format!(
             "{}\t{}\t{}\t{}",
@@ -121,7 +121,7 @@ impl PyFiberdata {
     }
 }
 
-fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
+fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
     // PB features
     let ec = fiber.ec.round() as i64;
 
@@ -166,7 +166,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
     let ref_nuc_lengths = fiber.get_nuc(true, false);
     let nuc = Ranges::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
 
-    PyFiberdata {
+    Fiberdata {
         ec,
         qname: qname.to_string(),
         sam_flag,
@@ -187,6 +187,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
 #[pyclass]
 /// Create a fibertools iterator from an indexed bam file.
 /// Must provide a valid chrom, start, and end.
+/// Returns an iterator over Fiberdata objects.
 pub struct FiberdataIter {
     count: usize,
     fiberdata: Vec<FiberseqData>,
@@ -209,7 +210,7 @@ impl FiberdataIter {
         }
     }
 
-    fn __next__(&mut self) -> IterNextOutput<PyFiberdata, &'static str> {
+    fn __next__(&mut self) -> IterNextOutput<Fiberdata, &'static str> {
         if self.count < self.fiberdata.len() {
             self.count += 1;
             // Given an instance `counter`, First five `next(counter)` calls yield 1, 2, 3, 4, 5.
