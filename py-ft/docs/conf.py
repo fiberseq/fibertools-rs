@@ -7,17 +7,17 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../"))
 
-import py_ft
+import pyft
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 # The short X.Y version.
-project = "py-ft"
+project = "pyft"
 copyright = "2023, Mitchell R. Vollger"
 author = "Mitchell R. Vollger"
-version = py_ft.__version__
+version = pyft.__version__
 # The full version, including alpha/beta/rc tags.
-release = py_ft.__version__
+release = pyft.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

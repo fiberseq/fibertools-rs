@@ -5,6 +5,8 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 //use rust_htslib::bam::Read;
 //use std::io::Result;
 
+/// Class for describing ranges within fiberseq data.
+/// For example, nucleosomes and msp features.
 #[pyclass]
 #[derive(Clone)]
 pub struct Ranges {

@@ -1,7 +1,7 @@
-py_ft
+pyft
 =====
 
 .. toctree::
    :maxdepth: 4
 
-   py_ft
+pyft
