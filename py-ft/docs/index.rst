@@ -13,6 +13,15 @@ Welcome to pyft's documentation!
 
 .. mdinclude:: ../README.md
 
+
+API Reference
+==================
+
+.. automodule:: pyft
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Indices and tables
 ==================
 
