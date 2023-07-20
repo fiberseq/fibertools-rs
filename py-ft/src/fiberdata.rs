@@ -1,7 +1,9 @@
 use fibertools_rs::extract::FiberseqData;
+use log;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
+use std::vec::IntoIter;
 //use rust_htslib::bam::Read;
 //use std::io::Result;
 
@@ -53,13 +55,25 @@ pub struct Fiberdata {
     /// :class:`~pyft.Ranges` object for nuc features
     #[pyo3(get, set)]
     pub nuc: Ranges,
+    /// hiden
+    fiber: FiberseqData,
 }
 #[pymethods]
 impl Fiberdata {
     pub fn __str__(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\n{:?}",
-            self.qname, self.chrom, self.start, self.end, self.m6a.starts,
+            "fiber: {}\t\
+            chrom: {}\tstart: {}\tend {}\t\
+            num m6a: {}\t num cpg: {}\t\
+            num nuc: {}\t num msp: {}",
+            self.qname,
+            self.chrom,
+            self.start,
+            self.end,
+            self.m6a.starts.len(),
+            self.cpg.starts.len(),
+            self.nuc.starts.len(),
+            self.msp.starts.len()
         )
     }
 
@@ -67,9 +81,25 @@ impl Fiberdata {
     pub fn get_seq_length(&self) -> usize {
         self.seq.len()
     }
+
+    /// Return a :class:`~pyft.Ranges` object for the continuous aligned regions of the fiber
+    pub fn get_aligned_ranges(&self) -> Ranges {
+        let (fiber, genome): (Vec<[i64; 2]>, Vec<[i64; 2]>) = self
+            .fiber
+            .record
+            .aligned_block_pairs()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .unzip();
+        let starts = fiber.iter().map(|x| x[0]).collect();
+        let lengths = fiber.iter().map(|x| x[1] - x[0]).collect();
+        let reference_starts = genome.iter().map(|x| x[0]).collect();
+        let reference_lengths = genome.iter().map(|x| x[1] - x[0]).collect();
+        Ranges::new(starts, lengths, reference_starts, reference_lengths)
+    }
 }
 
-fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
+fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
     // PB features
     let ec = fiber.ec.round() as i64;
 
@@ -133,6 +163,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
         cpg,
         msp,
         nuc,
+        fiber,
     }
 }
 
@@ -141,8 +172,10 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> Fiberdata {
 /// Must provide a valid chrom, start, and end.
 /// Returns an iterator over :class:`~pyft.Fiberdata` objects.
 pub struct FiberdataFetch {
-    count: usize,
-    fiberdata: Vec<FiberseqData>,
+    fiberdata: IntoIter<FiberseqData>,
+    //_inner: Rc<RefCell<bam::IndexedReader>>,
+    //fiberdata: Box<dyn Iterator<Item = FiberseqData> + Send + 'static>,
+    //fiberdata: Box<dyn Iterator<Item = FiberseqData> + Send + 'static>,
 }
 
 #[pymethods]
@@ -150,25 +183,28 @@ impl FiberdataFetch {
     #[new]
     pub fn new(f: &str, chrom: &str, start: i64, end: i64) -> Self {
         let mut bam = bam::IndexedReader::from_path(f).expect("unable to open indexed bam file");
+        bam.set_threads(8).unwrap();
         let header = bam::Header::from_template(bam.header());
         let head_view = bam::HeaderView::from_header(&header);
         bam.fetch((chrom, start, end))
             .expect("unable to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        let fiberdata = FiberseqData::from_records(&records, &head_view, 0);
-        Self {
-            count: 0,
-            fiberdata,
-        }
+        log::info!("{} records fetched", records.len());
+        let fiberdata = FiberseqData::from_records(&records, &head_view, 0).into_iter();
+        log::info!("fiberdata created from records");
+        /*let fiberdata = bam
+        .records()
+        .map(|rec| FiberseqData::new(&rec.unwrap(), None, 0))
+        .into_iter();*/
+
+        Self { fiberdata }
     }
 
     fn __next__(&mut self) -> IterNextOutput<Fiberdata, &'static str> {
-        if self.count < self.fiberdata.len() {
-            self.count += 1;
-            // Given an instance `counter`, First five `next(counter)` calls yield 1, 2, 3, 4, 5.
-            IterNextOutput::Yield(new_py_fiberdata(&self.fiberdata[self.count - 1]))
-        } else {
-            IterNextOutput::Return("Ended")
+        let data = self.fiberdata.next();
+        match data {
+            Some(fiber) => IterNextOutput::Yield(new_py_fiberdata(fiber)),
+            None => IterNextOutput::Return("Ended"),
         }
     }
 
