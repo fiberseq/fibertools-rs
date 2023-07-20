@@ -4,12 +4,12 @@
 
 `pyft` provides a python API for the rust library [fibertools-rs](https://github.com/fiberseq/fibertools-rs). The inspiration for this API is to make analysis in python easier and faster; therefore, only extraction of data from a fiberseq bam is supported and not writing. 
 
-## Install
+# Install
 ```bash
 pip install pyft
 ```
 
-## Example
+# Example
 ```python
 import pyft
 bam_f = "../tests/data/center.bam"
