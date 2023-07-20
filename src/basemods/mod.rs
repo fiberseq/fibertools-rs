@@ -315,6 +315,45 @@ impl BaseMods {
         }
     }
 
+    fn helper_get_cpg(&self, forward: bool) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+        let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
+        // skip if no m6a
+        if cpg.is_empty() {
+            return (vec![], vec![], vec![]);
+        }
+
+        let cpg_pos: Vec<i64> = if forward {
+            cpg.iter()
+                .flat_map(|x| x.get_modified_bases_forward())
+                .collect()
+        } else {
+            cpg.iter().flat_map(|x| x.get_modified_bases()).collect()
+        };
+
+        let cpg_ref: Vec<i64> = cpg
+            .iter()
+            .flat_map(|x| x.get_reference_positions())
+            .collect();
+        let cpg_qual: Vec<u8> = cpg
+            .iter()
+            .flat_map(|x| x.get_modified_probabilities())
+            .collect();
+
+        assert_eq!(cpg_pos.len(), cpg_ref.len());
+        assert_eq!(cpg_ref.len(), cpg_qual.len());
+        let mut z: Vec<(i64, i64, u8)> = izip!(cpg_pos, cpg_ref, cpg_qual).collect();
+        z.sort_by_key(|(p, _r, _q)| *p);
+        multiunzip(z)
+    }
+
+    pub fn cpg(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+        self.helper_get_cpg(false)
+    }
+
+    pub fn forward_cpg(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
+        self.helper_get_cpg(true)
+    }
+
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
     /// Example ML tag: ML:B:C,157,30,2,164,118,255
     pub fn add_mm_and_ml_tags(&self, record: &mut bam::Record) {
