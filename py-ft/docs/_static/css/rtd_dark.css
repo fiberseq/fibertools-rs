@@ -20,14 +20,14 @@
 	}
 
 	.wy-nav-content {
-		background: #3c3c3c;
-		color: aliceblue;
+		background: #282828;
+		color: rgb(255, 240, 255);
 	}
 
 	.method dt, .class dt, .data dt, .attribute dt, .function dt,
 	.descclassname, .descname {
 		background-color: #525252 !important;
-		color: white !important;
+		color: rgb(255, 255, 255) !important;
 	}
 
 	.toc-backref {
@@ -105,7 +105,7 @@
 	}
 
 	.wy-menu-vertical li code {
-		color: #cb1400;
+		color: #6900cb;
 	}
 
 	.wy-menu-vertical .xref {
