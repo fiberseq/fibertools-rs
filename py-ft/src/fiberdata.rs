@@ -5,7 +5,7 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Rea
 //use rust_htslib::bam::Read;
 //use std::io::Result;
 
-#[pyclass]
+#[pyclass(subclass)]
 /// Record class for fiberseq data, corresponding to a single bam record
 pub struct PyFiberdata {
     // PB features
@@ -116,6 +116,7 @@ fn new_py_fiberdata(fiber: &FiberseqData) -> PyFiberdata {
 }
 
 #[pyclass]
+/// An iterator over fiberseq data
 pub struct FiberdataIter {
     count: usize,
     fiberdata: Vec<FiberseqData>,
