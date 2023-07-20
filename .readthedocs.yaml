@@ -15,7 +15,7 @@ build:
 
 python:
   install:
-    #- requirements: py-ft/docs/requirements.txt
+    - requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
       
