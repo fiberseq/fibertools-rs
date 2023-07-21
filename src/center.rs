@@ -283,6 +283,7 @@ impl CenteredFiberData {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn center(
     records: Vec<bam::Record>,
     header_view: &rust_htslib::bam::HeaderView,
@@ -291,6 +292,7 @@ pub fn center(
     wide: bool,
     dist: Option<i64>,
     reference: bool,
+    buffer: &mut Box<dyn std::io::Write>,
 ) {
     let fiber_data = FiberseqData::from_records(records, header_view, min_ml_score);
     let total = fiber_data.len();
@@ -315,7 +317,7 @@ pub fn center(
         .filter(|x| !x.is_empty())
         .for_each(|x| {
             seen += 1;
-            write_to_stdout(x)
+            write_to_file(x, buffer);
         });
 
     if total - seen > 1 {
@@ -340,11 +342,13 @@ pub fn center_fiberdata(
     // header needed for the contig name...
     let header = bam::Header::from_template(bam.header());
     let header_view = bam::HeaderView::from_header(&header);
+    //
+    let mut buffer = bio_io::writer("-").unwrap();
 
     if wide {
-        write_to_stdout(&CenteredFiberData::header());
+        bio_io::write_to_file(&CenteredFiberData::header(), &mut buffer);
     } else {
-        write_to_stdout(&CenteredFiberData::long_header());
+        bio_io::write_to_file(&CenteredFiberData::long_header(), &mut buffer);
     }
 
     let pb = ProgressBar::new(center_positions.len() as u64);
@@ -370,10 +374,12 @@ pub fn center_fiberdata(
             wide,
             dist,
             reference,
+            &mut buffer,
         );
         pb.inc(1);
     }
-    pb.finish_with_message("done");
+    buffer.flush().unwrap();
+    pb.finish_with_message("\ndone");
 }
 
 pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
