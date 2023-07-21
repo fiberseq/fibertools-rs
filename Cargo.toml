@@ -19,9 +19,9 @@ path = "src/main.rs"
 [dependencies]
 anstyle = "1.0.0"
 anyhow = "1.0.58"
-bamlift = {path = "bamlift"}
+bamlift = {path = "bamlift", version = "0.1.1"}
 bio = "1.2.0"
-bio-io = {path = "bio-io"}
+bio-io = {path = "bio-io", version = "0.1.1"}
 clap = {version = "4.3.4", features = ["cargo", "wrap_help", "color", "unstable-styles", "derive"]}
 clap_complete = "4.0.6"
 clap_mangen = "0.2.5"
