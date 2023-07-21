@@ -8,6 +8,7 @@ use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
 };
+
 use std::convert::TryFrom;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -96,6 +97,12 @@ pub struct BaseMods {
 
 impl BaseMods {
     pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
+        //let new = BaseMods::new2(record, min_ml_score);
+        //assert_eq!(new, old);
+        BaseMods::my_mm_ml_parser(record, min_ml_score)
+    }
+
+    pub fn my_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
             static ref MM_RE: Regex =
@@ -204,6 +211,88 @@ impl BaseMods {
             );
         }
 
+        BaseMods { base_mods: rtn }
+    }
+
+    /// this is actually way slower than my parser for some reason...
+    /// so I am not going to use it
+    fn _rust_htslib_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
+        let mut rtn = vec![];
+        log::debug!("{:?} {} ", record.qname(), record.is_reverse());
+
+        if let Ok(mods) = record.basemods_iter() {
+            // data from current iteration
+            let mut modified_bases_forward = vec![];
+            let mut modified_probabilities_forward = vec![];
+            let mut pre_mod_base = b' ';
+            let mut pre_mod_strand = ' ';
+            let mut pre_mod_type = ' ';
+            // loop over all the base mods base by base
+            for bp in mods {
+                let (mut pos, m) = bp.unwrap();
+                if record.is_reverse() {
+                    pos = record.seq().len() as i32 - pos - 1;
+                };
+                let ml = m.qual as u8;
+                let mod_type = m.modified_base as u8 as char;
+                let mod_strand = if m.strand == 0 { '+' } else { '-' };
+                let mod_base = m.canonical_base as u8;
+                // return a completed basemod
+                if (mod_type != pre_mod_type
+                    || mod_strand != pre_mod_strand
+                    || mod_base != pre_mod_base)
+                    && pre_mod_type != ' '
+                {
+                    // need to flip if we are reversed
+                    if record.is_reverse() {
+                        modified_bases_forward.reverse();
+                        modified_probabilities_forward.reverse();
+                    }
+                    let cur_mod = BaseMod::new(
+                        record,
+                        pre_mod_base,
+                        pre_mod_strand,
+                        pre_mod_type,
+                        modified_bases_forward,
+                        modified_probabilities_forward,
+                    );
+                    // push the completed modifications if they are real
+                    rtn.push(cur_mod);
+                    // reset the current modification
+                    modified_bases_forward = vec![];
+                    modified_probabilities_forward = vec![];
+                }
+                // add the current position to the modification
+                if ml >= min_ml_score {
+                    modified_bases_forward.push(pos as i64);
+                    modified_probabilities_forward.push(ml);
+                }
+                // reset the previous modification
+                pre_mod_base = mod_base;
+                pre_mod_strand = mod_strand;
+                pre_mod_type = mod_type;
+            }
+            // push the last modification
+            if !modified_bases_forward.is_empty() {
+                // need to flip if we are reversed
+                if record.is_reverse() {
+                    modified_bases_forward.reverse();
+                    modified_probabilities_forward.reverse();
+                }
+
+                let cur_mod = BaseMod::new(
+                    record,
+                    pre_mod_base,
+                    pre_mod_strand,
+                    pre_mod_type,
+                    modified_bases_forward,
+                    modified_probabilities_forward,
+                );
+                rtn.push(cur_mod);
+            }
+        } else {
+            log::debug!("No MM tag found");
+        };
         BaseMods { base_mods: rtn }
     }
 

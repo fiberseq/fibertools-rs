@@ -20,4 +20,4 @@ lazy_static = "1.4.0"
 log = "0.4"
 niffler = {version = "2.5.0", default-features = false, features = ["gz"]}
 regex = "1.5.4"
-rust-htslib = "0.43.1"
+rust-htslib = "0.44.1"
