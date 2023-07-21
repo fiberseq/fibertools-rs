@@ -190,7 +190,7 @@ impl FiberdataFetch {
             .expect("unable to fetch region");
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         log::info!("{} records fetched", records.len());
-        let fiberdata = FiberseqData::from_records(&records, &head_view, 0).into_iter();
+        let fiberdata = FiberseqData::from_records(records, &head_view, 0).into_iter();
         log::info!("fiberdata created from records");
         /*let fiberdata = bam
         .records()
