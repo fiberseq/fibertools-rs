@@ -7,7 +7,7 @@ keywords = ["bam", "bfx"]
 license = "MIT"
 name = "bamlift"
 repository = "https://github.com/fiberseq/fibertools-rs"
-version = "0.1.0"
+version = "0.1.1"
 
 [dependencies]
 #bio = "1.2.0"
