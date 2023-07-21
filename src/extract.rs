@@ -583,7 +583,7 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let chunk_size = current_num_threads() * 5000;
+    let chunk_size = current_num_threads() * 500;
     let bam_chunk_iter = BamChunk {
         bam: bam.records(),
         chunk_size,
