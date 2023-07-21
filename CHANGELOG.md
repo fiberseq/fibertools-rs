@@ -5,14 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.2.6 (2023-07-21)
+
+### Bug Fixes
+
+ - <csr-id-9fe3676efa853b79af85e2e1f6bb7849c013a0ec/> speed options
+ - <csr-id-066ca9427211f5147f9528e66a342111e273296f/> rework fiberdata to consume bam record to avoid extra copy
+
+### New Features
+
+ - <csr-id-3ea32b01fda3e12f0cacae90d5a52495cec0b6bd/> add cpg to python modele and make easier access in the rust basemod api
+ - <csr-id-1f6fea3cf07e1e798649df45d944a5396bf82902/> I have a minimal working python package yay!
+
+### Chore
+
+ - <csr-id-66b98f9f3c2644e79bf72de2ed070fba75b2ba38/> rename iterator
+ - <csr-id-9e8cda2fb47eff101eb3d458cf4599543e7d05a2/> rename iterator
+ - <csr-id-23e6b12a7601afb4aa21454048a53d803ca1bcdf/> rename iterator
+ - <csr-id-b03df77d99a8f28ecd6d43509a43ff92fb300329/> rename iterator
+ - <csr-id-6e8cd6f9f25dcabc15ef2a25595b3a3ee86de241/> docs
+ - <csr-id-79ca845b0e72e832cdc57b1e1b58090a09417936/> docs
+ - <csr-id-41bcd27e9de8654fd46bfb50d3c7efabad59a17e/> docs
+ - <csr-id-66338fd576a66ee230aa4234d072a93b3a3b21d5/> docs
+ - <csr-id-6f910c53a4e0cb7be411b724385e540517f21306/> docs
+ - <csr-id-85d471df45a0c88567857427725852c491c041ff/> docs
+ - <csr-id-c5eb60a8d42616eacfafb871cf4f46fb2fa924c8/> docs
+ - <csr-id-5bd6803c346a409150daea7713878af46995e836/> docs
+ - <csr-id-a59f41d0b2d4b97b277b738f04b23010be8d6449/> docs
+ - <csr-id-7a633d71272a9425ae276d9b846fcda38f6526e5/> docs
+ - <csr-id-8d16055edc4bf9bc5f94d5be42b86b2a2df712c8/> docs
+ - <csr-id-467072ae6419b3ece8329f587467d0d0bf316911/> docs
+ - <csr-id-09994bdbdd3949186d44ecef36199a8d228ea280/> docs
+ - <csr-id-8ea9fb1efc4897e191468ee10aa66500456fa0fc/> docs
+ - <csr-id-82399e6e702033acbb455ef6aea3a9935338d77f/> docs
+ - <csr-id-fd115b7fdb6754d6f6885e901bc34d7364bfc7df/> docs
+ - <csr-id-1d25caf7e8c19f97d39dec8eb69de7219e85621b/> docs
+ - <csr-id-e73e00c849726e4577344ec8e964b3eda93ddbc6/> docs
+ - <csr-id-a3f29cd798fcbeb071fce7ea7041c4e71a98f8f6/> docs
+ - <csr-id-e85afd963f513fe578b2d0f3e368a7ae56b59d84/> docs
+ - <csr-id-580968a9da3c2a66740d01dfcc0d8c574bfd46c8/> docs
+ - <csr-id-6b1e714ccda049aef3199563c03d6f5ec1df9dfa/> docs
+ - <csr-id-c8502ac7cf87d375a5aa9fcf3494a3cf8f43105c/> docs
+ - <csr-id-b9274c2a7064cd615b079b3cc0b44d9e2f4b5e50/> docs
+ - <csr-id-eb44bdaf8280689eb06e536266b64802f509a7b3/> docs
+ - <csr-id-b98edf9f855ae24f81389a5ea481bf0b16dcd794/> python docs
+ - <csr-id-32f01826bbf06ac726464d59eee2769dfe80b138/> python docs
+ - <csr-id-94dfd521a3f637df47c996fd046d1de3cde85776/> python docs
+ - <csr-id-b3fa1c3b218379a3290fbed2382572b5e1c3e091/> python docs
+ - <csr-id-d4b75b1a569d694495bc1e87de651c1bb4e63778/> python docs
+ - <csr-id-73c918f9344fe362f602fa5356b11c9574c5ffec/> python docs
+ - <csr-id-5f635e04085c012d39d8afa362416ca3642fc7c5/> python docs
+ - <csr-id-c86cc585993506c55bd0243936767afe4a5f671c/> python docs
+ - <csr-id-15b825ed80a4b099c9ea9f21f64f1b695e20554a/> python docs
+ - <csr-id-26ef86389490b3161546271bea194e4c8a4a8b7f/> python docs
+ - <csr-id-d953400d9c7f676fea70fee51264c331ba7e1067/> python docs
+ - <csr-id-10bf0df63acca5812e3d2d3ad5134bc75abe73b4/> python docs
+ - <csr-id-cdde18e3b119ef36d57feed2f4740b7bde30c011/> readme
+ - <csr-id-ac1987d33daf7fb7395ed1cf15b311390a15e60c/> add to changelog
+ - <csr-id-2f7c08e2b24a07054d547088ac2c96463a6229d3/> add to changelog
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 65 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 48 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -22,10 +80,76 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Py-ft release ([`4de2b11`](https://github.com/fiberseq/fibertools-rs/commit/4de2b11dbcdec8836b53d0abef5444f87fd8c372))
+    - Py-ft release ([`b909bc8`](https://github.com/fiberseq/fibertools-rs/commit/b909bc8df6adda1e0cef2ce6198c14e44ba6cbeb))
+    - Larger chunks not worth ([`911bf40`](https://github.com/fiberseq/fibertools-rs/commit/911bf40a22eaace2afe659efc1000808078792fa))
+    - Larger chunks ([`171cf51`](https://github.com/fiberseq/fibertools-rs/commit/171cf5104464aea984c8c1266835a2f385e49fa0))
+    - Speed options ([`9fe3676`](https://github.com/fiberseq/fibertools-rs/commit/9fe3676efa853b79af85e2e1f6bb7849c013a0ec))
+    - Rework fiberdata to consume bam record to avoid extra copy ([`066ca94`](https://github.com/fiberseq/fibertools-rs/commit/066ca9427211f5147f9528e66a342111e273296f))
+    - Clippy ([`ecd0a61`](https://github.com/fiberseq/fibertools-rs/commit/ecd0a61bf1518476fa19be4c77554c68076b96fd))
+    - Update rusthtslib version ([`d262afa`](https://github.com/fiberseq/fibertools-rs/commit/d262afac986cf53e97f3a53d41c87d605231c03e))
+    - Move bam tags into bio_io ([`abcbcda`](https://github.com/fiberseq/fibertools-rs/commit/abcbcda65a9006c21c892bfdff509cf6e7e55c55))
+    - Add logging and iterator and aligned blocks ([`7671998`](https://github.com/fiberseq/fibertools-rs/commit/76719983d8104a04cabd9846a5529f8e65fc7f96))
+    - Rename iterator ([`66b98f9`](https://github.com/fiberseq/fibertools-rs/commit/66b98f9f3c2644e79bf72de2ed070fba75b2ba38))
+    - Rename iterator ([`9e8cda2`](https://github.com/fiberseq/fibertools-rs/commit/9e8cda2fb47eff101eb3d458cf4599543e7d05a2))
+    - Rename iterator ([`23e6b12`](https://github.com/fiberseq/fibertools-rs/commit/23e6b12a7601afb4aa21454048a53d803ca1bcdf))
+    - Rename iterator ([`b03df77`](https://github.com/fiberseq/fibertools-rs/commit/b03df77d99a8f28ecd6d43509a43ff92fb300329))
+    - Docs ([`6e8cd6f`](https://github.com/fiberseq/fibertools-rs/commit/6e8cd6f9f25dcabc15ef2a25595b3a3ee86de241))
+    - Docs ([`79ca845`](https://github.com/fiberseq/fibertools-rs/commit/79ca845b0e72e832cdc57b1e1b58090a09417936))
+    - Add cpg to python modele and make easier access in the rust basemod api ([`3ea32b0`](https://github.com/fiberseq/fibertools-rs/commit/3ea32b01fda3e12f0cacae90d5a52495cec0b6bd))
+    - Docs ([`41bcd27`](https://github.com/fiberseq/fibertools-rs/commit/41bcd27e9de8654fd46bfb50d3c7efabad59a17e))
+    - Docs ([`66338fd`](https://github.com/fiberseq/fibertools-rs/commit/66338fd576a66ee230aa4234d072a93b3a3b21d5))
+    - Docs ([`6f910c5`](https://github.com/fiberseq/fibertools-rs/commit/6f910c53a4e0cb7be411b724385e540517f21306))
+    - Docs ([`85d471d`](https://github.com/fiberseq/fibertools-rs/commit/85d471df45a0c88567857427725852c491c041ff))
+    - Docs ([`c5eb60a`](https://github.com/fiberseq/fibertools-rs/commit/c5eb60a8d42616eacfafb871cf4f46fb2fa924c8))
+    - Docs ([`5bd6803`](https://github.com/fiberseq/fibertools-rs/commit/5bd6803c346a409150daea7713878af46995e836))
+    - Docs ([`a59f41d`](https://github.com/fiberseq/fibertools-rs/commit/a59f41d0b2d4b97b277b738f04b23010be8d6449))
+    - Docs ([`7a633d7`](https://github.com/fiberseq/fibertools-rs/commit/7a633d71272a9425ae276d9b846fcda38f6526e5))
+    - Docs ([`8d16055`](https://github.com/fiberseq/fibertools-rs/commit/8d16055edc4bf9bc5f94d5be42b86b2a2df712c8))
+    - Docs ([`467072a`](https://github.com/fiberseq/fibertools-rs/commit/467072ae6419b3ece8329f587467d0d0bf316911))
+    - Docs ([`09994bd`](https://github.com/fiberseq/fibertools-rs/commit/09994bdbdd3949186d44ecef36199a8d228ea280))
+    - Docs ([`8ea9fb1`](https://github.com/fiberseq/fibertools-rs/commit/8ea9fb1efc4897e191468ee10aa66500456fa0fc))
+    - Docs ([`82399e6`](https://github.com/fiberseq/fibertools-rs/commit/82399e6e702033acbb455ef6aea3a9935338d77f))
+    - Docs ([`fd115b7`](https://github.com/fiberseq/fibertools-rs/commit/fd115b7fdb6754d6f6885e901bc34d7364bfc7df))
+    - Docs ([`1d25caf`](https://github.com/fiberseq/fibertools-rs/commit/1d25caf7e8c19f97d39dec8eb69de7219e85621b))
+    - Docs ([`e73e00c`](https://github.com/fiberseq/fibertools-rs/commit/e73e00c849726e4577344ec8e964b3eda93ddbc6))
+    - Docs ([`a3f29cd`](https://github.com/fiberseq/fibertools-rs/commit/a3f29cd798fcbeb071fce7ea7041c4e71a98f8f6))
+    - Docs ([`e85afd9`](https://github.com/fiberseq/fibertools-rs/commit/e85afd963f513fe578b2d0f3e368a7ae56b59d84))
+    - Docs ([`580968a`](https://github.com/fiberseq/fibertools-rs/commit/580968a9da3c2a66740d01dfcc0d8c574bfd46c8))
+    - Docs ([`6b1e714`](https://github.com/fiberseq/fibertools-rs/commit/6b1e714ccda049aef3199563c03d6f5ec1df9dfa))
+    - Docs ([`c8502ac`](https://github.com/fiberseq/fibertools-rs/commit/c8502ac7cf87d375a5aa9fcf3494a3cf8f43105c))
+    - Docs ([`b9274c2`](https://github.com/fiberseq/fibertools-rs/commit/b9274c2a7064cd615b079b3cc0b44d9e2f4b5e50))
+    - Docs ([`eb44bda`](https://github.com/fiberseq/fibertools-rs/commit/eb44bdaf8280689eb06e536266b64802f509a7b3))
+    - Rtd theme ([`44f93a4`](https://github.com/fiberseq/fibertools-rs/commit/44f93a42b1d5cb30fefad99e1b4dcf19f4f7f0c0))
+    - Python docs ([`b98edf9`](https://github.com/fiberseq/fibertools-rs/commit/b98edf9f855ae24f81389a5ea481bf0b16dcd794))
+    - Python docs ([`32f0182`](https://github.com/fiberseq/fibertools-rs/commit/32f01826bbf06ac726464d59eee2769dfe80b138))
+    - Python docs ([`94dfd52`](https://github.com/fiberseq/fibertools-rs/commit/94dfd521a3f637df47c996fd046d1de3cde85776))
+    - Python docs ([`b3fa1c3`](https://github.com/fiberseq/fibertools-rs/commit/b3fa1c3b218379a3290fbed2382572b5e1c3e091))
+    - Python docs ([`d4b75b1`](https://github.com/fiberseq/fibertools-rs/commit/d4b75b1a569d694495bc1e87de651c1bb4e63778))
+    - Python docs ([`73c918f`](https://github.com/fiberseq/fibertools-rs/commit/73c918f9344fe362f602fa5356b11c9574c5ffec))
+    - Python docs ([`5f635e0`](https://github.com/fiberseq/fibertools-rs/commit/5f635e04085c012d39d8afa362416ca3642fc7c5))
+    - Python docs ([`c86cc58`](https://github.com/fiberseq/fibertools-rs/commit/c86cc585993506c55bd0243936767afe4a5f671c))
+    - Python docs ([`15b825e`](https://github.com/fiberseq/fibertools-rs/commit/15b825ed80a4b099c9ea9f21f64f1b695e20554a))
+    - Python docs ([`26ef863`](https://github.com/fiberseq/fibertools-rs/commit/26ef86389490b3161546271bea194e4c8a4a8b7f))
+    - Python docs ([`d953400`](https://github.com/fiberseq/fibertools-rs/commit/d953400d9c7f676fea70fee51264c331ba7e1067))
+    - Python docs ([`10bf0df`](https://github.com/fiberseq/fibertools-rs/commit/10bf0df63acca5812e3d2d3ad5134bc75abe73b4))
+    - Readme ([`cdde18e`](https://github.com/fiberseq/fibertools-rs/commit/cdde18e3b119ef36d57feed2f4740b7bde30c011))
+    - I have a minimal working python package yay! ([`1f6fea3`](https://github.com/fiberseq/fibertools-rs/commit/1f6fea3cf07e1e798649df45d944a5396bf82902))
+    - Start a python package ([`7e5fbde`](https://github.com/fiberseq/fibertools-rs/commit/7e5fbde9f0f52496fd1f2facbbd55d80d0b64a26))
+    - Add to changelog ([`ac1987d`](https://github.com/fiberseq/fibertools-rs/commit/ac1987d33daf7fb7395ed1cf15b311390a15e60c))
+    - Add to changelog ([`2f7c08e`](https://github.com/fiberseq/fibertools-rs/commit/2f7c08e2b24a07054d547088ac2c96463a6229d3))
+    - Merge pull request #19 from fiberseq/development ([`202025d`](https://github.com/fiberseq/fibertools-rs/commit/202025dcdefdf88e0754ac78be03731c707c0b1b))
+    - Update docs ([`c61762b`](https://github.com/fiberseq/fibertools-rs/commit/c61762b423129c7428ca946981febec491a9d853))
+    - Update changelog ([`75a3a32`](https://github.com/fiberseq/fibertools-rs/commit/75a3a320729cfcedb3c99fd084cb2db16104ed70))
+    - Unsed ([`4bc52a2`](https://github.com/fiberseq/fibertools-rs/commit/4bc52a229ef8be46eac45f765cfec6842d5d1d36))
+    - Start a changelog ([`2aa57f5`](https://github.com/fiberseq/fibertools-rs/commit/2aa57f5fc1d7c38701964afea6ed5c20a76eb0d2))
     - Reorganize test data ([`966ac80`](https://github.com/fiberseq/fibertools-rs/commit/966ac80890e820da571164e01e360fc4c5507845))
+    - Merge pull request #18 from fiberseq/development ([`2369f27`](https://github.com/fiberseq/fibertools-rs/commit/2369f2702c9caeb18d6c8475c9d1a52a6cbe423e))
 </details>
 
 ## v0.2.5 (2023-07-18)
+
+<csr-id-082190756233e077b692839f979df466fd5c7239/>
 
 The default output for `ft extract` is now in reference coordinates instead of molecular.
 
@@ -43,7 +167,7 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 5 calendar days.
+ - 11 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -61,12 +185,16 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
     - Better var name ([`fb3ad6d`](https://github.com/fiberseq/fibertools-rs/commit/fb3ad6d7c35e930cfb1ead67d494844eea62de93))
     - Fix off by one that sometimes happened in the final msp when doing nuc/msp calling ([`da5763d`](https://github.com/fiberseq/fibertools-rs/commit/da5763d24a322db2f1e6bdc53af57358776a51f4))
     - Fix off by one in minus strand nuc and msp coordiantes ([`91e2bc5`](https://github.com/fiberseq/fibertools-rs/commit/91e2bc558ab94b85e1ede25dccb2bf0e2878a023))
+    - Merge pull request #17 from fiberseq/development ([`8f3d278`](https://github.com/fiberseq/fibertools-rs/commit/8f3d278d3285f8b5eafd429d5e6174b79adbbc49))
     - Check for bgz ([`14724dd`](https://github.com/fiberseq/fibertools-rs/commit/14724dd9270db0af9c12434fbc40252fd684b2fd))
     - Rewrite ft center so I can use threads? ([`7180f8e`](https://github.com/fiberseq/fibertools-rs/commit/7180f8e126a72fa49c4761e166bde1535c306aa2))
     - Rewrite ft center so I can use threads? ([`4485c5e`](https://github.com/fiberseq/fibertools-rs/commit/4485c5e46534b3bcdebf2295709e06830b404279))
+    - Merge pull request #16 from fiberseq/development ([`759ee9f`](https://github.com/fiberseq/fibertools-rs/commit/759ee9fae9484f20255ae90b431587302c1f1cba))
 </details>
 
 ## v0.2.4 (2023-07-11)
+
+<csr-id-98a51ab3030ed03ce6adc7e160ee7feed49a7222/>
 
 ### Chore
 
@@ -76,7 +204,7 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 <csr-read-only-do-not-edit/>
 
- - 21 commits contributed to the release over the course of 13 calendar days.
+ - 22 commits contributed to the release over the course of 13 calendar days.
  - 17 days passed between releases.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -93,6 +221,7 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
     - Unsed deps ([`b542514`](https://github.com/fiberseq/fibertools-rs/commit/b542514c3353d5afba985763a51645a10cacdf1e))
     - Ci ([`60c065e`](https://github.com/fiberseq/fibertools-rs/commit/60c065e0515df493957929a0de16f916300df761))
     - Bio-io updates ([`8615452`](https://github.com/fiberseq/fibertools-rs/commit/8615452ba8743caa7b46c39f7acb583abe7ee129))
+    - Merge pull request #15 from fiberseq/development ([`d8cfd67`](https://github.com/fiberseq/fibertools-rs/commit/d8cfd6773c37691c4aac73837a5124f9c7f4c6b7))
     - Change extract defaults ([`b009dda`](https://github.com/fiberseq/fibertools-rs/commit/b009ddacc3c07f9f86562ce25d987d04ab717c11))
     - CI ([`57880cc`](https://github.com/fiberseq/fibertools-rs/commit/57880cc16b29cbc250f9dfbf68dffd3c99f3c0fa))
     - Rename ([`a00e0d3`](https://github.com/fiberseq/fibertools-rs/commit/a00e0d30cf80d6ac987d4bfbcaa0bf46b128a067))
@@ -112,6 +241,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.2.3 (2023-06-24)
+
+<csr-id-6bb81e5a15f2f18bfe1a31b2ba207248e6a4e7b2/>
 
 ### Chore
 
@@ -157,6 +288,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 ## v0.2.2 (2023-06-15)
 
+<csr-id-7cd3d115ffa9c824218ac8ea9f2454682cb91ca9/>
+
 ### Chore
 
  - <csr-id-7cd3d115ffa9c824218ac8ea9f2454682cb91ca9/> Release fibertools-rs version 0.2.2
@@ -183,6 +316,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.2.1 (2023-06-14)
+
+<csr-id-53094a13be5fdc883bd87e46940bf93d48e41b1c/>
 
 ### Chore
 
@@ -212,6 +347,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.2.0 (2023-06-10)
+
+<csr-id-cd387947c4aafd5d70d087650e1e5fe929808e81/>
 
 ### Chore
 
@@ -255,6 +392,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.1.4 (2023-04-19)
+
+<csr-id-4f95956d0a60a75b6b1a4d446829935426b2ffaf/>
 
 ### Chore
 
@@ -324,6 +463,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 ## v0.1.3 (2023-03-14)
 
+<csr-id-84e4ee9e1ae31396f8743d9d02c1af02dbe84bb7/>
+
 ### Chore
 
  - <csr-id-84e4ee9e1ae31396f8743d9d02c1af02dbe84bb7/> Release fibertools-rs version 0.1.3
@@ -358,6 +499,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 ## v0.1.2 (2023-02-13)
 
+<csr-id-7df4056ecc335f5be92f5688215a156623f927cd/>
+
 ### Chore
 
  - <csr-id-7df4056ecc335f5be92f5688215a156623f927cd/> Release fibertools-rs version 0.1.2
@@ -384,6 +527,9 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.1.1 (2023-02-02)
+
+<csr-id-9f8f35b4f75ae3a944d137a8fd7bb562529a634e/>
+<csr-id-d8f2ea597075a4f13be9d1d68c173c2476c02f63/>
 
 ### Chore
 
@@ -415,6 +561,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 ## v0.1.1-alpha.3 (2023-02-01)
 
+<csr-id-c1161138edd4b1bd7153a1cc5b724bb2eef29a4c/>
+
 ### Chore
 
  - <csr-id-c1161138edd4b1bd7153a1cc5b724bb2eef29a4c/> Release fibertools-rs version 0.1.1-alpha.3
@@ -439,6 +587,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.1.1-alpha.2 (2023-02-01)
+
+<csr-id-dda2ea4236a46e4cba2ac0f7415a871c09f5777a/>
 
 ### Chore
 
@@ -465,6 +615,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 
 ## v0.1.1-alpha.1 (2023-02-01)
 
+<csr-id-c6f50df845bcd931b61cfa8151e4d38b1c9ccbdd/>
+
 ### Chore
 
  - <csr-id-c6f50df845bcd931b61cfa8151e4d38b1c9ccbdd/> Release fibertools-rs version 0.1.1-alpha.1
@@ -489,6 +641,8 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 </details>
 
 ## v0.1.1-alpha (2023-02-01)
+
+<csr-id-3eede8cd716b8a03090a6f5dcc593460c6a943a1/>
 
 ### Chore
 
