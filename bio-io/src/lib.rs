@@ -190,7 +190,7 @@ impl<'a> Iterator for BamChunk<'a> {
             None
         } else {
             let duration = start.elapsed().as_secs_f64();
-            log::info!(
+            log::debug!(
                 "Read {} bam records at {}.",
                 format!("{:}", cur_vec.len()).bright_magenta().bold(),
                 format!("{:.2?} reads/s", cur_vec.len() as f64 / duration)

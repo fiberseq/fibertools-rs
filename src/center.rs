@@ -287,7 +287,7 @@ pub fn center(
     dist: Option<i64>,
     reference: bool,
 ) {
-    let fiber_data = FiberseqData::from_records(&records, header_view, min_ml_score);
+    let fiber_data = FiberseqData::from_records(records, header_view, min_ml_score);
     let total = fiber_data.len();
     let mut seen = 0;
 

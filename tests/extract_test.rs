@@ -5,7 +5,7 @@ fn get_fiber_data_from_test_bam(bam_file: &str) -> Vec<fibertools_rs::extract::F
     bam.records()
         .map(|r| {
             let record = r.unwrap();
-            let fiber_data = fibertools_rs::extract::FiberseqData::new(&record, None, 0);
+            let fiber_data = fibertools_rs::extract::FiberseqData::new(record, None, 0);
             fiber_data
         })
         .collect::<Vec<_>>()
