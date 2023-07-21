@@ -71,11 +71,6 @@ pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
     }
 }
 
-pub fn write_to_stdout(out: &str) {
-    let mut out_f = Box::new(std::io::stdout()) as Box<dyn Write>;
-    write_to_file(out, &mut out_f);
-}
-
 /// a reader that can read compressed files but also stdin (indicated by -)
 /// ```
 /// use bio_io::buffer_from;
