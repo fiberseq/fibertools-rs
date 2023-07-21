@@ -7,6 +7,51 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## 0.2.6 (2023-07-21)
 
+<csr-id-66b98f9f3c2644e79bf72de2ed070fba75b2ba38/>
+<csr-id-9e8cda2fb47eff101eb3d458cf4599543e7d05a2/>
+<csr-id-23e6b12a7601afb4aa21454048a53d803ca1bcdf/>
+<csr-id-b03df77d99a8f28ecd6d43509a43ff92fb300329/>
+<csr-id-6e8cd6f9f25dcabc15ef2a25595b3a3ee86de241/>
+<csr-id-79ca845b0e72e832cdc57b1e1b58090a09417936/>
+<csr-id-41bcd27e9de8654fd46bfb50d3c7efabad59a17e/>
+<csr-id-66338fd576a66ee230aa4234d072a93b3a3b21d5/>
+<csr-id-6f910c53a4e0cb7be411b724385e540517f21306/>
+<csr-id-85d471df45a0c88567857427725852c491c041ff/>
+<csr-id-c5eb60a8d42616eacfafb871cf4f46fb2fa924c8/>
+<csr-id-5bd6803c346a409150daea7713878af46995e836/>
+<csr-id-a59f41d0b2d4b97b277b738f04b23010be8d6449/>
+<csr-id-7a633d71272a9425ae276d9b846fcda38f6526e5/>
+<csr-id-8d16055edc4bf9bc5f94d5be42b86b2a2df712c8/>
+<csr-id-467072ae6419b3ece8329f587467d0d0bf316911/>
+<csr-id-09994bdbdd3949186d44ecef36199a8d228ea280/>
+<csr-id-8ea9fb1efc4897e191468ee10aa66500456fa0fc/>
+<csr-id-82399e6e702033acbb455ef6aea3a9935338d77f/>
+<csr-id-fd115b7fdb6754d6f6885e901bc34d7364bfc7df/>
+<csr-id-1d25caf7e8c19f97d39dec8eb69de7219e85621b/>
+<csr-id-e73e00c849726e4577344ec8e964b3eda93ddbc6/>
+<csr-id-a3f29cd798fcbeb071fce7ea7041c4e71a98f8f6/>
+<csr-id-e85afd963f513fe578b2d0f3e368a7ae56b59d84/>
+<csr-id-580968a9da3c2a66740d01dfcc0d8c574bfd46c8/>
+<csr-id-6b1e714ccda049aef3199563c03d6f5ec1df9dfa/>
+<csr-id-c8502ac7cf87d375a5aa9fcf3494a3cf8f43105c/>
+<csr-id-b9274c2a7064cd615b079b3cc0b44d9e2f4b5e50/>
+<csr-id-eb44bdaf8280689eb06e536266b64802f509a7b3/>
+<csr-id-b98edf9f855ae24f81389a5ea481bf0b16dcd794/>
+<csr-id-32f01826bbf06ac726464d59eee2769dfe80b138/>
+<csr-id-94dfd521a3f637df47c996fd046d1de3cde85776/>
+<csr-id-b3fa1c3b218379a3290fbed2382572b5e1c3e091/>
+<csr-id-d4b75b1a569d694495bc1e87de651c1bb4e63778/>
+<csr-id-73c918f9344fe362f602fa5356b11c9574c5ffec/>
+<csr-id-5f635e04085c012d39d8afa362416ca3642fc7c5/>
+<csr-id-c86cc585993506c55bd0243936767afe4a5f671c/>
+<csr-id-15b825ed80a4b099c9ea9f21f64f1b695e20554a/>
+<csr-id-26ef86389490b3161546271bea194e4c8a4a8b7f/>
+<csr-id-d953400d9c7f676fea70fee51264c331ba7e1067/>
+<csr-id-10bf0df63acca5812e3d2d3ad5134bc75abe73b4/>
+<csr-id-cdde18e3b119ef36d57feed2f4740b7bde30c011/>
+<csr-id-ac1987d33daf7fb7395ed1cf15b311390a15e60c/>
+<csr-id-2f7c08e2b24a07054d547088ac2c96463a6229d3/>
+
 ### Bug Fixes
 
  - <csr-id-9fe3676efa853b79af85e2e1f6bb7849c013a0ec/> speed options
@@ -68,7 +113,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 65 commits contributed to the release over the course of 2 calendar days.
+ - 66 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 48 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -80,6 +125,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.2.6 ([`0c525b5`](https://github.com/fiberseq/fibertools-rs/commit/0c525b5e0d6d81a1a82dd14a7fb6ea3c500c8c35))
     - Py-ft release ([`4de2b11`](https://github.com/fiberseq/fibertools-rs/commit/4de2b11dbcdec8836b53d0abef5444f87fd8c372))
     - Py-ft release ([`b909bc8`](https://github.com/fiberseq/fibertools-rs/commit/b909bc8df6adda1e0cef2ce6198c14e44ba6cbeb))
     - Larger chunks not worth ([`911bf40`](https://github.com/fiberseq/fibertools-rs/commit/911bf40a22eaace2afe659efc1000808078792fa))
