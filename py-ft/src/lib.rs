@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 #[pymodule]
 fn pyft(_py: Python, m: &PyModule) -> PyResult<()> {
     Builder::new()
+        .format_timestamp_secs()
         .target(Target::Stderr)
         .filter(None, LevelFilter::Info)
         .init();

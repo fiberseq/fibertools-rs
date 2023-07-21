@@ -196,7 +196,6 @@ impl FiberdataFetch {
         .records()
         .map(|rec| FiberseqData::new(&rec.unwrap(), None, 0))
         .into_iter();*/
-
         Self { fiberdata }
     }
 
@@ -204,7 +203,10 @@ impl FiberdataFetch {
         let data = self.fiberdata.next();
         match data {
             Some(fiber) => IterNextOutput::Yield(new_py_fiberdata(fiber)),
-            None => IterNextOutput::Return("Ended"),
+            None => {
+                log::info!("\n\nDone iterating over fibers");
+                IterNextOutput::Return("Ended")
+            }
         }
     }
 
