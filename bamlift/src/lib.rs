@@ -1,3 +1,4 @@
+use itertools::multiunzip;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::{Debug, Display};
 
@@ -68,6 +69,24 @@ pub fn positions_on_complimented_sequence(
         input_positions.to_vec()
     };
     positions
+}
+
+/// get positions on the complimented sequence in the cigar record
+pub fn positions_on_complimented_sequence_in_place(
+    record: &bam::Record,
+    input_positions: &mut Vec<i64>,
+    part_of_range: bool,
+) {
+    if !record.is_reverse() {
+        return;
+    }
+    let seq_len = i64::try_from(record.seq_len()).unwrap();
+    // need to correct for going from [) to (] if we are part of a range
+    let offset = if part_of_range { 0 } else { 1 };
+    for p in input_positions.iter_mut() {
+        *p = seq_len - *p - offset;
+    }
+    input_positions.reverse();
 }
 
 pub fn is_sorted<T>(v: &[T]) -> bool
@@ -214,6 +233,31 @@ pub fn get_closest_reference_range(
             }
         })
         .collect()
+}
+
+/// reimplement get_closest_reference_range but hopefully better
+pub fn closest_reference_range(
+    record: &bam::Record,
+    starts: &[i64],
+    ends: &[i64],
+) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+    assert_eq!(starts.len(), ends.len());
+    let ref_starts = closest_reference_positions(record, starts);
+    let ref_ends = closest_reference_positions(record, ends);
+    assert_eq!(ref_starts.len(), ref_ends.len());
+
+    let z = ref_starts
+        .into_iter()
+        .zip(ref_ends.into_iter())
+        .map(|(start, end)| {
+            if end <= start {
+                (-1, -1, -1)
+            } else {
+                (start, end, end - start)
+            }
+        })
+        .collect::<Vec<_>>();
+    multiunzip(z)
 }
 
 /// liftover positions using the cigar string
