@@ -7,6 +7,7 @@ use lazy_static::lazy_static;
 use niffler::get_reader;
 use regex::Regex;
 use rust_htslib::bam;
+use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::Read;
 use std::collections::HashMap;
 use std::env;
@@ -272,4 +273,70 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         binding_kit
     );
     chemistry.clone()
+}
+
+///```
+/// use rust_htslib::{bam, bam::Read};
+/// use log;
+/// let mut bam = bam::Reader::from_path(&"../tests/data/all.bam").unwrap();
+/// for record in bam.records() {
+///     let record = record.unwrap();
+///     let n_s = bio_io::get_u32_tag(&record, b"ns");
+///     let n_l = bio_io::get_u32_tag(&record, b"nl");
+///     let a_s = bio_io::get_u32_tag(&record, b"as");
+///     let a_l = bio_io::get_u32_tag(&record, b"al");
+///     log::debug!("{:?}", a_s);
+/// }
+///```
+pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
+    if let Ok(Aux::ArrayU32(array)) = record.aux(tag) {
+        let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
+        read_array
+    } else {
+        vec![]
+    }
+}
+
+pub fn get_u8_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
+    if let Ok(Aux::ArrayU8(array)) = record.aux(tag) {
+        let read_array = array.iter().collect::<Vec<_>>();
+        read_array
+    } else {
+        vec![]
+    }
+}
+
+/// Convert the PacBio u16 tag into the u8 tag we normally expect.
+pub fn get_pb_u16_tag_as_u8(record: &bam::Record, tag: &[u8; 2]) -> Vec<u8> {
+    if let Ok(Aux::ArrayU16(array)) = record.aux(tag) {
+        let read_array = array.iter().collect::<Vec<_>>();
+        read_array
+            .iter()
+            .map(|&x| {
+                if x < 64 {
+                    x
+                } else if x < 191 {
+                    (x - 64) / 2 + 64
+                } else if x < 445 {
+                    (x - 192) / 4 + 128
+                } else if x < 953 {
+                    (x - 448) / 8 + 192
+                } else {
+                    255
+                }
+            })
+            .map(|x| x as u8)
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
+pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
+    if let Ok(Aux::ArrayFloat(array)) = record.aux(tag) {
+        let read_array = array.iter().collect::<Vec<_>>();
+        read_array
+    } else {
+        vec![]
+    }
 }

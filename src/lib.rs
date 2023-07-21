@@ -17,6 +17,7 @@ pub mod strip_basemods;
 use anyhow::Result;
 use bio_io::*;
 use indicatif::{style, ProgressBar};
+#[cfg(feature = "predict")]
 use itertools::Itertools;
 use rust_htslib::{bam, bam::Read};
 use std::env;

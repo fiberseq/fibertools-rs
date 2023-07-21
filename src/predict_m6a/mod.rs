@@ -1,7 +1,7 @@
 use super::*;
 use anyhow::anyhow;
-use bamlift;
 use bio::alphabets::dna::revcomp;
+use bio_io;
 use indicatif::{style, ParallelProgressIterator};
 use nucleosomes;
 use ordered_float::OrderedFloat;
@@ -281,7 +281,7 @@ pub fn basemod_from_ml(
 
     // add full probabilities if needed requested
     if predict_options.full_float {
-        let mut mp = bamlift::get_f32_tag(record, b"mp");
+        let mut mp = bio_io::get_f32_tag(record, b"mp");
         record.remove_aux(b"mp").unwrap_or(());
         mp.extend(&full_probabilities_forward);
         let aux_array: AuxArray<f32> = (&mp).into();
@@ -322,27 +322,27 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     }
 
     let extend = WINDOW / 2;
-    let mut f_ip = bamlift::get_u8_tag(record, b"fi");
+    let mut f_ip = bio_io::get_u8_tag(record, b"fi");
     let r_ip;
     let f_pw;
     let r_pw;
     // check if we maybe are getting u16 input instead of u8
     if f_ip.is_empty() {
-        f_ip = bamlift::get_pb_u16_tag_as_u8(record, b"fi");
+        f_ip = bio_io::get_pb_u16_tag_as_u8(record, b"fi");
         if f_ip.is_empty() {
             // missing u16 as well, set all to empty arrays
             r_ip = vec![];
             f_pw = vec![];
             r_pw = vec![];
         } else {
-            r_ip = bamlift::get_pb_u16_tag_as_u8(record, b"ri");
-            f_pw = bamlift::get_pb_u16_tag_as_u8(record, b"fp");
-            r_pw = bamlift::get_pb_u16_tag_as_u8(record, b"rp");
+            r_ip = bio_io::get_pb_u16_tag_as_u8(record, b"ri");
+            f_pw = bio_io::get_pb_u16_tag_as_u8(record, b"fp");
+            r_pw = bio_io::get_pb_u16_tag_as_u8(record, b"rp");
         }
     } else {
-        r_ip = bamlift::get_u8_tag(record, b"ri");
-        f_pw = bamlift::get_u8_tag(record, b"fp");
-        r_pw = bamlift::get_u8_tag(record, b"rp");
+        r_ip = bio_io::get_u8_tag(record, b"ri");
+        f_pw = bio_io::get_u8_tag(record, b"fp");
+        r_pw = bio_io::get_u8_tag(record, b"rp");
     }
     // return if missing kinetics
     if f_ip.is_empty() || r_ip.is_empty() || f_pw.is_empty() || r_pw.is_empty() {
