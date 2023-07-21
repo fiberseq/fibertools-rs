@@ -8,10 +8,11 @@ use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
 };
+use std::collections::HashMap;
 
 use std::convert::TryFrom;
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
@@ -97,7 +98,8 @@ pub struct BaseMods {
 
 impl BaseMods {
     pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
-        //let new = BaseMods::new2(record, min_ml_score);
+        // my basemod parser is ~25% faster than rust_htslib's
+        // let new = BaseMods::rust_htslib_mm_ml_parser(record, min_ml_score);
         //assert_eq!(new, old);
         BaseMods::my_mm_ml_parser(record, min_ml_score)
     }
@@ -188,6 +190,10 @@ impl BaseMods {
                         .filter(|(&ml, &_mm)| ml >= min_ml_score)
                         .unzip();
 
+                // don't add empty basemods
+                if modified_positions.is_empty() {
+                    continue;
+                }
                 // add to a struct
                 let mods = BaseMod::new(
                     record,
@@ -210,90 +216,64 @@ impl BaseMods {
                 num_mods_seen
             );
         }
+        // needed so I can compare methods
+        rtn.sort();
+        BaseMods { base_mods: rtn }
+    }
 
+    pub fn hashmap_to_basemods(
+        map: HashMap<(i32, i32, i32), Vec<(i64, u8)>>,
+        record: &bam::Record,
+    ) -> BaseMods {
+        let mut rtn = vec![];
+        for (mod_info, mods) in map {
+            let mod_base = mod_info.0 as u8;
+            let mod_type = mod_info.1 as u8 as char;
+            let mod_strand = if mod_info.2 == 0 { '+' } else { '-' };
+            let (mut positions, mut qualities): (Vec<i64>, Vec<u8>) = mods.into_iter().unzip();
+            if record.is_reverse() {
+                let length = record.seq_len() as i64;
+                positions = positions
+                    .into_iter()
+                    .rev()
+                    .map(|p| length - p - 1)
+                    .collect();
+                qualities.reverse();
+            }
+            let mods = BaseMod::new(record, mod_base, mod_strand, mod_type, positions, qualities);
+            rtn.push(mods);
+        }
+        // needed so I can compare methods
+        rtn.sort();
         BaseMods { base_mods: rtn }
     }
 
     /// this is actually way slower than my parser for some reason...
     /// so I am not going to use it
-    fn _rust_htslib_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
-        let mut rtn = vec![];
-        log::debug!("{:?} {} ", record.qname(), record.is_reverse());
+    pub fn rust_htslib_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
+        let mut base_mods = HashMap::new();
 
-        if let Ok(mods) = record.basemods_iter() {
-            // data from current iteration
-            let mut modified_bases_forward = vec![];
-            let mut modified_probabilities_forward = vec![];
-            let mut pre_mod_base = b' ';
-            let mut pre_mod_strand = ' ';
-            let mut pre_mod_type = ' ';
-            // loop over all the base mods base by base
-            for bp in mods {
-                let (mut pos, m) = bp.unwrap();
-                if record.is_reverse() {
-                    pos = record.seq().len() as i32 - pos - 1;
-                };
-                let ml = m.qual as u8;
-                let mod_type = m.modified_base as u8 as char;
-                let mod_strand = if m.strand == 0 { '+' } else { '-' };
-                let mod_base = m.canonical_base as u8;
-                // return a completed basemod
-                if (mod_type != pre_mod_type
-                    || mod_strand != pre_mod_strand
-                    || mod_base != pre_mod_base)
-                    && pre_mod_type != ' '
-                {
-                    // need to flip if we are reversed
-                    if record.is_reverse() {
-                        modified_bases_forward.reverse();
-                        modified_probabilities_forward.reverse();
+        match record.basemods_iter() {
+            Ok(mods) => {
+                for bp in mods {
+                    let (pos, m) = bp.unwrap();
+                    if min_ml_score > m.qual as u8 {
+                        continue;
                     }
-                    let cur_mod = BaseMod::new(
-                        record,
-                        pre_mod_base,
-                        pre_mod_strand,
-                        pre_mod_type,
-                        modified_bases_forward,
-                        modified_probabilities_forward,
-                    );
-                    // push the completed modifications if they are real
-                    rtn.push(cur_mod);
-                    // reset the current modification
-                    modified_bases_forward = vec![];
-                    modified_probabilities_forward = vec![];
+                    let z = (m.canonical_base, m.modified_base, m.strand);
+                    let cur_mod = base_mods.entry(z).or_insert(vec![]);
+                    cur_mod.push((pos as i64, m.qual as u8));
+                    continue;
                 }
-                // add the current position to the modification
-                if ml >= min_ml_score {
-                    modified_bases_forward.push(pos as i64);
-                    modified_probabilities_forward.push(ml);
-                }
-                // reset the previous modification
-                pre_mod_base = mod_base;
-                pre_mod_strand = mod_strand;
-                pre_mod_type = mod_type;
             }
-            // push the last modification
-            if !modified_bases_forward.is_empty() {
-                // need to flip if we are reversed
-                if record.is_reverse() {
-                    modified_bases_forward.reverse();
-                    modified_probabilities_forward.reverse();
+            _ => {
+                return {
+                    log::warn!("Rust hts-lib failed to parse basemods, trying custom parser.");
+                    BaseMods::my_mm_ml_parser(record, min_ml_score)
                 }
-
-                let cur_mod = BaseMod::new(
-                    record,
-                    pre_mod_base,
-                    pre_mod_strand,
-                    pre_mod_type,
-                    modified_bases_forward,
-                    modified_probabilities_forward,
-                );
-                rtn.push(cur_mod);
             }
-        } else {
-            log::debug!("No MM tag found");
-        };
-        BaseMods { base_mods: rtn }
+        }
+        BaseMods::hashmap_to_basemods(base_mods, record)
     }
 
     /// remove m6a base mods from the struct

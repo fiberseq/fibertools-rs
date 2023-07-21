@@ -23,11 +23,11 @@ pub struct FiberseqData {
 }
 
 impl FiberseqData {
-    pub fn new(record: &bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
-        let mut nuc_starts = get_u32_tag(record, b"ns");
-        let mut msp_starts = get_u32_tag(record, b"as");
-        let mut nuc_length = get_u32_tag(record, b"nl");
-        let mut msp_length = get_u32_tag(record, b"al");
+    pub fn new(record: bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
+        let mut nuc_starts = get_u32_tag(&record, b"ns");
+        let mut msp_starts = get_u32_tag(&record, b"as");
+        let mut nuc_length = get_u32_tag(&record, b"nl");
+        let mut msp_length = get_u32_tag(&record, b"al");
         let mut nuc_ends = nuc_starts
             .iter()
             .zip(nuc_length.iter())
@@ -42,12 +42,12 @@ impl FiberseqData {
         // i.e. query coordinates in bam format
         if record.is_reverse() {
             (nuc_ends, nuc_starts) = (
-                positions_on_complimented_sequence(record, &nuc_starts),
-                positions_on_complimented_sequence(record, &nuc_ends),
+                positions_on_complimented_sequence(&record, &nuc_starts),
+                positions_on_complimented_sequence(&record, &nuc_ends),
             );
             (msp_ends, msp_starts) = (
-                positions_on_complimented_sequence(record, &msp_starts),
-                positions_on_complimented_sequence(record, &msp_ends),
+                positions_on_complimented_sequence(&record, &msp_starts),
+                positions_on_complimented_sequence(&record, &msp_ends),
             );
 
             // because coordinates are [) we need to modify positions when complements so they remain [) instead of (]
@@ -70,8 +70,8 @@ impl FiberseqData {
         }
 
         // range positions
-        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, record);
-        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, record);
+        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, &record);
+        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, &record);
 
         assert_eq!(ref_nuc.len(), nuc_starts.len());
         assert_eq!(ref_msp.len(), msp_starts.len());
@@ -87,9 +87,10 @@ impl FiberseqData {
             Some(t) => t.clone(),
             None => ".".to_string(),
         };
+        let base_mods = BaseMods::new(&record, min_ml_score);
         //
         FiberseqData {
-            record: record.clone(),
+            record,
             nuc: nuc_starts
                 .iter()
                 .cloned()
@@ -102,7 +103,7 @@ impl FiberseqData {
                 .collect(),
             ref_nuc,
             ref_msp,
-            base_mods: BaseMods::new(record, min_ml_score),
+            base_mods,
             ec,
             target_name,
         }
@@ -127,14 +128,17 @@ impl FiberseqData {
     }
 
     pub fn from_records(
-        records: &Vec<bam::Record>,
+        records: Vec<bam::Record>,
         head_view: &HeaderView,
         min_ml_score: u8,
     ) -> Vec<Self> {
         let target_dict = Self::dict_from_head_view(head_view);
         records
-            .par_iter()
-            .map(|r| (r, Self::target_name_from_tid(r.tid(), &target_dict)))
+            .into_par_iter()
+            .map(|r| {
+                let tid = r.tid();
+                (r, Self::target_name_from_tid(tid, &target_dict))
+            })
             .map(|(r, target_name)| Self::new(r, target_name, min_ml_score))
             .collect::<Vec<_>>()
     }
@@ -479,7 +483,7 @@ impl FiberseqData {
 
 #[allow(clippy::too_many_arguments)]
 pub fn process_bam_chunk(
-    records: &Vec<bam::Record>,
+    records: Vec<bam::Record>,
     so_far: usize,
     out_files: &mut FiberOut,
     head_view: &HeaderView,
@@ -551,10 +555,10 @@ pub fn process_bam_chunk(
     let duration = start.elapsed().as_secs_f64();
     log::info!(
         "Processing {}, {} reads done so far.",
-        format!("{:.2?} reads/s", records.len() as f64 / duration)
+        format!("{:.2?} reads/s", fiber_data.len() as f64 / duration)
             .bright_cyan()
             .bold(),
-        format!("{:}", so_far + records.len())
+        format!("{:}", so_far + fiber_data.len())
             .bright_magenta()
             .bold()
     );
@@ -586,7 +590,7 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
     };
     let mut processed_reads = 0;
     for chunk in bam_chunk_iter {
-        process_bam_chunk(&chunk, processed_reads, &mut out_files, &head_view);
         processed_reads += chunk.len();
+        process_bam_chunk(chunk, processed_reads, &mut out_files, &head_view);
     }
 }

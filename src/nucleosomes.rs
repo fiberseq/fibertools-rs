@@ -318,7 +318,7 @@ pub fn add_nucleosomes_to_bam(
             .par_iter_mut()
             .progress_with_style(style)
             .map(|record| {
-                let fd = extract::FiberseqData::new(record, None, 0);
+                let fd = extract::FiberseqData::new(record.clone(), None, 0);
                 let m6a = fd.base_mods.forward_m6a();
                 add_nucleosomes_to_record(record, &m6a.0, &options);
                 record
