@@ -11,12 +11,66 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::time::Instant;
 
+pub struct Ranges {
+    pub starts: Vec<i64>,
+    pub ends: Vec<i64>,
+    pub lengths: Vec<i64>,
+    pub reference_starts: Vec<i64>,
+    pub reference_ends: Vec<i64>,
+    pub reference_lengths: Vec<i64>,
+}
+
+impl Ranges {
+    pub fn new(
+        record: &bam::Record,
+        mut starts: Vec<i64>,
+        ends: Option<Vec<i64>>,
+        lengths: Option<Vec<i64>>,
+    ) -> Self {
+        if ends.is_none() && lengths.is_none() {
+            panic!("Must provide either ends or lengths");
+        }
+        // use ends or calculate them
+        let mut ends = match ends {
+            Some(x) => x,
+            None => starts
+                .iter()
+                .zip(lengths.unwrap().iter())
+                .map(|(&x, &y)| x + y)
+                .collect::<Vec<_>>(),
+        };
+
+        // get positions and lengths in reference orientation
+        positions_on_complimented_sequence_in_place(record, &mut starts, true);
+        positions_on_complimented_sequence_in_place(record, &mut ends, true);
+        // swaps starts and ends if we reverse complemented
+        if record.is_reverse() {
+            std::mem::swap(&mut starts, &mut ends);
+        }
+        // get lengths
+        let lengths = starts
+            .iter()
+            .zip(ends.iter())
+            .map(|(&x, &y)| y - x)
+            .collect::<Vec<_>>();
+
+        let (reference_starts, reference_ends, reference_lengths) =
+            closest_reference_range(record, &starts, &ends);
+        Ranges {
+            starts,
+            ends,
+            lengths,
+            reference_starts,
+            reference_ends,
+            reference_lengths,
+        }
+    }
+}
+
 pub struct FiberseqData {
     pub record: bam::Record,
-    pub nuc: Vec<(i64, i64)>,
-    pub msp: Vec<(i64, i64)>,
-    pub ref_nuc: Vec<(i64, i64)>,
-    pub ref_msp: Vec<(i64, i64)>,
+    pub msp: Ranges,
+    pub nuc: Ranges,
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
@@ -24,57 +78,12 @@ pub struct FiberseqData {
 
 impl FiberseqData {
     pub fn new(record: bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
-        let mut nuc_starts = get_u32_tag(&record, b"ns");
-        let mut msp_starts = get_u32_tag(&record, b"as");
-        let mut nuc_length = get_u32_tag(&record, b"nl");
-        let mut msp_length = get_u32_tag(&record, b"al");
-        let mut nuc_ends = nuc_starts
-            .iter()
-            .zip(nuc_length.iter())
-            .map(|(&x, &y)| x + y)
-            .collect::<Vec<_>>();
-        let mut msp_ends = msp_starts
-            .iter()
-            .zip(msp_length.iter())
-            .map(|(&x, &y)| x + y)
-            .collect::<Vec<_>>();
-        // get new starts, ends, and lengths in reference orientation
-        // i.e. query coordinates in bam format
-        if record.is_reverse() {
-            (nuc_ends, nuc_starts) = (
-                positions_on_complimented_sequence(&record, &nuc_starts),
-                positions_on_complimented_sequence(&record, &nuc_ends),
-            );
-            (msp_ends, msp_starts) = (
-                positions_on_complimented_sequence(&record, &msp_starts),
-                positions_on_complimented_sequence(&record, &msp_ends),
-            );
-
-            // because coordinates are [) we need to modify positions when complements so they remain [) instead of (]
-            nuc_starts = nuc_starts.iter().map(|&x| x + 1).collect::<Vec<_>>();
-            nuc_ends = nuc_ends.iter().map(|&x| x + 1).collect::<Vec<_>>();
-            msp_starts = msp_starts.iter().map(|&x| x + 1).collect::<Vec<_>>();
-            msp_ends = msp_ends.iter().map(|&x| x + 1).collect::<Vec<_>>();
-
-            // get the lengths
-            nuc_length = nuc_starts
-                .iter()
-                .zip(nuc_ends.iter())
-                .map(|(&x, &y)| y - x)
-                .collect::<Vec<_>>();
-            msp_length = msp_starts
-                .iter()
-                .zip(msp_ends.iter())
-                .map(|(&x, &y)| y - x)
-                .collect::<Vec<_>>();
-        }
-
-        // range positions
-        let ref_nuc = get_closest_reference_range(&nuc_starts, &nuc_length, &record);
-        let ref_msp = get_closest_reference_range(&msp_starts, &msp_length, &record);
-
-        assert_eq!(ref_nuc.len(), nuc_starts.len());
-        assert_eq!(ref_msp.len(), msp_starts.len());
+        let nuc_starts = get_u32_tag(&record, b"ns");
+        let msp_starts = get_u32_tag(&record, b"as");
+        let nuc_length = get_u32_tag(&record, b"nl");
+        let msp_length = get_u32_tag(&record, b"al");
+        let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
+        let msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
 
         // get the number of passes
         let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
@@ -91,18 +100,8 @@ impl FiberseqData {
         //
         FiberseqData {
             record,
-            nuc: nuc_starts
-                .iter()
-                .cloned()
-                .zip(nuc_length.iter().cloned())
-                .collect(),
-            msp: msp_starts
-                .iter()
-                .cloned()
-                .zip(msp_length.iter().cloned())
-                .collect(),
-            ref_nuc,
-            ref_msp,
+            msp,
+            nuc,
             base_mods,
             ec,
             target_name,
@@ -144,28 +143,30 @@ impl FiberseqData {
     }
 
     pub fn get_nuc(&self, reference: bool, get_starts: bool) -> Vec<i64> {
-        let (starts, lengths): (Vec<_>, Vec<_>) = if reference {
-            self.ref_nuc.iter().map(|(a, b)| (a, b)).unzip()
+        if reference {
+            if get_starts {
+                self.nuc.reference_starts.clone()
+            } else {
+                self.nuc.reference_lengths.clone()
+            }
+        } else if get_starts {
+            self.nuc.starts.clone()
         } else {
-            self.nuc.iter().map(|(a, b)| (a, b)).unzip()
-        };
-        if get_starts {
-            starts
-        } else {
-            lengths
+            self.nuc.lengths.clone()
         }
     }
 
     pub fn get_msp(&self, reference: bool, get_starts: bool) -> Vec<i64> {
-        let (starts, lengths): (Vec<_>, Vec<_>) = if reference {
-            self.ref_msp.iter().map(|(a, b)| (a, b)).unzip()
+        if reference {
+            if get_starts {
+                self.msp.reference_starts.clone()
+            } else {
+                self.msp.reference_lengths.clone()
+            }
+        } else if get_starts {
+            self.msp.starts.clone()
         } else {
-            self.msp.iter().map(|(a, b)| (a, b)).unzip()
-        };
-        if get_starts {
-            starts
-        } else {
-            lengths
+            self.msp.lengths.clone()
         }
     }
 
