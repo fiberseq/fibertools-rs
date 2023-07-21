@@ -63,6 +63,7 @@ and the docs will open in your browser.
 - [x] Set filters for ML depending on the model used
 - [ ] long format extract command
 - [ ] add option result to bamlift
+- [ ] improve speed of liftover closest in bamlift. It takes about 50% of the time. 
 - [x] Add more test cases, learn about test modules in folders
 - [x] GPU support
     - [ ] see if I can simplify or statically link PyTorch to get it onto bioconda
