@@ -118,14 +118,9 @@ impl CenteredFiberData {
         self.apply_offset(&self.fiber.base_mods.cpg_positions(self.reference))
     }
 
-    fn get_start_end_positions(&self, starts: Vec<i64>, lengths: Vec<i64>) -> Vec<(i64, i64)> {
-        let ends: Vec<i64> = lengths
-            .iter()
-            .zip(starts.iter())
-            .map(|(&length, &start)| length + start)
-            .collect();
-        let starts = self.apply_offset(&starts);
-        let ends = self.apply_offset(&ends);
+    fn get_start_end_positions(&self, starts: &[i64], ends: &[i64]) -> Vec<(i64, i64)> {
+        let starts = self.apply_offset(starts);
+        let ends = self.apply_offset(ends);
         starts
             .into_iter()
             .zip(ends)
@@ -143,17 +138,27 @@ impl CenteredFiberData {
     }
 
     pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
-        self.get_start_end_positions(
-            self.fiber.get_nuc(self.reference, true),
-            self.fiber.get_nuc(self.reference, false),
-        )
+        let (starts, ends) = if self.reference {
+            (
+                &self.fiber.nuc.reference_starts,
+                &self.fiber.nuc.reference_ends,
+            )
+        } else {
+            (&self.fiber.nuc.starts, &self.fiber.nuc.ends)
+        };
+        self.get_start_end_positions(starts, ends)
     }
 
     pub fn msp_positions(&self) -> Vec<(i64, i64)> {
-        self.get_start_end_positions(
-            self.fiber.get_msp(self.reference, true),
-            self.fiber.get_msp(self.reference, false),
-        )
+        let (starts, ends) = if self.reference {
+            (
+                &self.fiber.msp.reference_starts,
+                &self.fiber.msp.reference_ends,
+            )
+        } else {
+            (&self.fiber.msp.starts, &self.fiber.msp.ends)
+        };
+        self.get_start_end_positions(starts, ends)
     }
 
     pub fn get_sequence(&self) -> String {

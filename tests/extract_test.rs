@@ -21,8 +21,7 @@ fn test_msp_extract() -> Result<(), Box<dyn std::error::Error>> {
     let fiber_records = get_fiber_data_from_test_bam("tests/data/msp_nuc.bam");
     assert!(fiber_records.len() == 1);
     let fiber_data = &fiber_records[0];
-    let msp_starts = fiber_data.get_msp(false, true);
-    assert_eq!(msp_starts, expected_msp_starts);
+    assert_eq!(fiber_data.msp.starts, expected_msp_starts);
     Ok(())
 }
 
@@ -34,15 +33,14 @@ fn test_many_msps() {
         if m6a.is_empty() {
             continue;
         }
-        let msp_starts = fiber_data.get_msp(false, true);
-        let msp_lengths = fiber_data.get_msp(false, false);
-        let msp_ends = msp_starts
-            .iter()
-            .zip(msp_lengths.iter())
-            .map(|(start, length)| start + length - 1)
-            .collect::<Vec<_>>();
 
-        let msps = msp_starts.iter().chain(msp_ends.iter()).collect::<Vec<_>>();
+        let msps = fiber_data
+            .msp
+            .starts
+            .iter()
+            .map(|&x| x)
+            .chain(fiber_data.msp.ends.iter().map(|&x| x - 1))
+            .collect::<Vec<_>>();
         eprintln!("m6a: {:?}", m6a);
         eprintln!("msp: {:?}", msps);
         eprintln!(
@@ -51,7 +49,7 @@ fn test_many_msps() {
             fiber_data.record.seq_len()
         );
         for msp in msps {
-            assert!(m6a.contains(msp), "{}", msp);
+            assert!(m6a.contains(&msp), "{}", msp);
         }
     }
 }
