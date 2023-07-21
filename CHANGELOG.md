@@ -113,7 +113,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 71 commits contributed to the release over the course of 2 calendar days.
+ - 72 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 48 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -125,6 +125,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.2.6 ([`b80d856`](https://github.com/fiberseq/fibertools-rs/commit/b80d8567ee7ee899734fa5d2c5fd2b6604d45c78))
     - Release fibertools-rs v0.2.6 ([`14562fd`](https://github.com/fiberseq/fibertools-rs/commit/14562fd4b9552752ddba160cd3cba04e5f90102b))
     - Try again ([`4aa06eb`](https://github.com/fiberseq/fibertools-rs/commit/4aa06eb00c66afb2e5c0273247b81dbabfa15417))
     - Release fibertools-rs v0.2.6 ([`e247747`](https://github.com/fiberseq/fibertools-rs/commit/e24774703e6addefabcbe4b1a4df0a91383bdfa8))
