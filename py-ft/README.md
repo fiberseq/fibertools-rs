@@ -11,7 +11,7 @@ pip install pyft
 
 
 # Example
-https://github.com/fiberseq/fibertools-rs/blob/168c9517b5137dbd58950f341d96a420c7d50935/py-ft/example.py
+https://github.com/fiberseq/fibertools-rs/blob/168c9517b5137dbd58950f341d96a420c7d50935/py-ft/example.py#L1-L30
 
 ```python
 import pyft
