@@ -2,6 +2,7 @@
 pub mod basemods;
 /// Center fiberseq information around a reference position
 pub mod center;
+#[cfg(feature = "cli")]
 /// Command line interface for fibertools-rs.
 pub mod cli;
 /// Extract fiberseq data into plain text formats
