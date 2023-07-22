@@ -33,3 +33,6 @@ for idx, fiber in enumerate(fiberdata):
     # aligned blocks between query (fiber) and reference 
     fiber.get_aligned_blocks_as_ranges()
 ```
+
+# Documentation
+The documentation for `pyft` can be found on [readthedocs](https://py-ft.readthedocs.io/en/latest/).
