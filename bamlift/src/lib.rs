@@ -168,11 +168,14 @@ fn liftover_closest(
 
     // find the closest position for every position
     let mut starting_block = 0;
+    let ending_block = aligned_block_pairs.len();
     let mut pos_mapping = HashMap::new();
     for cur_pos in positions {
         pos_mapping.insert(cur_pos, (-1, i64::MAX));
         let mut current_block = 0;
-        for ([q_st, q_en], [r_st, r_en]) in &aligned_block_pairs[starting_block..] {
+        for block_index in starting_block..ending_block {
+            // get the current alignment block
+            let ([q_st, q_en], [r_st, r_en]) = &aligned_block_pairs[block_index];
             // get the previous closest position
             let (best_r_pos, best_diff) = pos_mapping.get_mut(cur_pos).unwrap();
             // exact match found
