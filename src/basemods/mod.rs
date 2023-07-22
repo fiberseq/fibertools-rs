@@ -45,7 +45,7 @@ impl BaseMod {
         let record_is_reverse = record.is_reverse();
 
         // get the reference positions
-        let reference_positions = get_exact_reference_positions(record, &modified_bases);
+        let reference_positions = lift_reference_positions_exact(record, &modified_bases);
         Self {
             modified_base,
             strand,
