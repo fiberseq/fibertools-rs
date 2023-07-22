@@ -12,16 +12,3 @@ pip install pyft
 
 # Example
 https://github.com/fiberseq/fibertools-rs/blob/168c9517b5137dbd58950f341d96a420c7d50935/py-ft/example.py#L1-L12
-
-```python
-import pyft
-bam_f = "../tests/data/center.bam"
-fiberdata = pyft.FiberdataFetch(bam_f, "chr1", 0, 1000)
-for fiber in fiberdata:
-    # print some info about the fiber
-    print(fiber)
-    # print the fiber number of ccs passes
-    print(fiber.ec)    
-    # print the mps start positions
-    print(fiber.msp.starts)    
-```
