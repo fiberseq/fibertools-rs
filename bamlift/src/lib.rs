@@ -150,15 +150,22 @@ where
     indexes
 }
 
-#[inline(always)]
 /// this is a helper function for liftover_closest that should only be called from there
 /// The exception for this is test cases, where it should be easier to test this function
 /// directly.
-fn _liftover_closest(
+fn liftover_closest(
     positions: &[i64],
-    aligned_block_pairs: Vec<([i64; 2], [i64; 2])>,
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
 ) -> Vec<i64> {
+    // skip empty
+    if positions.is_empty() {
+        return vec![];
+    }
+    if aligned_block_pairs.is_empty() {
+        return positions.iter().map(|_x| -1).collect();
+    }
     assert!(is_sorted(positions));
+
     // find the closest position for every position
     let mut starting_block = 0;
     let mut pos_mapping = HashMap::new();
@@ -205,60 +212,43 @@ fn _liftover_closest(
     rtn
 }
 
-fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
-    // skip unmapped
-    if record.is_unmapped() {
-        return positions.iter().map(|_x| -1).collect();
-    }
-    // skip empty
-    if positions.is_empty() {
-        return vec![];
-    }
-    // get the aligned block pairs
-    let mut aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
+/// find the closest reference positions for a list of query positions
+pub fn lift_reference_positions(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    query_positions: &[i64],
+) -> Vec<i64> {
+    liftover_closest(query_positions, aligned_block_pairs)
+}
+
+/// find the closest query positions for a list of reference positions
+pub fn lift_query_positions(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    reference_positions: &[i64],
+) -> Vec<i64> {
     // if lifting to the query, we need to reverse the pairs
-    if !get_reference {
-        aligned_block_pairs = aligned_block_pairs
-            .into_iter()
-            .map(|(q, r)| (r, q))
-            .collect();
-    }
-    _liftover_closest(positions, aligned_block_pairs)
+    let aligned_block_pairs = aligned_block_pairs.iter().map(|(q, r)| (*r, *q)).collect();
+    liftover_closest(reference_positions, &aligned_block_pairs)
 }
 
-///```
-/// use rust_htslib::{bam, bam::Read};
-/// use bamlift::*;
-/// use log;
-/// use env_logger::{Builder, Target};;
-/// Builder::new().target(Target::Stderr).filter(None, log::LevelFilter::Debug).init();
-/// let mut bam = bam::Reader::from_path(&"../tests/data/all.bam").unwrap();
-/// for record in bam.records() {
-///     let record = record.unwrap();
-///     let seq_len = i64::try_from(record.seq_len()).unwrap();
-///     let positions: Vec<i64> = (0..seq_len).collect();
-///     closest_reference_positions(&record, &positions);
-/// }
-///```
-pub fn closest_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    liftover_closest(record, query_positions, true)
-}
-
-pub fn closest_query_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
-    liftover_closest(record, query_positions, false)
-}
-
-/// reimplement get_closest_reference_range but hopefully better
-pub fn closest_reference_range(
-    record: &bam::Record,
+pub fn lift_range(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     starts: &[i64],
     ends: &[i64],
+    lift_reference_to_query: bool,
 ) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
     assert_eq!(starts.len(), ends.len());
-    let ref_starts = closest_reference_positions(record, starts);
-    let ref_ends = closest_reference_positions(record, ends);
+    let (ref_starts, ref_ends) = if !lift_reference_to_query {
+        (
+            lift_reference_positions(aligned_block_pairs, starts),
+            lift_reference_positions(aligned_block_pairs, ends),
+        )
+    } else {
+        (
+            lift_query_positions(aligned_block_pairs, starts),
+            lift_query_positions(aligned_block_pairs, ends),
+        )
+    };
     assert_eq!(ref_starts.len(), ref_ends.len());
-
     let rtn = ref_starts
         .into_iter()
         .zip(ref_ends.into_iter())
@@ -273,14 +263,29 @@ pub fn closest_reference_range(
     multiunzip(rtn)
 }
 
+/// Find the closest range but hopefully better
+pub fn closest_reference_range(
+    record: &bam::Record,
+    starts: &[i64],
+    ends: &[i64],
+) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+    // get the aligned block pairs
+    let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
+    lift_range(&aligned_block_pairs, starts, ends, false)
+}
+
 /// liftover positions using the cigar string
-fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
+pub fn liftover_exact(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    positions: &[i64],
+    lift_reference_to_query: bool,
+) -> Vec<i64> {
     // find the shared positions in the reference
     let mut return_positions = vec![];
     let mut cur_idx = 0;
     // ends are not inclusive, I checked.
-    for ([q_st, q_en], [r_st, r_en]) in record.aligned_block_pairs() {
-        let (st, en) = if get_reference {
+    for ([q_st, q_en], [r_st, r_en]) in aligned_block_pairs {
+        let (st, en) = if !lift_reference_to_query {
             (q_st, q_en)
         } else {
             (r_st, r_en)
@@ -291,10 +296,10 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
         }
         let mut cur_pos = positions[cur_idx];
         // need to go to the next block
-        while cur_pos < en {
-            if cur_pos >= st {
+        while cur_pos < *en {
+            if cur_pos >= *st {
                 let dist_from_start = cur_pos - st;
-                let rtn_pos = if get_reference {
+                let rtn_pos = if !lift_reference_to_query {
                     r_st + dist_from_start
                 } else {
                     q_st + dist_from_start
@@ -320,36 +325,20 @@ fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) 
     return_positions
 }
 
-pub fn get_exact_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
+pub fn lift_reference_positions_exact(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
     if record.is_unmapped() {
         query_positions.iter().map(|_x| -1).collect()
     } else {
-        liftover_exact(record, query_positions, true)
+        let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
+        liftover_exact(&aligned_block_pairs, query_positions, false)
     }
 }
 
-pub fn get_exact_query_positions(record: &bam::Record, reference_positions: &[i64]) -> Vec<i64> {
+pub fn lift_query_positions_exact(record: &bam::Record, reference_positions: &[i64]) -> Vec<i64> {
     if record.is_unmapped() {
         reference_positions.iter().map(|_x| -1).collect()
     } else {
-        liftover_exact(record, reference_positions, false)
+        let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
+        liftover_exact(&aligned_block_pairs, reference_positions, true)
     }
-}
-
-///
-/// TESTS
-///
-#[test]
-fn test_private_liftover_closest() {
-    let aligned_block_pairs = vec![
-        ([0, 4], [40, 44]),
-        ([7, 8], [50, 51]),
-        ([9, 20], [59, 70]),
-        ([20, 21], [70, 71]),
-    ];
-
-    let positions = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-    let expected_result = vec![41, 42, 43, 44, 44, 50, 50, 51, 59];
-    let result = _liftover_closest(&positions, aligned_block_pairs);
-    assert_eq!(result, expected_result);
 }
