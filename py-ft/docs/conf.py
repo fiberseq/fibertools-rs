@@ -3,10 +3,11 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import os
+import sphinx
+import re
 import sys
-
+import sphinx.ext.autosummary as autosummary
 sys.path.insert(0, os.path.abspath("../"))
-
 import pyft
 
 # -- Project information -----------------------------------------------------
@@ -16,8 +17,8 @@ project = "pyft"
 copyright = "2023, Mitchell R. Vollger"
 author = "Mitchell R. Vollger"
 version = pyft.__version__
-# The full version, including alpha/beta/rc tags.
 release = pyft.__version__
+
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -25,10 +26,10 @@ release = pyft.__version__
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
-    "sphinx.ext.napoleon",
+    #"sphinx.ext.napoleon",
     "sphinx_rtd_theme",
     "sphinx.ext.intersphinx",
-    # "edit_on_github",
+    #"edit_on_github",
     "m2r2",
 ]
 
@@ -50,5 +51,7 @@ html_css_files = [
 ]
 html_logo = "_static/img/fiber_tools_grey.png"
 
+
 # other options
 autodoc_member_order = 'bysource'
+
