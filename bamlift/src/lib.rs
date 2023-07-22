@@ -264,7 +264,7 @@ pub fn lift_range(
 }
 
 /// Find the closest range but hopefully better
-pub fn closest_reference_range(
+pub fn lift_query_range(
     record: &bam::Record,
     starts: &[i64],
     ends: &[i64],

@@ -55,7 +55,7 @@ impl Ranges {
             .collect::<Vec<_>>();
 
         let (reference_starts, reference_ends, reference_lengths) =
-            closest_reference_range(record, &starts, &ends);
+            lift_query_range(record, &starts, &ends);
         Ranges {
             starts,
             ends,
