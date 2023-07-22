@@ -1,3 +1,4 @@
+use bamlift;
 use fibertools_rs::extract::FiberseqData;
 use log;
 use pyo3::iter::IterNextOutput;
@@ -55,8 +56,9 @@ pub struct Fiberdata {
     /// :class:`~pyft.Ranges` object for nuc features
     #[pyo3(get, set)]
     pub nuc: Ranges,
-    /// hiden
-    fiber: FiberseqData,
+    /// Aligned block pairs from the bam record
+    #[pyo3(get)]
+    pub aligned_block_pairs: Vec<([i64; 2], [i64; 2])>,
 }
 #[pymethods]
 impl Fiberdata {
@@ -82,15 +84,20 @@ impl Fiberdata {
         self.seq.len()
     }
 
+    /// liftover query (fiber) positions to the reference
+    pub fn lift_query_positions(&self, positions: Vec<i64>) -> Vec<i64> {
+        bamlift::lift_query_positions(&self.aligned_block_pairs, &positions)
+    }
+
+    /// liftover reference positions to the query (fiber)
+    pub fn lift_reference_positions(&self, positions: Vec<i64>) -> Vec<i64> {
+        bamlift::lift_reference_positions(&self.aligned_block_pairs, &positions)
+    }
+
     /// Return a :class:`~pyft.Ranges` object for the continuous aligned regions of the fiber
-    pub fn get_aligned_ranges(&self) -> Ranges {
-        let (fiber, genome): (Vec<[i64; 2]>, Vec<[i64; 2]>) = self
-            .fiber
-            .record
-            .aligned_block_pairs()
-            .collect::<Vec<_>>()
-            .into_iter()
-            .unzip();
+    pub fn get_aligned_blocks_as_ranges(&self) -> Ranges {
+        let (fiber, genome): (Vec<[i64; 2]>, Vec<[i64; 2]>) =
+            self.aligned_block_pairs.iter().cloned().unzip();
         let starts = fiber.iter().map(|x| x[0]).collect();
         let lengths = fiber.iter().map(|x| x[1] - x[0]).collect();
         let reference_starts = genome.iter().map(|x| x[0]).collect();
@@ -165,7 +172,7 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
         reference_lengths: fiber.msp.reference_lengths,
     };
     */
-
+    let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();
     Fiberdata {
         ec,
         qname: qname.to_string(),
@@ -182,7 +189,7 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
         cpg,
         msp,
         nuc,
-        fiber,
+        aligned_block_pairs,
     }
 }
 
