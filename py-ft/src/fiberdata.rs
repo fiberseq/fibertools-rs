@@ -147,6 +147,25 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
     let ref_nuc_lengths = fiber.get_nuc(true, false);
     let nuc = Ranges::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
 
+    /*
+    let nuc = Ranges {
+        starts: fiber.nuc.starts,
+        ends: fiber.nuc.ends,
+        lengths: fiber.nuc.lengths,
+        reference_starts: fiber.nuc.reference_starts,
+        reference_ends: fiber.nuc.reference_ends,
+        reference_lengths: fiber.nuc.reference_lengths,
+    };
+    let msp = Ranges {
+        starts: fiber.msp.starts,
+        ends: fiber.msp.ends,
+        lengths: fiber.msp.lengths,
+        reference_starts: fiber.msp.reference_starts,
+        reference_ends: fiber.msp.reference_ends,
+        reference_lengths: fiber.msp.reference_lengths,
+    };
+    */
+
     Fiberdata {
         ec,
         qname: qname.to_string(),
