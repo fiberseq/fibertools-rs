@@ -12,6 +12,9 @@ pip install pyft
 
 # Example
 https://github.com/fiberseq/fibertools-rs/blob/main/py-ft/example.py#L1-L12
+
+https://github.com/fiberseq/fibertools-rs/blob/f5a65a612b8978f9742dab6990a8d52c6df7645a/py-ft/example.py#L1-L12
+
 ```python
 import pyft
 bam_f = "../tests/data/center.bam"
