@@ -1,12 +1,8 @@
-use bamlift;
 use fibertools_rs::extract::FiberseqData;
-use log;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
 use std::vec::IntoIter;
-//use rust_htslib::bam::Read;
-//use std::io::Result;
 
 #[pyclass]
 /// Record class for fiberseq data, corresponding to a single bam record
