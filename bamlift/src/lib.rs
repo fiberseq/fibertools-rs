@@ -259,7 +259,7 @@ pub fn closest_reference_range(
     let ref_ends = closest_reference_positions(record, ends);
     assert_eq!(ref_starts.len(), ref_ends.len());
 
-    let z = ref_starts
+    let rtn = ref_starts
         .into_iter()
         .zip(ref_ends.into_iter())
         .map(|(start, end)| {
@@ -270,45 +270,11 @@ pub fn closest_reference_range(
             }
         })
         .collect::<Vec<_>>();
-    multiunzip(z)
+    multiunzip(rtn)
 }
 
 /// liftover positions using the cigar string
-fn _liftover_exact_old(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
-    // find the shared positions in the reference
-    let mut return_positions = vec![];
-    let mut cur_pos = 0;
-    for [q_pos, r_pos] in record.aligned_pairs() {
-        // check whether we are searching for an exact position in
-        // the reference or the query
-        let val_to_match = if get_reference { q_pos } else { r_pos };
-        // iterate over positions until we find the exact position or move past it
-        while cur_pos < positions.len() && positions[cur_pos] <= val_to_match {
-            if positions[cur_pos] == val_to_match {
-                if get_reference {
-                    return_positions.push(r_pos);
-                } else {
-                    return_positions.push(q_pos);
-                }
-            } else {
-                return_positions.push(-1);
-            }
-            cur_pos += 1;
-        }
-        if cur_pos == positions.len() {
-            break;
-        }
-    }
-    // add values for things that won't lift at the end
-    while positions.len() > return_positions.len() {
-        return_positions.push(-1);
-    }
-    assert_eq!(positions.len(), return_positions.len());
-    return_positions
-}
-
-/// liftover positions using the cigar string
-fn liftover_exact_new(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
+fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
     // find the shared positions in the reference
     let mut return_positions = vec![];
     let mut cur_idx = 0;
@@ -352,13 +318,6 @@ fn liftover_exact_new(record: &bam::Record, positions: &[i64], get_reference: bo
     }
     assert_eq!(positions.len(), return_positions.len());
     return_positions
-}
-
-fn liftover_exact(record: &bam::Record, positions: &[i64], get_reference: bool) -> Vec<i64> {
-    let new = liftover_exact_new(record, positions, get_reference);
-    //let old = _liftover_exact_old(record, positions, get_reference);
-    //assert_eq!(new, old);
-    new
 }
 
 pub fn get_exact_reference_positions(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
