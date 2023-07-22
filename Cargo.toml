@@ -35,7 +35,7 @@ lazy_static = "1.4.0"
 log = "0.4"
 ordered-float = "3.4.0"
 rayon = "1.5"
-regex = "1.5.4"
+regex = "1.9.1"
 rust-htslib = "0.44.1"
 serde = {version = "1.0.104", features = ["derive"], optional = true}
 serde_json = {version = "1.0.48", optional = true}
