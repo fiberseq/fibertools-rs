@@ -1,5 +1,6 @@
 use itertools::multiunzip;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
 /// Merge two lists into a sorted list
@@ -153,7 +154,61 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
     if record.is_unmapped() {
         return positions.iter().map(|_x| -1).collect();
     }
+    // skip empty
+    if positions.is_empty() {
+        return vec![];
+    }
+    // get the aligned block pairs
+    let mut aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
+    if !get_reference {
+        aligned_block_pairs = aligned_block_pairs
+            .into_iter()
+            .map(|(q, r)| (r, q))
+            .collect();
+    }
 
+    // find the closest position for every position
+    let mut starting_block = 0;
+    let mut pos_mapping = HashMap::new();
+    for cur_pos in positions {
+        pos_mapping.insert(cur_pos, (-1, i64::MAX));
+        let mut current_block = 0;
+        for ([q_st, q_en], [r_st, r_en]) in &aligned_block_pairs[starting_block..] {
+            // get the previous closest position
+            let (best_r_pos, best_diff) = pos_mapping.get_mut(cur_pos).unwrap();
+            // exact match found
+            if cur_pos >= &q_st && cur_pos < &q_en {
+                let dist_from_start = cur_pos - q_st;
+                *best_diff = 0;
+                *best_r_pos = r_st + dist_from_start;
+                break;
+            }
+            // we are before the start of the block
+            else if cur_pos < &q_st {
+                let diff = (q_st - cur_pos).abs();
+                if diff < *best_diff {
+                    *best_diff = diff;
+                    *best_r_pos = *r_st;
+                }
+            }
+            // we are past the end of the block
+            else if cur_pos >= &q_en {
+                let diff = (q_en - cur_pos).abs();
+                if diff < *best_diff {
+                    *best_diff = diff;
+                    *best_r_pos = *r_en;
+                }
+                starting_block = current_block + 1;
+            }
+            current_block += 1;
+        }
+    }
+    let mut rtn = vec![];
+    for q_pos in positions {
+        let (r_pos, _diff) = pos_mapping.get(q_pos).unwrap();
+        rtn.push(*r_pos);
+    }
+    /*
     // real work
     let (q_pos, r_pos): (Vec<i64>, Vec<i64>) = record
         .aligned_pairs()
@@ -178,6 +233,7 @@ fn liftover_closest(record: &bam::Record, positions: &[i64], get_reference: bool
         //log::trace!("Idx {}\tr_pos {}", idx, r_pos[idx]);
         rtn.push(return_positions[idx]);
     }
+     */
     assert_eq!(rtn.len(), positions.len());
     rtn
 }
@@ -226,7 +282,7 @@ pub fn get_closest_reference_range(
         //.filter(|(&start, &end)| start < end) // filter out zero length ranges, basically means there is no liftover
         //.map(|(&start, &end)| (start, end - start))
         .map(|(&start, &end)| {
-            if end <= start {
+            if end <= start || start == -1 || end == -1 {
                 (-1, -1)
             } else {
                 (start, end - start)
