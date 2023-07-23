@@ -60,7 +60,7 @@ impl CenteredFiberData {
     }
 
     /// find the query position that corresponds to the central reference position
-    fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
+    pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
         let read_center: Vec<i64> = lift_query_positions_exact(record, &[reference_position])
             .into_iter()
             .filter(|&x| x >= 0)
