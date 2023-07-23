@@ -139,19 +139,7 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
     let m6a = Basemods::new(m6a.0, m6a.1, m6a.2);
     let cpg = fiber.base_mods.cpg();
     let cpg = Basemods::new(cpg.0, cpg.1, cpg.2);
-    let msp_starts = fiber.get_msp(false, true);
-    let msp_lengths = fiber.get_msp(false, false);
-    let ref_msp_starts = fiber.get_msp(true, true);
-    let ref_msp_lengths = fiber.get_msp(true, false);
-    let msp = Ranges::new(msp_starts, msp_lengths, ref_msp_starts, ref_msp_lengths);
 
-    let nuc_starts = fiber.get_nuc(false, true);
-    let nuc_lengths = fiber.get_nuc(false, false);
-    let ref_nuc_starts = fiber.get_nuc(true, true);
-    let ref_nuc_lengths = fiber.get_nuc(true, false);
-    let nuc = Ranges::new(nuc_starts, nuc_lengths, ref_nuc_starts, ref_nuc_lengths);
-
-    /*
     let nuc = Ranges {
         starts: fiber.nuc.starts,
         ends: fiber.nuc.ends,
@@ -168,7 +156,7 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
         reference_ends: fiber.msp.reference_ends,
         reference_lengths: fiber.msp.reference_lengths,
     };
-    */
+
     let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();
     Fiberdata {
         ec,
@@ -254,6 +242,7 @@ fn build_fiberdata_iter(fiberdata: Vec<FiberseqData>) -> Fiberiter {
 pub struct Fiberiter {
     fiberdata: IntoIter<FiberseqData>,
     length: usize,
+    //records: Vec<bam::Record>,
 }
 
 #[pymethods]
