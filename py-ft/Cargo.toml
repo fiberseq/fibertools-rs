@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "pyft"
-version = "0.1.6"
+version = "0.1.7"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -18,6 +18,6 @@ fibertools-rs = {path = "../", default-features = false}
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
-pyo3 = "0.19.0"
+pyo3 = "0.19.1"
 regex = "1.9.1"
 rust-htslib = "0.44.1"

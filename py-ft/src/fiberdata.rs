@@ -179,9 +179,7 @@ fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
 }
 
 #[pyclass]
-/// Create a fibertools iterator from an indexed bam file.
-/// Must provide a valid chrom, start, and end.
-/// Returns an iterator over :class:`~pyft.Fiberdata` objects.
+/// Open a fiberseq bam file. Must have an index.
 pub struct Fiberbam {
     bam: bam::IndexedReader,
     header: bam::Header,
@@ -189,40 +187,54 @@ pub struct Fiberbam {
 }
 
 #[pymethods]
-/// Open a fiberseq bam file. Must have an index.
 impl Fiberbam {
     #[new]
-    pub fn new(f: &str) -> Self {
-        let mut bam = bam::IndexedReader::from_path(f).expect("unable to open indexed bam file");
-        bam.set_threads(8).unwrap();
+    #[pyo3(signature = (bam_file, threads = 8))]
+    fn new(bam_file: &str, threads: usize) -> Self {
+        let mut bam =
+            bam::IndexedReader::from_path(bam_file).expect("unable to open indexed bam file");
+        bam.set_threads(threads).unwrap();
         let header = bam::Header::from_template(bam.header());
         let start = time::Instant::now();
         Self { bam, header, start }
     }
 
     /// Returns an iterator over :class:`~pyft.Fiberdata` objects for the selected region.
-    pub fn fetch(&mut self, chrom: &str, start: i64, end: i64) -> Fiberiter {
+    /// Arguments for the region to fetch can be provided in multiple ways, e.g.:
+    ///
+    ///     fiberdata.fetch("chr1", 100, 200)
+    ///
+    ///     fiberdata.fetch("chr1", start=100, end=200)
+    ///
+    ///     fiberdata.fetch("chr1:100-200")
+    ///
+    ///     fiberdata.fetch("chr1")
+    #[pyo3(signature = (chrom, start = None, end=None))]
+    pub fn fetch(&mut self, chrom: &str, start: Option<i64>, end: Option<i64>) -> Fiberiter {
+        let fetch_args = if start.is_none() || end.is_none() {
+            bam::FetchDefinition::from(chrom)
+        } else {
+            bam::FetchDefinition::from((chrom, start.unwrap(), end.unwrap()))
+        };
         let head_view = bam::HeaderView::from_header(&self.header);
-        self.bam
-            .fetch((chrom, start, end))
-            .expect("unable to fetch region");
+        self.bam.fetch(fetch_args).expect("unable to fetch region");
         let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
 
         log::info!(
             "{} records fetched in {:.2}s",
             records.len(),
-            self.time_from_last()
+            self._time_from_last()
         );
         let fiberdata = FiberseqData::from_records(records, &head_view, 0);
         log::info!(
             "Fiberdata made for {} records in {:.2}s",
             fiberdata.len(),
-            self.time_from_last()
+            self._time_from_last()
         );
         build_fiberdata_iter(fiberdata)
     }
 
-    fn time_from_last(&mut self) -> f64 {
+    fn _time_from_last(&mut self) -> f64 {
         let elapsed = self.start.elapsed().as_secs_f64();
         self.start = time::Instant::now();
         elapsed
@@ -242,7 +254,6 @@ fn build_fiberdata_iter(fiberdata: Vec<FiberseqData>) -> Fiberiter {
 pub struct Fiberiter {
     fiberdata: IntoIter<FiberseqData>,
     length: usize,
-    //records: Vec<bam::Record>,
 }
 
 #[pymethods]
