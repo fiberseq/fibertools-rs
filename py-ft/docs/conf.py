@@ -25,7 +25,7 @@ release = pyft.__version__
 
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx_autodoc_typehints",
+    #"sphinx_autodoc_typehints",
     "sphinx.ext.viewcode",
     #"sphinx.ext.napoleon",
     "sphinx_rtd_theme",
@@ -49,9 +49,9 @@ html_theme = "sphinx_rtd_theme"
 #html_permalinks_icon = '<span>#</span>'
 #html_theme = 'sphinxawesome_theme'
 html_static_path = ["_static"]
-html_css_files = [
+#html_css_files = [
     #"css/rtd_dark.css",
-]
+#]
 html_logo = "_static/img/fiber_tools_grey.png"
 
 
