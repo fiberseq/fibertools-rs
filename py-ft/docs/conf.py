@@ -3,10 +3,10 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import os
-import sphinx
 import re
 import sys
-import sphinx.ext.autosummary as autosummary
+#import sphinx
+#import sphinx.ext.autosummary as autosummary
 sys.path.insert(0, os.path.abspath("../"))
 import pyft
 
@@ -25,6 +25,7 @@ release = pyft.__version__
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx_autodoc_typehints",
     "sphinx.ext.viewcode",
     #"sphinx.ext.napoleon",
     "sphinx_rtd_theme",
@@ -43,8 +44,10 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-# html_theme = "alabaster"
+#html_theme = "alabaster"
 html_theme = "sphinx_rtd_theme"
+#html_permalinks_icon = '<span>#</span>'
+#html_theme = 'sphinxawesome_theme'
 html_static_path = ["_static"]
 html_css_files = [
     "css/rtd_dark.css",

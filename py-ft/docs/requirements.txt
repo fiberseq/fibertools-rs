@@ -1,2 +1,7 @@
 m2r2
 sphinx_bootstrap_theme
+sphinx<7.0.0
+sphinx-autodoc-typehints
+sphinx-rtd-theme
+docutils
+#sphinxawesome-theme
