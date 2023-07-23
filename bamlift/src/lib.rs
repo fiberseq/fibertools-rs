@@ -164,7 +164,10 @@ fn liftover_closest(
     if aligned_block_pairs.is_empty() {
         return positions.iter().map(|_x| -1).collect();
     }
-    assert!(is_sorted(positions));
+    assert!(
+        is_sorted(positions),
+        "Positions must be sorted before calling liftover!"
+    );
 
     // find the closest position for every position
     let mut starting_block = 0;
@@ -283,6 +286,11 @@ pub fn liftover_exact(
     positions: &[i64],
     lift_reference_to_query: bool,
 ) -> Vec<i64> {
+    assert!(
+        is_sorted(positions),
+        "Positions must be sorted before calling liftover!"
+    );
+
     // find the shared positions in the reference
     let mut return_positions = vec![];
     let mut cur_idx = 0;

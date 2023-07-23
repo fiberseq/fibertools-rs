@@ -10,6 +10,7 @@ for idx, fiber in enumerate(tqdm.tqdm(fiberdata)):
     
     fiber.get_aligned_blocks_as_ranges()
     fiber.lift_query_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    fiber.lift_query_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 5])
     fiber.lift_reference_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
 
