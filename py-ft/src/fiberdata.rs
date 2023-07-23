@@ -1,3 +1,4 @@
+use fibertools_rs::center::CenteredFiberData;
 use fibertools_rs::extract::FiberseqData;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
@@ -6,7 +7,7 @@ use std::time;
 use std::vec::IntoIter;
 
 #[pyclass]
-/// Record class for fiberseq data, corresponding to a single bam record
+/// Class for fiberseq data. This class corresponds to a single record in the bam file.
 pub struct Fiberdata {
     /// Number of ccs passes
     #[pyo3(get, set)]
@@ -56,6 +57,9 @@ pub struct Fiberdata {
     /// Aligned block pairs from the bam record
     #[pyo3(get)]
     pub aligned_block_pairs: Vec<([i64; 2], [i64; 2])>,
+    /// offset for centering the fiber
+    #[pyo3(get, set)]
+    offset: Option<i64>,
 }
 #[pymethods]
 impl Fiberdata {
@@ -101,80 +105,121 @@ impl Fiberdata {
         let reference_lengths = genome.iter().map(|x| x[1] - x[0]).collect();
         Ranges::new(starts, lengths, reference_starts, reference_lengths)
     }
+
+    /// Center all coordinates on the read using the offset attribute.
+    pub fn _center(&mut self, strand: char) {
+        let offset = if let Some(offset) = self.offset {
+            offset
+        } else {
+            return;
+        };
+        // move basemods
+        Fibercenter::apply_offset(&mut self.m6a.starts, offset, strand);
+        Fibercenter::apply_offset(&mut self.m6a.reference_starts, offset, strand);
+        Fibercenter::apply_offset(&mut self.cpg.starts, offset, strand);
+        Fibercenter::apply_offset(&mut self.cpg.reference_starts, offset, strand);
+        // move ranges
+        Fibercenter::offset_range(&mut self.msp.starts, &mut self.msp.ends, offset, strand);
+        Fibercenter::offset_range(
+            &mut self.msp.reference_starts,
+            &mut self.msp.reference_ends,
+            offset,
+            strand,
+        );
+        Fibercenter::offset_range(&mut self.nuc.starts, &mut self.nuc.ends, offset, strand);
+        Fibercenter::offset_range(
+            &mut self.nuc.reference_starts,
+            &mut self.nuc.reference_ends,
+            offset,
+            strand,
+        );
+        // correct orientations
+        if strand == '-' {
+            self.m6a.ml.reverse();
+            self.cpg.ml.reverse();
+            self.msp.lengths.reverse();
+            self.msp.reference_lengths.reverse();
+            self.nuc.lengths.reverse();
+            self.nuc.reference_lengths.reverse();
+        }
+    }
 }
 
-fn new_py_fiberdata(fiber: FiberseqData) -> Fiberdata {
-    // PB features
-    let ec = fiber.ec.round() as i64;
+impl Fiberdata {
+    fn new(fiber: FiberseqData, offset: Option<i64>) -> Self {
+        // PB features
+        let ec = fiber.ec.round() as i64;
 
-    // record features
-    let qname = std::str::from_utf8(fiber.record.qname()).unwrap();
-    let sam_flag = fiber.record.flags();
-    let rq = match fiber.get_rq() {
-        Some(x) => format!("{}", x),
-        None => ".".to_string(),
-    };
-    let hp = fiber.get_hp();
-    let seq = String::from_utf8_lossy(&fiber.record.seq().as_bytes()).to_string();
-    let (chrom, start, end, strand): (&str, i64, i64, char) = if fiber.record.is_unmapped() {
-        (".", 0, 0, '.')
-    } else {
-        let strand = if fiber.record.is_reverse() { '-' } else { '+' };
-        (
-            &fiber.target_name,
-            fiber.record.reference_start(),
-            fiber.record.reference_end(),
+        // record features
+        let qname = std::str::from_utf8(fiber.record.qname()).unwrap();
+        let sam_flag = fiber.record.flags();
+        let rq = match fiber.get_rq() {
+            Some(x) => format!("{}", x),
+            None => ".".to_string(),
+        };
+        let hp = fiber.get_hp();
+        let seq = String::from_utf8_lossy(&fiber.record.seq().as_bytes()).to_string();
+        let (chrom, start, end, strand): (&str, i64, i64, char) = if fiber.record.is_unmapped() {
+            (".", 0, 0, '.')
+        } else {
+            let strand = if fiber.record.is_reverse() { '-' } else { '+' };
+            (
+                &fiber.target_name,
+                fiber.record.reference_start(),
+                fiber.record.reference_end(),
+                strand,
+            )
+        };
+        let rg = if let Ok(Aux::String(f)) = fiber.record.aux(b"RG") {
+            log::trace!("{f}");
+            f
+        } else {
+            "."
+        };
+
+        // fiberseq features
+        let m6a = fiber.base_mods.m6a();
+        let m6a = Basemods::new(m6a.0, m6a.1, m6a.2);
+        let cpg = fiber.base_mods.cpg();
+        let cpg = Basemods::new(cpg.0, cpg.1, cpg.2);
+
+        let nuc = Ranges {
+            starts: fiber.nuc.starts,
+            ends: fiber.nuc.ends,
+            lengths: fiber.nuc.lengths,
+            reference_starts: fiber.nuc.reference_starts,
+            reference_ends: fiber.nuc.reference_ends,
+            reference_lengths: fiber.nuc.reference_lengths,
+        };
+        let msp = Ranges {
+            starts: fiber.msp.starts,
+            ends: fiber.msp.ends,
+            lengths: fiber.msp.lengths,
+            reference_starts: fiber.msp.reference_starts,
+            reference_ends: fiber.msp.reference_ends,
+            reference_lengths: fiber.msp.reference_lengths,
+        };
+
+        let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();
+        Self {
+            ec,
+            qname: qname.to_string(),
+            sam_flag,
+            rq,
+            hp,
+            seq,
+            chrom: chrom.to_string(),
+            start,
+            end,
             strand,
-        )
-    };
-    let rg = if let Ok(Aux::String(f)) = fiber.record.aux(b"RG") {
-        log::trace!("{f}");
-        f
-    } else {
-        "."
-    };
-
-    // fiberseq features
-    let m6a = fiber.base_mods.m6a();
-    let m6a = Basemods::new(m6a.0, m6a.1, m6a.2);
-    let cpg = fiber.base_mods.cpg();
-    let cpg = Basemods::new(cpg.0, cpg.1, cpg.2);
-
-    let nuc = Ranges {
-        starts: fiber.nuc.starts,
-        ends: fiber.nuc.ends,
-        lengths: fiber.nuc.lengths,
-        reference_starts: fiber.nuc.reference_starts,
-        reference_ends: fiber.nuc.reference_ends,
-        reference_lengths: fiber.nuc.reference_lengths,
-    };
-    let msp = Ranges {
-        starts: fiber.msp.starts,
-        ends: fiber.msp.ends,
-        lengths: fiber.msp.lengths,
-        reference_starts: fiber.msp.reference_starts,
-        reference_ends: fiber.msp.reference_ends,
-        reference_lengths: fiber.msp.reference_lengths,
-    };
-
-    let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();
-    Fiberdata {
-        ec,
-        qname: qname.to_string(),
-        sam_flag,
-        rq,
-        hp,
-        seq,
-        chrom: chrom.to_string(),
-        start,
-        end,
-        strand,
-        rg: rg.to_string(),
-        m6a,
-        cpg,
-        msp,
-        nuc,
-        aligned_block_pairs,
+            rg: rg.to_string(),
+            m6a,
+            cpg,
+            msp,
+            nuc,
+            aligned_block_pairs,
+            offset,
+        }
     }
 }
 
@@ -184,6 +229,38 @@ pub struct Fiberbam {
     bam: bam::IndexedReader,
     header: bam::Header,
     start: time::Instant,
+}
+
+/// pure rust functions for Fiberbam
+impl Fiberbam {
+    fn _fetch_helper(
+        &mut self,
+        chrom: &str,
+        start: Option<i64>,
+        end: Option<i64>,
+    ) -> Vec<FiberseqData> {
+        let fetch_args = match (start, end) {
+            (Some(start), Some(end)) => bam::FetchDefinition::from((chrom, start, end)),
+            _ => bam::FetchDefinition::from(chrom),
+        };
+
+        let head_view = bam::HeaderView::from_header(&self.header);
+        self.bam.fetch(fetch_args).expect("unable to fetch region");
+        let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
+
+        log::info!(
+            "{} records fetched in {:.2}s",
+            records.len(),
+            self._time_from_last()
+        );
+        let fiberdata = FiberseqData::from_records(records, &head_view, 0);
+        log::info!(
+            "Fiberdata made for {} records in {:.2}s",
+            fiberdata.len(),
+            self._time_from_last()
+        );
+        fiberdata
+    }
 }
 
 #[pymethods]
@@ -211,41 +288,25 @@ impl Fiberbam {
     ///     fiberdata.fetch("chr1")
     #[pyo3(signature = (chrom, start = None, end=None))]
     pub fn fetch(&mut self, chrom: &str, start: Option<i64>, end: Option<i64>) -> Fiberiter {
-        let fetch_args = if start.is_none() || end.is_none() {
-            bam::FetchDefinition::from(chrom)
-        } else {
-            bam::FetchDefinition::from((chrom, start.unwrap(), end.unwrap()))
-        };
-        let head_view = bam::HeaderView::from_header(&self.header);
-        self.bam.fetch(fetch_args).expect("unable to fetch region");
-        let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
+        Fiberiter::build_fiberdata_iter(self._fetch_helper(chrom, start, end))
+    }
 
-        log::info!(
-            "{} records fetched in {:.2}s",
-            records.len(),
-            self._time_from_last()
+    /// Returns an iterator over :class:`~pyft.Fiberdata` objects; however, the data is centered around the region that has been fetched (works the same as **ft center**).
+    #[pyo3(signature = (chrom, start, end, strand = '+'))]
+    pub fn center(&mut self, chrom: &str, start: i64, end: i64, strand: char) -> Fibercenter {
+        let centering_position = if strand == '-' { end - 1 } else { start };
+        let fiberdata = self._fetch_helper(
+            chrom,
+            Some(centering_position),
+            Some(centering_position + 1),
         );
-        let fiberdata = FiberseqData::from_records(records, &head_view, 0);
-        log::info!(
-            "Fiberdata made for {} records in {:.2}s",
-            fiberdata.len(),
-            self._time_from_last()
-        );
-        build_fiberdata_iter(fiberdata)
+        Fibercenter::new(fiberdata, centering_position, strand)
     }
 
     fn _time_from_last(&mut self) -> f64 {
         let elapsed = self.start.elapsed().as_secs_f64();
         self.start = time::Instant::now();
         elapsed
-    }
-}
-
-fn build_fiberdata_iter(fiberdata: Vec<FiberseqData>) -> Fiberiter {
-    let length = fiberdata.len();
-    Fiberiter {
-        fiberdata: fiberdata.into_iter(),
-        length,
     }
 }
 
@@ -256,12 +317,23 @@ pub struct Fiberiter {
     length: usize,
 }
 
+/// rust only functions for Fiberiter
+impl Fiberiter {
+    fn build_fiberdata_iter(fiberdata: Vec<FiberseqData>) -> Self {
+        let length = fiberdata.len();
+        Self {
+            fiberdata: fiberdata.into_iter(),
+            length,
+        }
+    }
+}
+
 #[pymethods]
 impl Fiberiter {
     fn __next__(&mut self) -> IterNextOutput<Fiberdata, &'static str> {
         let data = self.fiberdata.next();
         match data {
-            Some(fiber) => IterNextOutput::Yield(new_py_fiberdata(fiber)),
+            Some(fiber) => IterNextOutput::Yield(Fiberdata::new(fiber, None)),
             None => IterNextOutput::Return("Ended"),
         }
     }
@@ -276,6 +348,77 @@ impl Fiberiter {
 
     fn len(&self) -> usize {
         self.length
+    }
+}
+
+#[pyclass]
+/// An iterator over :class:`~pyft.Fiberdata` objects.
+pub struct Fibercenter {
+    fiberdata: IntoIter<Fiberdata>,
+    #[pyo3(get)]
+    centering_position: i64,
+    #[pyo3(get)]
+    pub strand: char,
+}
+
+/// pure rust fiber center functions
+impl Fibercenter {
+    pub fn new(fiberdata: Vec<FiberseqData>, centering_position: i64, strand: char) -> Self {
+        let fiberdata = fiberdata
+            .into_iter()
+            .map(|fiber| {
+                let offset = CenteredFiberData::find_offset(&fiber.record, centering_position);
+                let mut fiber = Fiberdata::new(fiber, offset);
+                fiber._center(strand);
+                fiber
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            fiberdata: fiberdata.into_iter(),
+            strand,
+            centering_position,
+        }
+    }
+
+    /// Center positions on the read around the reference position.
+    fn apply_offset(positions: &mut [i64], offset: i64, strand: char) {
+        for pos in positions.iter_mut() {
+            *pos -= offset;
+            if strand == '-' {
+                *pos = -*pos;
+            }
+        }
+        if strand == '-' {
+            positions.reverse();
+        }
+    }
+
+    /// Center ranges on the read around the reference position.
+    fn offset_range(starts: &mut [i64], ends: &mut [i64], offset: i64, strand: char) {
+        Fibercenter::apply_offset(starts, offset, strand);
+        Fibercenter::apply_offset(ends, offset, strand);
+        for (start, end) in starts.iter_mut().zip(ends.iter_mut()) {
+            if start > end {
+                std::mem::swap(start, end);
+            }
+        }
+    }
+}
+
+#[pymethods]
+/// Returns an iterator over :class:`~pyft.Fiberdata` objects, but all coordinates are relative to the center of the region.
+impl Fibercenter {
+    fn __next__(&mut self) -> IterNextOutput<Fiberdata, &'static str> {
+        let data = self.fiberdata.next();
+        match data {
+            Some(fiber) => IterNextOutput::Yield(fiber),
+            None => IterNextOutput::Return("Ended"),
+        }
+    }
+
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
     }
 }
 
