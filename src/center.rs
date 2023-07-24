@@ -57,7 +57,7 @@ impl CenteredFiberData {
     pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
         let read_center: Vec<i64> = lift_query_positions_exact(record, &[reference_position])
             .into_iter()
-            .filter(|&x| x >= 0)
+            .flatten()
             .collect();
         log::debug!(
             "{}, {}, {}, {:?}",
@@ -121,7 +121,18 @@ impl CenteredFiberData {
     }
 
     #[allow(clippy::type_complexity)]
-    fn grab_data(&self) -> (&[i64], &[u8], &[i64], &[u8], &[i64], &[i64], &[i64], &[i64]) {
+    fn grab_data(
+        &self,
+    ) -> (
+        &[Option<i64>],
+        &[u8],
+        &[Option<i64>],
+        &[u8],
+        &[Option<i64>],
+        &[Option<i64>],
+        &[Option<i64>],
+        &[Option<i64>],
+    ) {
         if self.reference {
             (
                 &self.fiber.m6a.reference_starts,
@@ -152,14 +163,14 @@ impl CenteredFiberData {
         format!(
             "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
-            join_by_str(m6a, ""),
+            join_by_str_option(m6a, ""),
             join_by_str(m6a_qual, ","),
-            join_by_str(cpg, ""),
+            join_by_str_option(cpg, ""),
             join_by_str(cpg_qual, ","),
-            join_by_str(nuc_st, ","),
-            join_by_str(nuc_en, ","),
-            join_by_str(msp_st, ","),
-            join_by_str(msp_en, ","),
+            join_by_str_option(nuc_st, ","),
+            join_by_str_option(nuc_en, ","),
+            join_by_str_option(msp_st, ","),
+            join_by_str_option(msp_en, ","),
             self.get_sequence(),
         )
     }
@@ -216,10 +227,10 @@ impl CenteredFiberData {
             ("nuc", (nuc_st, Some(nuc_en), None)),
             ("msp", (msp_st, Some(msp_en), None)),
         ] {
-            let starts = vals.0;
-            let ends: Vec<i64> = match vals.1 {
+            let starts = vals.0.iter().collect::<Vec<_>>();
+            let ends: Vec<Option<i64>> = match vals.1 {
                 Some(ends) => ends.to_vec(),
-                None => starts.to_vec().iter().map(|&st| st + 1).collect(),
+                None => vec![None; starts.len()],
             };
             let quals = match vals.2 {
                 Some(quals) => quals.to_vec(),
@@ -227,6 +238,12 @@ impl CenteredFiberData {
             };
 
             for ((&st, &en), &qual) in starts.iter().zip(ends.iter()).zip(quals.iter()) {
+                let Some(st) = st else {
+                    continue;
+                };
+                let st = *st;
+                let en = en.unwrap_or(st + 1);
+
                 let mut write = true;
                 if let Some(dist) = self.dist {
                     // skip writing if we are outside the motif range
