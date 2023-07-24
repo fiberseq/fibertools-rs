@@ -85,24 +85,13 @@ impl Fiberdata {
     }
 
     /// liftover query (fiber) positions to the reference
-    pub fn lift_query_positions(&self, positions: Vec<i64>) -> Vec<i64> {
+    pub fn lift_query_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_query_positions(&self.aligned_block_pairs, &positions)
     }
 
     /// liftover reference positions to the query (fiber)
-    pub fn lift_reference_positions(&self, positions: Vec<i64>) -> Vec<i64> {
+    pub fn lift_reference_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_reference_positions(&self.aligned_block_pairs, &positions)
-    }
-
-    /// Return a :class:`~pyft.Ranges` object for the continuous aligned regions of the fiber
-    pub fn get_aligned_blocks_as_ranges(&self) -> Ranges {
-        let (fiber, genome): (Vec<[i64; 2]>, Vec<[i64; 2]>) =
-            self.aligned_block_pairs.iter().cloned().unzip();
-        let starts = fiber.iter().map(|x| x[0]).collect();
-        let lengths = fiber.iter().map(|x| x[1] - x[0]).collect();
-        let reference_starts = genome.iter().map(|x| x[0]).collect();
-        let reference_lengths = genome.iter().map(|x| x[1] - x[0]).collect();
-        Ranges::new(starts, lengths, reference_starts, reference_lengths)
     }
 }
 
@@ -139,10 +128,8 @@ impl Fiberdata {
         };
 
         // fiberseq features
-        let m6a = fiber.base_mods.m6a();
-        let m6a = Basemods::new(m6a.0, m6a.1, m6a.2);
-        let cpg = fiber.base_mods.cpg();
-        let cpg = Basemods::new(cpg.0, cpg.1, cpg.2);
+        let m6a = Basemods::new(fiber.m6a.starts, fiber.m6a.reference_starts, fiber.m6a.ml);
+        let cpg = Basemods::new(fiber.cpg.starts, fiber.cpg.reference_starts, fiber.cpg.ml);
 
         let nuc = Ranges {
             starts: fiber.nuc.starts,
@@ -329,10 +316,10 @@ impl Fiberiter {
 pub struct Basemods {
     /// Basemod starts
     #[pyo3(get, set)]
-    pub starts: Vec<i64>,
+    pub starts: Vec<Option<i64>>,
     /// Basemod reference starts
     #[pyo3(get, set)]
-    pub reference_starts: Vec<i64>,
+    pub reference_starts: Vec<Option<i64>>,
     /// Basemod ML
     #[pyo3(get, set)]
     pub ml: Vec<u8>,
@@ -341,7 +328,7 @@ pub struct Basemods {
 #[pymethods]
 impl Basemods {
     #[new]
-    pub fn new(starts: Vec<i64>, reference_starts: Vec<i64>, ml: Vec<u8>) -> Self {
+    pub fn new(starts: Vec<Option<i64>>, reference_starts: Vec<Option<i64>>, ml: Vec<u8>) -> Self {
         Self {
             starts,
             reference_starts,
@@ -357,42 +344,48 @@ impl Basemods {
 pub struct Ranges {
     /// Range starts
     #[pyo3(get, set)]
-    pub starts: Vec<i64>,
+    pub starts: Vec<Option<i64>>,
     /// Range ends
     #[pyo3(get, set)]
-    pub ends: Vec<i64>,
+    pub ends: Vec<Option<i64>>,
     /// Range lengths
     #[pyo3(get, set)]
-    pub lengths: Vec<i64>,
+    pub lengths: Vec<Option<i64>>,
     /// Reference starts
     #[pyo3(get, set)]
-    pub reference_starts: Vec<i64>,
+    pub reference_starts: Vec<Option<i64>>,
     /// Reference ends
     #[pyo3(get, set)]
-    pub reference_ends: Vec<i64>,
+    pub reference_ends: Vec<Option<i64>>,
     /// Reference lengths
     #[pyo3(get, set)]
-    pub reference_lengths: Vec<i64>,
+    pub reference_lengths: Vec<Option<i64>>,
 }
 
 #[pymethods]
 impl Ranges {
     #[new]
     pub fn new(
-        starts: Vec<i64>,
-        lengths: Vec<i64>,
-        reference_starts: Vec<i64>,
-        reference_lengths: Vec<i64>,
+        starts: Vec<Option<i64>>,
+        lengths: Vec<Option<i64>>,
+        reference_starts: Vec<Option<i64>>,
+        reference_lengths: Vec<Option<i64>>,
     ) -> Self {
         let ends = starts
             .iter()
             .zip(lengths.iter())
-            .map(|(s, l)| s + l)
+            .map(|(s, l)| match (s, l) {
+                (Some(s), Some(l)) => Some(s + l),
+                _ => None,
+            })
             .collect();
         let reference_ends = reference_starts
             .iter()
             .zip(reference_lengths.iter())
-            .map(|(s, l)| s + l)
+            .map(|(s, l)| match (s, l) {
+                (Some(s), Some(l)) => Some(s + l),
+                _ => None,
+            })
             .collect();
         Self {
             starts,
