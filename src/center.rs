@@ -94,46 +94,6 @@ impl CenteredFiberData {
         String::from_utf8_lossy(&out_seq).to_string()
     }
 
-    pub fn m6a_positions(&self) -> Vec<i64> {
-        self.fiber.m6a_positions(self.reference).to_vec()
-    }
-
-    pub fn cpg_positions(&self) -> Vec<i64> {
-        self.fiber.cpg_positions(self.reference).to_vec()
-    }
-
-    pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
-        let (starts, ends) = if self.reference {
-            (
-                &self.fiber.nuc.reference_starts,
-                &self.fiber.nuc.reference_ends,
-            )
-        } else {
-            (&self.fiber.nuc.starts, &self.fiber.nuc.ends)
-        };
-        starts
-            .clone()
-            .into_iter()
-            .zip(ends.clone().into_iter())
-            .collect()
-    }
-
-    pub fn msp_positions(&self) -> Vec<(i64, i64)> {
-        let (starts, ends) = if self.reference {
-            (
-                &self.fiber.msp.reference_starts,
-                &self.fiber.msp.reference_ends,
-            )
-        } else {
-            (&self.fiber.msp.starts, &self.fiber.msp.ends)
-        };
-        starts
-            .clone()
-            .into_iter()
-            .zip(ends.clone().into_iter())
-            .collect()
-    }
-
     pub fn get_sequence(&self) -> String {
         let forward_bases = if self.center_position.strand == '+' {
             self.fiber.record.seq().as_bytes()
@@ -160,16 +120,42 @@ impl CenteredFiberData {
         )
     }
 
+    #[allow(clippy::type_complexity)]
+    fn grab_data(&self) -> (&[i64], &[u8], &[i64], &[u8], &[i64], &[i64], &[i64], &[i64]) {
+        if self.reference {
+            (
+                &self.fiber.m6a.reference_starts,
+                &self.fiber.m6a.ml,
+                &self.fiber.cpg.reference_starts,
+                &self.fiber.cpg.ml,
+                &self.fiber.nuc.reference_starts,
+                &self.fiber.nuc.reference_ends,
+                &self.fiber.msp.reference_starts,
+                &self.fiber.msp.reference_ends,
+            )
+        } else {
+            (
+                &self.fiber.m6a.starts,
+                &self.fiber.m6a.ml,
+                &self.fiber.cpg.starts,
+                &self.fiber.cpg.ml,
+                &self.fiber.nuc.starts,
+                &self.fiber.nuc.ends,
+                &self.fiber.msp.starts,
+                &self.fiber.msp.ends,
+            )
+        }
+    }
+
     pub fn write(&self) -> String {
-        let m6a = join_by_str(self.m6a_positions(), ",");
-        let cpg = join_by_str(self.cpg_positions(), ",");
-        let (nuc_st, nuc_en) = unzip_to_vectors(self.nuc_positions());
-        let (msp_st, msp_en) = unzip_to_vectors(self.msp_positions());
+        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en) = self.grab_data();
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
-            m6a,
-            cpg,
+            join_by_str(m6a, ""),
+            join_by_str(m6a_qual, ","),
+            join_by_str(cpg, ""),
+            join_by_str(cpg_qual, ","),
             join_by_str(nuc_st, ","),
             join_by_str(nuc_en, ","),
             join_by_str(msp_st, ","),
@@ -196,10 +182,12 @@ impl CenteredFiberData {
     }
     pub fn header() -> String {
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_m6a_positions",
+            "m6a_qual",
             "centered_5mC_positions",
+            "5mC_qual",
             "centered_nuc_starts",
             "centered_nuc_ends",
             "centered_msp_starts",
@@ -210,32 +198,35 @@ impl CenteredFiberData {
 
     pub fn long_header() -> String {
         format!(
-            "{}{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_position_type",
             "centered_start",
             "centered_end",
+            "centered_qual",
         )
     }
 
     pub fn write_long(&self) -> String {
-        let m6a = self.m6a_positions();
-        let cpg = self.cpg_positions();
-        let (nuc_st, nuc_en) = unzip_to_vectors(self.nuc_positions());
-        let (msp_st, msp_en) = unzip_to_vectors(self.msp_positions());
         let mut rtn = String::new();
+        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en) = self.grab_data();
         for (t, vals) in [
-            ("m6a", (m6a, None)),
-            ("5mC", (cpg, None)),
-            ("nuc", (nuc_st, Some(nuc_en))),
-            ("msp", (msp_st, Some(msp_en))),
+            ("m6a", (m6a, None, Some(m6a_qual))),
+            ("5mC", (cpg, None, Some(cpg_qual))),
+            ("nuc", (nuc_st, Some(nuc_en), None)),
+            ("msp", (msp_st, Some(msp_en), None)),
         ] {
             let starts = vals.0;
-            let ends = match vals.1 {
-                Some(ends) => ends,
-                None => starts.iter().map(|&st| st + 1).collect(),
+            let ends: Vec<i64> = match vals.1 {
+                Some(ends) => ends.to_vec(),
+                None => starts.to_vec().iter().map(|&st| st + 1).collect(),
             };
-            for (&st, &en) in starts.iter().zip(ends.iter()) {
+            let quals = match vals.2 {
+                Some(quals) => quals.to_vec(),
+                None => vec![0; starts.len()],
+            };
+
+            for ((&st, &en), &qual) in starts.iter().zip(ends.iter()).zip(quals.iter()) {
                 let mut write = true;
                 if let Some(dist) = self.dist {
                     // skip writing if we are outside the motif range
@@ -247,7 +238,12 @@ impl CenteredFiberData {
                     // add the leading data
                     rtn.push_str(&self.leading_columns());
                     // add the long form data
-                    write!(&mut rtn, "{}", format_args!("{}\t{}\t{}\n", t, st, en)).unwrap();
+                    write!(
+                        &mut rtn,
+                        "{}",
+                        format_args!("{}\t{}\t{}\t{}\n", t, st, en, qual)
+                    )
+                    .unwrap();
                 }
             }
         }
