@@ -150,19 +150,23 @@ where
     indexes
 }
 
+//
+// CLOSEST LIFTOVER FUNCTIONS
+//
+
 /// this is a helper function for liftover_closest that should only be called from there
 /// The exception for this is test cases, where it should be easier to test this function
 /// directly.
 fn liftover_closest(
     positions: &[i64],
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
-) -> Vec<i64> {
+) -> Vec<Option<i64>> {
     // skip empty
     if positions.is_empty() {
         return vec![];
     }
     if aligned_block_pairs.is_empty() {
-        return positions.iter().map(|_x| -1).collect();
+        return positions.iter().map(|_x| None).collect();
     }
     assert!(
         is_sorted(positions),
@@ -211,8 +215,12 @@ fn liftover_closest(
     }
     let mut rtn = vec![];
     for q_pos in positions {
-        let (r_pos, _diff) = pos_mapping.get(q_pos).unwrap();
-        rtn.push(*r_pos);
+        let (r_pos, diff) = pos_mapping.get(q_pos).unwrap();
+        if *r_pos == -1 && *diff == i64::MAX {
+            rtn.push(None);
+        } else {
+            rtn.push(Some(*r_pos));
+        }
     }
     assert_eq!(rtn.len(), positions.len());
     rtn
@@ -222,7 +230,7 @@ fn liftover_closest(
 pub fn lift_reference_positions(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     query_positions: &[i64],
-) -> Vec<i64> {
+) -> Vec<Option<i64>> {
     liftover_closest(query_positions, aligned_block_pairs)
 }
 
@@ -230,18 +238,18 @@ pub fn lift_reference_positions(
 pub fn lift_query_positions(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     reference_positions: &[i64],
-) -> Vec<i64> {
+) -> Vec<Option<i64>> {
     // if lifting to the query, we need to reverse the pairs
     let aligned_block_pairs = aligned_block_pairs.iter().map(|(q, r)| (*r, *q)).collect();
     liftover_closest(reference_positions, &aligned_block_pairs)
 }
 
-pub fn lift_range(
+fn lift_range(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     starts: &[i64],
     ends: &[i64],
     lift_reference_to_query: bool,
-) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
     assert_eq!(starts.len(), ends.len());
     let (ref_starts, ref_ends) = if !lift_reference_to_query {
         (
@@ -258,12 +266,15 @@ pub fn lift_range(
     let rtn = ref_starts
         .into_iter()
         .zip(ref_ends.into_iter())
-        .map(|(start, end)| {
-            if end <= start {
-                (-1, -1, -1)
-            } else {
-                (start, end, end - start)
+        .map(|(start, end)| match (start, end) {
+            (Some(start), Some(end)) => {
+                if start == end {
+                    (None, None, None)
+                } else {
+                    (Some(start), Some(end), Some(end - start))
+                }
             }
+            _ => (None, None, None),
         })
         .collect::<Vec<_>>();
     multiunzip(rtn)
@@ -274,18 +285,22 @@ pub fn lift_query_range(
     record: &bam::Record,
     starts: &[i64],
     ends: &[i64],
-) -> (Vec<i64>, Vec<i64>, Vec<i64>) {
+) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
     // get the aligned block pairs
     let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
     lift_range(&aligned_block_pairs, starts, ends, false)
 }
 
+//
+// EXACT LIFTOVER FUNCTIONS
+//
+
 /// liftover positions using the cigar string
-pub fn liftover_exact(
+fn liftover_exact(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     positions: &[i64],
     lift_reference_to_query: bool,
-) -> Vec<i64> {
+) -> Vec<Option<i64>> {
     assert!(
         is_sorted(positions),
         "Positions must be sorted before calling liftover!"
@@ -315,9 +330,9 @@ pub fn liftover_exact(
                 } else {
                     q_st + dist_from_start
                 };
-                return_positions.push(rtn_pos);
+                return_positions.push(Some(rtn_pos));
             } else {
-                return_positions.push(-1);
+                return_positions.push(None);
             }
             // reset current position
             cur_idx += 1;
@@ -330,24 +345,30 @@ pub fn liftover_exact(
 
     // add values for things that won't lift at the end
     while positions.len() > return_positions.len() {
-        return_positions.push(-1);
+        return_positions.push(None);
     }
     assert_eq!(positions.len(), return_positions.len());
     return_positions
 }
 
-pub fn lift_reference_positions_exact(record: &bam::Record, query_positions: &[i64]) -> Vec<i64> {
+pub fn lift_reference_positions_exact(
+    record: &bam::Record,
+    query_positions: &[i64],
+) -> Vec<Option<i64>> {
     if record.is_unmapped() {
-        query_positions.iter().map(|_x| -1).collect()
+        query_positions.iter().map(|_x| None).collect()
     } else {
         let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
         liftover_exact(&aligned_block_pairs, query_positions, false)
     }
 }
 
-pub fn lift_query_positions_exact(record: &bam::Record, reference_positions: &[i64]) -> Vec<i64> {
+pub fn lift_query_positions_exact(
+    record: &bam::Record,
+    reference_positions: &[i64],
+) -> Vec<Option<i64>> {
     if record.is_unmapped() {
-        reference_positions.iter().map(|_x| -1).collect()
+        reference_positions.iter().map(|_x| None).collect()
     } else {
         let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
         liftover_exact(&aligned_block_pairs, reference_positions, true)

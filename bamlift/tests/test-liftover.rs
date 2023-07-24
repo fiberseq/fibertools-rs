@@ -12,7 +12,10 @@ fn test_lift_reference_positions() {
         ([20, 21], [70, 71]),
     ];
     let positions = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-    let expected_result = vec![41, 42, 43, 44, 44, 50, 50, 51, 59];
+    let expected_result = vec![41, 42, 43, 44, 44, 50, 50, 51, 59]
+        .into_iter()
+        .map(Some)
+        .collect::<Vec<_>>();
     let result = lift_reference_positions(&aligned_block_pairs, &positions);
     assert_eq!(result, expected_result);
 }

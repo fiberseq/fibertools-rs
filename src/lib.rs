@@ -47,6 +47,17 @@ where
     vals.into_iter().map(|v| v.to_string() + sep).collect()
 }
 
+/// join a vector with commas
+pub fn join_by_str_option(vals: &[Option<i64>], sep: &str) -> String {
+    vals.iter()
+        .map(|v| match v {
+            Some(v) => v.to_string() + sep,
+            None => String::from("NA") + sep,
+        })
+        .map(|v| v + sep)
+        .collect()
+}
+
 pub struct FiberOut {
     pub m6a: Option<Box<dyn Write>>,
     pub cpg: Option<Box<dyn Write>>,

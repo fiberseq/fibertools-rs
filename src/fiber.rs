@@ -10,8 +10,8 @@ use std::fmt::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FiberMods {
-    pub starts: Vec<i64>,
-    pub reference_starts: Vec<i64>,
+    pub starts: Vec<Option<i64>>,
+    pub reference_starts: Vec<Option<i64>>,
     pub ml: Vec<u8>,
 }
 
@@ -19,13 +19,13 @@ impl FiberMods {
     pub fn new(all_basemods: &BaseMods) -> (Self, Self) {
         let (starts, reference_starts, ml) = all_basemods.m6a();
         let m6a = Self {
-            starts,
+            starts: starts.into_iter().map(Some).collect(),
             reference_starts,
             ml,
         };
         let (starts, reference_starts, ml) = all_basemods.cpg();
         let cpg = Self {
-            starts,
+            starts: starts.into_iter().map(Some).collect(),
             reference_starts,
             ml,
         };
@@ -35,12 +35,12 @@ impl FiberMods {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ranges {
-    pub starts: Vec<i64>,
-    pub ends: Vec<i64>,
-    pub lengths: Vec<i64>,
-    pub reference_starts: Vec<i64>,
-    pub reference_ends: Vec<i64>,
-    pub reference_lengths: Vec<i64>,
+    pub starts: Vec<Option<i64>>,
+    pub ends: Vec<Option<i64>>,
+    pub lengths: Vec<Option<i64>>,
+    pub reference_starts: Vec<Option<i64>>,
+    pub reference_ends: Vec<Option<i64>>,
+    pub reference_lengths: Vec<Option<i64>>,
 }
 
 impl Ranges {
@@ -74,14 +74,14 @@ impl Ranges {
         let lengths = starts
             .iter()
             .zip(ends.iter())
-            .map(|(&x, &y)| y - x)
+            .map(|(&x, &y)| Some(y - x))
             .collect::<Vec<_>>();
 
         let (reference_starts, reference_ends, reference_lengths) =
             lift_query_range(record, &starts, &ends);
         Ranges {
-            starts,
-            ends,
+            starts: starts.into_iter().map(Some).collect(),
+            ends: ends.into_iter().map(Some).collect(),
             lengths,
             reference_starts,
             reference_ends,
@@ -207,57 +207,13 @@ impl FiberseqData {
         }
     }
 
-    pub fn get_nuc(&self, reference: bool, get_starts: bool) -> Vec<i64> {
-        if reference {
-            if get_starts {
-                self.nuc.reference_starts.clone()
-            } else {
-                self.nuc.reference_lengths.clone()
-            }
-        } else if get_starts {
-            self.nuc.starts.clone()
-        } else {
-            self.nuc.lengths.clone()
-        }
-    }
-
-    pub fn get_msp(&self, reference: bool, get_starts: bool) -> Vec<i64> {
-        if reference {
-            if get_starts {
-                self.msp.reference_starts.clone()
-            } else {
-                self.msp.reference_lengths.clone()
-            }
-        } else if get_starts {
-            self.msp.starts.clone()
-        } else {
-            self.msp.lengths.clone()
-        }
-    }
-
-    pub fn m6a_positions(&self, reference: bool) -> &[i64] {
-        if reference {
-            &self.m6a.reference_starts
-        } else {
-            &self.m6a.starts
-        }
-    }
-
-    pub fn cpg_positions(&self, reference: bool) -> &[i64] {
-        if reference {
-            &self.cpg.reference_starts
-        } else {
-            &self.cpg.starts
-        }
-    }
-
     //
     //  CENTERING FUNCTIONS
     //
 
     /// Center positions on the read around the reference position.
-    fn apply_offset(positions: &mut [i64], offset: i64, strand: char) {
-        for pos in positions.iter_mut() {
+    fn apply_offset(positions: &mut [Option<i64>], offset: i64, strand: char) {
+        for pos in positions.iter_mut().flatten() {
             // bp is unaligned
             if *pos == -1 {
                 *pos = i64::MIN;
@@ -275,7 +231,12 @@ impl FiberseqData {
     }
 
     /// Center ranges on the read around the reference position.
-    fn offset_range(starts: &mut [i64], ends: &mut [i64], offset: i64, strand: char) {
+    fn offset_range(
+        starts: &mut [Option<i64>],
+        ends: &mut [Option<i64>],
+        offset: i64,
+        strand: char,
+    ) {
         FiberseqData::apply_offset(starts, offset, strand);
         FiberseqData::apply_offset(ends, offset, strand);
         for (start, end) in starts.iter_mut().zip(ends.iter_mut()) {
@@ -349,51 +310,64 @@ impl FiberseqData {
     //
     pub fn write_msp(&self, reference: bool) -> String {
         let color = "255,0,255";
-        let starts = self.get_msp(reference, true);
-        let lengths = self.get_msp(reference, false);
-        if starts.is_empty() {
-            return "".to_string();
-        }
-        self.to_bed12(reference, &starts, &lengths, color)
+        let (starts, _ends, lengths) = if reference {
+            (
+                &self.msp.reference_starts,
+                &self.msp.reference_ends,
+                &self.msp.reference_lengths,
+            )
+        } else {
+            (&self.msp.starts, &self.msp.ends, &self.msp.lengths)
+        };
+        self.to_bed12(reference, starts, lengths, color)
     }
 
     pub fn write_nuc(&self, reference: bool) -> String {
         let color = "169,169,169";
-        let starts = self.get_nuc(reference, true);
-        let lengths = self.get_nuc(reference, false);
-        if starts.is_empty() {
-            return "".to_string();
-        }
-        self.to_bed12(reference, &starts, &lengths, color)
+        let (starts, _ends, lengths) = if reference {
+            (
+                &self.nuc.reference_starts,
+                &self.nuc.reference_ends,
+                &self.nuc.reference_lengths,
+            )
+        } else {
+            (&self.nuc.starts, &self.nuc.ends, &self.nuc.lengths)
+        };
+        self.to_bed12(reference, starts, lengths, color)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
         let color = "128,0,128";
-        let starts = self.m6a_positions(reference);
-        if starts.is_empty() {
-            return "".to_string();
-        }
-        let lengths = vec![1; starts.len()];
+        let starts = if reference {
+            &self.m6a.reference_starts
+        } else {
+            &self.m6a.starts
+        };
+        let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, starts, &lengths, color)
     }
 
     pub fn write_cpg(&self, reference: bool) -> String {
         let color = "139,69,19";
-        let starts = self.cpg_positions(reference);
-        if starts.is_empty() {
-            return "".to_string();
-        }
-        let lengths = vec![1; starts.len()];
+        let starts = if reference {
+            &self.cpg.reference_starts
+        } else {
+            &self.cpg.starts
+        };
+        let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, starts, &lengths, color)
     }
 
     pub fn to_bed12(
         &self,
         reference: bool,
-        starts: &[i64],
-        lengths: &[i64],
+        starts: &[Option<i64>],
+        lengths: &[Option<i64>],
         color: &str,
     ) -> String {
+        if starts.is_empty() {
+            return "".to_string();
+        }
         // skip if no alignments are here
         if self.record.is_unmapped() && reference {
             return "".to_string();
@@ -418,8 +392,8 @@ impl FiberseqData {
         // filter out positions that do not have an exact liftover
         let (filtered_starts, filtered_lengths): (Vec<i64>, Vec<i64>) = starts
             .iter()
-            .zip(lengths.iter())
-            .filter(|(&st, &ln)| st >= 0 && ln >= 0)
+            .flatten()
+            .zip(lengths.iter().flatten())
             .unzip();
         // skip empty ones
         if filtered_lengths.is_empty() || filtered_starts.is_empty() {
@@ -533,17 +507,6 @@ impl FiberseqData {
         let sam_flag = self.record.flags();
         let hp = self.get_hp();
 
-        // fiber features
-        let nuc_starts = self.get_nuc(false, true);
-        let nuc_lengths = self.get_nuc(false, false);
-        let ref_nuc_starts = self.get_nuc(true, true);
-        let ref_nuc_lengths = self.get_nuc(true, false);
-
-        let msp_starts = self.get_msp(false, true);
-        let msp_lengths = self.get_msp(false, false);
-        let ref_msp_starts = self.get_msp(true, true);
-        let ref_msp_lengths = self.get_msp(true, false);
-
         let at_count = self
             .record
             .seq()
@@ -554,9 +517,9 @@ impl FiberseqData {
 
         // get the info
         let m6a_count = self.m6a.starts.len();
-        let m6a_qual: Vec<i64> = self.m6a.ml.iter().map(|a| *a as i64).collect();
+        let m6a_qual = self.m6a.ml.iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = self.cpg.starts.len();
-        let cpg_qual: Vec<i64> = self.cpg.ml.iter().map(|a| *a as i64).collect();
+        let cpg_qual = self.cpg.ml.iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -590,8 +553,8 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = nuc_lengths.iter().sum::<i64>();
-        let total_msp_bp = msp_lengths.iter().sum::<i64>();
+        let total_nuc_bp = self.nuc.lengths.iter().flatten().sum::<i64>();
+        let total_msp_bp = self.msp.lengths.iter().flatten().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
@@ -599,14 +562,14 @@ impl FiberseqData {
         .unwrap();
         // add fiber features
         for vec in &[
-            &nuc_starts,
-            &nuc_lengths,
-            &ref_nuc_starts,
-            &ref_nuc_lengths,
-            &msp_starts,
-            &msp_lengths,
-            &ref_msp_starts,
-            &ref_msp_lengths,
+            &self.nuc.starts,
+            &self.nuc.lengths,
+            &self.nuc.reference_starts,
+            &self.nuc.reference_lengths,
+            &self.msp.starts,
+            &self.msp.lengths,
+            &self.msp.reference_starts,
+            &self.msp.reference_lengths,
             &self.m6a.starts,
             &self.m6a.reference_starts,
             &m6a_qual,
@@ -618,7 +581,14 @@ impl FiberseqData {
                 rtn.push('.');
                 rtn.push('\t');
             } else {
-                let z: String = vec.iter().map(|&x| x.to_string() + ",").collect();
+                let z: String = vec
+                    .iter()
+                    .map(|x| match x {
+                        Some(y) => *y,
+                        None => -1,
+                    })
+                    .map(|x| x.to_string() + ",")
+                    .collect();
                 rtn.write_fmt(format_args!("{}\t", z)).unwrap();
             }
         }

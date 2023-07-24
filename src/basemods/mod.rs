@@ -12,6 +12,11 @@ use std::collections::HashMap;
 
 use std::convert::TryFrom;
 
+pub enum FiberModTypes {
+    M6A,
+    CPG,
+}
+
 #[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
 pub struct BaseMod {
     pub modified_base: u8,
@@ -21,7 +26,7 @@ pub struct BaseMod {
     modified_bases: Vec<i64>,
     modified_bases_forward: Vec<i64>,
     modified_probabilities: Vec<u8>,
-    reference_positions: Vec<i64>,
+    reference_positions: Vec<Option<i64>>,
 }
 
 impl BaseMod {
@@ -58,7 +63,7 @@ impl BaseMod {
         }
     }
 
-    pub fn get_reference_positions(&self) -> Vec<i64> {
+    pub fn get_reference_positions(&self) -> Vec<Option<i64>> {
         self.reference_positions.clone()
     }
 
@@ -286,121 +291,59 @@ impl BaseMods {
         self.base_mods.retain(|bm| !bm.is_cpg());
     }
 
-    pub fn m6a_positions(&self, reference: bool) -> Vec<i64> {
-        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
-        // skip if no m6a
-        if m6a.is_empty() {
-            return vec![];
-        }
-        // if we only have one of the two mod types
-        if m6a.len() == 1 {
-            if reference {
-                return m6a[0].get_reference_positions();
-            } else {
-                return m6a[0].get_modified_bases();
-            }
-        }
-        // get positions of m6a if we have both A+a and T-a
-        if reference {
-            merge_two_lists(
-                &m6a[0].get_reference_positions(),
-                &m6a[1].get_reference_positions(),
-            )
-        } else {
-            merge_two_lists(&m6a[0].get_modified_bases(), &m6a[1].get_modified_bases())
-        }
-    }
+    fn helper_get_basemods(
+        &self,
+        forward: bool,
+        fiber_mod_type: FiberModTypes,
+    ) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
+        let bm: Vec<&BaseMod> = match fiber_mod_type {
+            FiberModTypes::M6A => self.base_mods.iter().filter(|x| x.is_m6a()).collect(),
+            FiberModTypes::CPG => self.base_mods.iter().filter(|x| x.is_cpg()).collect(),
+        };
 
-    fn helper_get_m6a(&self, forward: bool) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
-        // skip if no m6a
-        if m6a.is_empty() {
+        // skip if no basemods
+        if bm.is_empty() {
             return (vec![], vec![], vec![]);
         }
 
-        let m6a_pos: Vec<i64> = if forward {
-            m6a.iter()
+        let bm_pos: Vec<i64> = if forward {
+            bm.iter()
                 .flat_map(|x| x.get_modified_bases_forward())
                 .collect()
         } else {
-            m6a.iter().flat_map(|x| x.get_modified_bases()).collect()
+            bm.iter().flat_map(|x| x.get_modified_bases()).collect()
         };
 
-        let m6a_ref: Vec<i64> = m6a
+        let bm_ref: Vec<Option<i64>> = bm
             .iter()
             .flat_map(|x| x.get_reference_positions())
             .collect();
-        let m6a_qual: Vec<u8> = m6a
+        let bm_qual: Vec<u8> = bm
             .iter()
             .flat_map(|x| x.get_modified_probabilities())
             .collect();
 
-        assert_eq!(m6a_pos.len(), m6a_ref.len());
-        assert_eq!(m6a_ref.len(), m6a_qual.len());
-        let mut z: Vec<(i64, i64, u8)> = izip!(m6a_pos, m6a_ref, m6a_qual).collect();
+        assert_eq!(bm_pos.len(), bm_ref.len());
+        assert_eq!(bm_ref.len(), bm_qual.len());
+        let mut z: Vec<(i64, Option<i64>, u8)> = izip!(bm_pos, bm_ref, bm_qual).collect();
         z.sort_by_key(|(p, _r, _q)| *p);
         multiunzip(z)
     }
 
-    pub fn m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        self.helper_get_m6a(false)
+    pub fn m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
+        self.helper_get_basemods(false, FiberModTypes::M6A)
     }
 
-    pub fn forward_m6a(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        self.helper_get_m6a(true)
+    pub fn forward_m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
+        self.helper_get_basemods(true, FiberModTypes::M6A)
     }
 
-    pub fn cpg_positions(&self, reference: bool) -> Vec<i64> {
-        let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
-        // skip if no cpg
-        if cpg.is_empty() {
-            return vec![];
-        }
-        // get positions of cpg
-        if reference {
-            cpg[0].get_reference_positions()
-        } else {
-            cpg[0].get_modified_bases()
-        }
+    pub fn cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
+        self.helper_get_basemods(false, FiberModTypes::CPG)
     }
 
-    fn helper_get_cpg(&self, forward: bool) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        let cpg: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_cpg()).collect();
-        // skip if no m6a
-        if cpg.is_empty() {
-            return (vec![], vec![], vec![]);
-        }
-
-        let cpg_pos: Vec<i64> = if forward {
-            cpg.iter()
-                .flat_map(|x| x.get_modified_bases_forward())
-                .collect()
-        } else {
-            cpg.iter().flat_map(|x| x.get_modified_bases()).collect()
-        };
-
-        let cpg_ref: Vec<i64> = cpg
-            .iter()
-            .flat_map(|x| x.get_reference_positions())
-            .collect();
-        let cpg_qual: Vec<u8> = cpg
-            .iter()
-            .flat_map(|x| x.get_modified_probabilities())
-            .collect();
-
-        assert_eq!(cpg_pos.len(), cpg_ref.len());
-        assert_eq!(cpg_ref.len(), cpg_qual.len());
-        let mut z: Vec<(i64, i64, u8)> = izip!(cpg_pos, cpg_ref, cpg_qual).collect();
-        z.sort_by_key(|(p, _r, _q)| *p);
-        multiunzip(z)
-    }
-
-    pub fn cpg(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        self.helper_get_cpg(false)
-    }
-
-    pub fn forward_cpg(&self) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
-        self.helper_get_cpg(true)
+    pub fn forward_cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
+        self.helper_get_basemods(true, FiberModTypes::CPG)
     }
 
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
