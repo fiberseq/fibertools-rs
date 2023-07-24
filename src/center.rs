@@ -18,10 +18,9 @@ pub struct CenterPosition {
 }
 pub struct CenteredFiberData {
     fiber: FiberseqData,
-    rg: String,
-    offset: i64,
     pub dist: Option<i64>,
     center_position: CenterPosition,
+    pub offset: i64,
     pub reference: bool,
 }
 
@@ -32,31 +31,26 @@ impl CenteredFiberData {
         dist: Option<i64>,
         reference: bool,
     ) -> Option<Self> {
-        let offset = if reference {
-            Some(center_position.position)
-        } else {
-            CenteredFiberData::find_offset(&fiber.record, center_position.position)
-        };
-        // get RG
-        let rg = if let Ok(bam::record::Aux::String(f)) = fiber.record.aux(b"RG") {
-            f
-        } else {
-            "."
-        }
-        .to_string();
+        let (ref_offset, mol_offset) =
+            CenteredFiberData::find_offsets(&fiber.record, &center_position);
+        let offset = if reference { ref_offset } else { mol_offset };
 
-        offset.map(|offset| CenteredFiberData {
+        let fiber = fiber.center(&center_position)?;
+
+        Some(CenteredFiberData {
             fiber,
-            rg,
-            offset,
             dist,
             center_position,
+            offset,
             reference,
         })
     }
-
-    pub fn get_centering_position(&self) -> i64 {
-        self.center_position.position
+    /// find both the ref and mol offsets
+    pub fn find_offsets(record: &bam::Record, center_position: &CenterPosition) -> (i64, i64) {
+        let ref_offset = center_position.position;
+        let mol_offset =
+            CenteredFiberData::find_offset(record, center_position.position).unwrap_or(0);
+        (ref_offset, mol_offset)
     }
 
     /// find the query position that corresponds to the central reference position
@@ -76,16 +70,6 @@ impl CenteredFiberData {
             None
         } else {
             Some(read_center[0])
-        }
-    }
-
-    /// Center positions on the read around the reference position.
-    fn apply_offset(&self, positions: &[i64]) -> Vec<i64> {
-        let out = positions.iter().map(|&p| p - self.offset).collect();
-        if self.center_position.strand == '+' {
-            out
-        } else {
-            out.iter().rev().map(|&p| -p).collect()
         }
     }
 
@@ -111,30 +95,11 @@ impl CenteredFiberData {
     }
 
     pub fn m6a_positions(&self) -> Vec<i64> {
-        self.apply_offset(self.fiber.m6a_positions(self.reference))
+        self.fiber.m6a_positions(self.reference).to_vec()
     }
 
     pub fn cpg_positions(&self) -> Vec<i64> {
-        self.apply_offset(self.fiber.cpg_positions(self.reference))
-    }
-
-    fn get_start_end_positions(&self, starts: &[i64], ends: &[i64]) -> Vec<(i64, i64)> {
-        let starts = self.apply_offset(starts);
-        let ends = self.apply_offset(ends);
-        starts
-            .into_iter()
-            .zip(ends)
-            .map(|(s, e)| {
-                if e - s > 300 || s - e > 300 {
-                    log::trace!("{}, {}, {}", s, e, e - s);
-                }
-                if s < e {
-                    (s, e)
-                } else {
-                    (e, s)
-                }
-            })
-            .collect()
+        self.fiber.cpg_positions(self.reference).to_vec()
     }
 
     pub fn nuc_positions(&self) -> Vec<(i64, i64)> {
@@ -146,7 +111,11 @@ impl CenteredFiberData {
         } else {
             (&self.fiber.nuc.starts, &self.fiber.nuc.ends)
         };
-        self.get_start_end_positions(starts, ends)
+        starts
+            .clone()
+            .into_iter()
+            .zip(ends.clone().into_iter())
+            .collect()
     }
 
     pub fn msp_positions(&self) -> Vec<(i64, i64)> {
@@ -158,7 +127,11 @@ impl CenteredFiberData {
         } else {
             (&self.fiber.msp.starts, &self.fiber.msp.ends)
         };
-        self.get_start_end_positions(starts, ends)
+        starts
+            .clone()
+            .into_iter()
+            .zip(ends.clone().into_iter())
+            .collect()
     }
 
     pub fn get_sequence(&self) -> String {
@@ -180,7 +153,7 @@ impl CenteredFiberData {
             self.fiber.record.reference_start(),
             self.fiber.record.reference_end(),
             std::str::from_utf8(self.fiber.record.qname()).unwrap(),
-            self.rg,
+            self.fiber.rg,
             -self.offset,
             self.fiber.record.seq_len() as i64 - self.offset,
             self.fiber.record.seq_len()
