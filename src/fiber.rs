@@ -100,11 +100,21 @@ pub struct FiberseqData {
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
+    pub rg: String,
     pub center_position: Option<CenterPosition>,
 }
 
 impl FiberseqData {
     pub fn new(record: bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
+        // read group
+        let rg = if let Ok(Aux::String(f)) = record.aux(b"RG") {
+            log::trace!("{f}");
+            f
+        } else {
+            "."
+        }
+        .to_string();
+
         let nuc_starts = get_u32_tag(&record, b"ns");
         let msp_starts = get_u32_tag(&record, b"as");
         let nuc_length = get_u32_tag(&record, b"nl");
@@ -138,6 +148,7 @@ impl FiberseqData {
             cpg,
             ec,
             target_name,
+            rg,
             center_position: None,
         }
     }
@@ -278,9 +289,8 @@ impl FiberseqData {
     pub fn center(&self, center_position: &CenterPosition) -> Option<Self> {
         // setup new fiberseq data object to return
         let mut new = self.clone();
-        let ref_offset = center_position.position;
-        let mol_offset =
-            CenteredFiberData::find_offset(&self.record, center_position.position).unwrap_or(0);
+        let (ref_offset, mol_offset) =
+            CenteredFiberData::find_offsets(&self.record, center_position);
 
         // move basemods
         FiberseqData::apply_offset(&mut new.m6a.starts, mol_offset, center_position.strand);
@@ -522,12 +532,6 @@ impl FiberseqData {
         }
         let sam_flag = self.record.flags();
         let hp = self.get_hp();
-        let rg = if let Ok(Aux::String(f)) = self.record.aux(b"RG") {
-            log::trace!("{f}");
-            f
-        } else {
-            "."
-        };
 
         // fiber features
         let nuc_starts = self.get_nuc(false, true);
@@ -559,7 +563,7 @@ impl FiberseqData {
         // add first things 7
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-            ct, start, end, name, score, strand, sam_flag, hp, rg, q_len
+            ct, start, end, name, score, strand, sam_flag, hp, self.rg, q_len
         ))
         .unwrap();
         // add sequence
