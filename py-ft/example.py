@@ -18,5 +18,5 @@ for fiber in tqdm.tqdm(fiberbam.fetch("chr20", 0, 10_000_000)):
     fiber.get_aligned_blocks_as_ranges()
 
 for fiber in fiberbam.center("chr20", start=20_000_000, end=20_000_001, strand="-"):
-    # returns the same fiber object as above; however, all the positions have been modified to be relative to the region be fetched
+    # returns the same fiber object as above; however, all the positions have been modified to be relative to the region fetched
     print(fiber.msp.starts)

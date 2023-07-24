@@ -262,11 +262,16 @@ impl Fiberbam {
             strand,
         };
         let fiberdata = self._fetch_helper(chrom, Some(position), Some(position + 1));
-        let fibderdata: Vec<FiberseqData> = fiberdata
+        let fiberdata: Vec<FiberseqData> = fiberdata
             .into_iter()
             .filter_map(|fiber| fiber.center(&center_position))
             .collect();
-        Fiberiter::build_fiberdata_iter(fibderdata)
+        log::info!(
+            "Fiberdata centered for {} records in {:.2}s",
+            fiberdata.len(),
+            self._time_from_last()
+        );
+        Fiberiter::build_fiberdata_iter(fiberdata)
     }
 
     fn _time_from_last(&mut self) -> f64 {
