@@ -35,7 +35,7 @@ extensions = [
 ]
 
 # source_suffix = '.rst'
-source_suffix = [".rst", ".md"]
+source_suffix = [".rst", ".md", ".py"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
