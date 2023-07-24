@@ -45,6 +45,9 @@ The extract all option is a special option that tries to extract all the fiberse
 Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/ft-center-help.md).
 ![Center](/assets/img/center.png)
 
+# Python API (`pyft`)
+The python API is still in development and not stable; however, you can find the current code progress in the [py-ft](/py-ft) folder. More information available at [readthedocs](https://py-ft.readthedocs.io/en/latest/).
+
 # Cite
 **Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Finkbeiner, C., Li, T., Whittington, D., Stergachis, A. B., & **Vollger, M. R.** (2023). Fibertools: fast and accurate DNA-m6A calling using single-molecule long-read sequencing. *bioRxiv*. https://doi.org/10.1101/2023.04.20.537673
 
