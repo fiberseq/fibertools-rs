@@ -5,6 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Chore
+
+ - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
+ - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
+ - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
+ - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
+ - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
+ - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
+ - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
+ - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
+ - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
+ - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
+ - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
+ - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
+ - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
+### New Features
+
+ - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
+ - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
+ - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
+ - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
+ - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 40 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 28 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Readme ([`6595c36`](https://github.com/fiberseq/fibertools-rs/commit/6595c3696dda1288f0f763fdc54d7311dfb790c9))
+    - Add qual to ft cetner, and clean the ft center code more ([`b9f4950`](https://github.com/fiberseq/fibertools-rs/commit/b9f4950f2839c5d8df61593ec58997e439fc5c6a))
+    - Docs ([`1a1f260`](https://github.com/fiberseq/fibertools-rs/commit/1a1f260323e262772ce7ecfaed2df52ab2597b5d))
+    - Docs ([`2ab1645`](https://github.com/fiberseq/fibertools-rs/commit/2ab16455268ef311fbc60a17a7831e05b2f2cf8a))
+    - Simplifed center with new api. ([`6fe2beb`](https://github.com/fiberseq/fibertools-rs/commit/6fe2beb91b2552292563fdae391c5ce026eded1d))
+    - Refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api. ([`df3ffba`](https://github.com/fiberseq/fibertools-rs/commit/df3ffba3aafa8403cdc95b6e0c31de07ac0a8114))
+    - Improve docs ([`96b4fc0`](https://github.com/fiberseq/fibertools-rs/commit/96b4fc0638e991ec6c29dffbb1678b99ffc00b1d))
+    - Adding ft center to the python module! ([`96f251b`](https://github.com/fiberseq/fibertools-rs/commit/96f251b7f370f68e729357f52d3f2b6400d1af33))
+    - Drop darkmode ([`1436dbf`](https://github.com/fiberseq/fibertools-rs/commit/1436dbfb05c542aa1f4c862d46113e43d0b396d8))
+    - Fix docs and fetch ([`04b1e9b`](https://github.com/fiberseq/fibertools-rs/commit/04b1e9b02059718fea91b0aef71efc0d9d86f744))
+    - Clean ([`1d5872d`](https://github.com/fiberseq/fibertools-rs/commit/1d5872dc510a370c065076e533af1913ccbc764f))
+    - Reorganize pyft api and docs ([`9da4fa3`](https://github.com/fiberseq/fibertools-rs/commit/9da4fa3b27e991250185463de48ba0ebea866bce))
+    - Check for sorted ([`8fbdc7c`](https://github.com/fiberseq/fibertools-rs/commit/8fbdc7c1a4af7039e62f249c49a4ca226023eefb))
+    - Check for sorted ([`624dd33`](https://github.com/fiberseq/fibertools-rs/commit/624dd3317814594b47835be120a8d4bcadc775f6))
+    - Block index ([`ab59d1d`](https://github.com/fiberseq/fibertools-rs/commit/ab59d1d3a650530c75d50b507a594ee7cc74eddc))
+    - Regex update ([`f73a36a`](https://github.com/fiberseq/fibertools-rs/commit/f73a36a716023835e16da50838752d74a2768843))
+    - Readme ([`8bf2168`](https://github.com/fiberseq/fibertools-rs/commit/8bf2168969acf67fa5069fb578f94941bd01e3f4))
+    - Readme ([`15d535a`](https://github.com/fiberseq/fibertools-rs/commit/15d535ae7dc90f86bec99a18015a22376c195788))
+    - Readme ([`aba1d75`](https://github.com/fiberseq/fibertools-rs/commit/aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6))
+    - Readme ([`9ea0b5f`](https://github.com/fiberseq/fibertools-rs/commit/9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b))
+    - Readme ([`69d87ea`](https://github.com/fiberseq/fibertools-rs/commit/69d87ea41febf0bd88380708cacea4232ae57f24))
+    - Readme ([`970c41f`](https://github.com/fiberseq/fibertools-rs/commit/970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3))
+    - Readme ([`49180bc`](https://github.com/fiberseq/fibertools-rs/commit/49180bccd2dffdc49313e0b259dcdd0e80682bba))
+    - Readme ([`c8a2ab4`](https://github.com/fiberseq/fibertools-rs/commit/c8a2ab45cbff913c41bde48903c129b6e4d2f70a))
+    - Readme ([`168c951`](https://github.com/fiberseq/fibertools-rs/commit/168c9517b5137dbd58950f341d96a420c7d50935))
+    - Readme ([`f5a65a6`](https://github.com/fiberseq/fibertools-rs/commit/f5a65a612b8978f9742dab6990a8d52c6df7645a))
+    - Clippy ([`9f71158`](https://github.com/fiberseq/fibertools-rs/commit/9f711585d39c66ff45598d85dbf3783aca6ee44c))
+    - Clippy ([`b4278e4`](https://github.com/fiberseq/fibertools-rs/commit/b4278e4599a6634f37f05874a7e2e860c0b6a45a))
+    - Adding liftover to pyft ([`248bf4e`](https://github.com/fiberseq/fibertools-rs/commit/248bf4e56c5b10c2dd4613888818a995e6f75529))
+    - Unify api anming for liftover, optimize for inclusion in pyft ([`2e1fe93`](https://github.com/fiberseq/fibertools-rs/commit/2e1fe93f48b357fbb3459f5206fc5a994325d7a4))
+    - Unify api anming for liftover, optimize for inclusion in pyft ([`1c32392`](https://github.com/fiberseq/fibertools-rs/commit/1c32392c0bb24adfb3dc4bc78ab290e5405e2a62))
+    - Clean ([`0e2a574`](https://github.com/fiberseq/fibertools-rs/commit/0e2a574cfd8e1b832a3f157b51c22a60713039a9))
+    - Speed up and clean up approximate liftover and add a real test ([`c1ac44e`](https://github.com/fiberseq/fibertools-rs/commit/c1ac44e0a188a77900f9bf1dfef2dfbc42b3fdb9))
+    - Update with ranges ([`cae1a41`](https://github.com/fiberseq/fibertools-rs/commit/cae1a415a2dac4aca1558d14a50eaa0cba258b09))
+    - Very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare. ([`6a695ec`](https://github.com/fiberseq/fibertools-rs/commit/6a695ec7a71e5002709d5496c8aade541e737514))
+    - Hide more deps under features for pyft ([`a80fe51`](https://github.com/fiberseq/fibertools-rs/commit/a80fe514ff3d4bf860dedbf7130a21d97b9537ab))
+    - Clean writes in center. ([`0d19ac1`](https://github.com/fiberseq/fibertools-rs/commit/0d19ac12281dd7fef0b571a745a3e6240bc771a3))
+    - Reduce number of copies for nuc and msp. ([`3e6aa94`](https://github.com/fiberseq/fibertools-rs/commit/3e6aa945cb643e5d0559fac59b14a649e0de34b1))
+    - Move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change. ([`eea28d5`](https://github.com/fiberseq/fibertools-rs/commit/eea28d57a9eac79e3e3e0d9d16ede6dce51d242e))
+    - Example py-ft ([`c55fcc5`](https://github.com/fiberseq/fibertools-rs/commit/c55fcc59749216e0f65c3d9c07efc14f32fb5fdf))
+</details>
+
 ## 0.2.6 (2023-07-21)
 
 <csr-id-66b98f9f3c2644e79bf72de2ed070fba75b2ba38/>
@@ -64,56 +148,17 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ### Chore
 
- - <csr-id-66b98f9f3c2644e79bf72de2ed070fba75b2ba38/> rename iterator
- - <csr-id-9e8cda2fb47eff101eb3d458cf4599543e7d05a2/> rename iterator
- - <csr-id-23e6b12a7601afb4aa21454048a53d803ca1bcdf/> rename iterator
  - <csr-id-b03df77d99a8f28ecd6d43509a43ff92fb300329/> rename iterator
  - <csr-id-6e8cd6f9f25dcabc15ef2a25595b3a3ee86de241/> docs
- - <csr-id-79ca845b0e72e832cdc57b1e1b58090a09417936/> docs
- - <csr-id-41bcd27e9de8654fd46bfb50d3c7efabad59a17e/> docs
- - <csr-id-66338fd576a66ee230aa4234d072a93b3a3b21d5/> docs
- - <csr-id-6f910c53a4e0cb7be411b724385e540517f21306/> docs
- - <csr-id-85d471df45a0c88567857427725852c491c041ff/> docs
- - <csr-id-c5eb60a8d42616eacfafb871cf4f46fb2fa924c8/> docs
- - <csr-id-5bd6803c346a409150daea7713878af46995e836/> docs
- - <csr-id-a59f41d0b2d4b97b277b738f04b23010be8d6449/> docs
- - <csr-id-7a633d71272a9425ae276d9b846fcda38f6526e5/> docs
- - <csr-id-8d16055edc4bf9bc5f94d5be42b86b2a2df712c8/> docs
- - <csr-id-467072ae6419b3ece8329f587467d0d0bf316911/> docs
- - <csr-id-09994bdbdd3949186d44ecef36199a8d228ea280/> docs
- - <csr-id-8ea9fb1efc4897e191468ee10aa66500456fa0fc/> docs
- - <csr-id-82399e6e702033acbb455ef6aea3a9935338d77f/> docs
- - <csr-id-fd115b7fdb6754d6f6885e901bc34d7364bfc7df/> docs
- - <csr-id-1d25caf7e8c19f97d39dec8eb69de7219e85621b/> docs
- - <csr-id-e73e00c849726e4577344ec8e964b3eda93ddbc6/> docs
- - <csr-id-a3f29cd798fcbeb071fce7ea7041c4e71a98f8f6/> docs
- - <csr-id-e85afd963f513fe578b2d0f3e368a7ae56b59d84/> docs
- - <csr-id-580968a9da3c2a66740d01dfcc0d8c574bfd46c8/> docs
- - <csr-id-6b1e714ccda049aef3199563c03d6f5ec1df9dfa/> docs
- - <csr-id-c8502ac7cf87d375a5aa9fcf3494a3cf8f43105c/> docs
- - <csr-id-b9274c2a7064cd615b079b3cc0b44d9e2f4b5e50/> docs
- - <csr-id-eb44bdaf8280689eb06e536266b64802f509a7b3/> docs
- - <csr-id-b98edf9f855ae24f81389a5ea481bf0b16dcd794/> python docs
- - <csr-id-32f01826bbf06ac726464d59eee2769dfe80b138/> python docs
- - <csr-id-94dfd521a3f637df47c996fd046d1de3cde85776/> python docs
- - <csr-id-b3fa1c3b218379a3290fbed2382572b5e1c3e091/> python docs
- - <csr-id-d4b75b1a569d694495bc1e87de651c1bb4e63778/> python docs
- - <csr-id-73c918f9344fe362f602fa5356b11c9574c5ffec/> python docs
- - <csr-id-5f635e04085c012d39d8afa362416ca3642fc7c5/> python docs
- - <csr-id-c86cc585993506c55bd0243936767afe4a5f671c/> python docs
- - <csr-id-15b825ed80a4b099c9ea9f21f64f1b695e20554a/> python docs
- - <csr-id-26ef86389490b3161546271bea194e4c8a4a8b7f/> python docs
- - <csr-id-d953400d9c7f676fea70fee51264c331ba7e1067/> python docs
  - <csr-id-10bf0df63acca5812e3d2d3ad5134bc75abe73b4/> python docs
  - <csr-id-cdde18e3b119ef36d57feed2f4740b7bde30c011/> readme
  - <csr-id-ac1987d33daf7fb7395ed1cf15b311390a15e60c/> add to changelog
- - <csr-id-2f7c08e2b24a07054d547088ac2c96463a6229d3/> add to changelog
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 78 commits contributed to the release over the course of 2 calendar days.
+ - 79 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
  - 48 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -125,6 +170,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.2.6 ([`3beecf6`](https://github.com/fiberseq/fibertools-rs/commit/3beecf697eafa9707abf5be30a2b773479125069))
     - Release fibertools-rs v0.2.6 ([`e973f17`](https://github.com/fiberseq/fibertools-rs/commit/e973f17def31e7c4731ae10143e6c5be5e01425a))
     - Release fibertools-rs v0.2.6 ([`ba8df9b`](https://github.com/fiberseq/fibertools-rs/commit/ba8df9b8e918be85beef13411cb3aab588634056))
     - Release fibertools-rs v0.2.6 ([`1b5dcfa`](https://github.com/fiberseq/fibertools-rs/commit/1b5dcfa18eef69a8e4a3f7e3e514bb5d5ae87b7f))
