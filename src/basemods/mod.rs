@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use std::convert::TryFrom;
 
-#[derive(Eq, PartialEq, Debug, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
 pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
@@ -91,7 +91,7 @@ impl BaseMod {
     }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub struct BaseMods {
     pub base_mods: Vec<BaseMod>,
 }
@@ -309,27 +309,6 @@ impl BaseMods {
         } else {
             merge_two_lists(&m6a[0].get_modified_bases(), &m6a[1].get_modified_bases())
         }
-    }
-
-    pub fn m6a_full_probabilities(&self, record: &bam::Record) -> Vec<(i64, f32)> {
-        let mp = get_f32_tag(record, b"mp");
-        let m6a: Vec<&BaseMod> = self.base_mods.iter().filter(|x| x.is_m6a()).collect();
-        // skip if no mp or m6a
-        if m6a.is_empty() || mp.is_empty() {
-            return vec![];
-        }
-        let m6a: Vec<i64> = m6a.iter().flat_map(|x| x.get_modified_bases()).collect();
-        // skip if not equal
-        if m6a.len() != mp.len() {
-            log::warn!(
-                "In {} m6A mods ({}) not equal to number of predictions ({}), returning nothing for this read.",
-                String::from_utf8_lossy(record.qname()),
-                m6a.len(),
-                mp.len()
-            );
-            return vec![];
-        }
-        m6a.into_iter().zip(mp.into_iter()).collect()
     }
 
     fn helper_get_m6a(&self, forward: bool) -> (Vec<i64>, Vec<i64>, Vec<u8>) {
