@@ -1,3 +1,6 @@
+/// Data structure for fiberseq data
+pub mod fiber;
+
 /// Add and remove base modifications from a bam record
 pub mod basemods;
 /// Center fiberseq information around a reference position

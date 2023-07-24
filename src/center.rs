@@ -1,4 +1,4 @@
-use super::extract::*;
+use super::fiber::FiberseqData;
 use super::*;
 use bamlift::*;
 use bio::alphabets::dna::revcomp;
@@ -10,7 +10,7 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Write;
 use std::io::{self, prelude::*};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CenterPosition {
     pub chrom: String,
     pub position: i64,
@@ -111,11 +111,11 @@ impl CenteredFiberData {
     }
 
     pub fn m6a_positions(&self) -> Vec<i64> {
-        self.apply_offset(&self.fiber.base_mods.m6a_positions(self.reference))
+        self.apply_offset(self.fiber.m6a_positions(self.reference))
     }
 
     pub fn cpg_positions(&self) -> Vec<i64> {
-        self.apply_offset(&self.fiber.base_mods.cpg_positions(self.reference))
+        self.apply_offset(self.fiber.cpg_positions(self.reference))
     }
 
     fn get_start_end_positions(&self, starts: &[i64], ends: &[i64]) -> Vec<(i64, i64)> {
