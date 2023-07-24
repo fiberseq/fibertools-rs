@@ -252,7 +252,6 @@ impl Fiberbam {
         Fiberiter::build_fiberdata_iter(self._fetch_helper(chrom, start, end))
     }
 
-    /// TODO
     /// Returns an iterator over :class:`~pyft.Fiberdata` objects; however, the data is centered around the region that has been fetched (`should` work the same as **ft center**).
     #[pyo3(signature = (chrom, start, end, strand = '+'))]
     pub fn center(&mut self, chrom: &str, start: i64, end: i64, strand: char) -> Fiberiter {
