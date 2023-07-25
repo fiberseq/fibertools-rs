@@ -3,7 +3,6 @@ edition = "2021"
 name = "pyft"
 version = "0.1.9"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 crate-type = ["cdylib"]
 name = "pyft"

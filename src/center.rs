@@ -350,7 +350,14 @@ pub fn center_fiberdata(
             center_position.position,
             center_position.position + 1,
         ))
-        .expect("Failed to fetch region");
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to fetch region: {}:{}-{}",
+                &center_position.chrom,
+                center_position.position,
+                center_position.position + 1
+            )
+        });
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         center(
             records,
