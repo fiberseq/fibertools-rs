@@ -15,6 +15,7 @@ where
     x.sort();
     x
 }
+
 /// Merge two lists based on a key
 /// Normal sort is supposed to be very fast on two sorted lists
 /// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
