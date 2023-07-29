@@ -5,57 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 (2023-07-29)
-
-<csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
-<csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
-<csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/>
-<csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
-<csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
-<csr-id-f73a36a716023835e16da50838752d74a2768843/>
-<csr-id-168c9517b5137dbd58950f341d96a420c7d50935/>
-<csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/>
-<csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
-<csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
-<csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
-<csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
-<csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
-<csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/>
-<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
+## Unreleased
 
 ### Chore
 
+ - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
+ - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
  - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
  - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
  - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
  - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
  - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
  - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
- - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
- - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
+ - <csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/> readme
+ - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
  - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
  - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
- - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
- - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
- - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
- - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
- - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
- - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
- - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
+
 ### New Features
 
+ - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
  - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
  - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
  - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
  - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
- - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
+
+### Bug Fixes
+
+ - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
+ - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
+ - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 59 commits contributed to the release over the course of 7 calendar days.
+ - 61 commits contributed to the release over the course of 7 calendar days.
  - 7 days passed between releases.
  - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -67,6 +53,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Readme ([`67fc6eb`](https://github.com/fiberseq/fibertools-rs/commit/67fc6eb1d2eaa45d4e4fbd0fe750b1d4a22dd85e))
+    - Release fibertools-rs v0.3.0 ([`668ff64`](https://github.com/fiberseq/fibertools-rs/commit/668ff648e125609e92d9c3b81d4f4b3481b8d152))
     - Release bio-io version 0.2.0 ([`6bb4c5c`](https://github.com/fiberseq/fibertools-rs/commit/6bb4c5c8b041c24743d2f89283c005f011084452))
     - Change ([`019e9de`](https://github.com/fiberseq/fibertools-rs/commit/019e9de0212ef414c69834b45c3dd3ebb29bcd5c))
     - Change ([`11c3915`](https://github.com/fiberseq/fibertools-rs/commit/11c39153fd5da5a5d630baca764b37eac884e872))
@@ -127,6 +115,55 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
     - Move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change. ([`eea28d5`](https://github.com/fiberseq/fibertools-rs/commit/eea28d57a9eac79e3e3e0d9d16ede6dce51d242e))
     - Example py-ft ([`c55fcc5`](https://github.com/fiberseq/fibertools-rs/commit/c55fcc59749216e0f65c3d9c07efc14f32fb5fdf))
 </details>
+
+## 0.3.0 (2023-07-29)
+
+<csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
+<csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
+<csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/>
+<csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
+<csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
+<csr-id-f73a36a716023835e16da50838752d74a2768843/>
+<csr-id-168c9517b5137dbd58950f341d96a420c7d50935/>
+<csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/>
+<csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
+<csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
+<csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
+<csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
+<csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
+<csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/>
+<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
+<csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
+<csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
+
+### Chore
+
+ - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
+ - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
+ - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
+ - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
+ - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
+ - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
+ - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
+ - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
+ - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
+ - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
+ - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
+ - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
+ - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
+ - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
+ - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
+ - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
+ - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
+
+### New Features
+
+ - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
+ - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
+ - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
+ - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
+ - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
+ - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
 
 ## 0.2.6 (2023-07-21)
 
