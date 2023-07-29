@@ -21,7 +21,7 @@ anstyle = "1.0.0"
 anyhow = "1.0.58"
 bamlift = {path = "bamlift", version = "0.2"}
 bio = "1.2.0"
-bio-io = {path = "bio-io"}
+bio-io = {path = "bio-io", version = "0.2"}
 clap = {version = "4.3.4", features = ["cargo", "wrap_help", "color", "unstable-styles", "derive"], optional = true}
 clap_complete = {version = "4.0.6", optional = true}
 clap_mangen = {version = "0.2.5", optional = true}
