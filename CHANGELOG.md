@@ -8,9 +8,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 ## Unreleased
 
 ### Chore
-
- - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
- - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
  - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
  - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
  - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
@@ -24,6 +21,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ### New Features
 
+ - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
+ - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
  - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
  - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
