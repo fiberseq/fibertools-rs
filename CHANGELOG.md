@@ -31,9 +31,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
  - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
  - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
-
-### Chore
-
  - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
  - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
  - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
@@ -44,9 +41,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
  - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
  - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
-
-### Chore
-
  - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
  - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
 
