@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.3.0 (2023-07-29)
 
 <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
 <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
@@ -13,33 +13,62 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
 <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
 <csr-id-f73a36a716023835e16da50838752d74a2768843/>
-<csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/>
-<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
+<csr-id-168c9517b5137dbd58950f341d96a420c7d50935/>
+<csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/>
 <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
 <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
+<csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
+<csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
+<csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
+<csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/>
+<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
 <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
 <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
 
+### Chore
+
+ - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
+ - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
+ - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
+ - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
+ - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
+ - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
+ - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
+ - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
+ - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
+ - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
+ - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
+ - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
+ - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
+ - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
+ - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
+ - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
+ - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
+
+### Chore
+
+ - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
+ - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
+ - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
+ - <csr-id-69d87ea41febf0bd88380708cacea4232ae57f24/> readme
+ - <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/> readme
+ - <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/> readme
+ - <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/> readme
+
 ### New Features
 
- - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
  - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
  - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
  - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
  - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
-
-### Bug Fixes
-
- - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
- - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
- - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
+ - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 64 commits contributed to the release over the course of 7 calendar days.
+ - 70 commits contributed to the release over the course of 7 calendar days.
  - 7 days passed between releases.
  - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -51,6 +80,12 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Readme ([`d11301f`](https://github.com/fiberseq/fibertools-rs/commit/d11301fa6826563d397cb4ba7000810aae8f09c4))
+    - Readme ([`b356b22`](https://github.com/fiberseq/fibertools-rs/commit/b356b22fa0596e2735c05cbf4004516e2899e411))
+    - Readme ([`fe9dd43`](https://github.com/fiberseq/fibertools-rs/commit/fe9dd43268d0c5bc023146b14081346288d5d9be))
+    - Readme ([`b532eb0`](https://github.com/fiberseq/fibertools-rs/commit/b532eb0d814cb965df7958f652279ecc8dd6f4fa))
+    - Readme ([`2c4b6ef`](https://github.com/fiberseq/fibertools-rs/commit/2c4b6ef2eb7bb2d935e94be0f41ec727acf64c77))
+    - Readme ([`ae12da9`](https://github.com/fiberseq/fibertools-rs/commit/ae12da9d5c7df82cfce89ed4e56d73200a7514e7))
     - Readme ([`9ca181d`](https://github.com/fiberseq/fibertools-rs/commit/9ca181de2ed1afb86e594b68a81118a50acd5b48))
     - Readme ([`5c2d004`](https://github.com/fiberseq/fibertools-rs/commit/5c2d004b326ae5a0164398d4bd436a1f2c6ad812))
     - Readme ([`f27c56d`](https://github.com/fiberseq/fibertools-rs/commit/f27c56d742a8eb8be2dd8d5271e5fa8568b56313))
@@ -116,55 +151,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
     - Move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change. ([`eea28d5`](https://github.com/fiberseq/fibertools-rs/commit/eea28d57a9eac79e3e3e0d9d16ede6dce51d242e))
     - Example py-ft ([`c55fcc5`](https://github.com/fiberseq/fibertools-rs/commit/c55fcc59749216e0f65c3d9c07efc14f32fb5fdf))
 </details>
-
-## 0.3.0 (2023-07-29)
-
-<csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
-<csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
-<csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/>
-<csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
-<csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
-<csr-id-f73a36a716023835e16da50838752d74a2768843/>
-<csr-id-168c9517b5137dbd58950f341d96a420c7d50935/>
-<csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/>
-<csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
-<csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
-<csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
-<csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
-<csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
-<csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/>
-<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
-<csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
-<csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
-
-### Chore
-
- - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
- - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
- - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
- - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
- - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
- - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
- - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
- - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
- - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
- - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
- - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
- - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
- - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
- - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
- - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
- - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
- - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
-
-### New Features
-
- - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
- - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
- - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
- - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
- - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
- - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
 
 ## 0.2.6 (2023-07-21)
 
