@@ -7,6 +7,17 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## Unreleased
 
+<csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
+<csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
+<csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/>
+<csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
+<csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
+<csr-id-f73a36a716023835e16da50838752d74a2768843/>
+<csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/>
+<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
+<csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
+<csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
+
 ### Chore
  - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
  - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
@@ -19,10 +30,13 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
  - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
 
-### New Features
+### Chore
 
  - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
  - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
+
+### New Features
+
  - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
  - <csr-id-96f251b7f370f68e729357f52d3f2b6400d1af33/> adding ft center to the python module!
@@ -40,7 +54,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 61 commits contributed to the release over the course of 7 calendar days.
+ - 63 commits contributed to the release over the course of 7 calendar days.
  - 7 days passed between releases.
  - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -52,6 +66,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Readme ([`5c2d004`](https://github.com/fiberseq/fibertools-rs/commit/5c2d004b326ae5a0164398d4bd436a1f2c6ad812))
+    - Readme ([`f27c56d`](https://github.com/fiberseq/fibertools-rs/commit/f27c56d742a8eb8be2dd8d5271e5fa8568b56313))
     - Readme ([`67fc6eb`](https://github.com/fiberseq/fibertools-rs/commit/67fc6eb1d2eaa45d4e4fbd0fe750b1d4a22dd85e))
     - Release fibertools-rs v0.3.0 ([`668ff64`](https://github.com/fiberseq/fibertools-rs/commit/668ff648e125609e92d9c3b81d4f4b3481b8d152))
     - Release bio-io version 0.2.0 ([`6bb4c5c`](https://github.com/fiberseq/fibertools-rs/commit/6bb4c5c8b041c24743d2f89283c005f011084452))
