@@ -20,8 +20,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
 <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
 
-### Chore
-
 ### New Features
 
  - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
