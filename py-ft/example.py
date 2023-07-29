@@ -3,7 +3,7 @@ import tqdm
 
 bam_f = "../tmp.bam"
 fiberbam = pyft.Fiberbam(bam_f)
-for fiber in tqdm.tqdm(fiberbam.fetch("chr20", 0, 10_000_000)): 
+for fiber in tqdm.tqdm(fiberbam.fetch("chr20", 10_000_000, 30_000_000)): 
     # the number of ccs passes
     fiber.ec
     # the mps start positions

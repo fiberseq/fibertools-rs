@@ -61,16 +61,21 @@ cargo doc --open
 and the docs will open in your browser.
 
 # TODO items
-- [ ] Add a python API (see py-ft for progress)
 - [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
-- [x] Set filters for ML depending on the model used
 - [ ] long format extract command
-- [ ] add option result to bamlift
-- [ ] improve speed of liftover closest in bamlift. It takes about 50% of the time. 
-- [x] Add more test cases, learn about test modules in folders
+- [ ] Improve progress bar for predict-m6a.
+    - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
+- [x] Add a python API (see py-ft for progress)
+    - [x] extract api
+    - [x] center api
+    - [ ] improve docs
+    - [ ] add default data viz 
+    - [ ] add conversion to pandas data frame or maybe anndata
 - [x] GPU support
     - [ ] see if I can simplify or statically link PyTorch to get it onto bioconda
     - [ ] Detect GPU memory to set batch size dynamically.
-- [ ] Improve progress bar for predict-m6a.
-    - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
 - [ ] Add unaligned, secondary, supplemental reads to the test bam.
+- [x] add option result to bamlift
+- [x] improve speed of liftover closest in bamlift. It takes about 50% of the time. 
+- [x] Add more test cases, learn about test modules in folders
+- [x] Set filters for ML depending on the model used
