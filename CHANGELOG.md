@@ -40,20 +40,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
  - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
  - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
-
-### Chore
-
  - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
  - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
- - <csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/> readme
- - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
- - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
- - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
- - <csr-id-69d87ea41febf0bd88380708cacea4232ae57f24/> readme
- - <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/> readme
- - <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/> readme
- - <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/> readme
-
 ### New Features
 
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
