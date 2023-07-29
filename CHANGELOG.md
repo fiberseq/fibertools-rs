@@ -7,6 +7,20 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## Unreleased
 
+<csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
+<csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
+<csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/>
+<csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/>
+<csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/>
+<csr-id-f73a36a716023835e16da50838752d74a2768843/>
+<csr-id-168c9517b5137dbd58950f341d96a420c7d50935/>
+<csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/>
+<csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
+<csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
+<csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
+<csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
+<csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
+
 ### Chore
 
  - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
@@ -22,6 +36,20 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/> unify api anming for liftover, optimize for inclusion in pyft
  - <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/> reduce number of copies for nuc and msp.
  - <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/> move nuc and msp logic out of extract into ranges struct and simplify. We ran on a whole genome ft extract to confirm results dont change.
+
+### Chore
+
+ - <csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/> readme
+ - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
+ - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
+ - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
+ - <csr-id-69d87ea41febf0bd88380708cacea4232ae57f24/> readme
+ - <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/> readme
+ - <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/> readme
+ - <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/> readme
+ - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
+ - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
+
 ### New Features
 
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
@@ -29,15 +57,15 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-9da4fa3b27e991250185463de48ba0ebea866bce/> Reorganize pyft api and docs
  - <csr-id-248bf4e56c5b10c2dd4613888818a995e6f75529/> adding liftover to pyft
  - <csr-id-6a695ec7a71e5002709d5496c8aade541e737514/> very large improvment in speed of lifting over ranges, some liftover results differ from before by 1bp but it is rare.
-
+ - <csr-id-9d07122e49b817f531b4a412ae77dced2e936f3a/> change the result of liftovers to be an Option<i64>.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 40 commits contributed to the release over the course of 2 calendar days.
- - 3 days passed between releases.
- - 28 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 48 commits contributed to the release over the course of 7 calendar days.
+ - 7 days passed between releases.
+ - 29 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -47,6 +75,14 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Readme ([`99aeada`](https://github.com/fiberseq/fibertools-rs/commit/99aeadae8ba61da26d961a8f6318065e0a9ad442))
+    - Improve fetch error msg ([`6332770`](https://github.com/fiberseq/fibertools-rs/commit/633277099e1fde8684733c05d6b192434ee01c10))
+    - Update so pyft works with options results ([`a09faa2`](https://github.com/fiberseq/fibertools-rs/commit/a09faa2d68a6f13b2330b4a8e302fd40f3765c55))
+    - Update so pyft works with options results ([`f225f9d`](https://github.com/fiberseq/fibertools-rs/commit/f225f9d8828b69b2af1a3c11b471fed84132e4d6))
+    - Change the result of liftovers to be an Option<i64>. ([`9d07122`](https://github.com/fiberseq/fibertools-rs/commit/9d07122e49b817f531b4a412ae77dced2e936f3a))
+    - Docs ([`07882ea`](https://github.com/fiberseq/fibertools-rs/commit/07882ea5396c178354ba735b651311a476c29cbc))
+    - Docs ([`776713b`](https://github.com/fiberseq/fibertools-rs/commit/776713bf647ec6a361bb6bde34de412c6ec8af8c))
+    - Change ([`ad0340e`](https://github.com/fiberseq/fibertools-rs/commit/ad0340e8d9f8b0ac744aea4785b9530c14572045))
     - Readme ([`6595c36`](https://github.com/fiberseq/fibertools-rs/commit/6595c3696dda1288f0f763fdc54d7311dfb790c9))
     - Add qual to ft cetner, and clean the ft center code more ([`b9f4950`](https://github.com/fiberseq/fibertools-rs/commit/b9f4950f2839c5d8df61593ec58997e439fc5c6a))
     - Docs ([`1a1f260`](https://github.com/fiberseq/fibertools-rs/commit/1a1f260323e262772ce7ecfaed2df52ab2597b5d))
