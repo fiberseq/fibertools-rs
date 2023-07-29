@@ -29,8 +29,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
  - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
  - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
- - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
- - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
 
 ### New Features
 
