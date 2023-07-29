@@ -17,6 +17,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
 <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/>
 <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/>
+<csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
+<csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
 
 ### Chore
  - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
@@ -29,6 +31,19 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
  - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
  - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
+
+### Chore
+
+ - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
+ - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
+ - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
+ - <csr-id-69d87ea41febf0bd88380708cacea4232ae57f24/> readme
+ - <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/> readme
+ - <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/> readme
+ - <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/> readme
+ - <csr-id-168c9517b5137dbd58950f341d96a420c7d50935/> readme
+ - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
+ - <csr-id-9f711585d39c66ff45598d85dbf3783aca6ee44c/> clippy
 
 ### Chore
 
@@ -54,7 +69,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 63 commits contributed to the release over the course of 7 calendar days.
+ - 64 commits contributed to the release over the course of 7 calendar days.
  - 7 days passed between releases.
  - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -66,6 +81,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Readme ([`9ca181d`](https://github.com/fiberseq/fibertools-rs/commit/9ca181de2ed1afb86e594b68a81118a50acd5b48))
     - Readme ([`5c2d004`](https://github.com/fiberseq/fibertools-rs/commit/5c2d004b326ae5a0164398d4bd436a1f2c6ad812))
     - Readme ([`f27c56d`](https://github.com/fiberseq/fibertools-rs/commit/f27c56d742a8eb8be2dd8d5271e5fa8568b56313))
     - Readme ([`67fc6eb`](https://github.com/fiberseq/fibertools-rs/commit/67fc6eb1d2eaa45d4e4fbd0fe750b1d4a22dd85e))
