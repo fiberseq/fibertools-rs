@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.3.0 (2023-07-29)
 
 <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/>
 <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/>
@@ -20,6 +20,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-2e1fe93f48b357fbb3459f5206fc5a994325d7a4/>
 <csr-id-3e6aa945cb643e5d0559fac59b14a649e0de34b1/>
 <csr-id-eea28d57a9eac79e3e3e0d9d16ede6dce51d242e/>
+<csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/>
+<csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/>
 
 ### Chore
 
@@ -39,6 +41,19 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-f5a65a612b8978f9742dab6990a8d52c6df7645a/> readme
  - <csr-id-b4278e4599a6634f37f05874a7e2e860c0b6a45a/> clippy
 
+### Chore
+
+ - <csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/> Release bio-io version 0.2.0
+ - <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/> Release bamlift version 0.2.0
+ - <csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/> readme
+ - <csr-id-15d535ae7dc90f86bec99a18015a22376c195788/> readme
+ - <csr-id-aba1d7572a6109bb2e7d2acffea5f5e5c4f1ced6/> readme
+ - <csr-id-9ea0b5f04f21cf74ab40a0ff1097eac996cc5b8b/> readme
+ - <csr-id-69d87ea41febf0bd88380708cacea4232ae57f24/> readme
+ - <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/> readme
+ - <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/> readme
+ - <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/> readme
+
 ### New Features
 
  - <csr-id-b9f4950f2839c5d8df61593ec58997e439fc5c6a/> add qual to ft cetner, and clean the ft center code more
@@ -52,9 +67,9 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 48 commits contributed to the release over the course of 7 calendar days.
+ - 59 commits contributed to the release over the course of 7 calendar days.
  - 7 days passed between releases.
- - 29 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 31 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -64,6 +79,17 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release bio-io version 0.2.0 ([`6bb4c5c`](https://github.com/fiberseq/fibertools-rs/commit/6bb4c5c8b041c24743d2f89283c005f011084452))
+    - Change ([`019e9de`](https://github.com/fiberseq/fibertools-rs/commit/019e9de0212ef414c69834b45c3dd3ebb29bcd5c))
+    - Change ([`11c3915`](https://github.com/fiberseq/fibertools-rs/commit/11c39153fd5da5a5d630baca764b37eac884e872))
+    - Change ([`20d9aa7`](https://github.com/fiberseq/fibertools-rs/commit/20d9aa70ff741fe198978abe4e8b8e46f7a9dd8e))
+    - Change ([`de36de7`](https://github.com/fiberseq/fibertools-rs/commit/de36de75483774c8f89b5371c13d6000276a788b))
+    - Release bamlift version 0.2.0 ([`36a975a`](https://github.com/fiberseq/fibertools-rs/commit/36a975a57afd5be38e4eb66429fc5b7f84ebe32d))
+    - Change ([`70c9606`](https://github.com/fiberseq/fibertools-rs/commit/70c9606273dd05d1cafd7ef7e1a1ba49f1aa5aa5))
+    - Change ([`49871ce`](https://github.com/fiberseq/fibertools-rs/commit/49871cef83c7229dd1754365876a7de33c1cdac1))
+    - Change ([`cbf0de8`](https://github.com/fiberseq/fibertools-rs/commit/cbf0de8d74f0cb14b6d71b5bb6b3378666f29580))
+    - Change ([`0a0c37b`](https://github.com/fiberseq/fibertools-rs/commit/0a0c37b4e62ed49048d78a836ddadcaa5911a844))
+    - Change ([`4a5e5c4`](https://github.com/fiberseq/fibertools-rs/commit/4a5e5c4ecdcfcb82c86d9df0899ce3e3c4ef5e34))
     - Readme ([`99aeada`](https://github.com/fiberseq/fibertools-rs/commit/99aeadae8ba61da26d961a8f6318065e0a9ad442))
     - Improve fetch error msg ([`6332770`](https://github.com/fiberseq/fibertools-rs/commit/633277099e1fde8684733c05d6b192434ee01c10))
     - Update so pyft works with options results ([`a09faa2`](https://github.com/fiberseq/fibertools-rs/commit/a09faa2d68a6f13b2330b4a8e302fd40f3765c55))
