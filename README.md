@@ -79,3 +79,6 @@ and the docs will open in your browser.
 - [x] improve speed of liftover closest in bamlift. It takes about 50% of the time. 
 - [x] Add more test cases, learn about test modules in folders
 - [x] Set filters for ML depending on the model used
+
+# Contributing 
+If you would like to contribute to `fibertools-rs`, please see the [CONTRIBUTING.md](/CONTRIBUTING.md) file for more information.
