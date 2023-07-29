@@ -21,14 +21,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-36a975a57afd5be38e4eb66429fc5b7f84ebe32d/>
 
 ### Chore
- - <csr-id-6fe2beb91b2552292563fdae391c5ce026eded1d/> simplifed center with new api.
- - <csr-id-df3ffba3aafa8403cdc95b6e0c31de07ac0a8114/> refactor a large part of the code base to reduce redudance. TODO simplify center and basemods with this new api.
- - <csr-id-96b4fc0638e991ec6c29dffbb1678b99ffc00b1d/> improve docs
- - <csr-id-1436dbfb05c542aa1f4c862d46113e43d0b396d8/> drop darkmode
- - <csr-id-04b1e9b02059718fea91b0aef71efc0d9d86f744/> fix docs and fetch
- - <csr-id-f73a36a716023835e16da50838752d74a2768843/> regex update
- - <csr-id-a80fe514ff3d4bf860dedbf7130a21d97b9537ab/> hide more deps under features for pyft
- - <csr-id-c55fcc59749216e0f65c3d9c07efc14f32fb5fdf/> example py-ft
 
 ### New Features
 
