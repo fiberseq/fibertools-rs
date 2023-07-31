@@ -1,6 +1,5 @@
 use super::fiber::FiberseqData;
 use super::*;
-use indicatif::{style, ParallelProgressIterator};
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -302,19 +301,11 @@ pub fn add_nucleosomes_to_bam(
     let chunk_size = current_num_threads() * 1000;
     let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
 
-    // predict format
-    let progress_format = "[Adding nucleosomes] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (reads/s {per_sec:.green})";
-
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
-        let style = style::ProgressStyle::with_template(progress_format)
-            .unwrap()
-            .progress_chars("##-");
-
         // add nuc calls
         let records: Vec<&mut Record> = chunk
             .par_iter_mut()
-            .progress_with_style(style)
             .map(|record| {
                 let fd = FiberseqData::new(record.clone(), None, 0);
                 let m6a = fd.base_mods.forward_m6a();

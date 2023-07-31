@@ -2,7 +2,6 @@ use super::*;
 use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use bio_io;
-use indicatif::{style, ParallelProgressIterator};
 use nucleosomes;
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
@@ -545,16 +544,11 @@ pub fn read_bam_into_fiberdata(
     // iterate over chunks
     let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
-        let style = style::ProgressStyle::with_template(predict_options.progress_style())
-            .unwrap()
-            .progress_chars("##-");
-
         // add m6a calls
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
             .map(|recs| predict_m6a_on_records(recs, predict_options))
-            .progress_with_style(style)
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
