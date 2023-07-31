@@ -5,8 +5,8 @@ use bio_io;
 use nucleosomes;
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
+use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
-use rayon::{current_num_threads, prelude::IndexedParallelIterator};
 use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
@@ -538,8 +538,7 @@ pub fn read_bam_into_fiberdata(
     predict_options: &PredictOptions,
 ) {
     // read in bam data
-    let chunk_size = current_num_threads() * 500;
-    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
+    let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
     // iterate over chunks
     let mut total_read = 0;

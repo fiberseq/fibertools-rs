@@ -6,6 +6,7 @@ use indicatif::{style, ProgressBar};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use niffler::get_reader;
+use rayon::current_num_threads;
 use regex::Regex;
 use rust_htslib::bam;
 use rust_htslib::bam::record::Aux;
@@ -182,7 +183,8 @@ pub struct BamChunk<'a> {
 }
 
 impl<'a> BamChunk<'a> {
-    pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: usize) -> Self {
+    pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: Option<usize>) -> Self {
+        let chunk_size = chunk_size.unwrap_or_else(|| current_num_threads() * 100);
         let bar = no_length_progress_bar();
         Self {
             bam,
