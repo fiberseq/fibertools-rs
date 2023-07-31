@@ -177,15 +177,18 @@ pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
 pub struct BamChunk<'a> {
     pub bam: bam::Records<'a, bam::Reader>,
     pub chunk_size: usize,
-    pub bytes_read: usize,
+    pub pre_chunk_done: u64,
+    pub bar: ProgressBar,
 }
 
 impl<'a> BamChunk<'a> {
     pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: usize) -> Self {
+        let bar = no_length_progress_bar();
         Self {
             bam,
             chunk_size,
-            bytes_read: 0,
+            pre_chunk_done: 0,
+            bar,
         }
     }
 }
@@ -201,12 +204,20 @@ impl<'a> Iterator for BamChunk<'a> {
     // We use Self::Item in the return type, so we can change
     // the type without having to update the function signatures.
     fn next(&mut self) -> Option<Self::Item> {
+        // update progress bar with results from previous iteration
+        self.bar.inc(self.pre_chunk_done);
+
         let start = Instant::now();
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
             let r = r.unwrap();
             cur_vec.push(r);
         }
+
+        // extend progress bar
+        self.pre_chunk_done = cur_vec.len() as u64;
+        self.bar.inc_length(self.pre_chunk_done);
+
         // return
         if cur_vec.is_empty() {
             None

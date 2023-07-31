@@ -1,6 +1,5 @@
 use super::basemods;
 use super::*;
-use indicatif::{style, ParallelProgressIterator};
 use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -12,19 +11,11 @@ pub fn strip_base_mods(bam: &mut bam::Reader, out: &mut bam::Writer, basemod: &s
     let chunk_size = current_num_threads() * 500;
     let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
 
-    // predict format
-    let progress_format = "[Adding nucleosomes] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (reads/s {per_sec:.green})";
-
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
-        let style = style::ProgressStyle::with_template(progress_format)
-            .unwrap()
-            .progress_chars("##-");
-
         // strip
         let records: Vec<&mut Record> = chunk
             .par_iter_mut()
-            .progress_with_style(style)
             .map(|record| {
                 let mut data = basemods::BaseMods::new(record, 0);
                 if (basemod == "5mC") || (basemod == "CpG") {
