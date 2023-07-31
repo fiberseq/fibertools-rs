@@ -13,7 +13,7 @@ version = "0.2.0"
 anyhow = "1.0.58"
 colored = "2.0.0"
 gzp = "0.11.3"
-#indicatif = {version = "0.17.0", features = ["rayon"]}
+indicatif = {version = "0.17.0", features = ["rayon"]}
 #env_logger = "0.9.0"
 itertools = "0.10.5"
 lazy_static = "1.4.0"

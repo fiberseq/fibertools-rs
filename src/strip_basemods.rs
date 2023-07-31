@@ -10,10 +10,7 @@ use rust_htslib::{bam, bam::Read};
 pub fn strip_base_mods(bam: &mut bam::Reader, out: &mut bam::Writer, basemod: &str) {
     // read in bam data
     let chunk_size = current_num_threads() * 500;
-    let bam_chunk_iter = BamChunk {
-        bam: bam.records(),
-        chunk_size,
-    };
+    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
 
     // predict format
     let progress_format = "[Adding nucleosomes] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (reads/s {per_sec:.green})";

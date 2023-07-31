@@ -1,17 +1,13 @@
 use super::fiber::FiberseqData;
 use super::*;
-use colored::Colorize;
 use rayon::{current_num_threads, prelude::*};
 use rust_htslib::{bam, bam::HeaderView, bam::Read};
-use std::time::Instant;
 
 pub fn process_bam_chunk(
     records: Vec<bam::Record>,
-    so_far: usize,
     out_files: &mut FiberOut,
     head_view: &HeaderView,
 ) {
-    let start = Instant::now();
     let fiber_data = FiberseqData::from_records(records, head_view, out_files.min_ml_score);
 
     match &mut out_files.m6a {
@@ -74,17 +70,6 @@ pub fn process_bam_chunk(
         }
         None => {}
     }
-
-    let duration = start.elapsed().as_secs_f64();
-    log::info!(
-        "Processing {}, {} reads done so far.",
-        format!("{:.2?} reads/s", fiber_data.len() as f64 / duration)
-            .bright_cyan()
-            .bold(),
-        format!("{:}", so_far + fiber_data.len())
-            .bright_magenta()
-            .bold()
-    );
 }
 
 pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
@@ -107,13 +92,12 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
     let chunk_size = current_num_threads() * 500;
-    let bam_chunk_iter = BamChunk {
-        bam: bam.records(),
-        chunk_size,
-    };
-    let mut processed_reads = 0;
+    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
+    let bar = bio_io::no_length_progress_bar();
     for chunk in bam_chunk_iter {
-        processed_reads += chunk.len();
-        process_bam_chunk(chunk, processed_reads, &mut out_files, &head_view);
+        let x = chunk.len() as u64;
+        bar.inc_length(x);
+        process_bam_chunk(chunk, &mut out_files, &head_view);
+        bar.inc(x);
     }
 }
