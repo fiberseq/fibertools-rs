@@ -2,6 +2,7 @@ use anyhow::Result;
 use colored::Colorize;
 use gzp::deflate::Bgzf; //, Gzip, Mgzip, RawDeflate};
 use gzp::{Compression, ZBuilder};
+use indicatif::{style, ProgressBar};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use niffler::get_reader;
@@ -21,6 +22,20 @@ use std::time::Instant;
 const BUFFER_SIZE: usize = 32 * 1024;
 const COMPRESSION_THREADS: usize = 8;
 const COMPRESSION_LEVEL: u32 = 6;
+
+/*
+PROGRESS BARS
+*/
+const PROGRESS_STYLE_NO_LENGTH: &str =
+    "[{elapsed_precise:.yellow}]  Records per second: {per_sec:<17.cyan}Total records processed:  {human_pos:.blue}\t";
+
+pub fn no_length_progress_bar() -> ProgressBar {
+    let bar = ProgressBar::new(0);
+    bar.set_style(style::ProgressStyle::with_template(PROGRESS_STYLE_NO_LENGTH).unwrap());
+    let finish = indicatif::ProgressFinish::AndLeave;
+    let bar = bar.with_finish(finish);
+    bar
+}
 
 /*
 STANDARD FILE IO
@@ -162,6 +177,17 @@ pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
 pub struct BamChunk<'a> {
     pub bam: bam::Records<'a, bam::Reader>,
     pub chunk_size: usize,
+    pub bytes_read: usize,
+}
+
+impl<'a> BamChunk<'a> {
+    pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: usize) -> Self {
+        Self {
+            bam,
+            chunk_size,
+            bytes_read: 0,
+        }
+    }
 }
 
 // The `Iterator` trait only requires a method to be defined for the `next` element.
@@ -178,7 +204,8 @@ impl<'a> Iterator for BamChunk<'a> {
         let start = Instant::now();
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
-            cur_vec.push(r.unwrap())
+            let r = r.unwrap();
+            cur_vec.push(r);
         }
         // return
         if cur_vec.is_empty() {

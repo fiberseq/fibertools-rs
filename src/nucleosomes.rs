@@ -300,10 +300,7 @@ pub fn add_nucleosomes_to_bam(
     };
     // read in bam data
     let chunk_size = current_num_threads() * 1000;
-    let bam_chunk_iter = BamChunk {
-        bam: bam.records(),
-        chunk_size,
-    };
+    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
 
     // predict format
     let progress_format = "[Adding nucleosomes] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (reads/s {per_sec:.green})";
