@@ -1,6 +1,6 @@
 use super::fiber::FiberseqData;
 use super::*;
-use rayon::{current_num_threads, prelude::*};
+use rayon::prelude::*;
 use rust_htslib::{bam, bam::HeaderView, bam::Read};
 
 pub fn process_bam_chunk(
@@ -91,8 +91,7 @@ pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let chunk_size = current_num_threads() * 500;
-    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
+    let bam_chunk_iter = BamChunk::new(bam.records(), None);
     for chunk in bam_chunk_iter {
         process_bam_chunk(chunk, &mut out_files, &head_view);
     }

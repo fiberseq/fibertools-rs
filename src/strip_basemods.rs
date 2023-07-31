@@ -1,6 +1,5 @@
 use super::basemods;
 use super::*;
-use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::bam::Record;
@@ -8,8 +7,7 @@ use rust_htslib::{bam, bam::Read};
 
 pub fn strip_base_mods(bam: &mut bam::Reader, out: &mut bam::Writer, basemod: &str) {
     // read in bam data
-    let chunk_size = current_num_threads() * 500;
-    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
+    let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
     // iterate over chunks
     for mut chunk in bam_chunk_iter {

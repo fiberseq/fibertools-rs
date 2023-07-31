@@ -1,6 +1,5 @@
 use super::fiber::FiberseqData;
 use super::*;
-use rayon::current_num_threads;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{
@@ -298,8 +297,7 @@ pub fn add_nucleosomes_to_bam(
         allowed_m6a_skips,
     };
     // read in bam data
-    let chunk_size = current_num_threads() * 1000;
-    let bam_chunk_iter = BamChunk::new(bam.records(), chunk_size);
+    let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
