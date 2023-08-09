@@ -163,9 +163,9 @@ impl CenteredFiberData {
         format!(
             "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
-            join_by_str_option(m6a, ""),
+            join_by_str_option(m6a, ","),
             join_by_str(m6a_qual, ","),
-            join_by_str_option(cpg, ""),
+            join_by_str_option(cpg, ","),
             join_by_str(cpg_qual, ","),
             join_by_str_option(nuc_st, ","),
             join_by_str_option(nuc_en, ","),
