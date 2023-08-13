@@ -31,6 +31,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <csr-id-970c41f9ba4a8c26bf980f0ce87f635dd4f68bd3/>
 <csr-id-49180bccd2dffdc49313e0b259dcdd0e80682bba/>
 <csr-id-c8a2ab45cbff913c41bde48903c129b6e4d2f70a/>
+<csr-id-8bf2168969acf67fa5069fb578f94941bd01e3f4/>
 
 ### Chore
 
@@ -84,8 +85,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 9 calendar days.
- - 11 days passed between releases.
+ - 11 commits contributed to the release over the course of 13 calendar days.
+ - 15 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -96,6 +97,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.0 ([`8262358`](https://github.com/fiberseq/fibertools-rs/commit/8262358293c29863d5eb44c6fe98df2c361659e2))
     - Update center.rs ([`90b1917`](https://github.com/fiberseq/fibertools-rs/commit/90b1917b38852a7bf3b3761cc08fa628a64e5a61))
     - Move progress bar into bamchunk iterator, unify progress bar. ([`0207066`](https://github.com/fiberseq/fibertools-rs/commit/02070669179e6b6ff3383ade356d0a307e903905))
     - Move progress bar into bamchunk iterator, unify progress bar. ([`d0a80ac`](https://github.com/fiberseq/fibertools-rs/commit/d0a80ace111bb5e2477502ac264dd44fd988007e))
@@ -712,6 +714,7 @@ And this is `bgzp` compression, so it is compatible with `tabix` indexing.
 ## v0.1.1-alpha.2 (2023-02-01)
 
 <csr-id-dda2ea4236a46e4cba2ac0f7415a871c09f5777a/>
+<csr-id-c6f50df845bcd931b61cfa8151e4d38b1c9ccbdd/>
 
 ### Chore
 
