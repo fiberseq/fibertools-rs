@@ -85,7 +85,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 11 commits contributed to the release over the course of 13 calendar days.
+ - 12 commits contributed to the release over the course of 13 calendar days.
  - 15 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -97,6 +97,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.0 ([`3d3d534`](https://github.com/fiberseq/fibertools-rs/commit/3d3d534b7d214ae13a5b1e3f313007bbe21f385e))
     - Release fibertools-rs v0.3.0 ([`8262358`](https://github.com/fiberseq/fibertools-rs/commit/8262358293c29863d5eb44c6fe98df2c361659e2))
     - Update center.rs ([`90b1917`](https://github.com/fiberseq/fibertools-rs/commit/90b1917b38852a7bf3b3761cc08fa628a64e5a61))
     - Move progress bar into bamchunk iterator, unify progress bar. ([`0207066`](https://github.com/fiberseq/fibertools-rs/commit/02070669179e6b6ff3383ade356d0a307e903905))
