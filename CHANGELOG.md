@@ -23,7 +23,7 @@ Added commas to wide format of ft center.
 
 <csr-read-only-do-not-edit/>
 
- - 16 commits contributed to the release over the course of 13 calendar days.
+ - 17 commits contributed to the release over the course of 13 calendar days.
  - 15 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -35,6 +35,7 @@ Added commas to wide format of ft center.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.1 ([`f5cc324`](https://github.com/fiberseq/fibertools-rs/commit/f5cc32460016b0a4ee9ea0804f236fc0aa73b803))
     - Update ([`9d870a9`](https://github.com/fiberseq/fibertools-rs/commit/9d870a928615c04cffe21b296970c9c6403d97de))
     - Release fibertools-rs v0.3.1 ([`0de730e`](https://github.com/fiberseq/fibertools-rs/commit/0de730e4949d61fff32fa06ff42c2d2f3bb16c29))
     - Update ([`1e7a6c1`](https://github.com/fiberseq/fibertools-rs/commit/1e7a6c1dfbb7805646a7d1e193b79e5699797269))
