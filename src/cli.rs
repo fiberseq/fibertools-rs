@@ -166,7 +166,7 @@ pub enum Commands {
     /// Extract fiberseq data into plain text files
     #[clap(visible_aliases = &["ex", "e"])]
     Extract {
-        /// Fiberseq bam file
+        /// Input fiberseq bam file. If no path is provided extract will read bam data from stdin.
         #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
         bam: String,
         /// Report in reference sequence coordinates
