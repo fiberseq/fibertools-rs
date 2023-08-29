@@ -58,7 +58,7 @@ pub struct Cli {
         help_heading = "Debug-Options"
     )]
     pub verbose: u8,
-    /// Turn of all logging
+    /// Turn off all logging
     #[clap(global = true, long, help_heading = "Debug-Options")]
     pub quiet: bool,
     /// Subcommands for fibertools-rs
