@@ -82,8 +82,6 @@ pub fn main() -> Result<(), Error> {
             all,
             full_float,
         }) => {
-            // read in the bam from stdin or from a file
-            let mut bam = bam_reader(bam, args.threads);
             let out_files = FiberOut::new(
                 m6a,
                 cpg,
@@ -96,6 +94,9 @@ pub fn main() -> Result<(), Error> {
                 *min_ml_score,
                 *full_float,
             )?;
+
+            // read in the bam from stdin or from a file
+            let mut bam = bam_reader(bam, args.threads);
             extract::extract_contained(&mut bam, out_files);
         }
         Some(Commands::Center {
