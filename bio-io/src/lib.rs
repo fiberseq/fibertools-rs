@@ -2,7 +2,7 @@ use anyhow::Result;
 use colored::Colorize;
 use gzp::deflate::Bgzf; //, Gzip, Mgzip, RawDeflate};
 use gzp::{Compression, ZBuilder};
-use indicatif::{style, ProgressBar};
+use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use niffler::get_reader;
@@ -31,8 +31,11 @@ const PROGRESS_STYLE_NO_LENGTH: &str =
     "[{elapsed_precise:.yellow}]  Records per second: {per_sec:<17.cyan}Total records processed:  {human_pos:.blue}\t";
 
 pub fn no_length_progress_bar() -> ProgressBar {
+    let style = ProgressStyle::default_bar()
+        .template(PROGRESS_STYLE_NO_LENGTH)
+        .unwrap();
     let bar = ProgressBar::new(0);
-    bar.set_style(style::ProgressStyle::with_template(PROGRESS_STYLE_NO_LENGTH).unwrap());
+    bar.set_style(style);
     let finish = indicatif::ProgressFinish::AndLeave;
     let bar = bar.with_finish(finish);
     bar
