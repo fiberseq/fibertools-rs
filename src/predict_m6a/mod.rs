@@ -552,7 +552,7 @@ pub fn read_bam_into_fiberdata(
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
         if frac_called < 0.05 {
-            log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0*frac_called);
+            log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0-100.0*frac_called);
         }
 
         // write to output
