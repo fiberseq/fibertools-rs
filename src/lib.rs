@@ -51,8 +51,8 @@ where
 pub fn join_by_str_option(vals: &[Option<i64>], sep: &str) -> String {
     vals.iter()
         .map(|v| match v {
-            Some(v) => v.to_string() + sep,
-            None => String::from("NA") + sep,
+            Some(v) => v.to_string(),
+            None => String::from("NA"),
         })
         .map(|v| v + sep)
         .collect()
