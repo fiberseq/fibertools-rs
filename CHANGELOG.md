@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.2 (2023-09-27)
+
+### Chore
+
+ - <csr-id-12186d106224f211ac39844b6a8c82a54825ffcf/> update deps
+ - <csr-id-619081fa421d6658149f28b3a0458e83c4e16af2/> fix typo in cli message
+
+### Bug Fixes
+
+ - <csr-id-ea456be994b9209e32332bf5b46c183eba45ca3d/> extra comma in ft center wide format. fixes 21
+
+### Other
+
+ - <csr-id-fe3aa9a2511944b4078b3b7ed9dbb2ca756f9b81/> fix warning msg
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 29 calendar days.
+ - 45 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Chore clippy ([`9c80dcb`](https://github.com/fiberseq/fibertools-rs/commit/9c80dcb2053ce42f2a33007954fc4506d50ce8a4))
+    - Fix centered_query_start and centered_query_end values in ft center ([`a43c082`](https://github.com/fiberseq/fibertools-rs/commit/a43c0826c8a454e9ebb142e1fe4636a537883b6d))
+    - Extra comma in ft center wide format. fixes 21 ([`ea456be`](https://github.com/fiberseq/fibertools-rs/commit/ea456be994b9209e32332bf5b46c183eba45ca3d))
+    - Fix warning msg ([`fe3aa9a`](https://github.com/fiberseq/fibertools-rs/commit/fe3aa9a2511944b4078b3b7ed9dbb2ca756f9b81))
+    - Update deps ([`12186d1`](https://github.com/fiberseq/fibertools-rs/commit/12186d106224f211ac39844b6a8c82a54825ffcf))
+    - Fix typo in cli message ([`619081f`](https://github.com/fiberseq/fibertools-rs/commit/619081fa421d6658149f28b3a0458e83c4e16af2))
+    - Add to cli message ([`7bf04d2`](https://github.com/fiberseq/fibertools-rs/commit/7bf04d280cef747391739896719b6fb0f84f6931))
+</details>
+
 ## 0.3.1 (2023-08-13)
 
 ### Fixed
@@ -23,7 +63,7 @@ Added commas to wide format of ft center.
 
 <csr-read-only-do-not-edit/>
 
- - 17 commits contributed to the release over the course of 13 calendar days.
+ - 18 commits contributed to the release over the course of 13 calendar days.
  - 15 days passed between releases.
  - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -35,6 +75,7 @@ Added commas to wide format of ft center.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.1 ([`6c5adf4`](https://github.com/fiberseq/fibertools-rs/commit/6c5adf4a88f04420e4024378cbed2bfdee73fe79))
     - Release fibertools-rs v0.3.1 ([`f5cc324`](https://github.com/fiberseq/fibertools-rs/commit/f5cc32460016b0a4ee9ea0804f236fc0aa73b803))
     - Update ([`9d870a9`](https://github.com/fiberseq/fibertools-rs/commit/9d870a928615c04cffe21b296970c9c6403d97de))
     - Release fibertools-rs v0.3.1 ([`0de730e`](https://github.com/fiberseq/fibertools-rs/commit/0de730e4949d61fff32fa06ff42c2d2f3bb16c29))
