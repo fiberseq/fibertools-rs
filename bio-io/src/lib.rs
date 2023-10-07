@@ -28,7 +28,7 @@ const COMPRESSION_LEVEL: u32 = 6;
 PROGRESS BARS
 */
 const PROGRESS_STYLE_NO_LENGTH: &str =
-    "[{elapsed_precise:.yellow}]  Records per second: {per_sec:<17.cyan}Total records processed:  {human_pos:.blue}\t";
+    "[{elapsed_precise:.yellow}]  Records per second: {per_sec:<17.cyan}Total records processed:  {human_pos:.blue}";
 
 pub fn no_length_progress_bar() -> ProgressBar {
     let style = ProgressStyle::default_bar()

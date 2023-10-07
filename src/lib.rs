@@ -30,8 +30,9 @@ use std::io::Write;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GIT_HASH: &str = env!("CARGO_GIT_HASH");
 pub const LONG_VERSION: &str = env!("CARGO_LONG_VERSION");
+// if this string (bar) gets too long it displays weird when writing to stdout
 const PROGRESS_STYLE: &str =
-    "[{elapsed_precise:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
+    "[{elapsed_precise:.yellow}] {bar:>35.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
 
 /// unzip a vector of tuples
 pub fn unzip_to_vectors<T, U>(vec: Vec<(T, U)>) -> (Vec<T>, Vec<U>) {

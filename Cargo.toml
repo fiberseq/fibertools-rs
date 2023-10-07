@@ -29,7 +29,7 @@ colored = "2.0.0"
 console = {version = "0.15", optional = true}
 env_logger = "0.9.0"
 gbdt = {version = "0.1.1", optional = true}
-indicatif = {version = "0.17.5", features = ["rayon"]}
+indicatif = {version = "0.17.7", features = ["rayon"]}
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
