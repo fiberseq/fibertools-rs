@@ -172,7 +172,7 @@ impl PredictOptions {
 
     pub fn progress_style(&self) -> &str {
         // {percent:>3.green}%
-        "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:50.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
+        "[PREDICTING m6A] [Elapsed {elapsed:.yellow} ETA {eta:.yellow}] {bar:30.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} (batches/s {per_sec:.green})"
     }
 
     /// function to find closest value in a btree based on precision
