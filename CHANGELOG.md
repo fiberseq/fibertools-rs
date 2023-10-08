@@ -5,7 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.3 (2023-10-08)
+
+### Bug Fixes
+
+ - <csr-id-6eb0527acb082d87eeb2dda2d898fe3642910dce/> progress bar display issues.
+
+### Other
+
+ - <csr-id-958e330daa4c51f7d69d9f7763333d78a92fb843/> add docs.
+ - <csr-id-f60e8fa97ae89b8b19a52b5f9a0e62931262b622/> add docs.
+ - <csr-id-d54dba8523a49eb9eac5d1b4743bcf9922094f8e/> add docs.
+ - <csr-id-35d498ab1be9efa670d08c8191e639ebdbecbd5a/> add docs.
+ - <csr-id-415cc7f2d151b18164e7cb2a8484e1369e61c2ca/> add docs.
+ - <csr-id-e6ac4d3a7c63554a65511a15d4c7aca144203797/> add docs.
+ - <csr-id-cef74228e5933e7b911db53b65352cfde5246b29/> add docs.
+ - <csr-id-b1b148a865cbc0223d55ad2dc11b826f51210b54/> add docs.
+ - <csr-id-8c818835c2c6f58103b3a8bfb0bbdd8e24379016/> add docs.
+ - <csr-id-4ca7269d0851c70ea25c466bf2d8092075658e52/> add docs.
+ - <csr-id-737fb50d4f311612f5f9aa5d1c342ed0d049b575/> add docs.
+ - <csr-id-c6fec85f40be60b5b101ab7ed1ade439e07d4052/> add docs.
+ - <csr-id-f2311eda7b3a400c39d93b8e95b7966b7ecba4da/> add docs.
+ - <csr-id-5ffa686bc22216a497abfa48c5adf318a743a815/> add docs.
+ - <csr-id-d166b29fdf08e24873afee8c37523293e288b762/> add docs.
+ - <csr-id-30645d382bfc0a02f4ffa516044995a87acfea7c/> add docs.
+ - <csr-id-897eca5bd467fc5ae7f888be1696af88bd3f4d9f/> add docs.
+ - <csr-id-893f5f9e4dfca97b459281b5d667f7449a54364e/> add docs.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 19 commits contributed to the release.
+ - 10 days passed between releases.
+ - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Add docs. ([`958e330`](https://github.com/fiberseq/fibertools-rs/commit/958e330daa4c51f7d69d9f7763333d78a92fb843))
+    - Add docs. ([`f60e8fa`](https://github.com/fiberseq/fibertools-rs/commit/f60e8fa97ae89b8b19a52b5f9a0e62931262b622))
+    - Add docs. ([`d54dba8`](https://github.com/fiberseq/fibertools-rs/commit/d54dba8523a49eb9eac5d1b4743bcf9922094f8e))
+    - Add docs. ([`35d498a`](https://github.com/fiberseq/fibertools-rs/commit/35d498ab1be9efa670d08c8191e639ebdbecbd5a))
+    - Add docs. ([`415cc7f`](https://github.com/fiberseq/fibertools-rs/commit/415cc7f2d151b18164e7cb2a8484e1369e61c2ca))
+    - Add docs. ([`e6ac4d3`](https://github.com/fiberseq/fibertools-rs/commit/e6ac4d3a7c63554a65511a15d4c7aca144203797))
+    - Add docs. ([`cef7422`](https://github.com/fiberseq/fibertools-rs/commit/cef74228e5933e7b911db53b65352cfde5246b29))
+    - Add docs. ([`b1b148a`](https://github.com/fiberseq/fibertools-rs/commit/b1b148a865cbc0223d55ad2dc11b826f51210b54))
+    - Add docs. ([`8c81883`](https://github.com/fiberseq/fibertools-rs/commit/8c818835c2c6f58103b3a8bfb0bbdd8e24379016))
+    - Add docs. ([`4ca7269`](https://github.com/fiberseq/fibertools-rs/commit/4ca7269d0851c70ea25c466bf2d8092075658e52))
+    - Add docs. ([`737fb50`](https://github.com/fiberseq/fibertools-rs/commit/737fb50d4f311612f5f9aa5d1c342ed0d049b575))
+    - Add docs. ([`c6fec85`](https://github.com/fiberseq/fibertools-rs/commit/c6fec85f40be60b5b101ab7ed1ade439e07d4052))
+    - Add docs. ([`f2311ed`](https://github.com/fiberseq/fibertools-rs/commit/f2311eda7b3a400c39d93b8e95b7966b7ecba4da))
+    - Add docs. ([`5ffa686`](https://github.com/fiberseq/fibertools-rs/commit/5ffa686bc22216a497abfa48c5adf318a743a815))
+    - Add docs. ([`d166b29`](https://github.com/fiberseq/fibertools-rs/commit/d166b29fdf08e24873afee8c37523293e288b762))
+    - Add docs. ([`30645d3`](https://github.com/fiberseq/fibertools-rs/commit/30645d382bfc0a02f4ffa516044995a87acfea7c))
+    - Add docs. ([`897eca5`](https://github.com/fiberseq/fibertools-rs/commit/897eca5bd467fc5ae7f888be1696af88bd3f4d9f))
+    - Add docs. ([`893f5f9`](https://github.com/fiberseq/fibertools-rs/commit/893f5f9e4dfca97b459281b5d667f7449a54364e))
+    - Progress bar display issues. ([`6eb0527`](https://github.com/fiberseq/fibertools-rs/commit/6eb0527acb082d87eeb2dda2d898fe3642910dce))
+</details>
+
 ## 0.3.2 (2023-09-27)
+
+<csr-id-12186d106224f211ac39844b6a8c82a54825ffcf/>
+<csr-id-619081fa421d6658149f28b3a0458e83c4e16af2/>
+<csr-id-fe3aa9a2511944b4078b3b7ed9dbb2ca756f9b81/>
 
 ### Chore
 
@@ -24,7 +92,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 29 calendar days.
+ - 8 commits contributed to the release over the course of 29 calendar days.
  - 45 days passed between releases.
  - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -36,6 +104,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.2 ([`f39c11b`](https://github.com/fiberseq/fibertools-rs/commit/f39c11b54046af24684a8726ee7e6d54f52a6595))
     - Chore clippy ([`9c80dcb`](https://github.com/fiberseq/fibertools-rs/commit/9c80dcb2053ce42f2a33007954fc4506d50ce8a4))
     - Fix centered_query_start and centered_query_end values in ft center ([`a43c082`](https://github.com/fiberseq/fibertools-rs/commit/a43c0826c8a454e9ebb142e1fe4636a537883b6d))
     - Extra comma in ft center wide format. fixes 21 ([`ea456be`](https://github.com/fiberseq/fibertools-rs/commit/ea456be994b9209e32332bf5b46c183eba45ca3d))
