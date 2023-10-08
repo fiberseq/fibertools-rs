@@ -8,6 +8,8 @@ See the [help message](./ft-center-help.md) for details.
 
 ## Output description
 
+This command writes Fiber-seq data in a tab-delimited format to `stdout` that has been centered relative to positions specified in the input bed file.
+
 | Column               | Description                                                        |
 | -------------------- | ------------------------------------------------------------------ |
 | chrom                | Chromosome                                                         |
@@ -24,12 +26,12 @@ See the [help message](./ft-center-help.md) for details.
 
 ### Additional columns specific to long (default) format
 
-| Column                  | Description                                                                |
-| ----------------------- | -------------------------------------------------------------------------- |
-| centered_positions_type | The type of position being centered. One of: `m6A`, `5mC`, `nuc`, `msp`.   |
-| centered_start          | The start position of the "feature" relative to the centering position     |
-| centered_end            | The end position of the "feature" relative to the centering position       |
-| centered_quality        | The quality of the "feature" relative to the centering position (ML value) |
+| Column                 | Description                                                                |
+| ---------------------- | -------------------------------------------------------------------------- |
+| centered_position_type | The type of position being centered. One of: `m6A`, `5mC`, `nuc`, `msp`.   |
+| centered_start         | The start position of the "feature" relative to the centering position     |
+| centered_end           | The end position of the "feature" relative to the centering position       |
+| centered_quality       | The quality of the "feature" relative to the centering position (ML value) |
 
 ### Additional columns specific to the wide format
 
