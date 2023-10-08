@@ -45,16 +45,12 @@ Add nucleosomes to a bam that file already contains m6a predictions. Note, this 
 
 ## `ft extract`
 
-Extracts fiberseq data from a bam file into plain text. [Help page for extract](/docs/ft-extract-help.md).
-
-### `ft extract --all`
-
-The extract all option is a special option that tries to extract all the fiberseq data into a tabular format. The following is an image of the output. Note that the [column names](/docs/ft-all-columns.md) will be preserved across different software versions (unless otherwise noted); however, the order may change and new columns may be added. Therefore, when loading the data (with `pandas` e.g.) be sure to use the column names as opposed to indexes for manipulation.
+Extracts Fiber-seq data from a bam file into plain text. [Help page for extract](/docs/extract.md).
 ![ft-extract all](/assets/img/ft-extract-all.png)
 
 ## `ft center`
 
-Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/center.md).
+Center Fiber-seq reads (bam) around reference position(s). [Help page for center](/docs/center.md).
 ![Center](/assets/img/center.png)
 
 # Python API (`pyft`)
