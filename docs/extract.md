@@ -8,14 +8,36 @@ See the [help message](./ft-extract-help.md) for details.
 
 ## Output description
 
+All outputs to `ft extract` can be (and should be) compressed by default simply by adding the `.gz` extension.
+For example, `ft extract input.bam --m6a m6a.bed.gz` will output a compressed bed12 file.
+
+### Shared Output columns:
+
+| Column | Description                                     |
+| ------ | ----------------------------------------------- |
+| ct     | Chromosome or contig                            |
+| st     | Start position of the read on the chromosome    |
+| en     | End position of the read on the chromosome      |
+| fiber  | The fiber/read name                             |
+| score  | The number of ccs passes for the read (rounded) |
+
+### Columns specific to the `--m6a`, `--cpg`, `--nuc`, and `--msp` formats
+
+All of these files are written in standard bed12 format. The first and last block in each the bed12 record do not reflect real data, and exist only to mark the start and end positions of the read.
+
+| Column      | Description                                                                              |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| thick start | Same as the start (`st`)                                                                 |
+| thick end   | Same as the end (`en`)                                                                   |
+| itemRgb     | Color specifc to the datatype, e.g. m6a marks get a purple RGB                           |
+| blockCount  | The number of blocks in the bed12 record                                                 |
+| blockSizes  | A comma separated list of the lengths of each feature in the bed12 record                |
+| blockStarts | A comma separated list of the relative start positions of each block in the bed12 record |
+
+### Columns specific to the `--all` format
+
 | Column          | Description                                                     |
 | --------------- | --------------------------------------------------------------- |
-| ct              | Chromosome or contig                                            |
-| st              | Start position of the read on the chromosome                    |
-| en              | End position of the read on the chromosome                      |
-| fiber           | The fiber/read name                                             |
-| score           | The number of ccs passes for the read (rounded)                 |
-| strand          | The strand of the read alignment                                |
 | sam_flag        | The sam flag of the read alignment                              |
 | HP              | The haplotype tag for the read                                  |
 | RG              | The read group tag for the read                                 |
