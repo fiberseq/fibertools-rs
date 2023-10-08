@@ -1,5 +1,5 @@
 ```
-Extract fiberseq data into plain text files
+Extract fiberseq data into plain text files. See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs
 
 Usage: ft extract [OPTIONS] [BAM]
 
