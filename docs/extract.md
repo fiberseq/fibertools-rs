@@ -64,3 +64,5 @@ All of these files are written in standard bed12 format. The first and last bloc
 | 5mC             | The start positions of the 5mC in molecular coordinates         |
 | ref_5mC         | The start positions of the 5mC in reference coordinates         |
 | 5mC_qual        | The quality of the 5mC positions (ML value)                     |
+
+Note positions in columns starting with `ref_` maybe contain NA values if the reference sequence has an insertion or deletion relative to the read sequence at that position.
