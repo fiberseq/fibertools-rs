@@ -46,7 +46,7 @@ Add nucleosomes to a bam that file already contains m6a predictions. Note, this 
 ## `ft extract`
 
 Extracts Fiber-seq data from a bam file into plain text. [Help page for extract](/docs/extract.md).
-![ft-extract all](/assets/img/ft-extract-all.png)
+![Extract](/assets/img/ft-extract-all.png)
 
 ## `ft center`
 
