@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.3.1 (2023-10-08)
 
+<csr-id-12186d106224f211ac39844b6a8c82a54825ffcf/>
+
 ### Chore
 
  - <csr-id-12186d106224f211ac39844b6a8c82a54825ffcf/> update deps
+
+### Other
+
+ - <csr-id-e216e7d184ddcd235e0e22dd1da3e99382d78277/> add docs.
 
 ### Bug Fixes
 
@@ -19,9 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 36 calendar days.
+ - 4 commits contributed to the release over the course of 36 calendar days.
  - 55 days passed between releases.
- - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
 ### Commit Details
@@ -31,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Add docs. ([`e216e7d`](https://github.com/fiberseq/fibertools-rs/commit/e216e7d184ddcd235e0e22dd1da3e99382d78277))
+    - Release bio-io v0.3.1 ([`2d57bc1`](https://github.com/fiberseq/fibertools-rs/commit/2d57bc138cc952b466ac9b377169ba5994b31737))
     - Progress bar display issues. ([`6eb0527`](https://github.com/fiberseq/fibertools-rs/commit/6eb0527acb082d87eeb2dda2d898fe3642910dce))
     - Update deps ([`12186d1`](https://github.com/fiberseq/fibertools-rs/commit/12186d106224f211ac39844b6a8c82a54825ffcf))
 </details>
@@ -70,6 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.2.0 (2023-07-29)
+
+<csr-id-6bb4c5c8b041c24743d2f89283c005f011084452/>
+<csr-id-f73a36a716023835e16da50838752d74a2768843/>
 
 ### Chore
 

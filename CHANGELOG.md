@@ -5,7 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.4 (2023-10-08)
+
+### Other
+
+ - <csr-id-e216e7d184ddcd235e0e22dd1da3e99382d78277/> add docs.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Add docs. ([`e216e7d`](https://github.com/fiberseq/fibertools-rs/commit/e216e7d184ddcd235e0e22dd1da3e99382d78277))
+    - Release bio-io v0.3.1 ([`2d57bc1`](https://github.com/fiberseq/fibertools-rs/commit/2d57bc138cc952b466ac9b377169ba5994b31737))
+</details>
+
 ## 0.3.3 (2023-10-08)
+
+<csr-id-958e330daa4c51f7d69d9f7763333d78a92fb843/>
+<csr-id-f60e8fa97ae89b8b19a52b5f9a0e62931262b622/>
+<csr-id-d54dba8523a49eb9eac5d1b4743bcf9922094f8e/>
+<csr-id-35d498ab1be9efa670d08c8191e639ebdbecbd5a/>
+<csr-id-415cc7f2d151b18164e7cb2a8484e1369e61c2ca/>
+<csr-id-e6ac4d3a7c63554a65511a15d4c7aca144203797/>
+<csr-id-cef74228e5933e7b911db53b65352cfde5246b29/>
+<csr-id-b1b148a865cbc0223d55ad2dc11b826f51210b54/>
+<csr-id-8c818835c2c6f58103b3a8bfb0bbdd8e24379016/>
+<csr-id-4ca7269d0851c70ea25c466bf2d8092075658e52/>
+<csr-id-737fb50d4f311612f5f9aa5d1c342ed0d049b575/>
+<csr-id-c6fec85f40be60b5b101ab7ed1ade439e07d4052/>
+<csr-id-f2311eda7b3a400c39d93b8e95b7966b7ecba4da/>
+<csr-id-5ffa686bc22216a497abfa48c5adf318a743a815/>
+<csr-id-d166b29fdf08e24873afee8c37523293e288b762/>
+<csr-id-30645d382bfc0a02f4ffa516044995a87acfea7c/>
+<csr-id-897eca5bd467fc5ae7f888be1696af88bd3f4d9f/>
+<csr-id-893f5f9e4dfca97b459281b5d667f7449a54364e/>
 
 ### Bug Fixes
 
@@ -36,7 +80,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release.
+ - 20 commits contributed to the release.
  - 10 days passed between releases.
  - 19 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -48,6 +92,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.3 ([`85ee32a`](https://github.com/fiberseq/fibertools-rs/commit/85ee32aea21eccdfccc699ae1e2c4222e16855f7))
     - Add docs. ([`958e330`](https://github.com/fiberseq/fibertools-rs/commit/958e330daa4c51f7d69d9f7763333d78a92fb843))
     - Add docs. ([`f60e8fa`](https://github.com/fiberseq/fibertools-rs/commit/f60e8fa97ae89b8b19a52b5f9a0e62931262b622))
     - Add docs. ([`d54dba8`](https://github.com/fiberseq/fibertools-rs/commit/d54dba8523a49eb9eac5d1b4743bcf9922094f8e))
