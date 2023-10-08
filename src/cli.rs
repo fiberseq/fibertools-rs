@@ -163,7 +163,8 @@ pub enum Commands {
         #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
         allowed_m6a_skips: i64,
     },
-    /// Extract fiberseq data into plain text files
+    /// Extract fiberseq data into plain text files.
+    /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
     Extract {
         /// Input fiberseq bam file. If no path is provided extract will read bam data from stdin.
@@ -211,13 +212,12 @@ pub enum Commands {
 
     #[clap(visible_aliases = &["c", "ct"])]
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs.
+    ///  See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output.
     Center {
         /// Aligned Fiber-seq bam file.
         bam: String,
-        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.
-        ///
+        /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.        
         /// If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
-        ///
         bed: String,
         /// Minium score in the ML tag to include in the output
         #[clap(short, long, default_value = MIN_ML_SCORE)]
