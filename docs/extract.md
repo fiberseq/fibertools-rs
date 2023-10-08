@@ -21,7 +21,7 @@ For example, `ft extract input.bam --m6a m6a.bed.gz` will output a compressed be
 | fiber  | The fiber/read name                             |
 | score  | The number of ccs passes for the read (rounded) |
 
-### Columns specific to the `--m6a`, `--cpg`, `--nuc`, and `--msp` formats
+### Columns specific to the `--m6a`, `--cpg`, `--nuc`, and `--msp` outputs
 
 All of these files are written in standard bed12 format. The first and last block in each the bed12 record do not reflect real data, and exist only to mark the start and end positions of the read.
 
@@ -34,7 +34,7 @@ All of these files are written in standard bed12 format. The first and last bloc
 | blockSizes  | A comma separated list of the lengths of each feature in the bed12 record                |
 | blockStarts | A comma separated list of the relative start positions of each block in the bed12 record |
 
-### Columns specific to the `--all` format
+### Columns specific to the `--all` output
 
 | Column          | Description                                                     |
 | --------------- | --------------------------------------------------------------- |
