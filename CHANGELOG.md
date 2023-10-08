@@ -7,6 +7,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## 0.3.4 (2023-10-08)
 
+<csr-id-e216e7d184ddcd235e0e22dd1da3e99382d78277/>
+
 ### Other
 
  - <csr-id-e216e7d184ddcd235e0e22dd1da3e99382d78277/> add docs.
@@ -15,7 +17,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -26,6 +28,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release bio-io v0.3.1 ([`efc9b3f`](https://github.com/fiberseq/fibertools-rs/commit/efc9b3f569490dac5b10462d359a834e324d62ef))
+    - Release fibertools-rs v0.3.4, bio-io v0.3.1 ([`0697d8d`](https://github.com/fiberseq/fibertools-rs/commit/0697d8db1797a1a46bd276269be8687ebbd102df))
     - Add docs. ([`e216e7d`](https://github.com/fiberseq/fibertools-rs/commit/e216e7d184ddcd235e0e22dd1da3e99382d78277))
     - Release bio-io v0.3.1 ([`2d57bc1`](https://github.com/fiberseq/fibertools-rs/commit/2d57bc138cc952b466ac9b377169ba5994b31737))
 </details>
