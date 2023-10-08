@@ -16,5 +16,5 @@ Global-Options:
 
 Debug-Options:
   -v, --verbose...  Logging level [-v: Info, -vv: Debug, -vvv: Trace]
-      --quiet       Turn of all logging
+      --quiet       Turn off all logging
 ```
