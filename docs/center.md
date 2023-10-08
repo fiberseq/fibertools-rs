@@ -2,9 +2,9 @@
 
 This command centers Fiber-seq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs
 
-## Input description and options
+## Inputs and options
 
-See help message for details.
+See the [help message](./ft-center-help.md) for details.
 
 ## Output description
 

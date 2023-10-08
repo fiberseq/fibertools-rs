@@ -54,7 +54,7 @@ The extract all option is a special option that tries to extract all the fiberse
 
 ## `ft center`
 
-Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/ft-center-help.md). [More details on the output](/docs/center.md).
+Center fiberseq reads (bam) around reference position(s). [Help page for center](/docs/center.md).
 ![Center](/assets/img/center.png)
 
 # Python API (`pyft`)
