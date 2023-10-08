@@ -11,8 +11,3 @@ for subcommand in "" "extract" "center" "predict-m6a" "add-nucleosomes" "clear-k
     cargo run -- $subcommand --help >>$out
     echo '```' >>$out
 done
-
-# extract the column names for the all command
-printf '# Columns in `ft extract --all`\n```\n' >docs/ft-all-columns.md
-cargo run -- -v extract --all - tests/data/all.bam | head -n 1 | sed 's/\t/\n/g' >>docs/ft-all-columns.md
-echo '```' >>docs/ft-all-columns.md
