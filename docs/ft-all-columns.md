@@ -1,4 +1,5 @@
 # Columns in `ft extract --all`
+
 ```
 #ct
 st
