@@ -7,7 +7,7 @@ keywords = ["bam", "bfx"]
 license = "MIT"
 name = "bio-io"
 repository = "https://github.com/fiberseq/fibertools-rs"
-version = "0.3.0"
+version = "0.3.1"
 
 [dependencies]
 anyhow = "1.0.58"
