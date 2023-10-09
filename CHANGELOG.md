@@ -5,7 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.6 (2023-10-09)
+
+### Chore
+
+ - <csr-id-32e9121f47e62e20b38600198f2f3fac3a4c88d6/> update
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Update ([`32e9121`](https://github.com/fiberseq/fibertools-rs/commit/32e9121f47e62e20b38600198f2f3fac3a4c88d6))
+</details>
+
 ## 0.3.5 (2023-10-09)
+
+<csr-id-9b7ceba1f664fe6cdb553b5de43ff856a2cf94c2/>
+<csr-id-c07f66b37f3e4e8d267578b7fc873c44e3df5d29/>
 
 ### Chore
 
@@ -16,7 +43,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 1 day passed between releases.
  - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
@@ -28,6 +55,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.5 ([`1e351db`](https://github.com/fiberseq/fibertools-rs/commit/1e351dbacefc18429ab0b4ddc0f42d907cd1531d))
     - Release bio-io v0.3.2 ([`92b5918`](https://github.com/fiberseq/fibertools-rs/commit/92b5918cce1773a304017d4f5cee268145689580))
     - Improve progress bar ([`9b7ceba`](https://github.com/fiberseq/fibertools-rs/commit/9b7ceba1f664fe6cdb553b5de43ff856a2cf94c2))
     - Improve progress bar ([`c07f66b`](https://github.com/fiberseq/fibertools-rs/commit/c07f66b37f3e4e8d267578b7fc873c44e3df5d29))
