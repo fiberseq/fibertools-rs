@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.5 (2023-10-09)
+
+### Chore
+
+ - <csr-id-9b7ceba1f664fe6cdb553b5de43ff856a2cf94c2/> improve progress bar
+ - <csr-id-c07f66b37f3e4e8d267578b7fc873c44e3df5d29/> improve progress bar
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Release bio-io v0.3.2 ([`92b5918`](https://github.com/fiberseq/fibertools-rs/commit/92b5918cce1773a304017d4f5cee268145689580))
+    - Improve progress bar ([`9b7ceba`](https://github.com/fiberseq/fibertools-rs/commit/9b7ceba1f664fe6cdb553b5de43ff856a2cf94c2))
+    - Improve progress bar ([`c07f66b`](https://github.com/fiberseq/fibertools-rs/commit/c07f66b37f3e4e8d267578b7fc873c44e3df5d29))
+    - Add notes ([`ff061a1`](https://github.com/fiberseq/fibertools-rs/commit/ff061a17a67ee8fa99e274613e4b2c4c1baa88a4))
+    - Add notes ([`9fa61a0`](https://github.com/fiberseq/fibertools-rs/commit/9fa61a055952d16bd4b76010d5d3b44bf44d917b))
+</details>
+
 ## 0.3.4 (2023-10-08)
 
 <csr-id-e216e7d184ddcd235e0e22dd1da3e99382d78277/>
@@ -17,7 +47,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 1 commit was understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -28,6 +58,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Release fibertools-rs v0.3.4 ([`8731ecb`](https://github.com/fiberseq/fibertools-rs/commit/8731ecb18abb4d1bcbcd4d95047c9f16785301f4))
     - Release bio-io v0.3.1 ([`efc9b3f`](https://github.com/fiberseq/fibertools-rs/commit/efc9b3f569490dac5b10462d359a834e324d62ef))
     - Release fibertools-rs v0.3.4, bio-io v0.3.1 ([`0697d8d`](https://github.com/fiberseq/fibertools-rs/commit/0697d8db1797a1a46bd276269be8687ebbd102df))
     - Add docs. ([`e216e7d`](https://github.com/fiberseq/fibertools-rs/commit/e216e7d184ddcd235e0e22dd1da3e99382d78277))
