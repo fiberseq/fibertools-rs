@@ -20,7 +20,6 @@ pub mod strip_basemods;
 
 use anyhow::Result;
 use bio_io::*;
-use indicatif::{style, ProgressBar};
 #[cfg(feature = "predict")]
 use itertools::Itertools;
 use rust_htslib::{bam, bam::Read};
@@ -30,7 +29,7 @@ use std::io::Write;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GIT_HASH: &str = env!("CARGO_GIT_HASH");
 pub const LONG_VERSION: &str = env!("CARGO_LONG_VERSION");
-// if this string (bar) gets too long it displays weird when writing to stdout
+// if this string (bar)gets too long it displays weird when writing to stdout
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:>35.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
 
@@ -129,12 +128,7 @@ impl FiberOut {
 
 /// clear kinetics from a hifi bam
 pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
-    let bar = ProgressBar::new(1);
-    let style_str="[Clearing Kinetics] [Elapsed {elapsed:.yellow}] [Reads processed {human_pos:>5.cyan}] (reads/s {per_sec:>5.green})";
-    let style = style::ProgressStyle::with_template(style_str)
-        .unwrap()
-        .progress_chars("##-");
-    bar.set_style(style);
+    let bar = bio_io::no_length_progress_bar();
     for rec in bam.records() {
         let mut record = rec.unwrap();
         record.remove_aux(b"fp").unwrap_or(());
@@ -142,6 +136,7 @@ pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
         record.remove_aux(b"rp").unwrap_or(());
         record.remove_aux(b"ri").unwrap_or(());
         out.write(&record).unwrap();
+        bar.inc_length(1);
         bar.inc(1);
     }
     bar.finish();
