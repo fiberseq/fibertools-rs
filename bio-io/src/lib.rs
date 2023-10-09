@@ -27,12 +27,18 @@ const COMPRESSION_LEVEL: u32 = 6;
 /*
 PROGRESS BARS
 */
-const PROGRESS_STYLE_NO_LENGTH: &str =
-    "[{elapsed_precise:.yellow}]  Records per second: {per_sec:<17.cyan}Total records processed:  {human_pos:.blue}";
-
 pub fn no_length_progress_bar() -> ProgressBar {
+    let progress_style_no_length = format!(
+        "{}    {} {} {} {} {}",
+        "[{elapsed_precise:.yellow.bold}]",
+        "Records".cyan(),
+        "{per_sec:<15.cyan}",
+        "Read".blue(),
+        "{human_pos:.blue}",
+        "records".blue(),
+    );
     let style = ProgressStyle::default_bar()
-        .template(PROGRESS_STYLE_NO_LENGTH)
+        .template(&progress_style_no_length)
         .unwrap();
     let bar = ProgressBar::new(0);
     bar.set_style(style);
