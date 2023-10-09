@@ -1,13 +1,14 @@
 ```
-This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs. See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output
+This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs. See
+https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output
 
 Usage: ft center [OPTIONS] <BAM> <BED>
 
 Arguments:
   <BAM>  Aligned Fiber-seq bam file
-  <BED>  Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.
-         If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align
-         to the same central position
+  <BED>  Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will
+         also be checked for the strand but only after the 6th is. If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the
+         start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position
 
 Options:
   -m, --min-ml-score <MIN_ML_SCORE>  Minium score in the ML tag to include in the output [default: 125]
