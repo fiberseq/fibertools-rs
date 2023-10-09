@@ -23,7 +23,7 @@ For example, `ft extract input.bam --m6a m6a.bed.gz` will output a compressed be
 
 ### Columns specific to the `--m6a`, `--cpg`, `--nuc`, and `--msp` outputs
 
-All of these files are written in standard bed12 format. The first and last block in each the bed12 record do not reflect real data, and exist only to mark the start and end positions of the read.
+All of these files are written in standard bed12 format. The first and last block in each the bed12 record do not reflect real data, and exist only to mark the start and end positions of the read. If you would like to convert these beds into bigBeds be sure to include `-allow1bpOverlap` in your command.
 
 | Column      | Description                                                                              |
 | ----------- | ---------------------------------------------------------------------------------------- |

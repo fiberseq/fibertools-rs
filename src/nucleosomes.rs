@@ -1,7 +1,7 @@
 use super::fiber::FiberseqData;
 use super::*;
 use rayon::iter::ParallelIterator;
-use rayon::prelude::IntoParallelRefMutIterator;
+use rayon::prelude::*;
 use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
