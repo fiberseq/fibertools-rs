@@ -4,6 +4,8 @@ This command centers Fiber-seq data around given reference positions. This is us
 
 my new info. 
 
+second commit.
+
 ## Inputs and options
 
 See the [help message](./ft-center-help.md) for details.
