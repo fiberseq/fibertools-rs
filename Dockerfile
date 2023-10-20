@@ -34,8 +34,8 @@ COPY . .
 
 # use the install pytroch from docker image
 ENV LIBTORCH_USE_PYTORCH=1
-RUN python checkpy.py
-RUN ls "/opt/conda/lib/python3.10/site-packages/torch/lib/"
+#RUN python checkpy.py
+#RUN ls "/opt/conda/lib/python3.10/site-packages/torch/lib/"
 
 RUN cargo build --release && cp ./target/release/ft /usr/local/bin/ft
 RUN ft --help
