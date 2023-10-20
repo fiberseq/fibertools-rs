@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ENV FT_VERSION="0.3.6"
 
@@ -45,12 +45,14 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install libtorch
 WORKDIR /src/fibertools-rs
-ENV TORCH_VERSION="2.0.1"
+ENV TORCH_VERSION="2.1.0"
 # "cu117" or "cu118" or "cpu"
 ENV INSTALL_TYPE="cu118" 
+ENV INSTALL_TYPE="cpu" 
 ENV PY_URL="https://download.pytorch.org/libtorch/${INSTALL_TYPE}/libtorch-shared-with-deps-${TORCH_VERSION}%2B${INSTALL_TYPE}.zip"
 RUN wget ${PY_URL}
 RUN unzip "libtorch-shared-with-deps-${TORCH_VERSION}+${INSTALL_TYPE}.zip"
+RUN ls
 #RUN unzip libtorch*.zip
 ENV LIBTORCH=/src/fibertools-rs/libtorch
 ENV LD_LIBRARY_PATH=/src/fibertools-rs/libtorch/lib:$LD_LIBRARY_PATH
