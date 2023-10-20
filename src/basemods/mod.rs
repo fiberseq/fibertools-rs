@@ -104,8 +104,6 @@ pub struct BaseMods {
 impl BaseMods {
     pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // my basemod parser is ~25% faster than rust_htslib's
-        // let new = BaseMods::rust_htslib_mm_ml_parser(record, min_ml_score);
-        //assert_eq!(new, old);
         BaseMods::my_mm_ml_parser(record, min_ml_score)
     }
 
@@ -251,34 +249,6 @@ impl BaseMods {
         // needed so I can compare methods
         rtn.sort();
         BaseMods { base_mods: rtn }
-    }
-
-    /// this is actually way slower than my parser for some reason...
-    /// so I am not going to use it
-    pub fn rust_htslib_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
-        let mut base_mods = HashMap::new();
-
-        match record.basemods_iter() {
-            Ok(mods) => {
-                for bp in mods {
-                    let (pos, m) = bp.unwrap();
-                    if min_ml_score > m.qual as u8 {
-                        continue;
-                    }
-                    let z = (m.canonical_base, m.modified_base, m.strand);
-                    let cur_mod = base_mods.entry(z).or_insert(vec![]);
-                    cur_mod.push((pos as i64, m.qual as u8));
-                    continue;
-                }
-            }
-            _ => {
-                return {
-                    log::warn!("Rust hts-lib failed to parse basemods, trying custom parser.");
-                    BaseMods::my_mm_ml_parser(record, min_ml_score)
-                }
-            }
-        }
-        BaseMods::hashmap_to_basemods(base_mods, record)
     }
 
     /// remove m6a base mods from the struct
