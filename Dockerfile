@@ -1,5 +1,7 @@
 FROM ubuntu:20.04
 
+ENV FT_VERSION="0.3.6"
+
 # Update default packages
 RUN apt-get update
 
@@ -29,9 +31,9 @@ RUN apt-get install -y \
 RUN apt-get update
 
 # Install HTSlib
-RUN wget https://github.com/samtools/htslib/releases/download/1.17/htslib-1.17.tar.bz2
-RUN tar -xjvf htslib-1.17.tar.bz2
-WORKDIR /htslib-1.17
+RUN wget https://github.com/samtools/htslib/releases/download/1.18/htslib-1.18.tar.bz2
+RUN tar -xjvf htslib-1.18.tar.bz2
+WORKDIR /htslib-1.18
 RUN ./configure
 RUN make
 RUN make install
@@ -43,15 +45,24 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install libtorch
 WORKDIR /src/fibertools-rs
-RUN wget https://download.pytorch.org/libtorch/cpu/libtorch-shared-with-deps-2.0.1%2Bcpu.zip
-RUN unzip libtorch-shared-with-deps-2.0.1+cpu.zip
+ENV TORCH_VERSION="2.0.1"
+# "cu117" or "cu118" or "cpu"
+ENV INSTALL_TYPE="cu118" 
+ENV PY_URL="https://download.pytorch.org/libtorch/${INSTALL_TYPE}/libtorch-shared-with-deps-${TORCH_VERSION}%2B${INSTALL_TYPE}.zip"
+RUN wget ${PY_URL}
+RUN unzip "libtorch-shared-with-deps-${TORCH_VERSION}+${INSTALL_TYPE}.zip"
+#RUN unzip libtorch*.zip
 ENV LIBTORCH=/src/fibertools-rs/libtorch
 ENV LD_LIBRARY_PATH=/src/fibertools-rs/libtorch/lib:$LD_LIBRARY_PATH
 ENV LIBTORCH_CXX11_ABI=0
 
 COPY . .
 
-# RUN cargo install --path . --root /usr/local
-RUN cargo build --release  
-RUN cp ./target/release/ft /usr/local/bin/ft
+#RUN wget "https://github.com/fiberseq/fibertools-rs/archive/refs/tags/v${FT_VERSION}.tar.gz"
+#RUN tar -xzf "v${FT_VERSION}.tar.gz"
+#RUN cd fibertools-rs-${FT_VERSION} && ls && 
+RUN cargo build --release && cp ./target/release/ft /usr/local/bin/ft
+
 RUN ft --help
+
+#RUN cargo install --path . --root /usr/local
