@@ -31,12 +31,12 @@ RUN apt-get install -y \
 RUN apt-get update
 
 # Install HTSlib
-RUN wget https://github.com/samtools/htslib/releases/download/1.18/htslib-1.18.tar.bz2
-RUN tar -xjvf htslib-1.18.tar.bz2
-WORKDIR /htslib-1.18
-RUN ./configure
-RUN make
-RUN make install
+# RUN wget https://github.com/samtools/htslib/releases/download/1.18/htslib-1.18.tar.bz2
+# RUN tar -xjvf htslib-1.18.tar.bz2
+# WORKDIR /htslib-1.18
+# RUN ./configure
+# RUN make
+# RUN make install
 
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
