@@ -47,11 +47,13 @@ fn test_many_msps() {
             .collect::<Vec<_>>();
         eprintln!("m6a: {:?}", m6a);
         eprintln!("msp: {:?}", msps);
+        /*
         eprintln!(
             "strand: {:?}\t{:?}",
             fiber_data.record.strand(),
             fiber_data.record.seq_len()
         );
+         */
         for msp in msps {
             assert!(m6a.contains(&&msp), "{}", msp);
         }
