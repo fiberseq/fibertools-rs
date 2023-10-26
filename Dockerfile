@@ -1,35 +1,24 @@
 FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
 # stop time prompt 
-#ARG DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Update new packages
-#RUN apt-get update
+RUN apt-get update
 
 # Get Ubuntu packages
-#RUN apt-get install -y \
-#   build-essential \
-#  curl \
-# zip \
-#cmake \
-#git \
-#autoconf \
-#   automake \
-#  make \
-# gcc \
-# zlib1g-dev \
-#libbz2-dev \
-#liblzma-dev \
-#libcurl4-gnutls-dev \
-#libssl-dev
+RUN apt-get install -y build-essential curl 
 
 # Update new packages
-#RUN apt-get update
+RUN apt-get update
 
 # Install Rust
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sed 's#/proc/self/exe#\/bin\/sh#g' | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
+RUN cargo --help
 
+# Install fibertools-rs
+WORKDIR /src/fibertools-rs
 COPY . .
 
 # use the install pytroch from docker image

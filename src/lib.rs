@@ -18,6 +18,9 @@ pub mod predict_m6a;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
 
+/// add fire data
+pub mod fire;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]
