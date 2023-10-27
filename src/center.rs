@@ -22,6 +22,7 @@ pub struct CenteredFiberData {
     center_position: CenterPosition,
     pub offset: i64,
     pub reference: bool,
+    pub simplify: bool,
 }
 
 impl CenteredFiberData {
@@ -30,6 +31,7 @@ impl CenteredFiberData {
         center_position: CenterPosition,
         dist: Option<i64>,
         reference: bool,
+        simplify: bool,
     ) -> Option<Self> {
         let (ref_offset, mol_offset) =
             CenteredFiberData::find_offsets(&fiber.record, &center_position);
@@ -43,6 +45,7 @@ impl CenteredFiberData {
             center_position,
             offset,
             reference,
+            simplify,
         })
     }
     /// find both the ref and mol offsets
@@ -75,6 +78,9 @@ impl CenteredFiberData {
 
     /// Get the sequence
     pub fn subset_sequence(&self) -> String {
+        if self.simplify {
+            return "N".to_string();
+        }
         let dist = if let Some(dist) = self.dist { dist } else { 0 };
         let seq = self.fiber.record.seq().as_bytes();
 
@@ -289,6 +295,7 @@ pub fn center(
     wide: bool,
     dist: Option<i64>,
     reference: bool,
+    simplify: bool,
     buffer: &mut Box<dyn std::io::Write>,
 ) {
     let fiber_data = FiberseqData::from_records(records, header_view, min_ml_score);
@@ -298,7 +305,8 @@ pub fn center(
     fiber_data
         .into_par_iter()
         .map(|fiber| {
-            match CenteredFiberData::new(fiber, center_position.clone(), dist, reference) {
+            match CenteredFiberData::new(fiber, center_position.clone(), dist, reference, simplify)
+            {
                 Some(centered_fiber) => {
                     if wide {
                         centered_fiber.write()
@@ -335,6 +343,7 @@ pub fn center_fiberdata(
     wide: bool,
     dist: Option<i64>,
     reference: bool,
+    simplify: bool,
 ) {
     // header needed for the contig name...
     let header = bam::Header::from_template(bam.header());
@@ -378,6 +387,7 @@ pub fn center_fiberdata(
             wide,
             dist,
             reference,
+            simplify,
             &mut buffer,
         );
         pb.inc(1);

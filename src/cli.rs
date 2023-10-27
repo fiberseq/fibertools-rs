@@ -231,6 +231,9 @@ pub enum Commands {
         /// Return relative reference position instead of relative molecular position
         #[clap(short, long)]
         reference: bool,
+        /// Replace the sequence output column with just "N".
+        #[clap(short, long)]
+        simplify: bool,
     },
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics {

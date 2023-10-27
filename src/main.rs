@@ -106,6 +106,7 @@ pub fn main() -> Result<(), Error> {
             dist,
             wide,
             reference,
+            simplify,
         }) => {
             // read in the bam from stdin or from a file
             let mut bam = bam::IndexedReader::from_path(bam)?;
@@ -118,6 +119,7 @@ pub fn main() -> Result<(), Error> {
                 *wide,
                 *dist,
                 *reference,
+                *simplify,
             );
         }
         #[cfg(feature = "predict")]
