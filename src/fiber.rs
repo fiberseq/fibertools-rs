@@ -88,6 +88,36 @@ impl Ranges {
             reference_lengths,
         }
     }
+
+    pub fn get_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
+        self.starts
+            .iter()
+            .zip(self.ends.iter())
+            .zip(self.lengths.iter())
+            .map(|((s, e), l)| {
+                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
+                    Some((*s, *e, *l))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {
+        self.reference_starts
+            .iter()
+            .zip(self.reference_ends.iter())
+            .zip(self.reference_lengths.iter())
+            .map(|((s, e), l)| {
+                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
+                    Some((*s, *e, *l))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

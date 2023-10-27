@@ -114,7 +114,7 @@ impl CenteredFiberData {
             }
         }
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.center_position.chrom,
             self.center_position.position,
             self.center_position.strand,
@@ -123,6 +123,7 @@ impl CenteredFiberData {
             self.fiber.record.reference_end(),
             std::str::from_utf8(self.fiber.record.qname()).unwrap(),
             self.fiber.rg,
+            self.fiber.get_hp(),
             c_query_start,
             c_query_end,
             self.fiber.record.seq_len()
@@ -186,7 +187,7 @@ impl CenteredFiberData {
 
     pub fn leading_header() -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             "chrom",
             "centering_position",
             "strand",
@@ -195,6 +196,7 @@ impl CenteredFiberData {
             "reference_end",
             "query_name",
             "RG",
+            "HP",
             "centered_query_start",
             "centered_query_end",
             "query_length",
