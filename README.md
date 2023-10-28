@@ -23,7 +23,7 @@
 mamba install -c conda-forge -c bioconda fibertools-rs
 ```
 
-However, the `bioconda` version currently does not support GPU acceleration. If you would like to use GPU acceleration, you will need to install using the directions in the [INSTALL.md](/INSTALL.md) file.
+However, due to size constraints in `bioconda` this version does not support m6a prediction or GPU acceleration. If you would like to use m6A prediction and GPU acceleration, you will need to install using the directions in the [INSTALL.md](/INSTALL.md) file.
 
 # Usage
 

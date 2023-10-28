@@ -1,6 +1,6 @@
 use super::nucleosomes::*;
 use anstyle;
-use clap::{Command, CommandFactory, Parser, Subcommand, ValueHint};
+use clap::{Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
 use std::io;
 
@@ -71,7 +71,6 @@ pub struct Cli {
 ///
 #[derive(Subcommand, Debug, PartialEq, Eq)]
 pub enum Commands {
-    #[cfg(feature = "predict")]
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
     #[clap(visible_aliases = &["m6A", "m6a"])]
     PredictM6A {
@@ -163,6 +162,8 @@ pub enum Commands {
         #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
         allowed_m6a_skips: i64,
     },
+    /// Add FIREs (Fiber-seq Inferred Regulatory Elements) to a bam file with m6a predictions
+    Fire(FireOptions),
     /// Extract fiberseq data into plain text files.
     /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
@@ -280,4 +281,26 @@ pub fn make_cli_parse() -> Cli {
 
 pub fn make_cli_app() -> Command {
     Cli::command()
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct FireOptions {
+    /// Bam HiFi file with m6A calls
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output bam file with nucleosome calls
+    #[clap(default_value = "-")]
+    pub out: String,
+    /// Width of bin for feature collection
+    #[clap(short, long, default_value = "40")]
+    pub width_bin: i64,
+    /// Number of bins to collect
+    #[clap(short, long, default_value = "9")]
+    pub bin_num: i64,
+    /// Use 5mC data in FIREs
+    #[clap(short, long)]
+    pub use_5mc: bool,
+    /// Output FIREs in text format
+    #[clap(short, long)]
+    pub feats_to_text: bool,
 }
