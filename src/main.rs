@@ -122,7 +122,7 @@ pub fn main() -> Result<(), Error> {
                 *simplify,
             );
         }
-        #[cfg(feature = "predict")]
+        #[allow(unused)]
         Some(Commands::PredictM6A {
             bam,
             out,
@@ -141,35 +141,42 @@ pub fn main() -> Result<(), Error> {
             batch_size,
         }) => {
             //check_torch_env_vars()?;
-
-            // cnn must be set to true if using semi
-            let cnn = if *semi { &true } else { cnn };
-            // read bam
-            let mut bam = bam_reader(bam, args.threads);
-            let header = bam::Header::from_template(bam.header());
-            let mut out = bam_writer(out, &bam, args.threads);
-            // set up options
-            let nuc_opts = fibertools_rs::nucleosomes::NucleosomeOptions {
-                nucleosome_length: *nucleosome_length,
-                combined_nucleosome_length: *combined_nucleosome_length,
-                min_distance_added: *min_distance_added,
-                distance_from_end: *distance_from_end,
-                allowed_m6a_skips: *allowed_m6a_skips,
-            };
-            let predict_options = PredictOptions::new(
-                *keep,
-                *xgb,
-                *cnn,
-                *semi,
-                *full_float,
-                *min_ml_score,
-                *all_calls,
-                find_pb_polymerase(&header),
-                *batch_size,
-                nuc_opts,
-            );
-            log::info!("{} reads included at once in batch prediction.", batch_size);
-            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+            #[cfg(feature = "predict")]
+            {
+                // cnn must be set to true if using semi
+                let cnn = if *semi { &true } else { cnn };
+                // read bam
+                let mut bam = bam_reader(bam, args.threads);
+                let header = bam::Header::from_template(bam.header());
+                let mut out = bam_writer(out, &bam, args.threads);
+                // set up options
+                let nuc_opts = fibertools_rs::nucleosomes::NucleosomeOptions {
+                    nucleosome_length: *nucleosome_length,
+                    combined_nucleosome_length: *combined_nucleosome_length,
+                    min_distance_added: *min_distance_added,
+                    distance_from_end: *distance_from_end,
+                    allowed_m6a_skips: *allowed_m6a_skips,
+                };
+                let predict_options = PredictOptions::new(
+                    *keep,
+                    *xgb,
+                    *cnn,
+                    *semi,
+                    *full_float,
+                    *min_ml_score,
+                    *all_calls,
+                    find_pb_polymerase(&header),
+                    *batch_size,
+                    nuc_opts,
+                );
+                log::info!("{} reads included at once in batch prediction.", batch_size);
+                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+            }
+            #[cfg(not(feature = "predict"))]
+            {
+                log::error!("Predictions are not enabled. Please recompile with the --features predict flag.\nIf installed via bioconda you will not be able to do predictions. Recent size limits on packages prevent me from including the pytorch libraries necessary for predictions in bioconda. Please install via Cargo following the directions here: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
+                )
+            }
         }
         Some(Commands::ClearKinetics { bam, out }) => {
             let mut bam = bam_reader(bam, args.threads);
@@ -201,6 +208,9 @@ pub fn main() -> Result<(), Error> {
                 *distance_from_end,
                 *allowed_m6a_skips,
             );
+        }
+        Some(Commands::Fire(fire_opts)) => {
+            fibertools_rs::fire::add_fire_to_bam(fire_opts)?;
         }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);
