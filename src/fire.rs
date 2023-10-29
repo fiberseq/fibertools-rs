@@ -230,19 +230,24 @@ impl<'a> FireFeats<'a> {
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
     let header = bam.header().clone();
-    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
+
+    let bam_chunk_iter = BamChunk::new(bam.records(), None);
     let mut first = true;
-    for rec in bam.records() {
-        let rec = rec?;
-        let target_name = String::from_utf8_lossy(header.tid2name(rec.tid() as u32)).to_string();
-        let fiber = FiberseqData::new(rec, Some(&target_name), 0);
-        let fire_feats = FireFeats::new(&fiber, fire_opts);
-        if first && fire_opts.feats_to_text {
-            print!("{}", fire_feats.fire_feats_header());
+    for chunk in bam_chunk_iter {
+        for rec in chunk {
+            let target_name =
+                String::from_utf8_lossy(header.tid2name(rec.tid() as u32)).to_string();
+            let fiber = FiberseqData::new(rec, Some(&target_name), 0);
+            let fire_feats = FireFeats::new(&fiber, fire_opts);
+            if first && fire_opts.feats_to_text {
+                print!("{}", fire_feats.fire_feats_header());
+            }
+            fire_feats.get_fire_features()?;
+            //out.write(&fiber.record)?;
+            first = false;
         }
-        fire_feats.get_fire_features()?;
-        //out.write(&fiber.record)?;
-        first = false;
     }
+
+    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
     Ok(())
 }
