@@ -3,18 +3,31 @@ use super::fiber::FiberseqData;
 use super::*;
 use anyhow::{Error, Ok};
 use itertools::Itertools;
-use rayon::prelude::*;
 
 fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
 }
 
+fn get_at_count(seq: &[u8], start: i64, end: i64) -> usize {
+    let subseq = &seq[start as usize..end as usize];
+    subseq
+        .iter()
+        .filter(|&&bp| bp == b'T' || bp == b'A')
+        .count()
+}
+
 /// ```
 /// use fibertools_rs::fire::get_bins;
-/// let bins = get_bins(0, 100, 5, 20);
+/// let bins = get_bins(0, 100, 5, 20, 200);
 /// assert_eq!(bins, vec![(0, 20), (20, 40), (40, 60), (60, 80), (80, 100)]);
 /// ```
-pub fn get_bins(start: i64, end: i64, bin_num: i64, bin_width: i64) -> Vec<(i64, i64)> {
+pub fn get_bins(
+    start: i64,
+    end: i64,
+    bin_num: i64,
+    bin_width: i64,
+    max_end: i64,
+) -> Vec<(i64, i64)> {
     let mid_point = get_mid_point(start, end);
     let mut bins = Vec::new();
     for i in 0..bin_num {
@@ -25,6 +38,12 @@ pub fn get_bins(start: i64, end: i64, bin_num: i64, bin_width: i64) -> Vec<(i64,
         }
         if bin_end < 0 {
             bin_end = 0;
+        }
+        if bin_start > max_end {
+            bin_start = max_end - 1;
+        }
+        if bin_end > max_end {
+            bin_end = max_end;
         }
         bins.push((bin_start, bin_end));
     }
@@ -37,14 +56,6 @@ fn get_5mc_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
         .iter()
         .flatten()
         .filter(|&&pos| pos >= start && pos < end)
-        .count()
-}
-
-fn get_at_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
-    let subseq = &rec.record.seq().encoded[start as usize..end as usize];
-    subseq
-        .iter()
-        .filter(|&&bp| bp == b'T' || bp == b'A')
         .count()
 }
 
@@ -63,6 +74,7 @@ pub struct FireFeats<'a> {
     m6a_count: usize,
     frac_m6a: f32,
     fire_opts: &'a FireOptions,
+    seq: Vec<u8>,
 }
 
 struct FireFeatsInRange {
@@ -76,8 +88,12 @@ struct FireFeatsInRange {
 
 impl<'a> FireFeats<'a> {
     pub fn new(rec: &'a FiberseqData, fire_opts: &'a FireOptions) -> Self {
-        let at_count = get_at_count(rec, 0, rec.record.seq_len() as i64);
-        let m6a_count = get_m6a_count(rec, 0, rec.record.seq_len() as i64);
+        let seq_len = rec.record.seq_len();
+        let seq = rec.record.seq().as_bytes();
+        log::trace!("new FireFeats {}", seq_len);
+        let at_count = get_at_count(&seq, 0, seq_len as i64);
+        let m6a_count = get_m6a_count(rec, 0, seq_len as i64);
+        log::trace!("new FireFeats");
         let frac_m6a = if at_count > 0 {
             m6a_count as f32 / at_count as f32
         } else {
@@ -89,13 +105,14 @@ impl<'a> FireFeats<'a> {
             m6a_count,
             frac_m6a,
             fire_opts,
+            seq,
         }
     }
 
     fn m6a_fc_over_expected(&self, m6a_count: usize, at_count: usize) -> f32 {
         let expected = self.frac_m6a * at_count as f32;
         let observed = m6a_count as f32;
-        if expected == 0.0 {
+        if expected == 0.0 || observed == 0.0 {
             return 0.0;
         }
         let fc = observed / expected;
@@ -104,7 +121,7 @@ impl<'a> FireFeats<'a> {
 
     fn feats_in_range(&self, start: i64, end: i64) -> FireFeatsInRange {
         let m6a_count = get_m6a_count(self.rec, start, end);
-        let at_count = get_at_count(self.rec, start, end);
+        let at_count = get_at_count(&self.seq, start, end);
         let count_5mc = get_5mc_count(self.rec, start, end);
         let frac_m6a = if at_count > 0 {
             m6a_count as f32 / at_count as f32
@@ -146,7 +163,13 @@ impl<'a> FireFeats<'a> {
         let ccs_passes = self.rec.ec;
 
         let msp_feats = self.feats_in_range(start, end);
-        let bins = get_bins(start, end, self.fire_opts.bin_num, self.fire_opts.width_bin);
+        let bins = get_bins(
+            start,
+            end,
+            self.fire_opts.bin_num,
+            self.fire_opts.width_bin,
+            self.rec.record.seq_len() as i64,
+        );
         let bin_feats = bins
             .into_iter()
             .map(|(start, end)| self.feats_in_range(start, end))
@@ -172,20 +195,31 @@ impl<'a> FireFeats<'a> {
     }
 
     pub fn get_fire_features(&self) -> Result<(), Error> {
-        let data: Vec<Vec<f32>> = self
+        let data: Vec<(i64, i64, Vec<f32>)> = self
             .rec
             .msp
-            .get_molecular()
-            .into_par_iter()
-            .flatten()
-            .map(|(s, e, _l)| self.msp_get_fire_features(s, e))
+            .into_iter()
+            .map(|(s, e, _l, refs)| {
+                let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
+                (rs, re, self.msp_get_fire_features(s, e))
+            })
             .collect();
 
         // dump features to text for training
         if self.fire_opts.feats_to_text {
             let mut buffer = bio_io::writer("-").unwrap();
-            for row in data {
+
+            for (s, e, row) in data {
+                let lead_feats = format!(
+                    "{}\t{}\t{}\t{}\t",
+                    self.rec.target_name,
+                    s,
+                    e,
+                    String::from_utf8_lossy(self.rec.record.qname())
+                );
+                buffer.write_all(lead_feats.as_bytes())?;
                 buffer.write_all(row.iter().join("\t").as_bytes())?;
+                buffer.write_all(b"\n")?;
             }
             return Ok(());
         }
@@ -195,14 +229,20 @@ impl<'a> FireFeats<'a> {
 
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
-    let mut out = bam_writer(&fire_opts.out, &bam, 8);
-
+    let header = bam.header().clone();
+    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
+    let mut first = true;
     for rec in bam.records() {
-        let fiber = FiberseqData::new(rec?, None, 0);
+        let rec = rec?;
+        let target_name = String::from_utf8_lossy(header.tid2name(rec.tid() as u32)).to_string();
+        let fiber = FiberseqData::new(rec, Some(&target_name), 0);
         let fire_feats = FireFeats::new(&fiber, fire_opts);
+        if first && fire_opts.feats_to_text {
+            print!("{}", fire_feats.fire_feats_header());
+        }
         fire_feats.get_fire_features()?;
-
-        out.write(&fiber.record)?;
+        //out.write(&fiber.record)?;
+        first = false;
     }
     Ok(())
 }
