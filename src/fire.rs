@@ -234,11 +234,9 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
     let mut first = true;
     for chunk in bam_chunk_iter {
-        for rec in chunk {
-            let target_name =
-                String::from_utf8_lossy(header.tid2name(rec.tid() as u32)).to_string();
-            let fiber = FiberseqData::new(rec, Some(&target_name), 0);
-            let fire_feats = FireFeats::new(&fiber, fire_opts);
+        let fiber_records = FiberseqData::from_records(chunk, &header, 0);
+        for rec in fiber_records {
+            let fire_feats = FireFeats::new(&rec, fire_opts);
             if first && fire_opts.feats_to_text {
                 print!("{}", fire_feats.fire_feats_header());
             }
