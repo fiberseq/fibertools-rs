@@ -120,6 +120,44 @@ impl Ranges {
     }
 }
 
+impl<'a> IntoIterator for &'a Ranges {
+    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    type IntoIter = RangesIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        RangesIterator {
+            row: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct RangesIterator<'a> {
+    row: &'a Ranges,
+    index: usize,
+}
+
+impl<'a> Iterator for RangesIterator<'a> {
+    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.row.starts.len() {
+            return None;
+        }
+        let start = self.row.starts[self.index]?;
+        let end = self.row.ends[self.index]?;
+        let length = self.row.lengths[self.index]?;
+        let reference_start = self.row.reference_starts[self.index];
+        let reference_end = self.row.reference_ends[self.index];
+        let reference_length = self.row.reference_lengths[self.index];
+        let reference = match (reference_start, reference_end, reference_length) {
+            (Some(s), Some(e), Some(l)) => Some((s, e, l)),
+            _ => None,
+        };
+        self.index += 1;
+        Some((start, end, length, reference))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
