@@ -3,6 +3,7 @@ use super::fiber::FiberseqData;
 use super::*;
 use anyhow::{Error, Ok};
 use itertools::Itertools;
+use rayon::prelude::*;
 
 fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
@@ -195,10 +196,10 @@ impl<'a> FireFeats<'a> {
     }
 
     pub fn get_fire_features(&self) -> Result<(), Error> {
-        let data: Vec<(i64, i64, Vec<f32>)> = self
-            .rec
-            .msp
-            .into_iter()
+        let msp_data = self.rec.msp.into_iter().collect_vec();
+
+        let data: Vec<(i64, i64, Vec<f32>)> = msp_data
+            .into_par_iter()
             .map(|(s, e, _l, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
