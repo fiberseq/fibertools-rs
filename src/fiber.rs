@@ -4,6 +4,7 @@ use super::center::CenteredFiberData;
 use bamlift::*;
 use bio_io::*;
 use rayon::prelude::*;
+use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -665,5 +666,47 @@ impl FiberseqData {
         rtn.replace_range(len - 1..len, "\n");
 
         rtn
+    }
+}
+
+pub struct FiberseqRecords<'a> {
+    bam_chunk: BamChunk<'a>,
+    header: HeaderView,
+    min_ml_score: u8,
+    cur_chunk: Vec<FiberseqData>,
+}
+
+impl<'a> FiberseqRecords<'a> {
+    pub fn new(bam: &'a mut bam::Reader, min_ml_score: u8) -> Self {
+        let header = bam.header().clone();
+        let bam_recs = bam.records();
+        let mut bam_chunk = BamChunk::new(bam_recs, None);
+        let cur_chunk =
+            FiberseqData::from_records(bam_chunk.next().unwrap_or_default(), &header, min_ml_score);
+
+        FiberseqRecords {
+            bam_chunk,
+            header,
+            min_ml_score,
+            cur_chunk,
+        }
+    }
+}
+
+impl<'a> Iterator for FiberseqRecords<'a> {
+    type Item = FiberseqData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // if we are out of data check for another chunk in the bam
+        if self.cur_chunk.is_empty() {
+            match self.bam_chunk.next() {
+                Some(recs) => {
+                    self.cur_chunk =
+                        FiberseqData::from_records(recs, &self.header, self.min_ml_score);
+                }
+                None => return None,
+            }
+        }
+        self.cur_chunk.pop()
     }
 }

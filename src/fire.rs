@@ -1,3 +1,5 @@
+use crate::fiber::FiberseqRecords;
+
 use super::cli::FireOptions;
 use super::fiber::FiberseqData;
 use super::*;
@@ -76,6 +78,7 @@ pub struct FireFeats<'a> {
     frac_m6a: f32,
     fire_opts: &'a FireOptions,
     seq: Vec<u8>,
+    fire_feats: Vec<(i64, i64, Vec<f32>)>,
 }
 
 struct FireFeatsInRange {
@@ -100,14 +103,17 @@ impl<'a> FireFeats<'a> {
         } else {
             0.0
         };
-        Self {
+        let mut rtn = Self {
             rec,
             at_count,
             m6a_count,
             frac_m6a,
             fire_opts,
             seq,
-        }
+            fire_feats: vec![],
+        };
+        rtn.get_fire_features();
+        rtn
     }
 
     fn m6a_fc_over_expected(&self, m6a_count: usize, at_count: usize) -> f32 {
@@ -195,34 +201,29 @@ impl<'a> FireFeats<'a> {
         rtn
     }
 
-    pub fn get_fire_features(&self) -> Result<(), Error> {
+    pub fn get_fire_features(&mut self) {
         let msp_data = self.rec.msp.into_iter().collect_vec();
-
-        let data: Vec<(i64, i64, Vec<f32>)> = msp_data
+        self.fire_feats = msp_data
             .into_par_iter()
             .map(|(s, e, _l, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
             })
             .collect();
+    }
 
-        // dump features to text for training
-        if self.fire_opts.feats_to_text {
-            let mut buffer = bio_io::writer("-").unwrap();
-
-            for (s, e, row) in data {
-                let lead_feats = format!(
-                    "{}\t{}\t{}\t{}\t",
-                    self.rec.target_name,
-                    s,
-                    e,
-                    String::from_utf8_lossy(self.rec.record.qname())
-                );
-                buffer.write_all(lead_feats.as_bytes())?;
-                buffer.write_all(row.iter().join("\t").as_bytes())?;
-                buffer.write_all(b"\n")?;
-            }
-            return Ok(());
+    pub fn dump_fire_feats(&self, out_buffer: &mut Box<dyn Write>) -> Result<(), Error> {
+        for (s, e, row) in self.fire_feats.iter() {
+            let lead_feats = format!(
+                "{}\t{}\t{}\t{}\t",
+                self.rec.target_name,
+                s,
+                e,
+                String::from_utf8_lossy(self.rec.record.qname())
+            );
+            out_buffer.write_all(lead_feats.as_bytes())?;
+            out_buffer.write_all(row.iter().join("\t").as_bytes())?;
+            out_buffer.write_all(b"\n")?;
         }
         Ok(())
     }
@@ -230,23 +231,22 @@ impl<'a> FireFeats<'a> {
 
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
-    let header = bam.header().clone();
+    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
+    let mut out_buffer = bio_io::writer("-")?;
 
-    let bam_chunk_iter = BamChunk::new(bam.records(), None);
+    let fiber_records = FiberseqRecords::new(&mut bam, 0);
     let mut first = true;
-    for chunk in bam_chunk_iter {
-        let fiber_records = FiberseqData::from_records(chunk, &header, 0);
-        for rec in fiber_records {
-            let fire_feats = FireFeats::new(&rec, fire_opts);
-            if first && fire_opts.feats_to_text {
+    for rec in fiber_records {
+        let fire_feats = FireFeats::new(&rec, fire_opts);
+        if fire_opts.feats_to_text {
+            if first {
                 print!("{}", fire_feats.fire_feats_header());
+                first = false;
             }
-            fire_feats.get_fire_features()?;
-            //out.write(&fiber.record)?;
-            first = false;
+            fire_feats.dump_fire_feats(&mut out_buffer)?;
         }
+        //out.write(&fiber.record)?;
     }
 
-    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
     Ok(())
 }
