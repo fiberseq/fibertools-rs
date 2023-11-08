@@ -1,11 +1,21 @@
-use crate::fiber::FiberseqRecords;
-
 use super::cli::FireOptions;
 use super::fiber::FiberseqData;
 use super::*;
-use anyhow::{Error, Ok};
+use crate::fiber::FiberseqRecords;
+use anyhow;
+use derive_builder::Builder;
+use gbdt::decision_tree::{Data, DataVec};
+use gbdt::gradient_boost::GBDT;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 use rayon::prelude::*;
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::fs;
+use tempfile::NamedTempFile;
+
+pub static FIRE_MODEL: &str = include_str!("../FIRE/FIRE.gbdt.json");
+pub static FIRE_CONF_JSON: &str = include_str!("../FIRE/FIRE.conf.json");
 
 fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
@@ -71,6 +81,7 @@ fn get_m6a_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
         .count()
 }
 
+#[derive(Debug)]
 pub struct FireFeats<'a> {
     rec: &'a FiberseqData,
     at_count: usize,
@@ -81,6 +92,7 @@ pub struct FireFeats<'a> {
     fire_feats: Vec<(i64, i64, Vec<f32>)>,
 }
 
+#[derive(Debug, Clone, Builder)]
 struct FireFeatsInRange {
     m6a_count: f32,
     at_count: f32,
@@ -212,7 +224,7 @@ impl<'a> FireFeats<'a> {
             .collect();
     }
 
-    pub fn dump_fire_feats(&self, out_buffer: &mut Box<dyn Write>) -> Result<(), Error> {
+    pub fn dump_fire_feats(&self, out_buffer: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         for (s, e, row) in self.fire_feats.iter() {
             let lead_feats = format!(
                 "{}\t{}\t{}\t{}\t",
@@ -227,9 +239,97 @@ impl<'a> FireFeats<'a> {
         }
         Ok(())
     }
+
+    pub fn predict_with_xgb(
+        &self,
+        gbdt_model: &GBDT,
+        precision_converter: &MapPrecisionValues,
+    ) -> Vec<u8> {
+        let count = self.fire_feats.len();
+        if count == 0 {
+            return vec![];
+        }
+        let mut gbdt_data: DataVec = Vec::new();
+        for (_st, _en, window) in self.fire_feats.iter() {
+            let d = Data::new_test_data(window.to_vec(), None);
+            gbdt_data.push(d);
+        }
+        let predictions = gbdt_model.predict(&gbdt_data);
+        let precisions = predictions
+            .iter()
+            .map(|&p| precision_converter.precision_from_float(p))
+            .collect_vec();
+        precisions
+    }
 }
 
-pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
+#[derive(Debug, Deserialize)]
+pub struct PrecisionTable {
+    pub columns: Vec<String>,
+    /// vec of (mokapot score, mokapot q-value)
+    pub data: Vec<(f32, f32)>,
+}
+
+pub struct MapPrecisionValues {
+    pub map: BTreeMap<OrderedFloat<f32>, u8>,
+}
+
+impl MapPrecisionValues {
+    pub fn new(pt: &PrecisionTable) -> Self {
+        // set up a precision table
+        let mut map = BTreeMap::new();
+        map.insert(OrderedFloat(0.0), 0);
+        for (mokapot_score, mokapot_q_value) in pt.data.iter() {
+            let precision = ((1.0 - mokapot_q_value) * 255.0) as u8;
+            map.insert(OrderedFloat(*mokapot_score), precision);
+        }
+        Self { map }
+    }
+
+    /// function to find closest value in a btree based on precision
+    pub fn precision_from_float(&self, value: f32) -> u8 {
+        let key = OrderedFloat(value);
+        // maximum in map less than key
+        let (less_key, less_val) = self
+            .map
+            .range(..key)
+            .next_back()
+            .unwrap_or((&OrderedFloat(0.0), &0));
+        // minimum in map greater than or equal to key
+        let (more_key, more_val) = self
+            .map
+            .range(key..)
+            .next()
+            .unwrap_or((&OrderedFloat(1.0), &255));
+        if (more_key - key).abs() < (less_key - key).abs() {
+            *more_val
+        } else {
+            *less_val
+        }
+    }
+}
+
+fn get_model() -> (GBDT, MapPrecisionValues) {
+    // load model
+    let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
+    let temp_file_name = temp_file
+        .path()
+        .as_os_str()
+        .to_str()
+        .expect("Unable to convert the path of the named temp file to an &str.");
+    fs::write(temp_file_name, FIRE_MODEL).expect("Unable to write file");
+    let model =
+        GBDT::from_xgoost_dump(temp_file_name, "binary:logistic").expect("failed to load model");
+    fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
+    // load precision table
+    let precision_table: PrecisionTable =
+        serde_json::from_str(FIRE_CONF_JSON).expect("Precision table JSON was not well-formatted");
+    let precision_converter = MapPrecisionValues::new(&precision_table);
+    (model, precision_converter)
+}
+
+pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
+    let (_model, _precision_table) = get_model();
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
     //let mut out = bam_writer(&fire_opts.out, &bam, 8);
     let mut out_buffer = bio_io::writer("-")?;
@@ -244,8 +344,10 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), Error> {
                 first = false;
             }
             fire_feats.dump_fire_feats(&mut out_buffer)?;
+        } else {
+            let _precisions = fire_feats.predict_with_xgb(&_model, &_precision_table);
+            //out.write(&rec.record)?;
         }
-        //out.write(&fiber.record)?;
     }
 
     Ok(())
