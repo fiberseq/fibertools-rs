@@ -110,8 +110,16 @@ impl CenteredFiberData {
     }
 
     pub fn leading_columns(&self) -> String {
-        let mut c_query_start = self.fiber.record.reference_start() - self.center_position.position;
-        let mut c_query_end = self.fiber.record.reference_end() - self.center_position.position;
+        let (mut c_query_start, mut c_query_end) = if self.reference {
+            (
+                self.fiber.record.reference_start() - self.center_position.position,
+                self.fiber.record.reference_end() - self.center_position.position,
+            )
+        } else {
+            let query_length = self.fiber.record.seq_len() as i64;
+            (-self.offset, query_length - self.offset)
+        };
+
         if self.center_position.strand == '-' {
             c_query_start = -c_query_start;
             c_query_end = -c_query_end;
