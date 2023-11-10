@@ -139,29 +139,7 @@ pub enum Commands {
         batch_size: usize,
     },
     /// Add nucleosomes to a bam file with m6a predictions
-    AddNucleosomes {
-        /// Bam HiFi file with m6A calls
-        #[clap(default_value = "-")]
-        bam: String,
-        /// Output bam file with nucleosome calls
-        #[clap(default_value = "-")]
-        out: String,
-        /// Minium nucleosome length
-        #[clap(short, long, default_value = NUC_LEN)]
-        nucleosome_length: i64,
-        /// Minium nucleosome length when combining over a single m6A
-        #[clap(short, long, default_value = COMBO_NUC_LEN)]
-        combined_nucleosome_length: i64,
-        /// Minium distance needed to add to an already existing nuc by crossing an m6a
-        #[clap(short, long, default_value = MIN_DIST_ADDED)]
-        min_distance_added: i64,
-        /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-        #[clap(short, long, default_value = DIST_FROM_END)]
-        distance_from_end: i64,
-        /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
-        #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
-        allowed_m6a_skips: i64,
-    },
+    AddNucleosomes(AddNucleosomeOptions),
     /// Add FIREs (Fiber-seq Inferred Regulatory Elements) to a bam file with m6a predictions
     Fire(FireOptions),
     /// Extract fiberseq data into plain text files.
@@ -303,4 +281,46 @@ pub struct FireOptions {
     /// Output FIREs in text format
     #[clap(short, long)]
     pub feats_to_text: bool,
+}
+
+#[derive(Args, Debug, PartialEq, Eq, Clone)]
+pub struct AddNucleosomeOptions {
+    /// Bam HiFi file with m6A calls
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output bam file with nucleosome calls
+    #[clap(default_value = "-")]
+    pub out: String,
+    /// Minium nucleosome length
+    #[clap(short, long, default_value = NUC_LEN)]
+    pub nucleosome_length: i64,
+    /// Minium nucleosome length when combining over a single m6A
+    #[clap(short, long, default_value = COMBO_NUC_LEN)]
+    pub combined_nucleosome_length: i64,
+    /// Minium distance needed to add to an already existing nuc by crossing an m6a
+    #[clap(short, long, default_value = MIN_DIST_ADDED)]
+    pub min_distance_added: i64,
+    /// Minimum distance from the end of a fiber to call a nucleosome or MSP
+    #[clap(short, long, default_value = DIST_FROM_END)]
+    pub distance_from_end: i64,
+    /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
+    #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
+    pub allowed_m6a_skips: i64,
+    /// Minium score in the ML tag to use in predicting nucleosomes
+    #[clap(long, default_value = MIN_ML_SCORE)]
+    pub min_ml_score: u8,
+}
+impl AddNucleosomeOptions {
+    pub fn default_value() -> Self {
+        Self {
+            bam: "-".to_string(),
+            out: "-".to_string(),
+            nucleosome_length: NUC_LEN.parse().unwrap(),
+            combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
+            min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
+            distance_from_end: DIST_FROM_END.parse().unwrap(),
+            allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
+            min_ml_score: MIN_ML_SCORE.parse().unwrap(),
+        }
+    }
 }

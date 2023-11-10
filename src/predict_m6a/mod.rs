@@ -2,6 +2,7 @@ use super::*;
 use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use bio_io;
+use cli;
 use nucleosomes;
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
@@ -34,7 +35,7 @@ pub struct PredictOptions {
     map: BTreeMap<OrderedFloat<f32>, u8>,
     pub model: Vec<u8>,
     pub min_ml: u8,
-    pub nuc_opts: nucleosomes::NucleosomeOptions,
+    pub nuc_opts: cli::AddNucleosomeOptions,
 }
 
 impl PredictOptions {
@@ -49,7 +50,7 @@ impl PredictOptions {
         all_calls: bool,
         polymerase: PbChem,
         batch_size: usize,
-        nuc_opts: nucleosomes::NucleosomeOptions,
+        nuc_opts: cli::AddNucleosomeOptions,
     ) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();

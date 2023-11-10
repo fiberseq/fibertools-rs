@@ -1,3 +1,4 @@
+use super::cli::AddNucleosomeOptions;
 use super::fiber::FiberseqData;
 use super::*;
 use rayon::iter::ParallelIterator;
@@ -13,40 +14,7 @@ pub static MIN_DIST_ADDED: &str = "25";
 pub static DIST_FROM_END: &str = "45";
 pub static ALLOWED_SKIPS: &str = "-1";
 
-#[derive(Debug, Clone)]
-pub struct NucleosomeOptions {
-    pub nucleosome_length: i64,
-    pub combined_nucleosome_length: i64,
-    pub min_distance_added: i64,
-    pub distance_from_end: i64,
-    pub allowed_m6a_skips: i64,
-}
-
-pub fn default_nucleosome_options() -> NucleosomeOptions {
-    NucleosomeOptions {
-        nucleosome_length: NUC_LEN.parse().unwrap(),
-        combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
-        min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
-        distance_from_end: DIST_FROM_END.parse().unwrap(),
-        allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
-    }
-}
-
-/// Example
-/// ```
-/// use fibertools_rs::nucleosomes::*;
-/// // base case
-/// let o = NucleosomeOptions{
-///     nucleosome_length:85,
-///     combined_nucleosome_length:100,
-///     min_distance_added: 20,
-///     distance_from_end:45,
-///     allowed_m6a_skips: 2
-/// };
-/// let m6a = vec![0, 86, 96, 106, 126, 210, 211, 212, 213, 214, 305, 340];
-/// assert_eq!(find_nucleosomes(&m6a,&o), vec![(1,85), (107,103), (215,125)]);
-/// ```
-pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
+pub fn find_nucleosomes(m6a: &[i64], options: &AddNucleosomeOptions) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
     // previous m6a mark position
     let mut pre = -1;
@@ -139,26 +107,7 @@ pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i
     nucs
 }
 
-/// Example
-/// ```
-/// use fibertools_rs::nucleosomes::*;
-/// // base case
-/// let o = NucleosomeOptions{
-///     nucleosome_length:85,
-///     combined_nucleosome_length:100,
-///     min_distance_added: 20,
-///     distance_from_end: 45,
-///     allowed_m6a_skips: 3,
-/// };
-/// let m6a = vec![1, 90,
-///  130,135,140, 190,
-///  191,192,193,
-///  340,
-///  401,402,403,404,
-///  450];
-/// assert_eq!(d_segment_nucleosomes(&m6a,&o), vec![(2,88), (91,99), (194,146)]);
-/// ```
-pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeOptions) -> Vec<(i64, i64)> {
+pub fn d_segment_nucleosomes(m6a: &[i64], options: &AddNucleosomeOptions) -> Vec<(i64, i64)> {
     // make scores for d-segment
     let mut pre_m6a = -1;
     let mut scores = vec![];
@@ -249,7 +198,7 @@ pub fn filter_for_end(
 pub fn add_nucleosomes_to_record(
     record: &mut bam::Record,
     m6a: &[i64],
-    options: &NucleosomeOptions,
+    options: &AddNucleosomeOptions,
 ) {
     record.remove_aux(b"ns").unwrap_or(());
     record.remove_aux(b"nl").unwrap_or(());
@@ -279,23 +228,10 @@ pub fn add_nucleosomes_to_record(
     }
 }
 
-pub fn add_nucleosomes_to_bam(
-    bam: &mut bam::Reader,
-    out: &mut bam::Writer,
-    nucleosome_length: i64,
-    combined_nucleosome_length: i64,
-    min_distance_added: i64,
-    distance_from_end: i64,
-    allowed_m6a_skips: i64,
-) {
-    // options for nuc calling
-    let options = NucleosomeOptions {
-        nucleosome_length,
-        combined_nucleosome_length,
-        min_distance_added,
-        distance_from_end,
-        allowed_m6a_skips,
-    };
+pub fn add_nucleosomes_to_bam(nuc_opts: &AddNucleosomeOptions, threads: usize) {
+    let mut bam = bam_reader(&nuc_opts.bam, threads);
+    let mut out = bam_writer(&nuc_opts.out, &bam, threads);
+
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
@@ -305,9 +241,9 @@ pub fn add_nucleosomes_to_bam(
         let records: Vec<&mut Record> = chunk
             .par_iter_mut()
             .map(|record| {
-                let fd = FiberseqData::new(record.clone(), None, 0);
+                let fd = FiberseqData::new(record.clone(), None, nuc_opts.min_ml_score);
                 let m6a = fd.base_mods.forward_m6a();
-                add_nucleosomes_to_record(record, &m6a.0, &options);
+                add_nucleosomes_to_record(record, &m6a.0, nuc_opts);
                 record
             })
             .collect();
@@ -325,7 +261,7 @@ mod tests {
     #[test]
     fn test_nucleosomes() {
         let m6a = vec![];
-        let o = default_nucleosome_options();
+        let o = AddNucleosomeOptions::default_value();
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // simple case
         let m6a = vec![100];

@@ -2,10 +2,10 @@ use anyhow::{bail, Error, Ok, Result};
 use bio_io::*;
 use colored::Colorize;
 use env_logger::{Builder, Target};
-use fibertools_rs::cli::Commands;
 #[cfg(feature = "predict")]
 use fibertools_rs::predict_m6a::PredictOptions;
 use fibertools_rs::*;
+use fibertools_rs::{cli::Commands, nucleosomes::add_nucleosomes_to_bam};
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
@@ -150,12 +150,15 @@ pub fn main() -> Result<(), Error> {
                 let header = bam::Header::from_template(bam.header());
                 let mut out = bam_writer(out, &bam, args.threads);
                 // set up options
-                let nuc_opts = fibertools_rs::nucleosomes::NucleosomeOptions {
+                let nuc_opts = fibertools_rs::cli::AddNucleosomeOptions {
+                    bam: "-".to_string(),
+                    out: "-".to_string(),
                     nucleosome_length: *nucleosome_length,
                     combined_nucleosome_length: *combined_nucleosome_length,
                     min_distance_added: *min_distance_added,
                     distance_from_end: *distance_from_end,
                     allowed_m6a_skips: *allowed_m6a_skips,
+                    min_ml_score: 0,
                 };
                 let predict_options = PredictOptions::new(
                     *keep,
@@ -188,26 +191,8 @@ pub fn main() -> Result<(), Error> {
             let mut out = bam_writer(out, &bam, args.threads);
             fibertools_rs::strip_basemods::strip_base_mods(&mut bam, &mut out, basemod);
         }
-        Some(Commands::AddNucleosomes {
-            bam,
-            out,
-            nucleosome_length,
-            combined_nucleosome_length,
-            min_distance_added,
-            distance_from_end,
-            allowed_m6a_skips,
-        }) => {
-            let mut bam = bam_reader(bam, args.threads);
-            let mut out = bam_writer(out, &bam, args.threads);
-            fibertools_rs::nucleosomes::add_nucleosomes_to_bam(
-                &mut bam,
-                &mut out,
-                *nucleosome_length,
-                *combined_nucleosome_length,
-                *min_distance_added,
-                *distance_from_end,
-                *allowed_m6a_skips,
-            );
+        Some(Commands::AddNucleosomes(nuc_opts)) => {
+            add_nucleosomes_to_bam(nuc_opts, args.threads);
         }
         Some(Commands::Fire(fire_opts)) => {
             fibertools_rs::fire::add_fire_to_bam(fire_opts)?;

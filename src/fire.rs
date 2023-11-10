@@ -217,6 +217,7 @@ impl<'a> FireFeats<'a> {
         let msp_data = self.rec.msp.into_iter().collect_vec();
         self.fire_feats = msp_data
             .into_par_iter()
+            //.into_iter()
             .map(|(s, e, _l, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
@@ -255,6 +256,7 @@ impl<'a> FireFeats<'a> {
             gbdt_data.push(d);
         }
         let predictions = gbdt_model.predict(&gbdt_data);
+        //log::debug!("precisions: {:?}", predictions);
         let precisions = predictions
             .iter()
             .map(|&p| precision_converter.precision_from_float(p))
@@ -278,11 +280,16 @@ impl MapPrecisionValues {
     pub fn new(pt: &PrecisionTable) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();
-        map.insert(OrderedFloat(0.0), 0);
+
         for (mokapot_score, mokapot_q_value) in pt.data.iter() {
-            let precision = ((1.0 - mokapot_q_value) * 255.0) as u8;
+            let precision = ((1.0 - mokapot_q_value) * 255.0).round() as u8;
             map.insert(OrderedFloat(*mokapot_score), precision);
         }
+        // if we dont have a zero value insert one
+        map.insert(
+            OrderedFloat(0.0),
+            *map.get(&OrderedFloat(0.0)).unwrap_or(&0),
+        );
         Self { map }
     }
 
@@ -329,7 +336,7 @@ fn get_model() -> (GBDT, MapPrecisionValues) {
 }
 
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
-    let (_model, _precision_table) = get_model();
+    let (model, precision_table) = get_model();
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
     //let mut out = bam_writer(&fire_opts.out, &bam, 8);
     let mut out_buffer = bio_io::writer("-")?;
@@ -345,7 +352,8 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
             }
             fire_feats.dump_fire_feats(&mut out_buffer)?;
         } else {
-            let _precisions = fire_feats.predict_with_xgb(&_model, &_precision_table);
+            let _precisions = fire_feats.predict_with_xgb(&model, &precision_table);
+            log::debug!("precisions: {:?}", _precisions);
             //out.write(&rec.record)?;
         }
     }
