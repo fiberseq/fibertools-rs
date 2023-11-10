@@ -3,12 +3,12 @@ use super::fiber::FiberseqData;
 use super::*;
 use crate::fiber::FiberseqRecords;
 use anyhow;
+use bam::record::{Aux, AuxArray};
 use derive_builder::Builder;
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -16,6 +16,25 @@ use tempfile::NamedTempFile;
 
 pub static FIRE_MODEL: &str = include_str!("../FIRE/FIRE.gbdt.json");
 pub static FIRE_CONF_JSON: &str = include_str!("../FIRE/FIRE.conf.json");
+
+fn get_model() -> (GBDT, MapPrecisionValues) {
+    // load model
+    let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
+    let temp_file_name = temp_file
+        .path()
+        .as_os_str()
+        .to_str()
+        .expect("Unable to convert the path of the named temp file to an &str.");
+    fs::write(temp_file_name, FIRE_MODEL).expect("Unable to write file");
+    let model =
+        GBDT::from_xgoost_dump(temp_file_name, "binary:logistic").expect("failed to load model");
+    fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
+    // load precision table
+    let precision_table: PrecisionTable =
+        serde_json::from_str(FIRE_CONF_JSON).expect("Precision table JSON was not well-formatted");
+    let precision_converter = MapPrecisionValues::new(&precision_table);
+    (model, precision_converter)
+}
 
 fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
@@ -178,6 +197,10 @@ impl<'a> FireFeats<'a> {
 
     fn msp_get_fire_features(&self, start: i64, end: i64) -> Vec<f32> {
         let msp_len = end - start;
+        // skip predicting (or outputting) on short windows
+        if msp_len < self.fire_opts.min_msp_length_for_positive_fire_call {
+            return vec![];
+        }
         let log_msp_len = (msp_len as f32).log2();
         let ccs_passes = self.rec.ec;
 
@@ -216,8 +239,7 @@ impl<'a> FireFeats<'a> {
     pub fn get_fire_features(&mut self) {
         let msp_data = self.rec.msp.into_iter().collect_vec();
         self.fire_feats = msp_data
-            .into_par_iter()
-            //.into_iter()
+            .into_iter()
             .map(|(s, e, _l, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
@@ -227,6 +249,9 @@ impl<'a> FireFeats<'a> {
 
     pub fn dump_fire_feats(&self, out_buffer: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         for (s, e, row) in self.fire_feats.iter() {
+            if row.is_empty() {
+                continue;
+            }
             let lead_feats = format!(
                 "{}\t{}\t{}\t{}\t",
                 self.rec.target_name,
@@ -250,17 +275,32 @@ impl<'a> FireFeats<'a> {
         if count == 0 {
             return vec![];
         }
+        // predict on windows of sufficient length
         let mut gbdt_data: DataVec = Vec::new();
         for (_st, _en, window) in self.fire_feats.iter() {
+            if window.is_empty() {
+                continue;
+            }
             let d = Data::new_test_data(window.to_vec(), None);
             gbdt_data.push(d);
         }
-        let predictions = gbdt_model.predict(&gbdt_data);
-        //log::debug!("precisions: {:?}", predictions);
-        let precisions = predictions
-            .iter()
-            .map(|&p| precision_converter.precision_from_float(p))
-            .collect_vec();
+        let predictions_without_short_ones = gbdt_model.predict(&gbdt_data);
+        // convert predictions to precision values, restoring empty windows
+        let mut precisions = Vec::with_capacity(count);
+        let mut cur_pos = 0;
+        for (_st, _en, window) in self.fire_feats.iter() {
+            if window.is_empty() {
+                precisions.push(0);
+            } else {
+                let precision = precision_converter
+                    .precision_from_float(predictions_without_short_ones[cur_pos]);
+                precisions.push(precision);
+                cur_pos += 1;
+            }
+        }
+        // check outputs
+        assert_eq!(cur_pos, predictions_without_short_ones.len());
+        assert_eq!(precisions.len(), count);
         precisions
     }
 }
@@ -316,45 +356,31 @@ impl MapPrecisionValues {
     }
 }
 
-fn get_model() -> (GBDT, MapPrecisionValues) {
-    // load model
-    let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
-    let temp_file_name = temp_file
-        .path()
-        .as_os_str()
-        .to_str()
-        .expect("Unable to convert the path of the named temp file to an &str.");
-    fs::write(temp_file_name, FIRE_MODEL).expect("Unable to write file");
-    let model =
-        GBDT::from_xgoost_dump(temp_file_name, "binary:logistic").expect("failed to load model");
-    fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
-    // load precision table
-    let precision_table: PrecisionTable =
-        serde_json::from_str(FIRE_CONF_JSON).expect("Precision table JSON was not well-formatted");
-    let precision_converter = MapPrecisionValues::new(&precision_table);
-    (model, precision_converter)
-}
-
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     let (model, precision_table) = get_model();
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
-    //let mut out = bam_writer(&fire_opts.out, &bam, 8);
-    let mut out_buffer = bio_io::writer("-")?;
+    let mut out = bam_writer(&fire_opts.out, &bam, 8);
+    let mut out_buffer = bio_io::writer(&fire_opts.out)?;
 
     let fiber_records = FiberseqRecords::new(&mut bam, 0);
     let mut first = true;
-    for rec in fiber_records {
+    for mut rec in fiber_records {
         let fire_feats = FireFeats::new(&rec, fire_opts);
         if fire_opts.feats_to_text {
             if first {
-                print!("{}", fire_feats.fire_feats_header());
+                out_buffer.write_all(fire_feats.fire_feats_header().as_bytes())?;
                 first = false;
             }
             fire_feats.dump_fire_feats(&mut out_buffer)?;
         } else {
-            let _precisions = fire_feats.predict_with_xgb(&model, &precision_table);
-            log::debug!("precisions: {:?}", _precisions);
-            //out.write(&rec.record)?;
+            let precisions = fire_feats.predict_with_xgb(&model, &precision_table);
+            let aux_array: AuxArray<u8> = (&precisions).into();
+            let aux_array_field = Aux::ArrayU8(aux_array);
+            rec.record
+                .push_aux(b"aq", aux_array_field)
+                .expect("Cannot add FIRE precision to bam");
+            log::trace!("precisions: {:?}", precisions);
+            out.write(&rec.record)?;
         }
     }
 

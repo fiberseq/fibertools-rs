@@ -278,6 +278,9 @@ pub struct FireOptions {
     /// Use 5mC data in FIREs
     #[clap(short, long)]
     pub use_5mc: bool,
+    /// Minium length of msp to call a FIRE
+    #[clap(short, long, default_value = "85")]
+    pub min_msp_length_for_positive_fire_call: i64,
     /// Output FIREs in text format
     #[clap(short, long)]
     pub feats_to_text: bool,
