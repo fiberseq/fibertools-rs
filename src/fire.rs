@@ -17,22 +17,43 @@ use tempfile::NamedTempFile;
 pub static FIRE_MODEL: &str = include_str!("../FIRE/FIRE.gbdt.json");
 pub static FIRE_CONF_JSON: &str = include_str!("../FIRE/FIRE.conf.json");
 
-fn get_model() -> (GBDT, MapPrecisionValues) {
+fn get_model(fire_opts: &FireOptions) -> (GBDT, MapPrecisionValues) {
+    let mut remove_temp_file = false;
+    // load defaults or passed in options
+    let (model_file, fdr_table_file) = match (&fire_opts.model, &fire_opts.fdr_table) {
+        (Some(model_file), Some(b)) => {
+            let fdr_table = fs::read_to_string(b).expect("Unable to read file");
+            (model_file.clone(), fdr_table)
+        }
+        _ => {
+            let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
+            let (mut temp_file, path) = temp_file.keep().expect("Unable to keep temp file");
+            let temp_file_name = path
+                .as_os_str()
+                .to_str()
+                .expect("Unable to convert the path of the named temp file to an &str.");
+            temp_file
+                .write_all(FIRE_MODEL.as_bytes())
+                .expect("Unable to write file");
+            //fs::write(temp, FIRE_MODEL).expect("Unable to write file");
+            remove_temp_file = true;
+            (temp_file_name.to_string(), FIRE_CONF_JSON.to_string())
+        }
+    };
+    log::info!("Using model: {}", model_file);
     // load model
-    let temp_file = NamedTempFile::new().expect("Unable to make a temp file");
-    let temp_file_name = temp_file
-        .path()
-        .as_os_str()
-        .to_str()
-        .expect("Unable to convert the path of the named temp file to an &str.");
-    fs::write(temp_file_name, FIRE_MODEL).expect("Unable to write file");
     let model =
-        GBDT::from_xgoost_dump(temp_file_name, "binary:logistic").expect("failed to load model");
-    fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
+        GBDT::from_xgoost_dump(&model_file, "binary:logistic").expect("failed to load FIRE model");
+    if remove_temp_file {
+        fs::remove_file(model_file).expect("Unable to remove temp file");
+    }
+
     // load precision table
     let precision_table: PrecisionTable =
-        serde_json::from_str(FIRE_CONF_JSON).expect("Precision table JSON was not well-formatted");
+        serde_json::from_str(&fdr_table_file).expect("Precision table JSON was not well-formatted");
     let precision_converter = MapPrecisionValues::new(&precision_table);
+
+    // return
     (model, precision_converter)
 }
 
@@ -357,22 +378,27 @@ impl MapPrecisionValues {
 }
 
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
-    let (model, precision_table) = get_model();
+    let (model, precision_table) = get_model(fire_opts);
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
-    let mut out = bam_writer(&fire_opts.out, &bam, 8);
-    let mut out_buffer = bio_io::writer(&fire_opts.out)?;
 
-    let fiber_records = FiberseqRecords::new(&mut bam, 0);
-    let mut first = true;
-    for mut rec in fiber_records {
-        let fire_feats = FireFeats::new(&rec, fire_opts);
-        if fire_opts.feats_to_text {
+    // write features to text file
+    if fire_opts.feats_to_text {
+        let mut first = true;
+        let mut out_buffer = bio_io::writer(&fire_opts.out)?;
+        for rec in FiberseqRecords::new(&mut bam, 0) {
+            let fire_feats = FireFeats::new(&rec, fire_opts);
             if first {
                 out_buffer.write_all(fire_feats.fire_feats_header().as_bytes())?;
                 first = false;
             }
             fire_feats.dump_fire_feats(&mut out_buffer)?;
-        } else {
+        }
+    }
+    // add FIRE prediction to bam file
+    else {
+        let mut out = bam_writer(&fire_opts.out, &bam, 8);
+        for mut rec in FiberseqRecords::new(&mut bam, 0) {
+            let fire_feats = FireFeats::new(&rec, fire_opts);
             let precisions = fire_feats.predict_with_xgb(&model, &precision_table);
             let aux_array: AuxArray<u8> = (&precisions).into();
             let aux_array_field = Aux::ArrayU8(aux_array);
@@ -383,6 +409,5 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
             out.write(&rec.record)?;
         }
     }
-
     Ok(())
 }
