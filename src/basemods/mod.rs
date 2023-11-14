@@ -110,6 +110,7 @@ impl BaseMods {
     pub fn my_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
+            // MM:Z:([ACGTUN][-+]([a-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
             static ref MM_RE: Regex =
                 Regex::new(r"((([ACGTUN])([-+])([a-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
         }
@@ -142,7 +143,13 @@ impl BaseMods {
                 } else {
                     record.seq().as_bytes()
                 };
-
+                log::trace!(
+                    "mod_base: {}, mod_strand: {}, modification_type: {}, mod_dists: {:?}",
+                    mod_base as char,
+                    mod_strand,
+                    modification_type,
+                    mod_dists
+                );
                 // find real positions in the forward sequence
                 let mut cur_mod_idx = 0;
                 let mut cur_seq_idx = 0;
