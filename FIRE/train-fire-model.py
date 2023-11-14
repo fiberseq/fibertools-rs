@@ -159,7 +159,7 @@ def train_classifier(
         xgb_model,
         train_fdr=train_fdr,
         subset_max_train=subset_max_train,
-        direction="log_msp_len",
+        direction="msp_len_times_m6a_fc",
     )
     model.fit(train_psms)
 
@@ -185,8 +185,8 @@ def read_input_features(
     logging.info(
         f"Label counts before setting a minimum FIRE size: {df.Label.value_counts()}"
     )
-    # df.loc[df.msp_len < min_msp_length_for_positive_fire_call, "Label"] = -1
-    df = df[df.msp_len >= min_msp_length_for_positive_fire_call]
+    df.loc[df.msp_len < min_msp_length_for_positive_fire_call, "Label"] = -1
+    # df = df[df.msp_len >= min_msp_length_for_positive_fire_call]
     logging.info(
         f"Label counts after setting a minimum FIRE size: {df.Label.value_counts()}"
     )

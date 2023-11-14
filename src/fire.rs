@@ -134,12 +134,12 @@ pub struct FireFeats<'a> {
 
 #[derive(Debug, Clone, Builder)]
 struct FireFeatsInRange {
-    m6a_count: f32,
-    at_count: f32,
+    pub m6a_count: f32,
+    pub at_count: f32,
     #[allow(unused)]
-    count_5mc: f32,
-    frac_m6a: f32,
-    m6a_fc: f32,
+    pub count_5mc: f32,
+    pub frac_m6a: f32,
+    pub m6a_fc: f32,
 }
 
 impl<'a> FireFeats<'a> {
@@ -203,7 +203,7 @@ impl<'a> FireFeats<'a> {
     */
     pub fn fire_feats_header(&self) -> String {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
-        out += "\tmsp_len\tlog_msp_len\tccs_passes";
+        out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
         out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc";
         for bin_num in 0..self.fire_opts.bin_num {
@@ -222,7 +222,6 @@ impl<'a> FireFeats<'a> {
         if msp_len < self.fire_opts.min_msp_length_for_positive_fire_call {
             return vec![];
         }
-        let log_msp_len = (msp_len as f32).log2();
         let ccs_passes = self.rec.ec;
 
         let msp_feats = self.feats_in_range(start, end);
@@ -237,10 +236,10 @@ impl<'a> FireFeats<'a> {
             .into_iter()
             .map(|(start, end)| self.feats_in_range(start, end))
             .collect::<Vec<FireFeatsInRange>>();
-
+        let msp_len_times_m6a_fc = msp_feats.m6a_fc * (msp_len as f32);
         let mut rtn = vec![
             msp_len as f32,
-            log_msp_len,
+            msp_len_times_m6a_fc,
             ccs_passes,
             self.m6a_count as f32,
             self.at_count as f32,
