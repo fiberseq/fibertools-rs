@@ -235,6 +235,8 @@ pub enum Commands {
         /// base modification to strip out of the bam file
         basemod: String,
     },
+    /// Make decorated bed files for fiberseq data
+    TrackDecorators(DecoratorOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions {
@@ -332,4 +334,20 @@ impl AddNucleosomeOptions {
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
         }
     }
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct DecoratorOptions {
+    /// Bam HiFi file with m6A calls
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output path for bed12 file to be decorated
+    #[clap(short, long)]
+    pub bed12: String,
+    /// Output path for decorator bed file
+    #[clap(short, long)]
+    pub decorator: String,
+    /// Minium score in the ML tag to include in the output
+    #[clap(short, long, default_value = MIN_ML_SCORE)]
+    pub min_ml_score: u8,
 }

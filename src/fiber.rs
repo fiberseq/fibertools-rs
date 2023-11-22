@@ -39,9 +39,11 @@ pub struct Ranges {
     pub starts: Vec<Option<i64>>,
     pub ends: Vec<Option<i64>>,
     pub lengths: Vec<Option<i64>>,
+    pub qual: Vec<u8>,
     pub reference_starts: Vec<Option<i64>>,
     pub reference_ends: Vec<Option<i64>>,
     pub reference_lengths: Vec<Option<i64>>,
+    reverse: bool,
 }
 
 impl Ranges {
@@ -84,9 +86,19 @@ impl Ranges {
             starts: starts.into_iter().map(Some).collect(),
             ends: ends.into_iter().map(Some).collect(),
             lengths,
+            qual: vec![0; reference_starts.len()],
             reference_starts,
             reference_ends,
             reference_lengths,
+            reverse: record.is_reverse(),
+        }
+    }
+
+    pub fn set_qual(&mut self, qual: Vec<u8>) {
+        assert_eq!(qual.len(), self.starts.len());
+        self.qual = qual;
+        if self.reverse {
+            self.qual.reverse();
         }
     }
 
@@ -189,7 +201,11 @@ impl FiberseqData {
         let nuc_length = get_u32_tag(&record, b"nl");
         let msp_length = get_u32_tag(&record, b"al");
         let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
-        let msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
+        let mut msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
+        let msp_qual = get_u8_tag(&record, b"aq");
+        if !msp_qual.is_empty() {
+            msp.set_qual(msp_qual);
+        }
 
         // get the number of passes
         let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
@@ -366,6 +382,7 @@ impl FiberseqData {
             new.cpg.ml.reverse();
             new.msp.lengths.reverse();
             new.msp.reference_lengths.reverse();
+            new.msp.qual.reverse();
             new.nuc.lengths.reverse();
             new.nuc.reference_lengths.reverse();
         }

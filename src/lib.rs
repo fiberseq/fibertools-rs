@@ -21,6 +21,9 @@ pub mod strip_basemods;
 /// add fire data
 pub mod fire;
 
+/// add decorators
+pub mod decorator;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]
