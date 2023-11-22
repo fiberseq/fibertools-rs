@@ -197,6 +197,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Fire(fire_opts)) => {
             fibertools_rs::fire::add_fire_to_bam(fire_opts)?;
         }
+        Some(Commands::TrackDecorators(decorator_opts)) => {
+            fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
+        }
         Some(Commands::Completions { shell }) => {
             log::info!("Generating completion file for {:?}...", shell);
             cli::print_completions(*shell, &mut cli::make_cli_app());
