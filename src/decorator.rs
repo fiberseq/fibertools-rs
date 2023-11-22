@@ -13,13 +13,20 @@ pub fn abs_pos_to_relative(fiber: &FiberseqData, pos: &[Option<i64>]) -> String 
         .collect()
 }
 
+pub fn pos_to_string(pos: &[Option<i64>]) -> String {
+    pos.iter().flatten().map(|p| p.to_string() + ",").collect()
+}
+
 pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, String) {
+    // base mods
     let m6a = abs_pos_to_relative(fiber, &fiber.m6a.reference_starts);
     let cpg = abs_pos_to_relative(fiber, &fiber.cpg.reference_starts);
+    // nucs
     let nuc_starts = abs_pos_to_relative(fiber, &fiber.nuc.reference_starts);
-    let nuc_lens = abs_pos_to_relative(fiber, &fiber.nuc.reference_lengths);
+    let nuc_lens = pos_to_string(&fiber.nuc.reference_lengths);
+    // msp
     let msp_starts = abs_pos_to_relative(fiber, &fiber.msp.reference_starts);
-    let msp_lens = abs_pos_to_relative(fiber, &fiber.msp.reference_lengths);
+    let msp_lens = pos_to_string(&fiber.msp.reference_lengths);
 
     todo!()
 }
