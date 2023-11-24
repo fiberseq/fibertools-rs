@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use tempfile::NamedTempFile;
 
-pub static FIRE_MODEL: &str = include_str!("../FIRE/FIRE.gbdt.json");
-pub static FIRE_CONF_JSON: &str = include_str!("../FIRE/FIRE.conf.json");
+pub static FIRE_MODEL: &str = include_str!("../models/FIRE.gbdt.json");
+pub static FIRE_CONF_JSON: &str = include_str!("../models/FIRE.conf.json");
 
 fn get_model(fire_opts: &FireOptions) -> (GBDT, MapPrecisionValues) {
     let mut remove_temp_file = false;
