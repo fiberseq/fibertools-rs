@@ -385,7 +385,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     if fire_opts.feats_to_text {
         let mut first = true;
         let mut out_buffer = bio_io::writer(&fire_opts.out)?;
-        for chunk in &FiberseqRecords::new(&mut bam, 0).chunks(500) {
+        for chunk in &FiberseqRecords::new(&mut bam, 0).chunks(5000) {
             if first {
                 out_buffer.write_all(FireFeats::fire_feats_header(fire_opts).as_bytes())?;
                 first = false;
