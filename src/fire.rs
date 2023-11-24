@@ -9,6 +9,7 @@ use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -201,12 +202,12 @@ impl<'a> FireFeats<'a> {
     /*
     features: ['score', 'msp_len', 'fiber_m6a_count', 'fiber_AT_count', 'fiber_m6a_frac', 'msp_m6a', 'msp_AT', 'msp_fc', 'm6a_frac', 'm6a_frac_0', 'm6a_frac_1', 'm6a_frac_2', 'm6a_frac_3', 'm6a_frac_4', 'm6a_frac_5', 'm6a_frac_6', 'm6a_frac_7', 'm6a_frac_8', 'm6a_count_0', 'm6a_count_1', 'm6a_count_2', 'm6a_count_3', 'm6a_count_4', 'm6a_count_5', 'm6a_count_6', 'm6a_count_7', 'm6a_count_8', 'AT_count_0', 'AT_count_1', 'AT_count_2', 'AT_count_3', 'AT_count_4', 'AT_count_5', 'AT_count_6', 'AT_count_7', 'AT_count_8', 'm6a_fc_0', 'm6a_fc_1', 'm6a_fc_2', 'm6a_fc_3', 'm6a_fc_4', 'm6a_fc_5', 'm6a_fc_6', 'm6a_fc_7', 'm6a_fc_8', 'log_msp_len']]
     */
-    pub fn fire_feats_header(&self) -> String {
+    pub fn fire_feats_header(fire_opts: &FireOptions) -> String {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
         out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
         out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc";
-        for bin_num in 0..self.fire_opts.bin_num {
+        for bin_num in 0..fire_opts.bin_num {
             out += &format!(
                 "\tm6a_count_{}\tAT_count_{}\tm6a_frac_{}\tm6a_fc_{}",
                 bin_num, bin_num, bin_num, bin_num
@@ -384,13 +385,19 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     if fire_opts.feats_to_text {
         let mut first = true;
         let mut out_buffer = bio_io::writer(&fire_opts.out)?;
-        for rec in FiberseqRecords::new(&mut bam, 0) {
-            let fire_feats = FireFeats::new(&rec, fire_opts);
+        for chunk in &FiberseqRecords::new(&mut bam, 0).chunks(500) {
             if first {
-                out_buffer.write_all(fire_feats.fire_feats_header().as_bytes())?;
+                out_buffer.write_all(FireFeats::fire_feats_header(fire_opts).as_bytes())?;
                 first = false;
             }
-            fire_feats.dump_fire_feats(&mut out_buffer)?;
+            let chunk: Vec<FiberseqData> = chunk.collect();
+            let feats: Vec<FireFeats> = chunk
+                .par_iter()
+                .map(|r| FireFeats::new(r, &fire_opts))
+                .collect();
+            feats.iter().for_each(|f| {
+                f.dump_fire_feats(&mut out_buffer).unwrap();
+            });
         }
     }
     // add FIRE prediction to bam file
