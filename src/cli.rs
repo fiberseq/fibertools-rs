@@ -2,7 +2,7 @@ use super::nucleosomes::*;
 use anstyle;
 use clap::{Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
-use std::io;
+use std::{fmt::Debug, io};
 
 pub static MIN_ML_SCORE: &str = "125";
 
@@ -27,7 +27,7 @@ pub fn get_styles() -> clap::builder::Styles {
         .placeholder(placeholder_style)
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[clap(
     author,
     version,
@@ -69,7 +69,7 @@ pub struct Cli {
 ///
 /// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
 ///
-#[derive(Subcommand, Debug, PartialEq, Eq)]
+#[derive(Subcommand)]
 pub enum Commands {
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
     #[clap(visible_aliases = &["m6A", "m6a"])]
@@ -294,7 +294,7 @@ pub struct FireOptions {
     pub feats_to_text: bool,
 }
 
-#[derive(Args, Debug, PartialEq, Eq, Clone)]
+#[derive(Args, Debug)]
 pub struct AddNucleosomeOptions {
     /// Bam HiFi file with m6A calls
     #[clap(default_value = "-")]
@@ -336,7 +336,7 @@ impl AddNucleosomeOptions {
     }
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args)]
 pub struct DecoratorOptions {
     /// Bam HiFi file with m6A calls
     #[clap(default_value = "-")]

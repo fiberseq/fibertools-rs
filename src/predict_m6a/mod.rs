@@ -22,7 +22,7 @@ mod xgb;
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 pub const MIN_F32_PRED: f32 = 1.0e-46;
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PredictOptions {
     pub keep: bool,
     pub cnn: bool,

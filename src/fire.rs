@@ -393,7 +393,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
             let chunk: Vec<FiberseqData> = chunk.collect();
             let feats: Vec<FireFeats> = chunk
                 .par_iter()
-                .map(|r| FireFeats::new(r, &fire_opts))
+                .map(|r| FireFeats::new(r, fire_opts))
                 .collect();
             feats.iter().for_each(|f| {
                 f.dump_fire_feats(&mut out_buffer).unwrap();

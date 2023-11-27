@@ -19,14 +19,14 @@ pub fn pos_to_string(pos: &[Option<i64>]) -> String {
 
 pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, String) {
     // base mods
-    let m6a = abs_pos_to_relative(fiber, &fiber.m6a.reference_starts);
-    let cpg = abs_pos_to_relative(fiber, &fiber.cpg.reference_starts);
+    let _m6a = abs_pos_to_relative(fiber, &fiber.m6a.reference_starts);
+    let _cpg = abs_pos_to_relative(fiber, &fiber.cpg.reference_starts);
     // nucs
-    let nuc_starts = abs_pos_to_relative(fiber, &fiber.nuc.reference_starts);
-    let nuc_lens = pos_to_string(&fiber.nuc.reference_lengths);
+    let _nuc_starts = abs_pos_to_relative(fiber, &fiber.nuc.reference_starts);
+    let _nuc_lens = pos_to_string(&fiber.nuc.reference_lengths);
     // msp
-    let msp_starts = abs_pos_to_relative(fiber, &fiber.msp.reference_starts);
-    let msp_lens = pos_to_string(&fiber.msp.reference_lengths);
+    let _msp_starts = abs_pos_to_relative(fiber, &fiber.msp.reference_starts);
+    let _msp_lens = pos_to_string(&fiber.msp.reference_lengths);
 
     todo!()
 }
