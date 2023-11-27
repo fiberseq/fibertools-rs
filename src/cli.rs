@@ -345,7 +345,7 @@ pub struct DecoratorOptions {
     #[clap(short, long)]
     pub bed12: String,
     /// Output path for decorator bed file
-    #[clap(short, long)]
+    #[clap(short, long, default_value = "-")]
     pub decorator: String,
     /// Minium score in the ML tag to include in the output
     #[clap(short, long, default_value = MIN_ML_SCORE)]
