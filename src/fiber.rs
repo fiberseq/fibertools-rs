@@ -697,9 +697,8 @@ impl<'a> FiberseqRecords<'a> {
     pub fn new(bam: &'a mut bam::Reader, min_ml_score: u8) -> Self {
         let header = bam.header().clone();
         let bam_recs = bam.records();
-        let mut bam_chunk = BamChunk::new(bam_recs, None);
-        let cur_chunk =
-            FiberseqData::from_records(bam_chunk.next().unwrap_or_default(), &header, min_ml_score);
+        let bam_chunk = BamChunk::new(bam_recs, None);
+        let cur_chunk: Vec<FiberseqData> = vec![];
 
         FiberseqRecords {
             bam_chunk,
@@ -720,6 +719,8 @@ impl<'a> Iterator for FiberseqRecords<'a> {
                 Some(recs) => {
                     self.cur_chunk =
                         FiberseqData::from_records(recs, &self.header, self.min_ml_score);
+                    // we will be popping from this list so we want to remove the first element first, not the last
+                    self.cur_chunk.reverse();
                 }
                 None => return None,
             }

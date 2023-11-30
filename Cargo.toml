@@ -34,7 +34,7 @@ itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
 ordered-float = "3.4.0"
-rayon = "1.5"
+rayon = "1.8"
 regex = "1.9.1"
 rust-htslib = "0.43"
 serde = {version = "1.0.104", features = ["derive"], optional = false}

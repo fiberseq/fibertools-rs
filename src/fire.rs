@@ -122,6 +122,24 @@ fn get_m6a_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
         .count()
 }
 
+/// get the maximum and median rle of m6a in a window
+fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
+    let mut m6a_rles = vec![];
+    for (m6a_1, m6a_2) in rec.m6a.starts.iter().flatten().tuple_windows() {
+        if *m6a_1 < start || *m6a_1 >= end || *m6a_2 < start || *m6a_2 >= end {
+            continue;
+        }
+        m6a_rles.push((m6a_2 - m6a_1).abs());
+    }
+    if m6a_rles.is_empty() {
+        return (0.0, 0.0);
+    }
+    let mid_length = m6a_rles.len() / 2;
+    let (_low_slice, median, high_slice) = m6a_rles.select_nth_unstable(mid_length);
+    let max = high_slice.iter().max().unwrap_or(&0).clone();
+    (max as f32, *median as f32)
+}
+
 #[derive(Debug)]
 pub struct FireFeats<'a> {
     rec: &'a FiberseqData,
@@ -141,6 +159,8 @@ struct FireFeatsInRange {
     pub count_5mc: f32,
     pub frac_m6a: f32,
     pub m6a_fc: f32,
+    pub max_m6a_rle: f32,
+    pub median_m6a_rle: f32,
 }
 
 impl<'a> FireFeats<'a> {
@@ -189,6 +209,7 @@ impl<'a> FireFeats<'a> {
             0.0
         };
         let m6a_fc = self.m6a_fc_over_expected(m6a_count, at_count);
+        let (max_m6a_rle, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
 
         FireFeatsInRange {
             m6a_count: m6a_count as f32,
@@ -196,6 +217,8 @@ impl<'a> FireFeats<'a> {
             count_5mc: count_5mc as f32,
             frac_m6a,
             m6a_fc,
+            max_m6a_rle,
+            median_m6a_rle,
         }
     }
 
@@ -206,7 +229,7 @@ impl<'a> FireFeats<'a> {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
         out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
-        out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc";
+        out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc\tmsp_max_m6a_rle\tmsp_median_m6a_rle";
         for bin_num in 0..fire_opts.bin_num {
             out += &format!(
                 "\tm6a_count_{}\tAT_count_{}\tm6a_frac_{}\tm6a_fc_{}",
@@ -247,12 +270,18 @@ impl<'a> FireFeats<'a> {
             self.frac_m6a,
         ];
         let feat_sets = vec![&msp_feats].into_iter().chain(bin_feats.iter());
+        let mut first = true;
         for feat_set in feat_sets {
             rtn.push(feat_set.m6a_count);
             rtn.push(feat_set.at_count);
             //rtn.push(feat_set.count_5mc);
             rtn.push(feat_set.frac_m6a);
             rtn.push(feat_set.m6a_fc);
+            if first {
+                rtn.push(feat_set.max_m6a_rle);
+                rtn.push(feat_set.median_m6a_rle);
+                first = false;
+            }
         }
         rtn
     }
@@ -405,7 +434,10 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
         for mut rec in FiberseqRecords::new(&mut bam, 0) {
             let fire_feats = FireFeats::new(&rec, fire_opts);
-            let precisions = fire_feats.predict_with_xgb(&model, &precision_table);
+            let mut precisions = fire_feats.predict_with_xgb(&model, &precision_table);
+            if rec.record.is_reverse() {
+                precisions.reverse();
+            }
             let aux_array: AuxArray<u8> = (&precisions).into();
             let aux_array_field = Aux::ArrayU8(aux_array);
             rec.record
