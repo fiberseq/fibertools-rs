@@ -123,21 +123,27 @@ fn get_m6a_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
 }
 
 /// get the maximum and median rle of m6a in a window
-fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
+fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32) {
     let mut m6a_rles = vec![];
+    let mut max = 0;
+    let mut max_pos = 0;
     for (m6a_1, m6a_2) in rec.m6a.starts.iter().flatten().tuple_windows() {
         if *m6a_1 < start || *m6a_1 >= end || *m6a_2 < start || *m6a_2 >= end {
             continue;
         }
-        m6a_rles.push((m6a_2 - m6a_1).abs());
+        let rle = (m6a_2 - m6a_1).abs();
+        m6a_rles.push(rle);
+        if rle > max {
+            max = rle;
+            max_pos = ((*m6a_1 + *m6a_2) / 2 - (end + start) / 2).abs();
+        }
     }
     if m6a_rles.is_empty() {
-        return (0.0, 0.0);
+        return (0.0, 0.0, 0.0);
     }
     let mid_length = m6a_rles.len() / 2;
-    let (_low_slice, median, high_slice) = m6a_rles.select_nth_unstable(mid_length);
-    let max = high_slice.iter().max().unwrap_or(&0).clone();
-    (max as f32, *median as f32)
+    let (_, median, _) = m6a_rles.select_nth_unstable(mid_length);
+    (max as f32, max_pos as f32, *median as f32)
 }
 
 #[derive(Debug)]
@@ -160,6 +166,7 @@ struct FireFeatsInRange {
     pub frac_m6a: f32,
     pub m6a_fc: f32,
     pub max_m6a_rle: f32,
+    pub max_m6a_rle_pos: f32,
     pub median_m6a_rle: f32,
 }
 
@@ -209,7 +216,7 @@ impl<'a> FireFeats<'a> {
             0.0
         };
         let m6a_fc = self.m6a_fc_over_expected(m6a_count, at_count);
-        let (max_m6a_rle, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
+        let (max_m6a_rle, max_m6a_rle_pos, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
 
         FireFeatsInRange {
             m6a_count: m6a_count as f32,
@@ -218,6 +225,7 @@ impl<'a> FireFeats<'a> {
             frac_m6a,
             m6a_fc,
             max_m6a_rle,
+            max_m6a_rle_pos,
             median_m6a_rle,
         }
     }
@@ -229,7 +237,7 @@ impl<'a> FireFeats<'a> {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
         out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
-        out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc\tmsp_max_m6a_rle\tmsp_median_m6a_rle";
+        out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc\tmsp_max_m6a_rle\tmsp_max_m6a_rle_pos\tmsp_median_m6a_rle";
         for bin_num in 0..fire_opts.bin_num {
             out += &format!(
                 "\tm6a_count_{}\tAT_count_{}\tm6a_frac_{}\tm6a_fc_{}",
@@ -279,6 +287,7 @@ impl<'a> FireFeats<'a> {
             rtn.push(feat_set.m6a_fc);
             if first {
                 rtn.push(feat_set.max_m6a_rle);
+                rtn.push(feat_set.max_m6a_rle_pos);
                 rtn.push(feat_set.median_m6a_rle);
                 first = false;
             }
