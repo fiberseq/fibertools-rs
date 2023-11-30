@@ -32,9 +32,9 @@ fn decorator_from_positions(
     element_type: &str,
 ) -> String {
     // clean the starts and lengths
-    let starts: Vec<i64> = starts.iter().flatten().map(|x| *x).collect();
+    let starts: Vec<i64> = starts.iter().flatten().copied().collect();
     let lengths: Vec<i64> = if let Some(l) = lengths {
-        l.iter().flatten().map(|x| *x).collect()
+        l.iter().flatten().copied().collect()
     } else {
         vec![1; starts.len()]
     };
