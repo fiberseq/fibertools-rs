@@ -127,25 +127,36 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32)
     let mut m6a_rles = vec![];
     let mut max = 0;
     let mut max_pos = 0;
+    // if you are a position, on average you will be in an rle length of weighted_rle
+    let mut weighted_rle = 0.0;
     for (m6a_1, m6a_2) in rec.m6a.starts.iter().flatten().tuple_windows() {
-        if *m6a_1 < start || *m6a_1 >= end || *m6a_2 < start || *m6a_2 >= end {
+        // we only want m6a in the window
+        if *m6a_1 < start || *m6a_1 > end || *m6a_2 < start || *m6a_2 > end {
             continue;
         }
+        // distance between m6a sites
         let rle = (m6a_2 - m6a_1).abs();
         m6a_rles.push(rle);
+        // update max
         if rle > max {
             max = rle;
             max_pos = ((*m6a_1 + *m6a_2) / 2 - (end + start) / 2).abs();
         }
+        // update weighted rle
+        weighted_rle += (rle * rle) as f32;
     }
+    weighted_rle /= m6a_rles.len() as f32;
+
     if m6a_rles.is_empty() {
-        return (0.0, 0.0, 0.0);
+        return (-1.0, -1.0, -1.0);
     }
     let mid_length = m6a_rles.len() / 2;
     let (_, median, _) = m6a_rles.select_nth_unstable(mid_length);
     (
-        max as f32 / (end - start) as f32,
-        max_pos as f32,
+        //max as f32 / (end - start) as f32,
+        weighted_rle,
+        1.0,
+        //max_pos as f32,
         *median as f32,
     )
 }
