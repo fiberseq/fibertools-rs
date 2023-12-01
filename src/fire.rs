@@ -123,7 +123,7 @@ fn get_m6a_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
 }
 
 /// get the maximum and median rle of m6a in a window
-fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32) {
+fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
     let mut m6a_rles = vec![];
     let mut max = 0;
     let mut max_pos = 0;
@@ -148,20 +148,14 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32)
     weighted_rle /= (end - start) as f32;
 
     if m6a_rles.is_empty() {
-        return (-1.0, -1.0, -1.0);
+        return (-1.0, -1.0);
     }
     let mid_length = m6a_rles.len() / 2;
     let (_, median, _) = m6a_rles.select_nth_unstable(mid_length);
-    (
-        //max as f32 / (end - start) as f32,
-        //weighted_rle,
-        1.0, 1.0, 1.0,
-        //max_pos as f32,
-        //*median as f32,
-    )
+    (weighted_rle, *median as f32)
 }
 
-const FEATS_IN_USE: [&str; 3] = [
+const FEATS_IN_USE: [&str; 5] = [
     "m6a_count",
     //"at_count",
     //"count_5mc",
@@ -169,7 +163,8 @@ const FEATS_IN_USE: [&str; 3] = [
     "m6a_fc",
     //"max_m6a_rle",
     //"max_m6a_rle_pos",
-    //"median_m6a_rle",
+    "weighted_m6a_rle",
+    "median_m6a_rle",
 ];
 #[derive(Debug, Clone, Builder)]
 pub struct FireFeatsInRange {
@@ -179,8 +174,7 @@ pub struct FireFeatsInRange {
     pub count_5mc: f32,
     pub frac_m6a: f32,
     pub m6a_fc: f32,
-    pub max_m6a_rle: f32,
-    pub max_m6a_rle_pos: f32,
+    pub weighted_m6a_rle: f32,
     pub median_m6a_rle: f32,
 }
 
@@ -273,7 +267,7 @@ impl<'a> FireFeats<'a> {
             0.0
         };
         let m6a_fc = self.m6a_fc_over_expected(m6a_count, at_count);
-        let (max_m6a_rle, max_m6a_rle_pos, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
+        let (weighted_m6a_rle, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
 
         FireFeatsInRange {
             m6a_count: m6a_count as f32,
@@ -281,8 +275,7 @@ impl<'a> FireFeats<'a> {
             count_5mc: count_5mc as f32,
             frac_m6a,
             m6a_fc,
-            max_m6a_rle,
-            max_m6a_rle_pos,
+            weighted_m6a_rle,
             median_m6a_rle,
         }
     }
@@ -357,6 +350,8 @@ impl<'a> FireFeats<'a> {
             //rtn.push(feat_set.count_5mc);
             rtn.push(feat_set.frac_m6a);
             rtn.push(feat_set.m6a_fc);
+            rtn.push(feat_set.weighted_m6a_rle);
+            rtn.push(feat_set.median_m6a_rle);
             if first {
                 //rtn.push(feat_set.max_m6a_rle);
                 //rtn.push(feat_set.max_m6a_rle_pos);
