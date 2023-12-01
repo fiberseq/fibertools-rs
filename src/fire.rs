@@ -154,10 +154,10 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32)
     let (_, median, _) = m6a_rles.select_nth_unstable(mid_length);
     (
         //max as f32 / (end - start) as f32,
-        weighted_rle,
-        1.0,
+        //weighted_rle,
+        1.0, 1.0, 1.0,
         //max_pos as f32,
-        *median as f32,
+        //*median as f32,
     )
 }
 
