@@ -234,6 +234,7 @@ impl<'a> FireFeats<'a> {
 
     fn m6a_fc_over_expected(&self, m6a_count: usize, at_count: usize) -> f32 {
         //let expected = self.frac_m6a_in_msps * at_count as f32;
+        // ^ this didn't work well
         let expected = self.frac_m6a * at_count as f32;
         let observed = m6a_count as f32;
         if expected == 0.0 || observed == 0.0 {
