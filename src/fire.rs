@@ -155,7 +155,7 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
     (weighted_rle, *median as f32)
 }
 
-const FEATS_IN_USE: [&str; 5] = [
+const FEATS_IN_USE: [&str; 3] = [
     "m6a_count",
     //"at_count",
     //"count_5mc",
@@ -163,8 +163,8 @@ const FEATS_IN_USE: [&str; 5] = [
     "m6a_fc",
     //"max_m6a_rle",
     //"max_m6a_rle_pos",
-    "weighted_m6a_rle",
-    "median_m6a_rle",
+    //"weighted_m6a_rle",
+    //"median_m6a_rle",
 ];
 #[derive(Debug, Clone, Builder)]
 pub struct FireFeatsInRange {
@@ -288,6 +288,7 @@ impl<'a> FireFeats<'a> {
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
         out += &FireFeatsInRange::header("msp");
         out += &FireFeatsInRange::header("best");
+        out += &FireFeatsInRange::header("worst");
         for bin_num in 0..fire_opts.bin_num {
             out += &FireFeatsInRange::header(&format!("bin_{}", bin_num));
         }
@@ -305,8 +306,11 @@ impl<'a> FireFeats<'a> {
 
         // find the 100bp window within the range with the most m6a
         let mut max_m6a_count = 0;
-        let mut max_m6a_start = start;
+        let mut max_m6a_start = 0;
         let mut max_m6a_end = 0;
+        let mut min_m6a_count = usize::MAX;
+        let mut min_m6a_start = 0;
+        let mut min_m6a_end = 0;
         for st_idx in start..end {
             let en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
             let m6a_count = get_m6a_count(self.rec, st_idx, en_idx);
@@ -315,11 +319,17 @@ impl<'a> FireFeats<'a> {
                 max_m6a_start = st_idx;
                 max_m6a_end = en_idx;
             }
+            if m6a_count < min_m6a_count {
+                min_m6a_count = m6a_count;
+                min_m6a_start = st_idx;
+                min_m6a_end = en_idx;
+            }
             if en_idx == end {
                 break;
             }
         }
         let best_fire_feats = self.feats_in_range(max_m6a_start, max_m6a_end);
+        let worst_fire_feats = self.feats_in_range(min_m6a_start, min_m6a_end);
 
         let msp_feats = self.feats_in_range(start, end);
         let bins = get_bins(
@@ -342,24 +352,17 @@ impl<'a> FireFeats<'a> {
             self.at_count as f32,
             self.frac_m6a,
         ];
-        let feat_sets = vec![&msp_feats, &best_fire_feats]
+        let feat_sets = vec![&msp_feats, &best_fire_feats, &worst_fire_feats]
             .into_iter()
             .chain(bin_feats.iter());
-        let mut first = true;
         for feat_set in feat_sets {
             rtn.push(feat_set.m6a_count);
             //rtn.push(feat_set.at_count);
             //rtn.push(feat_set.count_5mc);
             rtn.push(feat_set.frac_m6a);
             rtn.push(feat_set.m6a_fc);
-            rtn.push(feat_set.weighted_m6a_rle);
-            rtn.push(feat_set.median_m6a_rle);
-            if first {
-                //rtn.push(feat_set.max_m6a_rle);
-                //rtn.push(feat_set.max_m6a_rle_pos);
-                //rtn.push(feat_set.median_m6a_rle);
-                first = false;
-            }
+            //rtn.push(feat_set.weighted_m6a_rle);
+            //rtn.push(feat_set.median_m6a_rle);
         }
         rtn
     }
