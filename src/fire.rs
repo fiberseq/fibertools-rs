@@ -145,7 +145,7 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32)
         // update weighted rle
         weighted_rle += (rle * rle) as f32;
     }
-    weighted_rle /= m6a_rles.len() as f32;
+    weighted_rle /= (end - start) as f32;
 
     if m6a_rles.is_empty() {
         return (-1.0, -1.0, -1.0);
@@ -167,6 +167,7 @@ pub struct FireFeats<'a> {
     at_count: usize,
     m6a_count: usize,
     frac_m6a: f32,
+    frac_m6a_in_msps: f32,
     fire_opts: &'a FireOptions,
     seq: Vec<u8>,
     fire_feats: Vec<(i64, i64, Vec<f32>)>,
@@ -198,11 +199,30 @@ impl<'a> FireFeats<'a> {
         } else {
             0.0
         };
+
+        // calculate the expected number AT bases covered by m6a within MSPs
+        let (m6a_count_in_msps, at_count_in_msps): (usize, usize) = rec
+            .msp
+            .into_iter()
+            .map(|(start, end, _l, _refs)| {
+                //let bp_count = end - start;
+                let m6a_count = get_m6a_count(rec, start, end);
+                let at_count = get_at_count(&seq, start, end);
+                (m6a_count, at_count)
+            })
+            .fold((0, 0), |acc, x| (acc.0 + x.0, acc.1 + x.1));
+        let frac_m6a_in_msps = if at_count_in_msps > 0 {
+            m6a_count_in_msps as f32 / at_count_in_msps as f32
+        } else {
+            0.0
+        };
+
         let mut rtn = Self {
             rec,
             at_count,
             m6a_count,
             frac_m6a,
+            frac_m6a_in_msps,
             fire_opts,
             seq,
             fire_feats: vec![],
@@ -212,7 +232,7 @@ impl<'a> FireFeats<'a> {
     }
 
     fn m6a_fc_over_expected(&self, m6a_count: usize, at_count: usize) -> f32 {
-        let expected = self.frac_m6a * at_count as f32;
+        let expected = self.frac_m6a_in_msps * at_count as f32;
         let observed = m6a_count as f32;
         if expected == 0.0 || observed == 0.0 {
             return 0.0;
