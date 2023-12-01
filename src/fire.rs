@@ -72,17 +72,10 @@ fn get_at_count(seq: &[u8], start: i64, end: i64) -> usize {
 
 /// ```
 /// use fibertools_rs::fire::get_bins;
-/// let bins = get_bins(0, 100, 5, 20, 200);
+/// let bins = get_bins(50, 5, 20, 200);
 /// assert_eq!(bins, vec![(0, 20), (20, 40), (40, 60), (60, 80), (80, 100)]);
 /// ```
-pub fn get_bins(
-    start: i64,
-    end: i64,
-    bin_num: i64,
-    bin_width: i64,
-    max_end: i64,
-) -> Vec<(i64, i64)> {
-    let mid_point = get_mid_point(start, end);
+pub fn get_bins(mid_point: i64, bin_num: i64, bin_width: i64, max_end: i64) -> Vec<(i64, i64)> {
     let mut bins = Vec::new();
     for i in 0..bin_num {
         let mut bin_start = mid_point - (bin_num / 2 - i) * bin_width - bin_width / 2;
@@ -311,19 +304,23 @@ impl<'a> FireFeats<'a> {
         let mut min_m6a_count = usize::MAX;
         let mut min_m6a_start = 0;
         let mut min_m6a_end = 0;
-        for mut st_idx in start..end {
-            let mut en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
-            // are we just the msp itself, if so these windows aren't informative
-            if st_idx == start && en_idx == end {
-                log::info!("msp is the only window");
-                st_idx = end;
-                en_idx = end;
+        let mut centering_pos = get_mid_point(start, end);
+        for st_idx in start..end {
+            let en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
+            // this analysis is only interesting if we have a larger msp that could have two ~ distinct windows. Thus we need to check that we have a window larger than 2X the best window size
+            if (end - start) < (2 * self.fire_opts.best_window_size) {
+                log::trace!("MSP window is not large enough for best and worst window analysis");
+                break;
             }
             let m6a_count = get_m6a_count(self.rec, st_idx, en_idx);
             if m6a_count > max_m6a_count {
                 max_m6a_count = m6a_count;
                 max_m6a_start = st_idx;
                 max_m6a_end = en_idx;
+                // center my bins around the highest density m6A region instead of the middle of the MSP
+                if st_idx != en_idx {
+                    centering_pos = get_mid_point(st_idx, en_idx);
+                }
             }
             if m6a_count < min_m6a_count {
                 min_m6a_count = m6a_count;
@@ -339,8 +336,7 @@ impl<'a> FireFeats<'a> {
 
         let msp_feats = self.feats_in_range(start, end);
         let bins = get_bins(
-            start,
-            end,
+            centering_pos,
             self.fire_opts.bin_num,
             self.fire_opts.width_bin,
             self.rec.record.seq_len() as i64,
