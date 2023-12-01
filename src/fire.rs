@@ -311,8 +311,14 @@ impl<'a> FireFeats<'a> {
         let mut min_m6a_count = usize::MAX;
         let mut min_m6a_start = 0;
         let mut min_m6a_end = 0;
-        for st_idx in start..end {
-            let en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
+        for mut st_idx in start..end {
+            let mut en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
+            // are we just the msp itself, if so these windows aren't informative
+            if st_idx == start && en_idx == end {
+                log::info!("msp is the only window");
+                st_idx = end;
+                en_idx = end;
+            }
             let m6a_count = get_m6a_count(self.rec, st_idx, en_idx);
             if m6a_count > max_m6a_count {
                 max_m6a_count = m6a_count;
