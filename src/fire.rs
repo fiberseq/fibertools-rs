@@ -148,7 +148,7 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
     (weighted_rle, *median as f32)
 }
 
-const FEATS_IN_USE: [&str; 5] = [
+const FEATS_IN_USE: [&str; 3] = [
     "m6a_count",
     //"at_count",
     //"count_5mc",
@@ -156,8 +156,8 @@ const FEATS_IN_USE: [&str; 5] = [
     "m6a_fc",
     //"max_m6a_rle",
     //"max_m6a_rle_pos",
-    "weighted_m6a_rle",
-    "median_m6a_rle",
+    // "weighted_m6a_rle",
+    //"median_m6a_rle",
 ];
 #[derive(Debug, Clone, Builder)]
 pub struct FireFeatsInRange {
@@ -184,6 +184,7 @@ impl FireFeatsInRange {
 #[derive(Debug)]
 pub struct FireFeats<'a> {
     rec: &'a FiberseqData,
+    #[allow(unused)]
     at_count: usize,
     m6a_count: usize,
     frac_m6a: f32,
@@ -278,7 +279,7 @@ impl<'a> FireFeats<'a> {
     pub fn fire_feats_header(fire_opts: &FireOptions) -> String {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
         out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
-        out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
+        out += "\tfiber_m6a_count\tfiber_m6a_frac";
         out += &FireFeatsInRange::header("msp");
         out += &FireFeatsInRange::header("best");
         out += &FireFeatsInRange::header("worst");
@@ -318,9 +319,7 @@ impl<'a> FireFeats<'a> {
                 max_m6a_start = st_idx;
                 max_m6a_end = en_idx;
                 // center my bins around the highest density m6A region instead of the middle of the MSP
-                if st_idx != en_idx {
-                    centering_pos = get_mid_point(st_idx, en_idx);
-                }
+                centering_pos = get_mid_point(st_idx, en_idx);
             }
             if m6a_count < min_m6a_count {
                 min_m6a_count = m6a_count;
@@ -351,7 +350,6 @@ impl<'a> FireFeats<'a> {
             msp_len_times_m6a_fc,
             ccs_passes,
             self.m6a_count as f32,
-            self.at_count as f32,
             self.frac_m6a,
         ];
         let feat_sets = vec![&msp_feats, &best_fire_feats, &worst_fire_feats]
@@ -363,8 +361,8 @@ impl<'a> FireFeats<'a> {
             //rtn.push(feat_set.count_5mc);
             rtn.push(feat_set.frac_m6a);
             rtn.push(feat_set.m6a_fc);
-            rtn.push(feat_set.weighted_m6a_rle);
-            rtn.push(feat_set.median_m6a_rle);
+            //rtn.push(feat_set.weighted_m6a_rle);
+            //rtn.push(feat_set.median_m6a_rle);
         }
         rtn
     }
