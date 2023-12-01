@@ -161,6 +161,39 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32, f32)
     )
 }
 
+const FEATS_IN_USE: [&str; 3] = [
+    "m6a_count",
+    //"at_count",
+    //"count_5mc",
+    "frac_m6a",
+    "m6a_fc",
+    //"max_m6a_rle",
+    //"max_m6a_rle_pos",
+    //"median_m6a_rle",
+];
+#[derive(Debug, Clone, Builder)]
+pub struct FireFeatsInRange {
+    pub m6a_count: f32,
+    pub at_count: f32,
+    #[allow(unused)]
+    pub count_5mc: f32,
+    pub frac_m6a: f32,
+    pub m6a_fc: f32,
+    pub max_m6a_rle: f32,
+    pub max_m6a_rle_pos: f32,
+    pub median_m6a_rle: f32,
+}
+
+impl FireFeatsInRange {
+    pub fn header(tag: &str) -> String {
+        let mut out = "".to_string();
+        for col in FEATS_IN_USE.iter() {
+            out += &format!("\t{}_{}", tag, col);
+        }
+        out
+    }
+}
+
 #[derive(Debug)]
 pub struct FireFeats<'a> {
     rec: &'a FiberseqData,
@@ -171,19 +204,6 @@ pub struct FireFeats<'a> {
     fire_opts: &'a FireOptions,
     seq: Vec<u8>,
     fire_feats: Vec<(i64, i64, Vec<f32>)>,
-}
-
-#[derive(Debug, Clone, Builder)]
-struct FireFeatsInRange {
-    pub m6a_count: f32,
-    pub at_count: f32,
-    #[allow(unused)]
-    pub count_5mc: f32,
-    pub frac_m6a: f32,
-    pub m6a_fc: f32,
-    pub max_m6a_rle: f32,
-    pub max_m6a_rle_pos: f32,
-    pub median_m6a_rle: f32,
 }
 
 impl<'a> FireFeats<'a> {
@@ -267,19 +287,14 @@ impl<'a> FireFeats<'a> {
         }
     }
 
-    /*
-    features: ['score', 'msp_len', 'fiber_m6a_count', 'fiber_AT_count', 'fiber_m6a_frac', 'msp_m6a', 'msp_AT', 'msp_fc', 'm6a_frac', 'm6a_frac_0', 'm6a_frac_1', 'm6a_frac_2', 'm6a_frac_3', 'm6a_frac_4', 'm6a_frac_5', 'm6a_frac_6', 'm6a_frac_7', 'm6a_frac_8', 'm6a_count_0', 'm6a_count_1', 'm6a_count_2', 'm6a_count_3', 'm6a_count_4', 'm6a_count_5', 'm6a_count_6', 'm6a_count_7', 'm6a_count_8', 'AT_count_0', 'AT_count_1', 'AT_count_2', 'AT_count_3', 'AT_count_4', 'AT_count_5', 'AT_count_6', 'AT_count_7', 'AT_count_8', 'm6a_fc_0', 'm6a_fc_1', 'm6a_fc_2', 'm6a_fc_3', 'm6a_fc_4', 'm6a_fc_5', 'm6a_fc_6', 'm6a_fc_7', 'm6a_fc_8', 'log_msp_len']]
-    */
     pub fn fire_feats_header(fire_opts: &FireOptions) -> String {
         let mut out = "#chrom\tstart\tend\tfiber".to_string();
         out += "\tmsp_len\tmsp_len_times_m6a_fc\tccs_passes";
         out += "\tfiber_m6a_count\tfiber_AT_count\tfiber_m6a_frac";
-        out += "\tmsp_m6a\tmsp_AT\tmsp_m6a_frac\tmsp_fc\tmsp_max_m6a_rle\tmsp_max_m6a_rle_pos\tmsp_median_m6a_rle";
+        out += &FireFeatsInRange::header("msp");
+        out += &FireFeatsInRange::header("best");
         for bin_num in 0..fire_opts.bin_num {
-            out += &format!(
-                "\tm6a_count_{}\tAT_count_{}\tm6a_frac_{}\tm6a_fc_{}",
-                bin_num, bin_num, bin_num, bin_num
-            );
+            out += &FireFeatsInRange::header(&format!("bin_{}", bin_num));
         }
         out += "\n";
         out
@@ -292,6 +307,24 @@ impl<'a> FireFeats<'a> {
             return vec![];
         }
         let ccs_passes = self.rec.ec;
+
+        // find the 100bp window within the range with the most m6a
+        let mut max_m6a_count = 0;
+        let mut max_m6a_start = start;
+        let mut max_m6a_end = 0;
+        for st_idx in start..end {
+            let en_idx = (st_idx + self.fire_opts.best_window_size).min(end);
+            let m6a_count = get_m6a_count(self.rec, st_idx, en_idx);
+            if m6a_count > max_m6a_count {
+                max_m6a_count = m6a_count;
+                max_m6a_start = st_idx;
+                max_m6a_end = en_idx;
+            }
+            if en_idx == end {
+                break;
+            }
+        }
+        let best_fire_feats = self.feats_in_range(max_m6a_start, max_m6a_end);
 
         let msp_feats = self.feats_in_range(start, end);
         let bins = get_bins(
@@ -314,18 +347,20 @@ impl<'a> FireFeats<'a> {
             self.at_count as f32,
             self.frac_m6a,
         ];
-        let feat_sets = vec![&msp_feats].into_iter().chain(bin_feats.iter());
+        let feat_sets = vec![&msp_feats, &best_fire_feats]
+            .into_iter()
+            .chain(bin_feats.iter());
         let mut first = true;
         for feat_set in feat_sets {
             rtn.push(feat_set.m6a_count);
-            rtn.push(feat_set.at_count);
+            //rtn.push(feat_set.at_count);
             //rtn.push(feat_set.count_5mc);
             rtn.push(feat_set.frac_m6a);
             rtn.push(feat_set.m6a_fc);
             if first {
-                rtn.push(feat_set.max_m6a_rle);
-                rtn.push(feat_set.max_m6a_rle_pos);
-                rtn.push(feat_set.median_m6a_rle);
+                //rtn.push(feat_set.max_m6a_rle);
+                //rtn.push(feat_set.max_m6a_rle_pos);
+                //rtn.push(feat_set.median_m6a_rle);
                 first = false;
             }
         }
@@ -495,3 +530,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+/*
+features: ['score', 'msp_len', 'fiber_m6a_count', 'fiber_AT_count', 'fiber_m6a_frac', 'msp_m6a', 'msp_AT', 'msp_fc', 'm6a_frac', 'm6a_frac_0', 'm6a_frac_1', 'm6a_frac_2', 'm6a_frac_3', 'm6a_frac_4', 'm6a_frac_5', 'm6a_frac_6', 'm6a_frac_7', 'm6a_frac_8', 'm6a_count_0', 'm6a_count_1', 'm6a_count_2', 'm6a_count_3', 'm6a_count_4', 'm6a_count_5', 'm6a_count_6', 'm6a_count_7', 'm6a_count_8', 'AT_count_0', 'AT_count_1', 'AT_count_2', 'AT_count_3', 'AT_count_4', 'AT_count_5', 'AT_count_6', 'AT_count_7', 'AT_count_8', 'm6a_fc_0', 'm6a_fc_1', 'm6a_fc_2', 'm6a_fc_3', 'm6a_fc_4', 'm6a_fc_5', 'm6a_fc_6', 'm6a_fc_7', 'm6a_fc_8', 'log_msp_len']]
+*/

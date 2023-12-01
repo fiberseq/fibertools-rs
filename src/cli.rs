@@ -277,6 +277,10 @@ pub struct FireOptions {
     /// Number of bins to collect
     #[clap(short, long, default_value = "9")]
     pub bin_num: i64,
+    /// Calculate stats for the highest X bp window within each MSP
+    /// Should be a fair amount higher than the expected linker length.
+    #[clap(long, default_value = "125")]
+    pub best_window_size: i64,
     /// Use 5mC data in FIREs
     #[clap(short, long)]
     pub use_5mc: bool,
