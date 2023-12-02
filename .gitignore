@@ -16,4 +16,5 @@ src/model
 .devcontainer/**
 issue_data/**
 flamegraph*
-tests/data/chr20.hifi.bam**
+tests/data/chr20*bam*
+hub.txt
