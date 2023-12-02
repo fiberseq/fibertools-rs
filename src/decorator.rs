@@ -20,6 +20,15 @@ const FIRE_COLORS: [(f32, &str); 8] = [
     (100.0, LINKER_COLOR),
 ];
 
+pub fn get_fire_color(fdr: f32) -> std::string::String {
+    for (fdr_val, color) in FIRE_COLORS.iter() {
+        if fdr <= *fdr_val {
+            return color.to_string();
+        }
+    }
+    LINKER_COLOR.to_string()
+}
+
 pub fn pos_to_string(pos: &[Option<i64>]) -> String {
     pos.iter().flatten().map(|p| p.to_string() + ",").collect()
 }
@@ -106,7 +115,7 @@ pub fn fire_decorators(fiber: &FiberseqData) -> String {
     // hashmap with colors and empty vecs
     let mut map = std::collections::HashMap::new();
     for (_, color) in FIRE_COLORS.iter() {
-        map.insert(*color, vec![]);
+        map.insert(color.to_string(), vec![]);
     }
 
     for ((pos, length), qual) in fiber
@@ -120,18 +129,14 @@ pub fn fire_decorators(fiber: &FiberseqData) -> String {
             let l = Some(*l);
             let p = Some(*p);
             let fdr_val = 100.0 - *qual as f32 / 255.0 * 100.0;
-            for (fdr, color) in FIRE_COLORS.iter() {
-                if fdr_val <= *fdr {
-                    map.get_mut(*color).unwrap().push((p, l));
-                    break;
-                }
-            }
+            let fire_color = get_fire_color(fdr_val);
+            map.get_mut(&fire_color).unwrap().push((p, l));
         }
     }
     let mut rtn = "".to_string();
     for (color, values) in map.into_iter() {
         let (starts, lengths): (Vec<Option<i64>>, Vec<Option<i64>>) = values.into_iter().unzip();
-        rtn += &decorator_from_positions(fiber, &starts, Some(&lengths), color, "FIRE");
+        rtn += &decorator_from_positions(fiber, &starts, Some(&lengths), &color, "FIRE");
     }
     rtn
 }

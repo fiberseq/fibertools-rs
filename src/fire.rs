@@ -4,6 +4,7 @@ use super::*;
 use crate::fiber::FiberseqRecords;
 use anyhow;
 use bam::record::{Aux, AuxArray};
+use decorator::get_fire_color;
 use derive_builder::Builder;
 use gbdt::decision_tree::{Data, DataVec};
 use gbdt::gradient_boost::GBDT;
@@ -510,6 +511,10 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
             });
         }
     }
+    // write existing fire elements to a bed9
+    else if fire_opts.extract {
+        fire_to_bed9(fire_opts, &mut bam)?;
+    }
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
@@ -531,6 +536,47 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/*
-features: ['score', 'msp_len', 'fiber_m6a_count', 'fiber_AT_count', 'fiber_m6a_frac', 'msp_m6a', 'msp_AT', 'msp_fc', 'm6a_frac', 'm6a_frac_0', 'm6a_frac_1', 'm6a_frac_2', 'm6a_frac_3', 'm6a_frac_4', 'm6a_frac_5', 'm6a_frac_6', 'm6a_frac_7', 'm6a_frac_8', 'm6a_count_0', 'm6a_count_1', 'm6a_count_2', 'm6a_count_3', 'm6a_count_4', 'm6a_count_5', 'm6a_count_6', 'm6a_count_7', 'm6a_count_8', 'AT_count_0', 'AT_count_1', 'AT_count_2', 'AT_count_3', 'AT_count_4', 'AT_count_5', 'AT_count_6', 'AT_count_7', 'AT_count_8', 'm6a_fc_0', 'm6a_fc_1', 'm6a_fc_2', 'm6a_fc_3', 'm6a_fc_4', 'm6a_fc_5', 'm6a_fc_6', 'm6a_fc_7', 'm6a_fc_8', 'log_msp_len']]
-*/
+/// extract existing fire calls into a bed9+ like file
+pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<(), anyhow::Error> {
+    let mut out_buffer = bio_io::writer(&fire_opts.out)?;
+    //let header =
+    //"#chrom\tstart\tend\tname\tscore\tstrand\tthickStart\tthickEnd\titemRgb\tfdr\tHP\n";
+    //out_buffer.write_all(header.as_bytes())?;
+
+    for rec in FiberseqRecords::new(bam, 0) {
+        if rec.record.is_secondary() || rec.record.is_supplementary() || rec.record.is_unmapped() {
+            continue;
+        }
+        for ((start, end), qual) in rec
+            .msp
+            .reference_starts
+            .iter()
+            .zip(rec.msp.reference_ends.iter())
+            .zip(rec.msp.qual.iter())
+        {
+            if let (Some(start), Some(end)) = (start, end) {
+                let fdr = 100.0 * (1.0 - *qual as f32 / 255.0);
+                if fdr >= 10.0 {
+                    continue;
+                }
+                let color = get_fire_color(fdr);
+                let bed9 = format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                    rec.target_name,
+                    start,
+                    end,
+                    String::from_utf8_lossy(rec.record.qname()),
+                    fdr.round(),
+                    if rec.record.is_reverse() { "-" } else { "+" },
+                    start,
+                    end,
+                    color,
+                    fdr / 100.0,
+                    rec.get_hp()
+                );
+                out_buffer.write_all(bed9.as_bytes())?;
+            }
+        }
+    }
+    Ok(())
+}
