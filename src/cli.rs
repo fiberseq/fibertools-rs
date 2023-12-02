@@ -265,12 +265,15 @@ pub fn make_cli_app() -> Command {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct FireOptions {
-    /// Bam HiFi file with m6A calls
+    /// Bam HiFi file with m6A and MSP calls
     #[clap(default_value = "-")]
     pub bam: String,
-    /// Output bam file with nucleosome calls
+    /// Output file (bam by default, table if --feats_to_text is used, and bed9 + if --extract is used)
     #[clap(default_value = "-")]
     pub out: String,
+    /// Output just FIRE elements in bed9 format
+    #[clap(short, long)]
+    pub extract: bool,
     /// Width of bin for feature collection
     #[clap(short, long, default_value = "40")]
     pub width_bin: i64,
@@ -293,7 +296,7 @@ pub struct FireOptions {
     /// Optional path to a FDR table
     #[clap(long)]
     pub fdr_table: Option<String>,
-    /// Output FIREs in text format
+    /// Output FIREs features for training in a table format
     #[clap(short, long)]
     pub feats_to_text: bool,
 }
