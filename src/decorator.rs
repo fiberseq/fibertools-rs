@@ -5,6 +5,7 @@ use crate::fiber::FiberseqRecords;
 use anyhow;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use std::cmp::Ordering;
+use std::fmt::Display;
 
 const NUC_COLOR: &str = "169,169,169";
 const M6A_COLOR: &str = "128,0,128";
@@ -73,20 +74,22 @@ impl<'a> Decorator<'a> {
         };
 
         Self {
-            starts: starts,
-            lengths: lengths,
-            fiber: fiber,
-            color: color,
-            element_type: element_type,
-            start: start,
-            end: end,
+            starts,
+            lengths,
+            fiber,
+            color,
+            element_type,
+            start,
+            end,
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl Display for Decorator<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // skip if not ref positions
         if self.starts.is_empty() {
-            return "".to_string();
+            return write!(f, "");
         }
         // get fields
         let strand = if self.fiber.record.is_reverse() {
@@ -122,7 +125,7 @@ impl<'a> Decorator<'a> {
             "Ignored",
             self.element_type,
         );
-        bed6 + &bed12 + &decorator
+        write!(f, "{}", bed6 + &bed12 + &decorator)
     }
 }
 
@@ -200,7 +203,7 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
             fiber,
             &starts,
             Some(&lengths),
-            &color,
+            color,
             "FIRE",
         ));
     }
