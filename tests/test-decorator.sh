@@ -1,12 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-scp hyak:'projects/phased-fdr-and-peaks/Train-FIRE-v2.0/FIRE.*.json' models/.
+#scp hyak:'projects/phased-fdr-and-peaks/Train-FIRE-v2.0/FIRE.*.json' models/.
 
 #samtools view -F 2308 -@ 16 -b chr20_PS00388_COLO829BL_1.bam chr20:0-1000000 |
 samtools view -F 2308 -@ 16 -b tests/data/chr20.hifi.bam chr20:0-1000000 |
-    cargo run -- fire - - |
-    cargo run -- track - --bed12 tmp.bed12.gz | sort -k1,1 -k2,2n | bgzip >tmp.dec.bed12.gz
+    cargo run --release -- fire - xx.tmp.bam
+
+#
+cargo run --release -- track xx.tmp.bam --bed12 tmp.bed12.gz | sort -k1,1 -k2,2n | bgzip -@ 8 >tmp.dec.bed12.gz
+
+rm xx.tmp.bam
 
 # samtools view -F 16 -@ 16 -b - |
 
