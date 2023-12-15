@@ -519,6 +519,9 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
         for mut rec in FiberseqRecords::new(&mut bam, 0) {
+            if fire_opts.skip_no_m6a && rec.m6a.starts.is_empty() {
+                continue;
+            }
             let fire_feats = FireFeats::new(&rec, fire_opts);
             let mut precisions = fire_feats.predict_with_xgb(&model, &precision_table);
             if rec.record.is_reverse() {
