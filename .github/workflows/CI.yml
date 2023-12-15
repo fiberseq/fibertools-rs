@@ -37,7 +37,7 @@ jobs:
           components: clippy
 
       - name: Lint with clippy
-        run: docker run -i $(docker build --pull -q .) cargo clippy --release
+        run: cargo clippy
 
   Testing:
     needs: Formatting
@@ -53,5 +53,4 @@ jobs:
           override: true
 
       - name: Run test
-        run: |
-          docker run -i $(docker build --pull -q .) cargo test  -p bio-io -p bamlift -p fibertools-rs --release -- --test-threads=1
+        run: cargo test -p bio-io -p bamlift -p fibertools-rs -- --test-threads=1
