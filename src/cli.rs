@@ -274,6 +274,9 @@ pub struct FireOptions {
     /// Output just FIRE elements in bed9 format
     #[clap(short, long)]
     pub extract: bool,
+    /// Don't write reads with no m6A calls to the output bam
+    #[clap(short, long)]
+    pub skip_no_m6a: bool,
     /// Width of bin for feature collection
     #[clap(short, long, default_value = "40")]
     pub width_bin: i64,
