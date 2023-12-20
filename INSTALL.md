@@ -5,7 +5,7 @@
 Get `libtorch` **v2.1.0** from the [PyTorch website](https://pytorch.org/get-started/) and extract the content of the zip file.
 
 - On Linux/Unix system you can download with:
-  - `wget  https://download.pytorch.org/libtorch/cu116/libtorch-shared-with-deps-2.1.0%2Bcu118.zip`
+  - `wget  https://download.pytorch.org/libtorch/cu118/libtorch-shared-with-deps-2.1.0%2Bcu118.zip`
 - On macOS you can download with:
   - `wget https://download.pytorch.org/libtorch/cpu/libtorch-macos-2.1.0.zip`
 - Windows is not supported and will not be.
