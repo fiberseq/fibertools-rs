@@ -24,6 +24,8 @@ pub mod fire;
 /// add decorators
 pub mod decorator;
 
+pub mod footprint;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]

@@ -1,0 +1,10 @@
+# modules of CTCF footprinting
+# Will report using a bit flag if the module does not contain an m6A (is footprinted, 1) or does contain an m6A (is not footprinted, 0) for each module.
+# modules must start at zero, be sorted, and be contiguous with one another.
+# intervals are 0-based, half-open (like BED)
+modules:
+  - [0, 8]
+  - [8, 16]
+  - [16, 23]
+  - [23, 29]
+  - [29, 34]
