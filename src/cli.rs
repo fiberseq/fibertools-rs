@@ -142,6 +142,8 @@ pub enum Commands {
     AddNucleosomes(AddNucleosomeOptions),
     /// Add FIREs (Fiber-seq Inferred Regulatory Elements) to a bam file with m6a predictions
     Fire(FireOptions),
+    /// Add footprints to a bam file with m6a predictions
+    Footprint(FootprintOptions),
     /// Extract fiberseq data into plain text files.
     /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
@@ -360,4 +362,16 @@ pub struct DecoratorOptions {
     /// Minium score in the ML tag to include in the output
     #[clap(short, long, default_value = MIN_ML_SCORE)]
     pub min_ml_score: u8,
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct FootprintOptions {
+    /// Indexed and aligned bam file with m6A and MSP calls
+    pub bam: String,
+    /// BED file with the regions to footprint. Should all contain the same motif with proper strand information, and ideally be ChIP-seq peaks.
+    pub bed: String,
+    /// yaml describing the modules of the footprint
+    pub yaml: String,
+    /// Output bam
+    pub out: String,
 }

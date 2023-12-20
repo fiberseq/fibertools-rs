@@ -197,6 +197,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Fire(fire_opts)) => {
             fibertools_rs::fire::add_fire_to_bam(fire_opts)?;
         }
+        Some(Commands::Footprint(footprint_opts)) => {
+            fibertools_rs::footprint::start_finding_footprints(footprint_opts)?;
+        }
         Some(Commands::TrackDecorators(decorator_opts)) => {
             fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
         }
