@@ -11,7 +11,7 @@ const NUC_COLOR: &str = "169,169,169";
 const M6A_COLOR: &str = "128,0,128";
 const CPG_COLOR: &str = "139,69,19";
 const LINKER_COLOR: &str = "147,112,219";
-const FIRE_COLORS: [(f32, &str); 8] = [
+const FIRE_COLORS: [(f32, &str); 9] = [
     (1.0, "139,0,0"),
     (2.0, "175,0,0"),
     (3.0, "200,0,0"),
@@ -20,6 +20,7 @@ const FIRE_COLORS: [(f32, &str); 8] = [
     (10.0, "255,140,0"),
     (25.0, "225,225,0"),
     (100.0, LINKER_COLOR),
+    (200.0, NUC_COLOR),
 ];
 
 pub fn get_fire_color(fdr: f32) -> &'static str {
