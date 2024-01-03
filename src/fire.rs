@@ -550,18 +550,27 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
         if rec.record.is_secondary() || rec.record.is_supplementary() || rec.record.is_unmapped() {
             continue;
         }
-        for ((start, end), qual) in rec
+        let start_iter = rec
             .msp
             .reference_starts
             .iter()
-            .zip(rec.msp.reference_ends.iter())
-            .zip(rec.msp.qual.iter())
-        {
+            .chain(rec.nuc.reference_starts.iter());
+        let end_iter = rec
+            .msp
+            .reference_ends
+            .iter()
+            .chain(rec.nuc.reference_ends.iter());
+        let qual_iter = rec.msp.qual.iter().chain(rec.nuc.qual.iter());
+        let n_msps = rec.msp.reference_starts.len();
+        let mut count = 0;
+        for ((start, end), qual) in start_iter.zip(end_iter).zip(qual_iter) {
             if let (Some(start), Some(end)) = (start, end) {
-                let fdr = 100.0 * (1.0 - *qual as f32 / 255.0);
-                if fdr >= 10.0 {
-                    continue;
-                }
+                let fdr = if count < n_msps {
+                    100.0 - *qual as f32 / 255.0 * 100.0
+                } else {
+                    // we are now in nucleosomes
+                    101.0
+                };
                 let color = get_fire_color(fdr);
                 let bed9 = format!(
                     "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -579,6 +588,7 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
                 );
                 out_buffer.write_all(bed9.as_bytes())?;
             }
+            count += 1;
         }
     }
     Ok(())
