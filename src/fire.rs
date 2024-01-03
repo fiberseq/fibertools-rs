@@ -562,8 +562,7 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
             .chain(rec.nuc.reference_ends.iter());
         let qual_iter = rec.msp.qual.iter().chain(rec.nuc.qual.iter());
         let n_msps = rec.msp.reference_starts.len();
-        let mut count = 0;
-        for ((start, end), qual) in start_iter.zip(end_iter).zip(qual_iter) {
+        for (count, ((start, end), qual)) in start_iter.zip(end_iter).zip(qual_iter).enumerate() {
             if let (Some(start), Some(end)) = (start, end) {
                 let fdr = if count < n_msps {
                     100.0 - *qual as f32 / 255.0 * 100.0
@@ -588,7 +587,6 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
                 );
                 out_buffer.write_all(bed9.as_bytes())?;
             }
-            count += 1;
         }
     }
     Ok(())

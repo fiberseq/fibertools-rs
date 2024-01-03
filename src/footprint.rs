@@ -52,9 +52,7 @@ pub fn define_footprint(fiber: FiberseqData, bed_rec: CenterPosition, _modules: 
     if fiber.target_name != bed_rec.chrom
         || fiber.record.reference_start() > bed_rec.position
         || fiber.record.reference_end() < bed_rec.position
-    {
-        return;
-    }
+    {}
 }
 
 pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::Error> {
