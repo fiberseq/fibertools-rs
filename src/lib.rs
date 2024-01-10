@@ -26,6 +26,10 @@ pub mod decorator;
 
 pub mod footprint;
 
+pub mod bamlift;
+
+pub mod bio_io;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]
