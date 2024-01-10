@@ -8,6 +8,18 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 ## 0.3.6 (2024-01-10)
 
 <csr-id-32e9121f47e62e20b38600198f2f3fac3a4c88d6/>
+<csr-id-c7331897aaf9ec5b2a574aa07155675b7dee9a68/>
+<csr-id-09249cbe1d46f4019a1943766b7a7c6ce22d732e/>
+<csr-id-3cf7a30cd115133138bf097b56b81b728756b545/>
+<csr-id-85b6a7180e8aa3f306deed66287ed8abd48c0cff/>
+<csr-id-7b1e93362bce2d88c9af39fbe0e17bb2c71a01ba/>
+<csr-id-76326aa133a1dfd84a14ef987f7275e3f9191476/>
+<csr-id-1e08da2d9a5f5d4e6f8d26f46bc1d95c29f4692d/>
+<csr-id-e6e45a3176369a21c8b7106c97a52644a2d596ce/>
+<csr-id-cd1894501787e76c5590f471b43f7b6b441235ac/>
+<csr-id-d33aed7543af326ca2096b5e675f9a83369741e5/>
+<csr-id-df416375797b65a35055d8746083e522ece2fc57/>
+<csr-id-ff5759efc4a11580d585abe52f4fbe97b44f948e/>
 
 ### Chore
 
@@ -85,8 +97,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 67 commits contributed to the release over the course of 75 calendar days.
- - 86 days passed between releases.
+ - 70 commits contributed to the release over the course of 81 calendar days.
+ - 93 days passed between releases.
  - 56 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' were seen in commit messages
 
@@ -97,6 +109,9 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Clippy ([`ca10f3e`](https://github.com/fiberseq/fibertools-rs/commit/ca10f3eb018e1186f4713e1ce47b2ba777c5ec63))
+    - Paths ([`78e9b44`](https://github.com/fiberseq/fibertools-rs/commit/78e9b448b1ede8a14d02649e8e3360eed6521c3c))
+    - Release fibertools-rs v0.3.6 ([`cf6891e`](https://github.com/fiberseq/fibertools-rs/commit/cf6891e61aaa2f14b382dc10e48214cb0c4e02ae))
     - FIRE extract update ([`7ddcf19`](https://github.com/fiberseq/fibertools-rs/commit/7ddcf19be2814d616b3a337fcfe17944f0c5d1c5))
     - FIRE extract update ([`bfed259`](https://github.com/fiberseq/fibertools-rs/commit/bfed25908b7380f535eaac05d53caa1402a3d097))
     - Adding code outline for footprinting tool ([`c733189`](https://github.com/fiberseq/fibertools-rs/commit/c7331897aaf9ec5b2a574aa07155675b7dee9a68))
