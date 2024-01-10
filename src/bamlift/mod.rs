@@ -20,7 +20,7 @@ where
 /// Normal sort is supposed to be very fast on two sorted lists
 /// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
 /// ```
-/// use bamlift::*;
+/// use fibertools_rs::bamlift::*;
 /// let x = vec![1,3];
 /// let x_q = vec!["a","b"];
 /// let y = vec![2,4];
@@ -76,7 +76,7 @@ pub fn positions_on_complimented_sequence(
 /// get positions on the complimented sequence in the cigar record
 pub fn positions_on_complimented_sequence_in_place(
     record: &bam::Record,
-    input_positions: &mut Vec<i64>,
+    input_positions: &mut [i64],
     part_of_range: bool,
 ) {
     if !record.is_reverse() {
@@ -107,7 +107,7 @@ where
 /// a\[i-1\] <= v < a\[i\]
 /// <https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html>
 /// ```
-/// use bamlift::*;
+/// use fibertools_rs::bamlift::*;
 /// let a = vec![1, 2, 3, 5, 6, 7, 8, 9, 10];
 /// let v = vec![0, 1, 3, 4, 11, 11];
 /// let indexes = search_sorted(&a, &v);
@@ -187,14 +187,14 @@ fn liftover_closest(
             // get the previous closest position
             let (best_r_pos, best_diff) = pos_mapping.get_mut(cur_pos).unwrap();
             // exact match found
-            if cur_pos >= &q_st && cur_pos < &q_en {
+            if cur_pos >= q_st && cur_pos < q_en {
                 let dist_from_start = cur_pos - q_st;
                 *best_diff = 0;
                 *best_r_pos = r_st + dist_from_start;
                 break;
             }
             // we are before the start of the block
-            else if cur_pos < &q_st {
+            else if cur_pos < q_st {
                 let diff = (q_st - cur_pos).abs();
                 if diff < *best_diff {
                     *best_diff = diff;
@@ -202,7 +202,7 @@ fn liftover_closest(
                 }
             }
             // we are past the end of the block
-            else if cur_pos >= &q_en {
+            else if cur_pos >= q_en {
                 let diff = (q_en - cur_pos).abs();
                 if diff < *best_diff {
                     *best_diff = diff;
@@ -237,7 +237,7 @@ pub fn lift_reference_positions(
 
 /// find the closest query positions for a list of reference positions
 pub fn lift_query_positions(
-    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    aligned_block_pairs: &[([i64; 2], [i64; 2])],
     reference_positions: &[i64],
 ) -> Vec<Option<i64>> {
     // if lifting to the query, we need to reverse the pairs
@@ -266,7 +266,7 @@ fn lift_range(
     assert_eq!(ref_starts.len(), ref_ends.len());
     let rtn = ref_starts
         .into_iter()
-        .zip(ref_ends.into_iter())
+        .zip(ref_ends)
         .map(|(start, end)| match (start, end) {
             (Some(start), Some(end)) => {
                 if start == end {

@@ -1,8 +1,8 @@
+use super::bamlift::*;
 use super::basemods::BaseMods;
+use super::bio_io::*;
 use super::center::CenterPosition;
 use super::center::CenteredFiberData;
-use bamlift::*;
-use bio_io::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};

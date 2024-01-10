@@ -1,6 +1,7 @@
 use crate::center::CenterPosition;
 
 use super::bam_writer;
+use super::bio_io;
 use super::cli::FootprintOptions;
 use super::fiber::*;
 use anyhow;

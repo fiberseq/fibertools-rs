@@ -1,6 +1,6 @@
-use bamlift::*;
+use super::bamlift::*;
+use super::bio_io::*;
 use bio::alphabets::dna::revcomp;
-use bio_io::*;
 use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
