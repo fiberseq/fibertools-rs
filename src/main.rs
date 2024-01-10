@@ -177,7 +177,9 @@ pub fn main() -> Result<(), Error> {
             }
             #[cfg(not(feature = "predict"))]
             {
-                log::error!("Predictions are not enabled. Please recompile with the --features predict flag.\nIf installed via bioconda you will not be able to do predictions. Recent size limits on packages prevent me from including the pytorch libraries necessary for predictions in bioconda. Please install via Cargo following the directions here: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
+                log::error!("m6A predictions are not enabled with this install of fibertools.");
+                log::error!("Please recompile with: `--all-features`.");
+                log::error!("If fibertools was installed via bioconda you will not be able to do m6A predictions. Recent size limits on packages prevent us from including the pytorch libraries necessary for predictions within the bioconda install. Please install via Cargo following the directions here: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
                 )
             }
         }
