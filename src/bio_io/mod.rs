@@ -43,8 +43,7 @@ pub fn no_length_progress_bar() -> ProgressBar {
     let bar = ProgressBar::new(0);
     bar.set_style(style);
     let finish = indicatif::ProgressFinish::AndLeave;
-    let bar = bar.with_finish(finish);
-    bar
+    bar.with_finish(finish)
 }
 
 /*
@@ -98,12 +97,12 @@ pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
 
 /// a reader that can read compressed files but also stdin (indicated by -)
 /// ```
-/// use bio_io::buffer_from;
+/// use fibertools_rs::bio_io::buffer_from;
 /// use std::io;
-/// let reader = buffer_from("../tests/data/test.txt.gz").expect("Error: cannot open file");
+/// let reader = buffer_from("tests/data/test.txt.gz").expect("Error: cannot open file");
 /// let msg = io::read_to_string(reader).unwrap();
 /// assert_eq!(msg, "Hello World!\n");
-/// let reader = buffer_from("../tests/data/test.txt").expect("Error: cannot open file");
+/// let reader = buffer_from("tests/data/test.txt").expect("Error: cannot open file");
 /// let msg = io::read_to_string(reader).unwrap();
 /// assert_eq!(msg, "Hello World!\n");
 /// ```
@@ -321,8 +320,9 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
 
 ///```
 /// use rust_htslib::{bam, bam::Read};
+/// use fibertools_rs::bio_io;
 /// use log;
-/// let mut bam = bam::Reader::from_path(&"../tests/data/all.bam").unwrap();
+/// let mut bam = bam::Reader::from_path(&"tests/data/all.bam").unwrap();
 /// for record in bam.records() {
 ///     let record = record.unwrap();
 ///     let n_s = bio_io::get_u32_tag(&record, b"ns");
