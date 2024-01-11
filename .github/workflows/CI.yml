@@ -53,4 +53,4 @@ jobs:
           override: true
 
       - name: Run test
-        run: cargo test -p bio-io -p bamlift -p fibertools-rs -- --test-threads=1
+        run: cargo test -- --test-threads=1

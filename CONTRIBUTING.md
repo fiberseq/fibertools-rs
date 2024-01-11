@@ -1,7 +1,7 @@
 # Contributing to `fibertools-rs`
 Please feel free to open PRs! But first make sure you code passes tests, and please add tests for new features:
 ```bash
-cargo test -p bio-io -p bamlift -p fibertools-rs
+cargo test --all-features
 ```
 Also format your code and check it with clingy:
 ```bash
