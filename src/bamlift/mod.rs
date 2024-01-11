@@ -158,6 +158,7 @@ where
 /// this is a helper function for liftover_closest that should only be called from there
 /// The exception for this is test cases, where it should be easier to test this function
 /// directly.
+#[allow(clippy::all)]
 fn liftover_closest(
     positions: &[i64],
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
@@ -245,6 +246,7 @@ pub fn lift_query_positions(
     liftover_closest(reference_positions, &aligned_block_pairs)
 }
 
+#[allow(clippy::type_complexity)]
 fn lift_range(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     starts: &[i64],
@@ -282,6 +284,7 @@ fn lift_range(
 }
 
 /// Find the closest range but hopefully better
+#[allow(clippy::type_complexity)]
 pub fn lift_query_range(
     record: &bam::Record,
     starts: &[i64],
