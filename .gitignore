@@ -18,3 +18,4 @@ issue_data/**
 flamegraph*
 tests/data/chr20*bam*
 hub.txt
+*test.bam*
