@@ -20,5 +20,6 @@ fn pyft(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<fiberdata::Fiberdata>()?;
     m.add_class::<fiberdata::Basemods>()?;
     m.add_class::<fiberdata::Ranges>()?;
+    m.add_class::<fiberdata::Fiberwriter>()?;
     Ok(())
 }

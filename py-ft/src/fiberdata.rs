@@ -60,6 +60,8 @@ pub struct Fiberdata {
     /// offset for centering the fiber
     #[pyo3(get, set)]
     offset: Option<i64>,
+    /// record
+    fiber: FiberseqData,
 }
 #[pymethods]
 impl Fiberdata {
@@ -121,7 +123,7 @@ impl Fiberdata {
                 strand,
             )
         };
-        let rg = if let Ok(Aux::String(f)) = fiber.record.aux(b"RG") {
+        let rg = if let std::result::Result::Ok(Aux::String(f)) = fiber.record.aux(b"RG") {
             log::trace!("{f}");
             f
         } else {
@@ -129,24 +131,32 @@ impl Fiberdata {
         };
 
         // fiberseq features
-        let m6a = Basemods::new(fiber.m6a.starts, fiber.m6a.reference_starts, fiber.m6a.ml);
-        let cpg = Basemods::new(fiber.cpg.starts, fiber.cpg.reference_starts, fiber.cpg.ml);
+        let m6a = Basemods::new(
+            fiber.m6a.starts.clone(),
+            fiber.m6a.reference_starts.clone(),
+            fiber.m6a.ml.clone(),
+        );
+        let cpg = Basemods::new(
+            fiber.cpg.starts.clone(),
+            fiber.cpg.reference_starts.clone(),
+            fiber.cpg.ml.clone(),
+        );
 
         let nuc = Ranges {
-            starts: fiber.nuc.starts,
-            ends: fiber.nuc.ends,
-            lengths: fiber.nuc.lengths,
-            reference_starts: fiber.nuc.reference_starts,
-            reference_ends: fiber.nuc.reference_ends,
-            reference_lengths: fiber.nuc.reference_lengths,
+            starts: fiber.nuc.starts.clone(),
+            ends: fiber.nuc.ends.clone(),
+            lengths: fiber.nuc.lengths.clone(),
+            reference_starts: fiber.nuc.reference_starts.clone(),
+            reference_ends: fiber.nuc.reference_ends.clone(),
+            reference_lengths: fiber.nuc.reference_lengths.clone(),
         };
         let msp = Ranges {
-            starts: fiber.msp.starts,
-            ends: fiber.msp.ends,
-            lengths: fiber.msp.lengths,
-            reference_starts: fiber.msp.reference_starts,
-            reference_ends: fiber.msp.reference_ends,
-            reference_lengths: fiber.msp.reference_lengths,
+            starts: fiber.msp.starts.clone(),
+            ends: fiber.msp.ends.clone(),
+            lengths: fiber.msp.lengths.clone(),
+            reference_starts: fiber.msp.reference_starts.clone(),
+            reference_ends: fiber.msp.reference_ends.clone(),
+            reference_lengths: fiber.msp.reference_lengths.clone(),
         };
 
         let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();
@@ -168,7 +178,36 @@ impl Fiberdata {
             nuc,
             aligned_block_pairs,
             offset,
+            fiber,
         }
+    }
+}
+
+#[pyclass]
+pub struct Fiberwriter {
+    writer: bam::Writer,
+}
+
+#[pymethods]
+impl Fiberwriter {
+    #[new]
+    pub fn new(output_bam_path: &str, template_bam_path: &str) -> Self {
+        let header = bam::Header::from_template(
+            bam::Reader::from_path(template_bam_path)
+                .expect("unable to open template bam file")
+                .header(),
+        );
+        let writer = bam::Writer::from_path(output_bam_path, &header, bam::Format::Bam)
+            .expect("unable to open output bam file");
+        Self { writer }
+    }
+    /// Write a Fiberdata object to a bam file.
+    #[pyo3(signature = (fiberdata))]
+    pub fn write(&mut self, fiberdata: &Fiberdata) -> PyResult<()> {
+        self.writer
+            .write(&fiberdata.fiber.record)
+            .expect("unable to write record");
+        pyo3::prelude::PyResult::Ok(())
     }
 }
 

@@ -3,6 +3,7 @@ import tqdm
 
 bam_f = "../tests/data/center.bam"
 fiberbam = pyft.Fiberbam(bam_f)
+out_fiberbam = pyft.Fiberwriter("test.bam", bam_f)
 rgn = ["chr1", 15_323_697, 120_000_000]
 for fiber in tqdm.tqdm(fiberbam.fetch(*rgn)):
     # the number of ccs passes
@@ -15,6 +16,8 @@ for fiber in tqdm.tqdm(fiberbam.fetch(*rgn)):
     fiber.lift_query_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     # lift reference positions to query (fiber) positions
     fiber.lift_reference_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    out_fiberbam.write(fiber)
 
 
 for fiber in fiberbam.center(rgn[0], start=rgn[1], end=rgn[2], strand="-"):
