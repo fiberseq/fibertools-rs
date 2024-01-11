@@ -1,9 +1,10 @@
 import pyft
 import tqdm
 
-bam_f = "../tests/data/tmp.chr20.bam"
+bam_f = "../tests/data/center.bam"
 fiberbam = pyft.Fiberbam(bam_f)
-for fiber in tqdm.tqdm(fiberbam.fetch("chr20", 10_000_000, 12_000_000)):
+rgn = ["chr1", 15_323_697, 120_000_000]
+for fiber in tqdm.tqdm(fiberbam.fetch(*rgn)):
     # the number of ccs passes
     fiber.ec
     # the mps start positions
@@ -16,7 +17,7 @@ for fiber in tqdm.tqdm(fiberbam.fetch("chr20", 10_000_000, 12_000_000)):
     fiber.lift_reference_positions([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
 
-for fiber in fiberbam.center("chr20", start=20_000_000, end=20_000_001, strand="-"):
+for fiber in fiberbam.center(rgn[0], start=rgn[1], end=rgn[2], strand="-"):
     # returns the same fiber object as above; however, all the positions have been modified to be relative to the region fetched
     # print(fiber.msp.reference_starts)
     continue

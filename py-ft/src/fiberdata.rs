@@ -1,10 +1,11 @@
+use fibertools_rs::bamlift;
+//use fibertools_rs::bio_io;
 use fibertools_rs::fiber::FiberseqData;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
 use std::time;
 use std::vec::IntoIter;
-
 #[pyclass]
 /// Class for fiberseq data. This class corresponds to a single record in the bam file.
 pub struct Fiberdata {
