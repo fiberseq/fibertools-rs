@@ -9,11 +9,9 @@ name = "pyft"
 
 [dependencies]
 anyhow = "1.0.58"
-bamlift = {path = "../bamlift"}
-bio-io = {path = "../bio-io"}
 colored = "2.0.0"
 env_logger = "0.10"
-fibertools-rs = {path = "../", default-features = false}
+fibertools-rs = {path = "../"}
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
