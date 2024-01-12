@@ -40,7 +40,6 @@ impl FiberMods {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-
 pub struct Ranges {
     pub starts: Vec<Option<i64>>,
     pub ends: Vec<Option<i64>>,
