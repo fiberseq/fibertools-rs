@@ -22,11 +22,11 @@ impl Ranges {
         forward_ends: Option<Vec<i64>>,
         mut lengths: Option<Vec<i64>>,
     ) -> Self {
-        let mut do_exact_liftover = false;
+        let mut single_bp_liftover = false;
         // assume ends == starts if not provided
         if forward_ends.is_none() && lengths.is_none() {
             lengths = Some(vec![1; forward_starts.len()]);
-            //do_exact_liftover = true;
+            single_bp_liftover = true;
         }
 
         // use ends or calculate them
@@ -64,8 +64,8 @@ impl Ranges {
             .map(|(&x, &y)| Some(y - x))
             .collect::<Vec<_>>();
 
-        let (reference_starts, reference_ends, reference_lengths) = if do_exact_liftover {
-            lift_query_range_exact(record, &starts, &ends)
+        let (reference_starts, reference_ends, reference_lengths) = if single_bp_liftover {
+            lift_query_range_exact(record, &starts, &starts)
         } else {
             lift_query_range(record, &starts, &ends)
         };
@@ -142,14 +142,6 @@ impl Ranges {
         let mut z = self.get_starts();
         Self::positions_on_aligned_sequence(&mut z, self.reverse, self.seq_len);
         z
-    }
-
-    pub fn get_forward_ends(&self) -> Vec<i64> {
-        let mut forward: Vec<i64> = self.get_ends();
-        if self.reverse {
-            forward.reverse();
-        }
-        forward
     }
 
     pub fn get_forward_quals(&self) -> Vec<u8> {
