@@ -1,13 +1,9 @@
-use crate::CPG_COLOR;
-use crate::LINKER_COLOR;
-use crate::M6A_COLOR;
-use crate::NUC_COLOR;
-
-use super::bamlift::*;
+use super::bamranges::*;
 use super::basemods::BaseMods;
 use super::bio_io::*;
 use super::center::CenterPosition;
 use super::center::CenteredFiberData;
+use super::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
@@ -36,143 +32,6 @@ impl FiberMods {
             ml,
         };
         (m6a, cpg)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Ranges {
-    pub starts: Vec<Option<i64>>,
-    pub ends: Vec<Option<i64>>,
-    pub lengths: Vec<Option<i64>>,
-    pub qual: Vec<u8>,
-    pub reference_starts: Vec<Option<i64>>,
-    pub reference_ends: Vec<Option<i64>>,
-    pub reference_lengths: Vec<Option<i64>>,
-    reverse: bool,
-}
-
-impl Ranges {
-    pub fn new(
-        record: &bam::Record,
-        mut starts: Vec<i64>,
-        ends: Option<Vec<i64>>,
-        lengths: Option<Vec<i64>>,
-    ) -> Self {
-        if ends.is_none() && lengths.is_none() {
-            panic!("Must provide either ends or lengths");
-        }
-        // use ends or calculate them
-        let mut ends = match ends {
-            Some(x) => x,
-            None => starts
-                .iter()
-                .zip(lengths.unwrap().iter())
-                .map(|(&x, &y)| x + y)
-                .collect::<Vec<_>>(),
-        };
-
-        // get positions and lengths in reference orientation
-        positions_on_complimented_sequence_in_place(record, &mut starts, true);
-        positions_on_complimented_sequence_in_place(record, &mut ends, true);
-        // swaps starts and ends if we reverse complemented
-        if record.is_reverse() {
-            std::mem::swap(&mut starts, &mut ends);
-        }
-        // get lengths
-        let lengths = starts
-            .iter()
-            .zip(ends.iter())
-            .map(|(&x, &y)| Some(y - x))
-            .collect::<Vec<_>>();
-
-        let (reference_starts, reference_ends, reference_lengths) =
-            lift_query_range(record, &starts, &ends);
-        Ranges {
-            starts: starts.into_iter().map(Some).collect(),
-            ends: ends.into_iter().map(Some).collect(),
-            lengths,
-            qual: vec![0; reference_starts.len()],
-            reference_starts,
-            reference_ends,
-            reference_lengths,
-            reverse: record.is_reverse(),
-        }
-    }
-
-    pub fn set_qual(&mut self, qual: Vec<u8>) {
-        assert_eq!(qual.len(), self.starts.len());
-        self.qual = qual;
-        if self.reverse {
-            self.qual.reverse();
-        }
-    }
-
-    pub fn get_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.starts
-            .iter()
-            .zip(self.ends.iter())
-            .zip(self.lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.reference_starts
-            .iter()
-            .zip(self.reference_ends.iter())
-            .zip(self.reference_lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-impl<'a> IntoIterator for &'a Ranges {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
-    type IntoIter = RangesIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        RangesIterator {
-            row: self,
-            index: 0,
-        }
-    }
-}
-
-pub struct RangesIterator<'a> {
-    row: &'a Ranges,
-    index: usize,
-}
-
-impl<'a> Iterator for RangesIterator<'a> {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.row.starts.len() {
-            return None;
-        }
-        let start = self.row.starts[self.index]?;
-        let end = self.row.ends[self.index]?;
-        let length = self.row.lengths[self.index]?;
-        let reference_start = self.row.reference_starts[self.index];
-        let reference_end = self.row.reference_ends[self.index];
-        let reference_length = self.row.reference_lengths[self.index];
-        let reference = match (reference_start, reference_end, reference_length) {
-            (Some(s), Some(e), Some(l)) => Some((s, e, l)),
-            _ => None,
-        };
-        self.index += 1;
-        Some((start, end, length, reference))
     }
 }
 

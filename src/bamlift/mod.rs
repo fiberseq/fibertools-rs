@@ -1,7 +1,6 @@
 use itertools::multiunzip;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::collections::HashMap;
-use std::fmt::{Debug, Display};
 
 /// Merge two lists into a sorted list
 /// Normal sort is supposed to be very fast on two sorted lists
@@ -54,101 +53,12 @@ where
     x
 }
 
-/// get positions on the complimented sequence in the cigar record
-pub fn positions_on_complimented_sequence(
-    record: &bam::Record,
-    input_positions: &[i64],
-) -> Vec<i64> {
-    // reverse positions if needed
-    let positions: Vec<i64> = if record.is_reverse() {
-        let seq_len = i64::try_from(record.seq_len()).unwrap();
-        input_positions
-            .iter()
-            .rev()
-            .map(|p| seq_len - p - 1)
-            .collect()
-    } else {
-        input_positions.to_vec()
-    };
-    positions
-}
-
-/// get positions on the complimented sequence in the cigar record
-pub fn positions_on_complimented_sequence_in_place(
-    record: &bam::Record,
-    input_positions: &mut [i64],
-    part_of_range: bool,
-) {
-    if !record.is_reverse() {
-        return;
-    }
-    let seq_len = i64::try_from(record.seq_len()).unwrap();
-    // need to correct for going from [) to (] if we are part of a range
-    let offset = if part_of_range { 0 } else { 1 };
-    for p in input_positions.iter_mut() {
-        *p = seq_len - *p - offset;
-    }
-    input_positions.reverse();
-}
-
 #[inline(always)]
 pub fn is_sorted<T>(v: &[T]) -> bool
 where
     T: Ord,
 {
     v.windows(2).all(|w| w[0] <= w[1])
-}
-
-/// search a sorted array for insertions positions of another sorted array
-/// returned index i satisfies
-/// left
-/// a\[i-1\] < v <= a\[i\]
-/// right
-/// a\[i-1\] <= v < a\[i\]
-/// <https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html>
-/// ```
-/// use fibertools_rs::bamlift::*;
-/// let a = vec![1, 2, 3, 5, 6, 7, 8, 9, 10];
-/// let v = vec![0, 1, 3, 4, 11, 11];
-/// let indexes = search_sorted(&a, &v);
-/// assert_eq!(indexes, vec![0, 0, 2, 3, 9, 9]);
-/// ```
-pub fn search_sorted<T>(a: &[T], v: &[T]) -> Vec<usize>
-where
-    T: Ord,
-    T: Display,
-    [T]: Debug,
-{
-    if !is_sorted(v) {
-        panic!("v is not sorted: {:?}", v);
-    }
-
-    let mut indexes = Vec::with_capacity(v.len());
-    let mut a_idx = 0;
-    for cur_v in v {
-        while a_idx < a.len() {
-            // check starting condition
-            if a_idx == 0 && *cur_v <= a[a_idx] {
-                indexes.push(0);
-                break;
-            } else if a_idx == 0 {
-                a_idx += 1;
-            }
-            // end condition
-            if a_idx == a.len() - 1 && *cur_v > a[a_idx] {
-                indexes.push(a_idx + 1);
-                break;
-            }
-            // middle of the array
-            else if (a[a_idx - 1] < *cur_v) && (*cur_v <= a[a_idx]) {
-                indexes.push(a_idx);
-                break;
-            }
-            a_idx += 1;
-        }
-    }
-    log::trace!("search_sorted: {:?}\n{:?}", v, indexes);
-    indexes
 }
 
 //
@@ -377,4 +287,62 @@ pub fn lift_query_positions_exact(
         let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
         liftover_exact(&aligned_block_pairs, reference_positions, true)
     }
+}
+
+#[allow(clippy::type_complexity)]
+fn lift_range_exact(
+    record: &bam::Record,
+    starts: &[i64],
+    ends: &[i64],
+    lift_reference_to_query: bool,
+) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+    assert_eq!(starts.len(), ends.len());
+    let (ref_starts, ref_ends) = if !lift_reference_to_query {
+        (
+            lift_reference_positions_exact(record, starts),
+            lift_reference_positions_exact(record, ends),
+        )
+    } else {
+        (
+            lift_query_positions_exact(record, starts),
+            lift_query_positions_exact(record, ends),
+        )
+    };
+    assert_eq!(ref_starts.len(), ref_ends.len());
+    let rtn = ref_starts
+        .into_iter()
+        .zip(ref_ends)
+        .map(|(start, end)| match (start, end) {
+            (Some(start), Some(end)) => {
+                if start == end {
+                    //(None, None, None)
+                    (Some(start), Some(end), Some(end - start))
+                } else {
+                    (Some(start), Some(end), Some(end - start))
+                }
+            }
+            _ => (None, None, None),
+        })
+        .collect::<Vec<_>>();
+    multiunzip(rtn)
+}
+
+/// Find the exact range in the reference from a query range
+#[allow(clippy::type_complexity)]
+pub fn lift_query_range_exact(
+    record: &bam::Record,
+    starts: &[i64],
+    ends: &[i64],
+) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+    lift_range_exact(record, starts, ends, false)
+}
+
+/// Find the exact range in the query from a reference range
+#[allow(clippy::type_complexity)]
+pub fn lift_reference_range_exact(
+    record: &bam::Record,
+    starts: &[i64],
+    ends: &[i64],
+) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+    lift_range_exact(record, starts, ends, true)
 }

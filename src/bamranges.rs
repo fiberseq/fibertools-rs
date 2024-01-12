@@ -1,0 +1,217 @@
+use super::bamlift::*;
+use rust_htslib::bam;
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct Ranges {
+    pub starts: Vec<Option<i64>>,
+    pub ends: Vec<Option<i64>>,
+    pub lengths: Vec<Option<i64>>,
+    pub qual: Vec<u8>,
+    pub reference_starts: Vec<Option<i64>>,
+    pub reference_ends: Vec<Option<i64>>,
+    pub reference_lengths: Vec<Option<i64>>,
+    pub seq_len: i64,
+    reverse: bool,
+}
+
+impl Ranges {
+    /// starts and ends are [) intervals.
+    pub fn new(
+        record: &bam::Record,
+        mut forward_starts: Vec<i64>,
+        forward_ends: Option<Vec<i64>>,
+        mut lengths: Option<Vec<i64>>,
+    ) -> Self {
+        let mut do_exact_liftover = false;
+        // assume ends == starts if not provided
+        if forward_ends.is_none() && lengths.is_none() {
+            lengths = Some(vec![1; forward_starts.len()]);
+            //do_exact_liftover = true;
+        }
+
+        // use ends or calculate them
+        let mut forward_ends_inclusive: Vec<i64> = match forward_ends {
+            Some(x) => x.into_iter().map(|x| x + 1).collect(),
+            None => forward_starts
+                .iter()
+                .zip(lengths.unwrap().iter())
+                .map(|(&x, &y)| x + y - 1)
+                .collect(),
+        };
+
+        // bam features for finding aligned positions
+        let is_reverse = record.is_reverse();
+        let seq_len = i64::try_from(record.seq_len()).unwrap();
+
+        // get positions and lengths in reference orientation
+        Self::positions_on_aligned_sequence(&mut forward_starts, is_reverse, seq_len);
+        Self::positions_on_aligned_sequence(&mut forward_ends_inclusive, is_reverse, seq_len);
+        let mut starts = forward_starts;
+        let mut ends = forward_ends_inclusive;
+
+        // swaps starts and ends if we reverse complemented
+        if record.is_reverse() {
+            std::mem::swap(&mut starts, &mut ends);
+        }
+
+        // swap back to non-inclusive ends
+        ends = ends.into_iter().map(|x| x + 1).collect();
+
+        // get lengths
+        let lengths = starts
+            .iter()
+            .zip(ends.iter())
+            .map(|(&x, &y)| Some(y - x))
+            .collect::<Vec<_>>();
+
+        let (reference_starts, reference_ends, reference_lengths) = if do_exact_liftover {
+            lift_query_range_exact(record, &starts, &ends)
+        } else {
+            lift_query_range(record, &starts, &ends)
+        };
+
+        // return object
+        Ranges {
+            starts: starts.into_iter().map(Some).collect(),
+            ends: ends.into_iter().map(Some).collect(),
+            lengths,
+            qual: vec![0; reference_starts.len()],
+            reference_starts,
+            reference_ends,
+            reference_lengths,
+            seq_len,
+            reverse: is_reverse,
+        }
+    }
+
+    pub fn set_qual(&mut self, qual: Vec<u8>) {
+        assert_eq!(qual.len(), self.starts.len());
+        self.qual = qual;
+        if self.reverse {
+            self.qual.reverse();
+        }
+    }
+
+    /// get positions on the complimented sequence in the cigar record
+    fn positions_on_aligned_sequence(input_positions: &mut [i64], is_reverse: bool, seq_len: i64) {
+        if !is_reverse {
+            return;
+        }
+        //need to correct for going from [) to (] if we are part of a range
+        for p in input_positions.iter_mut() {
+            *p = seq_len - *p - 1;
+        }
+        input_positions.reverse();
+    }
+
+    /// get the molecular coordinates of the ranges, taking into account
+    /// the alignment orientation
+    pub fn get_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
+        self.starts
+            .iter()
+            .zip(self.ends.iter())
+            .zip(self.lengths.iter())
+            .map(|((s, e), l)| {
+                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
+                    Some((*s, *e, *l))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_starts(&self) -> Vec<i64> {
+        self.starts.clone().into_iter().flatten().collect()
+    }
+
+    pub fn get_ends(&self) -> Vec<i64> {
+        self.ends.clone().into_iter().flatten().collect()
+    }
+
+    /// get the molecular coordinates of the ranges prior to alignment
+    pub fn get_forward_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
+        let mut forward = self.get_molecular();
+        if self.reverse {
+            forward.reverse();
+        }
+        forward
+    }
+
+    pub fn get_forward_starts(&self) -> Vec<i64> {
+        let mut z = self.get_starts();
+        Self::positions_on_aligned_sequence(&mut z, self.reverse, self.seq_len);
+        z
+    }
+
+    pub fn get_forward_ends(&self) -> Vec<i64> {
+        let mut forward: Vec<i64> = self.get_ends();
+        if self.reverse {
+            forward.reverse();
+        }
+        forward
+    }
+
+    pub fn get_forward_quals(&self) -> Vec<u8> {
+        let mut forward = self.qual.clone();
+        if self.reverse {
+            forward.reverse();
+        }
+        forward
+    }
+
+    /// get the reference coordinates of the ranges, taking into account
+    /// the alignment orientation
+    pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {
+        self.reference_starts
+            .iter()
+            .zip(self.reference_ends.iter())
+            .zip(self.reference_lengths.iter())
+            .map(|((s, e), l)| {
+                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
+                    Some((*s, *e, *l))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a Ranges {
+    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    type IntoIter = RangesIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        RangesIterator {
+            row: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct RangesIterator<'a> {
+    row: &'a Ranges,
+    index: usize,
+}
+
+impl<'a> Iterator for RangesIterator<'a> {
+    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.row.starts.len() {
+            return None;
+        }
+        let start = self.row.starts[self.index]?;
+        let end = self.row.ends[self.index]?;
+        let length = self.row.lengths[self.index]?;
+        let reference_start = self.row.reference_starts[self.index];
+        let reference_end = self.row.reference_ends[self.index];
+        let reference_length = self.row.reference_lengths[self.index];
+        let reference = match (reference_start, reference_end, reference_length) {
+            (Some(s), Some(e), Some(l)) => Some((s, e, l)),
+            _ => None,
+        };
+        self.index += 1;
+        Some((start, end, length, reference))
+    }
+}

@@ -30,6 +30,8 @@ pub mod bamlift;
 
 pub mod bio_io;
 
+pub mod bamranges;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]
