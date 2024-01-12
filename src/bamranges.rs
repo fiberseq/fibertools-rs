@@ -1,4 +1,5 @@
 use super::bamlift::*;
+use itertools::{izip, multiunzip};
 use rust_htslib::bam;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
@@ -167,6 +168,68 @@ impl Ranges {
                 }
             })
             .collect()
+    }
+
+    pub fn merge_ranges(multiple_ranges: Vec<Self>) -> Self {
+        assert!(multiple_ranges.len() > 0);
+        // check properties that must be the same
+        let reverse = multiple_ranges[0].reverse;
+        let seq_len = multiple_ranges[0].seq_len;
+        for r in multiple_ranges.iter() {
+            assert_eq!(r.reverse, reverse);
+            assert_eq!(r.seq_len, seq_len);
+        }
+        // get the other properties
+        let starts = multiple_ranges.iter().flat_map(|r| r.starts.clone());
+        let ends = multiple_ranges.iter().flat_map(|r| r.ends.clone());
+        let lengths = multiple_ranges.iter().flat_map(|r| r.lengths.clone());
+        let qual = multiple_ranges.iter().flat_map(|r| r.qual.clone());
+        let reference_starts = multiple_ranges
+            .iter()
+            .flat_map(|r| r.reference_starts.clone());
+        let reference_ends = multiple_ranges
+            .iter()
+            .flat_map(|r| r.reference_ends.clone());
+        let reference_lengths = multiple_ranges
+            .iter()
+            .flat_map(|r| r.reference_lengths.clone());
+
+        let mut combo: Vec<(
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            u8,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+        )> = izip!(
+            starts,
+            ends,
+            lengths,
+            qual,
+            reference_starts,
+            reference_ends,
+            reference_lengths
+        )
+        .into_iter()
+        .collect();
+        // sort by start position
+        combo.sort_by_key(|(s, _e, _l, _q, _r_s, _r_e, _r_l)| *s);
+        // unzip
+        let (starts, ends, lengths, qual, reference_starts, reference_ends, reference_lengths) =
+            multiunzip(combo);
+
+        Self {
+            starts,
+            ends,
+            lengths,
+            qual,
+            reference_starts,
+            reference_ends,
+            reference_lengths,
+            seq_len,
+            reverse,
+        }
     }
 }
 
