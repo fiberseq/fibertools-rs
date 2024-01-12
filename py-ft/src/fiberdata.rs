@@ -134,12 +134,12 @@ impl Fiberdata {
         let m6a = Basemods::new(
             fiber.m6a.starts.clone(),
             fiber.m6a.reference_starts.clone(),
-            fiber.m6a.ml.clone(),
+            fiber.m6a.qual.clone(),
         );
         let cpg = Basemods::new(
             fiber.cpg.starts.clone(),
             fiber.cpg.reference_starts.clone(),
-            fiber.cpg.ml.clone(),
+            fiber.cpg.qual.clone(),
         );
 
         let nuc = Ranges {
