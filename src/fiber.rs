@@ -10,33 +10,6 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Hea
 use std::collections::HashMap;
 use std::fmt::Write;
 
-/*
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FiberMods {
-    pub starts: Vec<Option<i64>>,
-    pub reference_starts: Vec<Option<i64>>,
-    pub ml: Vec<u8>,
-}
-
-impl FiberMods {
-    pub fn new(all_basemods: &BaseMods) -> (Self, Self) {
-        let (starts, reference_starts, ml) = all_basemods.m6a();
-        let m6a = Self {
-            starts: starts.into_iter().map(Some).collect(),
-            reference_starts,
-            ml,
-        };
-        let (starts, reference_starts, ml) = all_basemods.cpg();
-        let cpg = Self {
-            starts: starts.into_iter().map(Some).collect(),
-            reference_starts,
-            ml,
-        };
-        (m6a, cpg)
-    }
-}
-*/
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
