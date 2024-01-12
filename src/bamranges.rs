@@ -144,6 +144,29 @@ impl Ranges {
         forward
     }
 
+    pub fn to_strings(&self, reference: bool, skip_none: bool) -> Vec<String> {
+        let (s, e, l, q) = if reference {
+            (
+                &self.reference_starts,
+                &self.reference_ends,
+                &self.reference_lengths,
+                &self.qual,
+            )
+        } else {
+            (&self.starts, &self.ends, &self.lengths, &self.qual)
+        };
+
+        let s = super::join_by_str_option_can_skip(s, ",", skip_none);
+        let e = super::join_by_str_option_can_skip(e, ",", skip_none);
+        let l = super::join_by_str_option_can_skip(l, ",", skip_none);
+        if reference {
+            vec![s, e, l]
+        } else {
+            let q = super::join_by_str(q, ",");
+            vec![s, e, l, q]
+        }
+    }
+
     /// get the reference coordinates of the ranges, taking into account
     /// the alignment orientation
     pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {

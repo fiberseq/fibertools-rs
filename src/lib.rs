@@ -89,6 +89,24 @@ pub fn join_by_str_option(vals: &[Option<i64>], sep: &str) -> String {
         .collect()
 }
 
+/// join a vector with commas
+pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: bool) -> String {
+    vals.iter()
+        .map(|v| match v {
+            Some(v) => v.to_string(),
+            None => {
+                if skip_none {
+                    String::from("")
+                } else {
+                    String::from("NA")
+                }
+            }
+        })
+        .filter(|v| !v.is_empty())
+        .map(|v| v + sep)
+        .collect()
+}
+
 pub struct FiberOut {
     pub m6a: Option<Box<dyn Write>>,
     pub cpg: Option<Box<dyn Write>>,
