@@ -313,14 +313,7 @@ fn lift_range_exact(
         .into_iter()
         .zip(ref_ends)
         .map(|(start, end)| match (start, end) {
-            (Some(start), Some(end)) => {
-                if start == end {
-                    //(None, None, None)
-                    (Some(start), Some(end), Some(end - start))
-                } else {
-                    (Some(start), Some(end), Some(end - start))
-                }
-            }
+            (Some(start), Some(end)) => (Some(start), Some(end), Some(end - start)),
             _ => (None, None, None),
         })
         .collect::<Vec<_>>();

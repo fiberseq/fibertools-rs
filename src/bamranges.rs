@@ -171,7 +171,7 @@ impl Ranges {
     }
 
     pub fn merge_ranges(multiple_ranges: Vec<Self>) -> Self {
-        assert!(multiple_ranges.len() > 0);
+        assert!(!multiple_ranges.is_empty());
         // check properties that must be the same
         let reverse = multiple_ranges[0].reverse;
         let seq_len = multiple_ranges[0].seq_len;
@@ -194,6 +194,7 @@ impl Ranges {
             .iter()
             .flat_map(|r| r.reference_lengths.clone());
 
+        #[allow(clippy::type_complexity)]
         let mut combo: Vec<(
             Option<i64>,
             Option<i64>,
@@ -211,7 +212,6 @@ impl Ranges {
             reference_ends,
             reference_lengths
         )
-        .into_iter()
         .collect();
         // sort by start position
         combo.sort_by_key(|(s, _e, _l, _q, _r_s, _r_e, _r_l)| *s);
