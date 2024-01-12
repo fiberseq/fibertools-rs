@@ -45,6 +45,23 @@ pub const LONG_VERSION: &str = env!("CARGO_LONG_VERSION");
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:>35.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
 
+/// COLORS
+pub const NUC_COLOR: &str = "169,169,169";
+pub const M6A_COLOR: &str = "128,0,128";
+pub const CPG_COLOR: &str = "139,69,19";
+pub const LINKER_COLOR: &str = "147,112,219";
+pub const FIRE_COLORS: [(f32, &str); 9] = [
+    (1.0, "139,0,0"),
+    (2.0, "175,0,0"),
+    (3.0, "200,0,0"),
+    (4.0, "225,0,0"),
+    (5.0, "255,0,0"),
+    (10.0, "255,140,0"),
+    (25.0, "225,225,0"),
+    (100.0, LINKER_COLOR),
+    (200.0, NUC_COLOR),
+];
+
 /// unzip a vector of tuples
 pub fn unzip_to_vectors<T, U>(vec: Vec<(T, U)>) -> (Vec<T>, Vec<U>) {
     vec.into_iter().unzip()
