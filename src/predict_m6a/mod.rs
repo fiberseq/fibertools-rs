@@ -495,7 +495,9 @@ pub fn predict_m6a_on_records(
         // write the ml and mm tags
         cur_basemods.add_mm_and_ml_tags(record);
 
-        let modified_bases_forward = cur_basemods.forward_m6a().0;
+        //let modified_bases_forward = cur_basemods.forward_m6a().0;
+        let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
+
         // adding the nucleosomes
         nucleosomes::add_nucleosomes_to_record(
             record,

@@ -10,6 +10,7 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Hea
 use std::collections::HashMap;
 use std::fmt::Write;
 
+/*
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FiberMods {
     pub starts: Vec<Option<i64>>,
@@ -34,14 +35,15 @@ impl FiberMods {
         (m6a, cpg)
     }
 }
+*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
     pub msp: Ranges,
     pub nuc: Ranges,
-    pub m6a: FiberMods,
-    pub cpg: FiberMods,
+    pub m6a: Ranges,
+    pub cpg: Ranges,
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
@@ -86,7 +88,9 @@ impl FiberseqData {
 
         // get fiberseq basemods
         let base_mods = BaseMods::new(&record, min_ml_score);
-        let (m6a, cpg) = FiberMods::new(&base_mods);
+        //let (m6a, cpg) = FiberMods::new(&base_mods);
+        let m6a = base_mods.m6a();
+        let cpg = base_mods.cpg();
 
         FiberseqData {
             record,
@@ -242,8 +246,8 @@ impl FiberseqData {
         );
         // correct orientations
         if center_position.strand == '-' {
-            new.m6a.ml.reverse();
-            new.cpg.ml.reverse();
+            new.m6a.qual.reverse();
+            new.cpg.qual.reverse();
             new.msp.lengths.reverse();
             new.msp.reference_lengths.reverse();
             new.msp.qual.reverse();
@@ -463,9 +467,9 @@ impl FiberseqData {
 
         // get the info
         let m6a_count = self.m6a.starts.len();
-        let m6a_qual = self.m6a.ml.iter().map(|a| Some(*a as i64)).collect();
+        let m6a_qual = self.m6a.qual.iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = self.cpg.starts.len();
-        let cpg_qual = self.cpg.ml.iter().map(|a| Some(*a as i64)).collect();
+        let cpg_qual = self.cpg.qual.iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);

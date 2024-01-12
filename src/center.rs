@@ -160,9 +160,9 @@ impl CenteredFiberData {
         if self.reference {
             (
                 &self.fiber.m6a.reference_starts,
-                &self.fiber.m6a.ml,
+                &self.fiber.m6a.qual,
                 &self.fiber.cpg.reference_starts,
-                &self.fiber.cpg.ml,
+                &self.fiber.cpg.qual,
                 &self.fiber.nuc.reference_starts,
                 &self.fiber.nuc.reference_ends,
                 &self.fiber.msp.reference_starts,
@@ -171,9 +171,9 @@ impl CenteredFiberData {
         } else {
             (
                 &self.fiber.m6a.starts,
-                &self.fiber.m6a.ml,
+                &self.fiber.m6a.qual,
                 &self.fiber.cpg.starts,
-                &self.fiber.cpg.ml,
+                &self.fiber.cpg.qual,
                 &self.fiber.nuc.starts,
                 &self.fiber.nuc.ends,
                 &self.fiber.msp.starts,

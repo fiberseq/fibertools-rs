@@ -130,15 +130,6 @@ impl Ranges {
         self.ends.clone().into_iter().flatten().collect()
     }
 
-    /// get the molecular coordinates of the ranges prior to alignment
-    pub fn get_forward_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
-        let mut forward = self.get_molecular();
-        if self.reverse {
-            forward.reverse();
-        }
-        forward
-    }
-
     pub fn get_forward_starts(&self) -> Vec<i64> {
         let mut z = self.get_starts();
         Self::positions_on_aligned_sequence(&mut z, self.reverse, self.seq_len);
@@ -170,8 +161,20 @@ impl Ranges {
             .collect()
     }
 
-    pub fn merge_ranges(multiple_ranges: Vec<Self>) -> Self {
-        assert!(!multiple_ranges.is_empty());
+    pub fn merge_ranges(multiple_ranges: Vec<&Self>) -> Self {
+        if multiple_ranges.is_empty() {
+            return Self {
+                starts: vec![],
+                ends: vec![],
+                lengths: vec![],
+                qual: vec![],
+                reference_starts: vec![],
+                reference_ends: vec![],
+                reference_lengths: vec![],
+                seq_len: 0,
+                reverse: false,
+            };
+        }
         // check properties that must be the same
         let reverse = multiple_ranges[0].reverse;
         let seq_len = multiple_ranges[0].seq_len;

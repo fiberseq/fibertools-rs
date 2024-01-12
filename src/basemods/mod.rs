@@ -1,7 +1,6 @@
 use super::bamranges::*;
 use super::bio_io::*;
 use bio::alphabets::dna::revcomp;
-use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_htslib::{
@@ -11,11 +10,6 @@ use rust_htslib::{
 use std::collections::HashMap;
 
 use std::convert::TryFrom;
-
-pub enum FiberModTypes {
-    M6A,
-    CPG,
-}
 
 #[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
 pub struct BaseMod {
@@ -237,65 +231,26 @@ impl BaseMods {
         self.base_mods.retain(|bm| !bm.is_cpg());
     }
 
-    fn helper_get_basemods(
-        &self,
-        forward: bool,
-        fiber_mod_type: FiberModTypes,
-    ) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        let bm: Vec<&BaseMod> = match fiber_mod_type {
-            FiberModTypes::M6A => self.base_mods.iter().filter(|x| x.is_m6a()).collect(),
-            FiberModTypes::CPG => self.base_mods.iter().filter(|x| x.is_cpg()).collect(),
-        };
-
-        // skip if no basemods
-        if bm.is_empty() {
-            return (vec![], vec![], vec![]);
-        }
-
-        // molecule positions
-        let bm_pos: Vec<i64> = if forward {
-            bm.iter()
-                .flat_map(|x| x.ranges.get_forward_starts())
-                .collect()
-        } else {
-            bm.iter().flat_map(|x| x.ranges.get_starts()).collect()
-        };
-        // reference positions
-        let bm_ref: Vec<Option<i64>> = bm
+    /// combine the forward and reverse m6a data
+    pub fn m6a(&self) -> Ranges {
+        let ranges = self
+            .base_mods
             .iter()
-            .flat_map(|x| x.ranges.reference_starts.clone())
+            .filter(|x| x.is_m6a())
+            .map(|x| &x.ranges)
             .collect();
-
-        // quality values
-        let bm_qual: Vec<u8> = if forward {
-            bm.iter()
-                .flat_map(|x| x.ranges.get_forward_quals())
-                .collect()
-        } else {
-            bm.iter().flat_map(|x| x.ranges.qual.clone()).collect()
-        };
-
-        assert_eq!(bm_pos.len(), bm_ref.len());
-        assert_eq!(bm_ref.len(), bm_qual.len());
-        let mut z: Vec<(i64, Option<i64>, u8)> = izip!(bm_pos, bm_ref, bm_qual).collect();
-        z.sort_by_key(|(p, _r, _q)| *p);
-        multiunzip(z)
+        Ranges::merge_ranges(ranges)
     }
 
-    pub fn m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(false, FiberModTypes::M6A)
-    }
-
-    pub fn forward_m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(true, FiberModTypes::M6A)
-    }
-
-    pub fn cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(false, FiberModTypes::CPG)
-    }
-
-    pub fn forward_cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(true, FiberModTypes::CPG)
+    /// combine the forward and reverse cpd/5mc data
+    pub fn cpg(&self) -> Ranges {
+        let ranges = self
+            .base_mods
+            .iter()
+            .filter(|x| x.is_cpg())
+            .map(|x| &x.ranges)
+            .collect();
+        Ranges::merge_ranges(ranges)
     }
 
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
