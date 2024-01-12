@@ -1,3 +1,8 @@
+use crate::CPG_COLOR;
+use crate::LINKER_COLOR;
+use crate::M6A_COLOR;
+use crate::NUC_COLOR;
+
 use super::bamlift::*;
 use super::basemods::BaseMods;
 use super::bio_io::*;
@@ -396,7 +401,6 @@ impl FiberseqData {
     //  WRITE BED12 FUNCTIONS
     //
     pub fn write_msp(&self, reference: bool) -> String {
-        let color = "255,0,255";
         let (starts, _ends, lengths) = if reference {
             (
                 &self.msp.reference_starts,
@@ -406,11 +410,10 @@ impl FiberseqData {
         } else {
             (&self.msp.starts, &self.msp.ends, &self.msp.lengths)
         };
-        self.to_bed12(reference, starts, lengths, color)
+        self.to_bed12(reference, starts, lengths, LINKER_COLOR)
     }
 
     pub fn write_nuc(&self, reference: bool) -> String {
-        let color = "169,169,169";
         let (starts, _ends, lengths) = if reference {
             (
                 &self.nuc.reference_starts,
@@ -420,29 +423,27 @@ impl FiberseqData {
         } else {
             (&self.nuc.starts, &self.nuc.ends, &self.nuc.lengths)
         };
-        self.to_bed12(reference, starts, lengths, color)
+        self.to_bed12(reference, starts, lengths, NUC_COLOR)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
-        let color = "128,0,128";
         let starts = if reference {
             &self.m6a.reference_starts
         } else {
             &self.m6a.starts
         };
         let lengths = vec![Some(1); starts.len()];
-        self.to_bed12(reference, starts, &lengths, color)
+        self.to_bed12(reference, starts, &lengths, M6A_COLOR)
     }
 
     pub fn write_cpg(&self, reference: bool) -> String {
-        let color = "139,69,19";
         let starts = if reference {
             &self.cpg.reference_starts
         } else {
             &self.cpg.starts
         };
         let lengths = vec![Some(1); starts.len()];
-        self.to_bed12(reference, starts, &lengths, color)
+        self.to_bed12(reference, starts, &lengths, CPG_COLOR)
     }
 
     pub fn to_bed12(
