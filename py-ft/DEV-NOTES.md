@@ -6,3 +6,7 @@ source .env/bin/activate
 #maturin develop
 #maturin publish
 ```
+
+
+# Remote pip install of dev branch
+pip install -e 'git+https://github.com/fiberseq/fibertools-rs.git@refactor#egg=pyft&subdirectory=py-ft'
