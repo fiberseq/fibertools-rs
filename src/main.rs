@@ -68,59 +68,16 @@ pub fn main() -> Result<(), Error> {
         .unwrap();
 
     match &args.command {
-        Some(Commands::Extract {
-            bam,
-            reference,
-            molecular: _molecular,
-            simplify,
-            quality,
-            min_ml_score,
-            m6a,
-            cpg,
-            msp,
-            nuc,
-            all,
-            full_float,
-        }) => {
-            let out_files = FiberOut::new(
-                m6a,
-                cpg,
-                msp,
-                nuc,
-                all,
-                *reference,
-                *simplify,
-                *quality,
-                *min_ml_score,
-                *full_float,
-            )?;
-
+        Some(Commands::Extract(extract_opts)) => {
             // read in the bam from stdin or from a file
-            let mut bam = bam_reader(bam, args.threads);
-            extract::extract_contained(&mut bam, out_files);
+            let mut bam = bam_reader(&extract_opts.bam, args.threads);
+            extract::extract_contained(&mut bam, extract_opts);
         }
-        Some(Commands::Center {
-            bam,
-            bed,
-            min_ml_score,
-            dist,
-            wide,
-            reference,
-            simplify,
-        }) => {
+        Some(Commands::Center(center_opts)) => {
             // read in the bam from stdin or from a file
-            let mut bam = bam::IndexedReader::from_path(bam)?;
+            let mut bam = bam::IndexedReader::from_path(center_opts.bam.clone())?;
             bam.set_threads(args.threads).unwrap();
-            let center_positions = center::read_center_positions(bed)?;
-            center::center_fiberdata(
-                &mut bam,
-                center_positions,
-                *min_ml_score,
-                *wide,
-                *dist,
-                *reference,
-                *simplify,
-            );
+            center::center_fiberdata(center_opts, &mut bam)?;
         }
         #[allow(unused)]
         Some(Commands::PredictM6A {

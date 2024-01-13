@@ -1,3 +1,5 @@
+use crate::cli::CenterOptions;
+
 use super::fiber::FiberseqData;
 use super::*;
 use bamlift::*;
@@ -345,21 +347,18 @@ pub fn center(
 }
 
 pub fn center_fiberdata(
+    center_opts: &CenterOptions,
     bam: &mut bam::IndexedReader,
-    center_positions: Vec<CenterPosition>,
-    min_ml_score: u8,
-    wide: bool,
-    dist: Option<i64>,
-    reference: bool,
-    simplify: bool,
-) {
+) -> anyhow::Result<()> {
+    let center_positions = center::read_center_positions(&center_opts.bed)?;
+
     // header needed for the contig name...
     let header = bam::Header::from_template(bam.header());
     let header_view = bam::HeaderView::from_header(&header);
     //
     let mut buffer = bio_io::writer("-").unwrap();
 
-    if wide {
+    if center_opts.wide {
         bio_io::write_to_file(&CenteredFiberData::header(), &mut buffer);
     } else {
         bio_io::write_to_file(&CenteredFiberData::long_header(), &mut buffer);
@@ -391,17 +390,18 @@ pub fn center_fiberdata(
             records,
             &header_view,
             center_position,
-            min_ml_score,
-            wide,
-            dist,
-            reference,
-            simplify,
+            center_opts.min_ml_score,
+            center_opts.wide,
+            center_opts.dist,
+            center_opts.reference,
+            center_opts.simplify,
             &mut buffer,
         );
         pb.inc(1);
     }
     buffer.flush().unwrap();
     pb.finish_with_message("\ndone");
+    Ok(())
 }
 
 pub fn read_center_positions(infile: &str) -> io::Result<Vec<CenterPosition>> {
