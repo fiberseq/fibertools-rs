@@ -539,7 +539,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
-        for recs in &FiberseqRecords::new(&mut bam, 0).chunks(500) {
+        for recs in &FiberseqRecords::new(&mut bam, 0).chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
