@@ -73,71 +73,7 @@ pub struct Cli {
 pub enum Commands {
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
     #[clap(visible_aliases = &["m6A", "m6a"])]
-    PredictM6A {
-        /// Bam HiFi file with kinetics
-        #[clap(default_value = "-")]
-        bam: String,
-        /// Output bam file with m6A calls in new/extended MM and ML bam tags
-        #[clap(default_value = "-")]
-        out: String,
-        /// Minium nucleosome length
-        #[clap(short, long, default_value = NUC_LEN)]
-        nucleosome_length: i64,
-        /// Minium nucleosome length when combining over a single m6A
-        #[clap(short, long, default_value = COMBO_NUC_LEN)]
-        combined_nucleosome_length: i64,
-        /// Minium distance needed to add to an already existing nuc by crossing an m6a
-        #[clap(long, default_value = MIN_DIST_ADDED)]
-        min_distance_added: i64,
-        /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-        #[clap(short, long, default_value = DIST_FROM_END)]
-        distance_from_end: i64,
-        /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
-        #[clap(long, default_value = ALLOWED_SKIPS, hide = true)]
-        allowed_m6a_skips: i64,
-        /// Keep hifi kinetics data
-        #[clap(short, long)]
-        keep: bool,
-        /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
-        #[clap(short, long, help_heading = "Developer-Options")]
-        min_ml_score: Option<u8>,
-        /// Keep all m6A calls regardless of how low the ML value is
-        #[clap(short, long, help_heading = "Developer-Options")]
-        all_calls: bool,
-        /// Use the XGBoost model for prediction
-        #[clap(long, help_heading = "Developer-Options")]
-        xgb: bool,
-        /// Use the CNN model for prediction
-        #[clap(long, help_heading = "Developer-Options")]
-        cnn: bool,
-        /// Use the semi-supervised CNN model for prediction [default: true]
-        #[clap(
-            short,
-            long,
-            default_value_ifs([
-                ("cnn", "true", "false"),
-                ("xgb", "false", "true"),
-            ]),
-            help_heading = "Developer-Options",
-        )]
-        semi: bool,
-        /// Add a bam tag (mp) with the full floating point predictions of the ML model
-        ///
-        /// For debugging only.
-        #[clap(short, long, help_heading = "Developer-Options")]
-        full_float: bool,
-        /// Number of reads to include in batch prediction
-        ///
-        /// Increasing improves GPU performance at the cost of memory.
-        #[clap(
-            short,
-            long,
-            default_value = "1",
-            default_value_if("cnn", "true", "1"),
-            help_heading = "Developer-Options"
-        )]
-        batch_size: usize,
-    },
+    PredictM6A(PredictM6AOptions),
     /// Add nucleosomes to a bam file with m6a predictions
     AddNucleosomes(AddNucleosomeOptions),
     /// Add FIREs (Fiber-seq Inferred Regulatory Elements) to a bam file with m6a predictions
@@ -199,6 +135,73 @@ pub fn make_cli_parse() -> Cli {
 
 pub fn make_cli_app() -> Command {
     Cli::command()
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct PredictM6AOptions {
+    /// Bam HiFi file with kinetics
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output bam file with m6A calls in new/extended MM and ML bam tags
+    #[clap(default_value = "-")]
+    pub out: String,
+    /// Minium nucleosome length
+    #[clap(short, long, default_value = NUC_LEN)]
+    pub nucleosome_length: i64,
+    /// Minium nucleosome length when combining over a single m6A
+    #[clap(short, long, default_value = COMBO_NUC_LEN)]
+    pub combined_nucleosome_length: i64,
+    /// Minium distance needed to add to an already existing nuc by crossing an m6a
+    #[clap(long, default_value = MIN_DIST_ADDED)]
+    pub min_distance_added: i64,
+    /// Minimum distance from the end of a fiber to call a nucleosome or MSP
+    #[clap(short, long, default_value = DIST_FROM_END)]
+    pub distance_from_end: i64,
+    /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
+    #[clap(long, default_value = ALLOWED_SKIPS, hide = true)]
+    pub allowed_m6a_skips: i64,
+    /// Keep hifi kinetics data
+    #[clap(short, long)]
+    pub keep: bool,
+    /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
+    #[clap(short, long, help_heading = "Developer-Options")]
+    pub min_ml_score: Option<u8>,
+    /// Keep all m6A calls regardless of how low the ML value is
+    #[clap(short, long, help_heading = "Developer-Options")]
+    pub all_calls: bool,
+    /// Use the XGBoost model for prediction
+    #[clap(long, help_heading = "Developer-Options")]
+    pub xgb: bool,
+    /// Use the CNN model for prediction
+    #[clap(long, help_heading = "Developer-Options")]
+    pub cnn: bool,
+    /// Use the semi-supervised CNN model for prediction [default: true]
+    #[clap(
+          short,
+          long,
+          default_value_ifs([
+              ("cnn", "true", "false"),
+              ("xgb", "false", "true"),
+          ]),
+          help_heading = "Developer-Options",
+      )]
+    pub semi: bool,
+    /// Add a bam tag (mp) with the full floating point predictions of the ML model
+    ///
+    /// For debugging only.
+    #[clap(short, long, help_heading = "Developer-Options")]
+    pub full_float: bool,
+    /// Number of reads to include in batch prediction
+    ///
+    /// Increasing improves GPU performance at the cost of memory.
+    #[clap(
+        short,
+        long,
+        default_value = "1",
+        default_value_if("cnn", "true", "1"),
+        help_heading = "Developer-Options"
+    )]
+    pub batch_size: usize,
 }
 
 #[derive(Args, Debug, PartialEq, Eq)]

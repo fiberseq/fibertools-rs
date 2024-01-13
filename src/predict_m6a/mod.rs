@@ -2,7 +2,7 @@ use super::*;
 use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use bio_io;
-use cli;
+use cli::PredictM6AOptions;
 use nucleosomes;
 use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
@@ -43,7 +43,7 @@ impl PredictOptions {
     pub fn new(
         keep: bool,
         _xgb: bool,
-        cnn: bool,
+        mut cnn: bool,
         semi: bool,
         full_float: bool,
         min_ml_score: Option<u8>,
@@ -52,6 +52,9 @@ impl PredictOptions {
         batch_size: usize,
         nuc_opts: cli::AddNucleosomeOptions,
     ) -> Self {
+        if semi {
+            cnn = true;
+        }
         // set up a precision table
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
@@ -538,8 +541,41 @@ fn _fake_apply_model(_: &[f32], count: usize, _: &PredictOptions) -> Vec<f32> {
 pub fn read_bam_into_fiberdata(
     bam: &mut bam::Reader,
     out: &mut bam::Writer,
-    predict_options: &PredictOptions,
+    predict_options: &PredictM6AOptions,
 ) {
+    let header = bam::Header::from_template(bam.header());
+    // log the options
+    log::info!(
+        "{} reads included at once in batch prediction.",
+        predict_options.batch_size
+    );
+
+    // set up nuc options
+    let nuc_opts = super::cli::AddNucleosomeOptions {
+        bam: "-".to_string(),
+        out: "-".to_string(),
+        nucleosome_length: predict_options.nucleosome_length,
+        combined_nucleosome_length: predict_options.combined_nucleosome_length,
+        min_distance_added: predict_options.min_distance_added,
+        distance_from_end: predict_options.distance_from_end,
+        allowed_m6a_skips: predict_options.allowed_m6a_skips,
+        min_ml_score: 0,
+    };
+
+    // switch to the internal predict options
+    let predict_options = PredictOptions::new(
+        predict_options.keep,
+        false,
+        predict_options.cnn,
+        predict_options.semi,
+        predict_options.full_float,
+        predict_options.min_ml_score,
+        predict_options.all_calls,
+        find_pb_polymerase(&header),
+        predict_options.batch_size,
+        nuc_opts,
+    );
+
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
@@ -550,7 +586,7 @@ pub fn read_bam_into_fiberdata(
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
-            .map(|recs| predict_m6a_on_records(recs, predict_options))
+            .map(|recs| predict_m6a_on_records(recs, &predict_options))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;

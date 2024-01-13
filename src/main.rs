@@ -3,7 +3,6 @@ use bio_io::*;
 use colored::Colorize;
 use env_logger::{Builder, Target};
 #[cfg(feature = "predict")]
-use fibertools_rs::predict_m6a::PredictOptions;
 use fibertools_rs::*;
 use fibertools_rs::{cli::Commands, nucleosomes::add_nucleosomes_to_bam};
 use log::LevelFilter;
@@ -80,57 +79,12 @@ pub fn main() -> Result<(), Error> {
             center::center_fiberdata(center_opts, &mut bam)?;
         }
         #[allow(unused)]
-        Some(Commands::PredictM6A {
-            bam,
-            out,
-            nucleosome_length,
-            combined_nucleosome_length,
-            min_distance_added,
-            distance_from_end,
-            allowed_m6a_skips,
-            keep,
-            min_ml_score,
-            all_calls,
-            xgb,
-            cnn,
-            semi,
-            full_float,
-            batch_size,
-        }) => {
-            //check_torch_env_vars()?;
+        Some(Commands::PredictM6A(predict_m6a_opts)) => {
             #[cfg(feature = "predict")]
             {
-                // cnn must be set to true if using semi
-                let cnn = if *semi { &true } else { cnn };
-                // read bam
-                let mut bam = bam_reader(bam, args.threads);
-                let header = bam::Header::from_template(bam.header());
-                let mut out = bam_writer(out, &bam, args.threads);
-                // set up options
-                let nuc_opts = fibertools_rs::cli::AddNucleosomeOptions {
-                    bam: "-".to_string(),
-                    out: "-".to_string(),
-                    nucleosome_length: *nucleosome_length,
-                    combined_nucleosome_length: *combined_nucleosome_length,
-                    min_distance_added: *min_distance_added,
-                    distance_from_end: *distance_from_end,
-                    allowed_m6a_skips: *allowed_m6a_skips,
-                    min_ml_score: 0,
-                };
-                let predict_options = PredictOptions::new(
-                    *keep,
-                    *xgb,
-                    *cnn,
-                    *semi,
-                    *full_float,
-                    *min_ml_score,
-                    *all_calls,
-                    find_pb_polymerase(&header),
-                    *batch_size,
-                    nuc_opts,
-                );
-                log::info!("{} reads included at once in batch prediction.", batch_size);
-                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+                let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
+                let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
+                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
             }
             #[cfg(not(feature = "predict"))]
             {
