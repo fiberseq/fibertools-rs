@@ -88,6 +88,8 @@ pub enum Commands {
     ///  See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output.
     #[clap(visible_aliases = &["c", "ct"])]
     Center(CenterOptions),
+    /// Make decorated bed files for fiberseq data
+    TrackDecorators(DecoratorOptions),
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics {
         /// Bam HiFi file with kinetics
@@ -109,8 +111,6 @@ pub enum Commands {
         /// base modification to strip out of the bam file
         basemod: String,
     },
-    /// Make decorated bed files for fiberseq data
-    TrackDecorators(DecoratorOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions {
