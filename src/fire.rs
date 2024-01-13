@@ -417,6 +417,7 @@ impl<'a> FireFeats<'a> {
             gbdt_data.push(d);
         }
         let predictions_without_short_ones = gbdt_model.predict(&gbdt_data);
+
         // convert predictions to precision values, restoring empty windows
         let mut precisions = Vec::with_capacity(count);
         let mut cur_pos = 0;
@@ -488,6 +489,28 @@ impl MapPrecisionValues {
     }
 }
 
+pub fn add_fire_to_rec(
+    rec: &mut FiberseqData,
+    fire_opts: &FireOptions,
+    model: &GBDT,
+    precision_table: &MapPrecisionValues,
+) {
+    if fire_opts.skip_no_m6a && rec.m6a.starts.is_empty() {
+        return;
+    }
+    let fire_feats = FireFeats::new(rec, fire_opts);
+    let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
+    if rec.record.is_reverse() {
+        precisions.reverse();
+    }
+    let aux_array: AuxArray<u8> = (&precisions).into();
+    let aux_array_field = Aux::ArrayU8(aux_array);
+    rec.record
+        .push_aux(b"aq", aux_array_field)
+        .expect("Cannot add FIRE precision to bam");
+    log::trace!("precisions: {:?}", precisions);
+}
+
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     let (model, precision_table) = get_model(fire_opts);
     let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
@@ -502,10 +525,8 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
                 first = false;
             }
             let chunk: Vec<FiberseqData> = chunk.collect();
-            let feats: Vec<FireFeats> = chunk
-                .par_iter()
-                .map(|r| FireFeats::new(r, fire_opts))
-                .collect();
+            let feats: Vec<FireFeats> =
+                chunk.iter().map(|r| FireFeats::new(r, fire_opts)).collect();
             feats.iter().for_each(|f| {
                 f.dump_fire_feats(&mut out_buffer).unwrap();
             });
@@ -518,22 +539,14 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
-        for mut rec in FiberseqRecords::new(&mut bam, 0) {
-            if fire_opts.skip_no_m6a && rec.m6a.starts.is_empty() {
-                continue;
+        for recs in &FiberseqRecords::new(&mut bam, 0).chunks(500) {
+            let mut recs: Vec<FiberseqData> = recs.collect();
+            recs.par_iter_mut().for_each(|r| {
+                add_fire_to_rec(r, fire_opts, &model, &precision_table);
+            });
+            for rec in recs {
+                out.write(&rec.record)?;
             }
-            let fire_feats = FireFeats::new(&rec, fire_opts);
-            let mut precisions = fire_feats.predict_with_xgb(&model, &precision_table);
-            if rec.record.is_reverse() {
-                precisions.reverse();
-            }
-            let aux_array: AuxArray<u8> = (&precisions).into();
-            let aux_array_field = Aux::ArrayU8(aux_array);
-            rec.record
-                .push_aux(b"aq", aux_array_field)
-                .expect("Cannot add FIRE precision to bam");
-            log::trace!("precisions: {:?}", precisions);
-            out.write(&rec.record)?;
         }
     }
     Ok(())
