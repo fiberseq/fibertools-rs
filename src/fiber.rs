@@ -1,188 +1,22 @@
-use crate::CPG_COLOR;
-use crate::LINKER_COLOR;
-use crate::M6A_COLOR;
-use crate::NUC_COLOR;
-
-use super::bamlift::*;
+use super::bamranges::*;
 use super::basemods::BaseMods;
 use super::bio_io::*;
 use super::center::CenterPosition;
 use super::center::CenteredFiberData;
+use super::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
 use std::collections::HashMap;
 use std::fmt::Write;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FiberMods {
-    pub starts: Vec<Option<i64>>,
-    pub reference_starts: Vec<Option<i64>>,
-    pub ml: Vec<u8>,
-}
-
-impl FiberMods {
-    pub fn new(all_basemods: &BaseMods) -> (Self, Self) {
-        let (starts, reference_starts, ml) = all_basemods.m6a();
-        let m6a = Self {
-            starts: starts.into_iter().map(Some).collect(),
-            reference_starts,
-            ml,
-        };
-        let (starts, reference_starts, ml) = all_basemods.cpg();
-        let cpg = Self {
-            starts: starts.into_iter().map(Some).collect(),
-            reference_starts,
-            ml,
-        };
-        (m6a, cpg)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Ranges {
-    pub starts: Vec<Option<i64>>,
-    pub ends: Vec<Option<i64>>,
-    pub lengths: Vec<Option<i64>>,
-    pub qual: Vec<u8>,
-    pub reference_starts: Vec<Option<i64>>,
-    pub reference_ends: Vec<Option<i64>>,
-    pub reference_lengths: Vec<Option<i64>>,
-    reverse: bool,
-}
-
-impl Ranges {
-    pub fn new(
-        record: &bam::Record,
-        mut starts: Vec<i64>,
-        ends: Option<Vec<i64>>,
-        lengths: Option<Vec<i64>>,
-    ) -> Self {
-        if ends.is_none() && lengths.is_none() {
-            panic!("Must provide either ends or lengths");
-        }
-        // use ends or calculate them
-        let mut ends = match ends {
-            Some(x) => x,
-            None => starts
-                .iter()
-                .zip(lengths.unwrap().iter())
-                .map(|(&x, &y)| x + y)
-                .collect::<Vec<_>>(),
-        };
-
-        // get positions and lengths in reference orientation
-        positions_on_complimented_sequence_in_place(record, &mut starts, true);
-        positions_on_complimented_sequence_in_place(record, &mut ends, true);
-        // swaps starts and ends if we reverse complemented
-        if record.is_reverse() {
-            std::mem::swap(&mut starts, &mut ends);
-        }
-        // get lengths
-        let lengths = starts
-            .iter()
-            .zip(ends.iter())
-            .map(|(&x, &y)| Some(y - x))
-            .collect::<Vec<_>>();
-
-        let (reference_starts, reference_ends, reference_lengths) =
-            lift_query_range(record, &starts, &ends);
-        Ranges {
-            starts: starts.into_iter().map(Some).collect(),
-            ends: ends.into_iter().map(Some).collect(),
-            lengths,
-            qual: vec![0; reference_starts.len()],
-            reference_starts,
-            reference_ends,
-            reference_lengths,
-            reverse: record.is_reverse(),
-        }
-    }
-
-    pub fn set_qual(&mut self, qual: Vec<u8>) {
-        assert_eq!(qual.len(), self.starts.len());
-        self.qual = qual;
-        if self.reverse {
-            self.qual.reverse();
-        }
-    }
-
-    pub fn get_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.starts
-            .iter()
-            .zip(self.ends.iter())
-            .zip(self.lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.reference_starts
-            .iter()
-            .zip(self.reference_ends.iter())
-            .zip(self.reference_lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-impl<'a> IntoIterator for &'a Ranges {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
-    type IntoIter = RangesIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        RangesIterator {
-            row: self,
-            index: 0,
-        }
-    }
-}
-
-pub struct RangesIterator<'a> {
-    row: &'a Ranges,
-    index: usize,
-}
-
-impl<'a> Iterator for RangesIterator<'a> {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.row.starts.len() {
-            return None;
-        }
-        let start = self.row.starts[self.index]?;
-        let end = self.row.ends[self.index]?;
-        let length = self.row.lengths[self.index]?;
-        let reference_start = self.row.reference_starts[self.index];
-        let reference_end = self.row.reference_ends[self.index];
-        let reference_length = self.row.reference_lengths[self.index];
-        let reference = match (reference_start, reference_end, reference_length) {
-            (Some(s), Some(e), Some(l)) => Some((s, e, l)),
-            _ => None,
-        };
-        self.index += 1;
-        Some((start, end, length, reference))
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
     pub msp: Ranges,
     pub nuc: Ranges,
-    pub m6a: FiberMods,
-    pub cpg: FiberMods,
+    pub m6a: Ranges,
+    pub cpg: Ranges,
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
@@ -227,7 +61,9 @@ impl FiberseqData {
 
         // get fiberseq basemods
         let base_mods = BaseMods::new(&record, min_ml_score);
-        let (m6a, cpg) = FiberMods::new(&base_mods);
+        //let (m6a, cpg) = FiberMods::new(&base_mods);
+        let m6a = base_mods.m6a();
+        let cpg = base_mods.cpg();
 
         FiberseqData {
             record,
@@ -383,8 +219,8 @@ impl FiberseqData {
         );
         // correct orientations
         if center_position.strand == '-' {
-            new.m6a.ml.reverse();
-            new.cpg.ml.reverse();
+            new.m6a.qual.reverse();
+            new.cpg.qual.reverse();
             new.msp.lengths.reverse();
             new.msp.reference_lengths.reverse();
             new.msp.qual.reverse();
@@ -604,9 +440,9 @@ impl FiberseqData {
 
         // get the info
         let m6a_count = self.m6a.starts.len();
-        let m6a_qual = self.m6a.ml.iter().map(|a| Some(*a as i64)).collect();
+        let m6a_qual = self.m6a.qual.iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = self.cpg.starts.len();
-        let cpg_qual = self.cpg.ml.iter().map(|a| Some(*a as i64)).collect();
+        let cpg_qual = self.cpg.qual.iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);

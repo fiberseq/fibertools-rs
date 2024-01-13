@@ -56,7 +56,12 @@ fn test_many_msps() {
         );
          */
         for msp in msps {
-            assert!(m6a.contains(&&msp), "{}", msp);
+            assert!(
+                m6a.contains(&&msp),
+                "{}\nreverse:{}",
+                msp,
+                fiber_data.record.is_reverse()
+            );
         }
     }
 }

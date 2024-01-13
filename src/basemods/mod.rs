@@ -1,7 +1,6 @@
-use super::bamlift::*;
+use super::bamranges::*;
 use super::bio_io::*;
 use bio::alphabets::dna::revcomp;
-use itertools::{izip, multiunzip};
 use lazy_static::lazy_static;
 use regex::Regex;
 use rust_htslib::{
@@ -12,21 +11,13 @@ use std::collections::HashMap;
 
 use std::convert::TryFrom;
 
-pub enum FiberModTypes {
-    M6A,
-    CPG,
-}
-
 #[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
 pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
-    record_is_reverse: bool,
-    modified_bases: Vec<i64>,
-    modified_bases_forward: Vec<i64>,
-    modified_probabilities: Vec<u8>,
-    reference_positions: Vec<Option<i64>>,
+    pub ranges: Ranges,
+    pub record_is_reverse: bool,
 }
 
 impl BaseMod {
@@ -38,52 +29,18 @@ impl BaseMod {
         modified_bases_forward: Vec<i64>,
         modified_probabilities_forward: Vec<u8>,
     ) -> Self {
-        let modified_bases = positions_on_complimented_sequence(record, &modified_bases_forward);
-
-        // rev qualities if needed
-        let modified_probabilities = if record.is_reverse() {
-            modified_probabilities_forward.into_iter().rev().collect()
-        } else {
-            modified_probabilities_forward
-        };
-
+        let tmp = modified_bases_forward.clone();
+        let mut ranges = Ranges::new(record, modified_bases_forward, None, None);
+        ranges.set_qual(modified_probabilities_forward);
         let record_is_reverse = record.is_reverse();
-
-        // get the reference positions
-        let reference_positions = lift_reference_positions_exact(record, &modified_bases);
+        //assert_eq!(tmp, ranges.get_starts(), "starts not equal");
+        assert_eq!(tmp, ranges.get_forward_starts(), "forward starts not equal");
         Self {
             modified_base,
             strand,
             modification_type,
+            ranges,
             record_is_reverse,
-            modified_bases,
-            modified_bases_forward,
-            modified_probabilities,
-            reference_positions,
-        }
-    }
-
-    pub fn get_reference_positions(&self) -> Vec<Option<i64>> {
-        self.reference_positions.clone()
-    }
-
-    pub fn get_modified_bases(&self) -> Vec<i64> {
-        self.modified_bases.clone()
-    }
-
-    pub fn get_modified_bases_forward(&self) -> Vec<i64> {
-        self.modified_bases_forward.clone()
-    }
-
-    pub fn get_modified_probabilities(&self) -> Vec<u8> {
-        self.modified_probabilities.clone()
-    }
-
-    pub fn get_modified_probabilities_forward(&self) -> Vec<u8> {
-        if self.record_is_reverse {
-            self.modified_probabilities.iter().rev().cloned().collect()
-        } else {
-            self.modified_probabilities.clone()
         }
     }
 
@@ -168,7 +125,13 @@ impl BaseMods {
                     cur_seq_idx += 1;
                 }
                 // assert that we extract the same number of modifications as we have distances
-                assert_eq!(cur_mod_idx, mod_dists.len());
+                assert_eq!(
+                    cur_mod_idx,
+                    mod_dists.len(),
+                    "{:?} {}",
+                    String::from_utf8_lossy(record.qname()),
+                    record.is_reverse()
+                );
 
                 // check for the probability of modification.
                 let num_mods_cur_end = num_mods_seen + unfiltered_modified_positions.len();
@@ -268,59 +231,26 @@ impl BaseMods {
         self.base_mods.retain(|bm| !bm.is_cpg());
     }
 
-    fn helper_get_basemods(
-        &self,
-        forward: bool,
-        fiber_mod_type: FiberModTypes,
-    ) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        let bm: Vec<&BaseMod> = match fiber_mod_type {
-            FiberModTypes::M6A => self.base_mods.iter().filter(|x| x.is_m6a()).collect(),
-            FiberModTypes::CPG => self.base_mods.iter().filter(|x| x.is_cpg()).collect(),
-        };
-
-        // skip if no basemods
-        if bm.is_empty() {
-            return (vec![], vec![], vec![]);
-        }
-
-        let bm_pos: Vec<i64> = if forward {
-            bm.iter()
-                .flat_map(|x| x.get_modified_bases_forward())
-                .collect()
-        } else {
-            bm.iter().flat_map(|x| x.get_modified_bases()).collect()
-        };
-
-        let bm_ref: Vec<Option<i64>> = bm
+    /// combine the forward and reverse m6a data
+    pub fn m6a(&self) -> Ranges {
+        let ranges = self
+            .base_mods
             .iter()
-            .flat_map(|x| x.get_reference_positions())
+            .filter(|x| x.is_m6a())
+            .map(|x| &x.ranges)
             .collect();
-        let bm_qual: Vec<u8> = bm
+        Ranges::merge_ranges(ranges)
+    }
+
+    /// combine the forward and reverse cpd/5mc data
+    pub fn cpg(&self) -> Ranges {
+        let ranges = self
+            .base_mods
             .iter()
-            .flat_map(|x| x.get_modified_probabilities())
+            .filter(|x| x.is_cpg())
+            .map(|x| &x.ranges)
             .collect();
-
-        assert_eq!(bm_pos.len(), bm_ref.len());
-        assert_eq!(bm_ref.len(), bm_qual.len());
-        let mut z: Vec<(i64, Option<i64>, u8)> = izip!(bm_pos, bm_ref, bm_qual).collect();
-        z.sort_by_key(|(p, _r, _q)| *p);
-        multiunzip(z)
-    }
-
-    pub fn m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(false, FiberModTypes::M6A)
-    }
-
-    pub fn forward_m6a(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(true, FiberModTypes::M6A)
-    }
-
-    pub fn cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(false, FiberModTypes::CPG)
-    }
-
-    pub fn forward_cpg(&self) -> (Vec<i64>, Vec<Option<i64>>, Vec<u8>) {
-        self.helper_get_basemods(true, FiberModTypes::CPG)
+        Ranges::merge_ranges(ranges)
     }
 
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
@@ -337,10 +267,10 @@ impl BaseMods {
         // add to the ml and mm tag.
         for basemod in self.base_mods.iter() {
             // adding quality values (ML)
-            ml_tag.extend(basemod.get_modified_probabilities_forward());
+            ml_tag.extend(basemod.ranges.get_forward_quals());
             // get MM tag values
             let mut cur_mm = vec![];
-            let positions = basemod.get_modified_bases_forward();
+            let positions = basemod.ranges.get_forward_starts();
             let mut last_pos = 0;
             for pos in positions {
                 let u_pos = pos as usize;

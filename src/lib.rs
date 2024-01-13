@@ -30,6 +30,8 @@ pub mod bamlift;
 
 pub mod bio_io;
 
+pub mod bamranges;
+
 use anyhow::Result;
 use bio_io::*;
 #[cfg(feature = "predict")]
@@ -87,72 +89,22 @@ pub fn join_by_str_option(vals: &[Option<i64>], sep: &str) -> String {
         .collect()
 }
 
-pub struct FiberOut {
-    pub m6a: Option<Box<dyn Write>>,
-    pub cpg: Option<Box<dyn Write>>,
-    pub msp: Option<Box<dyn Write>>,
-    pub nuc: Option<Box<dyn Write>>,
-    pub all: Option<Box<dyn Write>>,
-    pub reference: bool,
-    pub simplify: bool,
-    pub quality: bool,
-    pub min_ml_score: u8,
-    pub full_float: bool,
-}
-
-impl FiberOut {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        m6a: &Option<String>,
-        cpg: &Option<String>,
-        msp: &Option<String>,
-        nuc: &Option<String>,
-        all: &Option<String>,
-        reference: bool,
-        simplify: bool,
-        quality: bool,
-        min_ml_score: u8,
-        full_float: bool,
-    ) -> Result<Self> {
-        let m6a = match m6a {
-            Some(m6a) => Some(writer(m6a)?),
-            None => None,
-        };
-        let cpg = match cpg {
-            Some(cpg) => Some(writer(cpg)?),
-            None => None,
-        };
-        let msp = match msp {
-            Some(msp) => Some(writer(msp)?),
-            None => None,
-        };
-        let nuc = match nuc {
-            Some(nuc) => Some(writer(nuc)?),
-            None => None,
-        };
-        let all = match all {
-            Some(all) => Some(writer(all)?),
-            None => None,
-        };
-        // set to zero
-        let mut min_ml_score = min_ml_score;
-        if full_float {
-            min_ml_score = 0;
-        }
-
-        Ok(FiberOut {
-            m6a,
-            cpg,
-            msp,
-            nuc,
-            all,
-            reference,
-            simplify,
-            quality,
-            min_ml_score,
-            full_float,
+/// join a vector with commas
+pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: bool) -> String {
+    vals.iter()
+        .map(|v| match v {
+            Some(v) => v.to_string(),
+            None => {
+                if skip_none {
+                    String::from("")
+                } else {
+                    String::from("NA")
+                }
+            }
         })
-    }
+        .filter(|v| !v.is_empty())
+        .map(|v| v + sep)
+        .collect()
 }
 
 /// clear kinetics from a hifi bam

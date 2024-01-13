@@ -2,35 +2,12 @@ use anyhow::{bail, Error, Ok, Result};
 use bio_io::*;
 use colored::Colorize;
 use env_logger::{Builder, Target};
-#[cfg(feature = "predict")]
-use fibertools_rs::predict_m6a::PredictOptions;
+use fibertools_rs::cli::*;
+use fibertools_rs::nucleosomes::add_nucleosomes_to_bam;
 use fibertools_rs::*;
-use fibertools_rs::{cli::Commands, nucleosomes::add_nucleosomes_to_bam};
 use log::LevelFilter;
 use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
-/*
-use std::path::Path;
-// TODO FINISH THIS CHECK
-pub fn yank_check() {
-    let config = cargo::util::Config::default().unwrap();
-    //let build = config.build_config().unwrap();
-    let cur_exe_path = config.cargo_exe().unwrap();
-    log::warn!("{:?}", config.cargo_exe());
-    let sid = cargo::core::SourceId::for_path(cur_exe_path).unwrap();
-    log::warn!("{:?}", config.registry_source_path());
-    let _ws = cargo::core::Workspace::new(
-        Path::new("/Users/mrvollger/Desktop/repos/fibertools-rs/Cargo.toml"),
-        &config,
-    )
-    .unwrap();
-
-    let pkg = cargo::core::package_id::PackageId::new("fibertools-rs", "0.0.8", sid).unwrap();
-    log::warn!("{:?}", pkg);
-    let src_map = cargo::core::source::SourceMap::new();
-    let _pkg_set = cargo::core::package::PackageSet::new(&[pkg], src_map, &config).unwrap();
-}
-*/
 
 pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
@@ -68,112 +45,24 @@ pub fn main() -> Result<(), Error> {
         .unwrap();
 
     match &args.command {
-        Some(Commands::Extract {
-            bam,
-            reference,
-            molecular: _molecular,
-            simplify,
-            quality,
-            min_ml_score,
-            m6a,
-            cpg,
-            msp,
-            nuc,
-            all,
-            full_float,
-        }) => {
-            let out_files = FiberOut::new(
-                m6a,
-                cpg,
-                msp,
-                nuc,
-                all,
-                *reference,
-                *simplify,
-                *quality,
-                *min_ml_score,
-                *full_float,
-            )?;
-
+        Some(Commands::Extract(extract_opts)) => {
             // read in the bam from stdin or from a file
-            let mut bam = bam_reader(bam, args.threads);
-            extract::extract_contained(&mut bam, out_files);
+            let mut bam = bam_reader(&extract_opts.bam, args.threads);
+            extract::extract_contained(&mut bam, extract_opts);
         }
-        Some(Commands::Center {
-            bam,
-            bed,
-            min_ml_score,
-            dist,
-            wide,
-            reference,
-            simplify,
-        }) => {
+        Some(Commands::Center(center_opts)) => {
             // read in the bam from stdin or from a file
-            let mut bam = bam::IndexedReader::from_path(bam)?;
+            let mut bam = bam::IndexedReader::from_path(center_opts.bam.clone())?;
             bam.set_threads(args.threads).unwrap();
-            let center_positions = center::read_center_positions(bed)?;
-            center::center_fiberdata(
-                &mut bam,
-                center_positions,
-                *min_ml_score,
-                *wide,
-                *dist,
-                *reference,
-                *simplify,
-            );
+            center::center_fiberdata(center_opts, &mut bam)?;
         }
         #[allow(unused)]
-        Some(Commands::PredictM6A {
-            bam,
-            out,
-            nucleosome_length,
-            combined_nucleosome_length,
-            min_distance_added,
-            distance_from_end,
-            allowed_m6a_skips,
-            keep,
-            min_ml_score,
-            all_calls,
-            xgb,
-            cnn,
-            semi,
-            full_float,
-            batch_size,
-        }) => {
-            //check_torch_env_vars()?;
+        Some(Commands::PredictM6A(predict_m6a_opts)) => {
             #[cfg(feature = "predict")]
             {
-                // cnn must be set to true if using semi
-                let cnn = if *semi { &true } else { cnn };
-                // read bam
-                let mut bam = bam_reader(bam, args.threads);
-                let header = bam::Header::from_template(bam.header());
-                let mut out = bam_writer(out, &bam, args.threads);
-                // set up options
-                let nuc_opts = fibertools_rs::cli::AddNucleosomeOptions {
-                    bam: "-".to_string(),
-                    out: "-".to_string(),
-                    nucleosome_length: *nucleosome_length,
-                    combined_nucleosome_length: *combined_nucleosome_length,
-                    min_distance_added: *min_distance_added,
-                    distance_from_end: *distance_from_end,
-                    allowed_m6a_skips: *allowed_m6a_skips,
-                    min_ml_score: 0,
-                };
-                let predict_options = PredictOptions::new(
-                    *keep,
-                    *xgb,
-                    *cnn,
-                    *semi,
-                    *full_float,
-                    *min_ml_score,
-                    *all_calls,
-                    find_pb_polymerase(&header),
-                    *batch_size,
-                    nuc_opts,
-                );
-                log::info!("{} reads included at once in batch prediction.", batch_size);
-                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+                let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
+                let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
+                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
             }
             #[cfg(not(feature = "predict"))]
             {

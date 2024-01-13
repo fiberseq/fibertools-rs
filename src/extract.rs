@@ -1,7 +1,76 @@
 use super::fiber::FiberseqData;
 use super::*;
+use crate::cli::ExtractOptions;
 use rayon::prelude::*;
 use rust_htslib::{bam, bam::HeaderView, bam::Read};
+
+pub struct FiberOut {
+    pub m6a: Option<Box<dyn Write>>,
+    pub cpg: Option<Box<dyn Write>>,
+    pub msp: Option<Box<dyn Write>>,
+    pub nuc: Option<Box<dyn Write>>,
+    pub all: Option<Box<dyn Write>>,
+    pub reference: bool,
+    pub simplify: bool,
+    pub quality: bool,
+    pub min_ml_score: u8,
+    pub full_float: bool,
+}
+
+impl FiberOut {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        m6a: &Option<String>,
+        cpg: &Option<String>,
+        msp: &Option<String>,
+        nuc: &Option<String>,
+        all: &Option<String>,
+        reference: bool,
+        simplify: bool,
+        quality: bool,
+        min_ml_score: u8,
+        full_float: bool,
+    ) -> Result<Self> {
+        let m6a = match m6a {
+            Some(m6a) => Some(writer(m6a)?),
+            None => None,
+        };
+        let cpg = match cpg {
+            Some(cpg) => Some(writer(cpg)?),
+            None => None,
+        };
+        let msp = match msp {
+            Some(msp) => Some(writer(msp)?),
+            None => None,
+        };
+        let nuc = match nuc {
+            Some(nuc) => Some(writer(nuc)?),
+            None => None,
+        };
+        let all = match all {
+            Some(all) => Some(writer(all)?),
+            None => None,
+        };
+        // set to zero
+        let mut min_ml_score = min_ml_score;
+        if full_float {
+            min_ml_score = 0;
+        }
+
+        Ok(FiberOut {
+            m6a,
+            cpg,
+            msp,
+            nuc,
+            all,
+            reference,
+            simplify,
+            quality,
+            min_ml_score,
+            full_float,
+        })
+    }
+}
 
 pub fn process_bam_chunk(
     records: Vec<bam::Record>,
@@ -72,7 +141,21 @@ pub fn process_bam_chunk(
     }
 }
 
-pub fn extract_contained(bam: &mut bam::Reader, mut out_files: FiberOut) {
+pub fn extract_contained(bam: &mut bam::Reader, extract_opts: &ExtractOptions) {
+    let mut out_files = FiberOut::new(
+        &extract_opts.m6a,
+        &extract_opts.cpg,
+        &extract_opts.msp,
+        &extract_opts.nuc,
+        &extract_opts.all,
+        extract_opts.reference,
+        extract_opts.simplify,
+        extract_opts.quality,
+        extract_opts.min_ml_score,
+        extract_opts.full_float,
+    )
+    .unwrap();
+
     let header = bam::Header::from_template(bam.header());
     let head_view = bam::HeaderView::from_header(&header);
 
