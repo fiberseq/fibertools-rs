@@ -12,6 +12,7 @@ Options:
   -c, --combined-nucleosome-length <COMBINED_NUCLEOSOME_LENGTH>  Minium nucleosome length when combining over a single m6A [default: 100]
   -m, --min-distance-added <MIN_DISTANCE_ADDED>                  Minium distance needed to add to an already existing nuc by crossing an m6a [default: 25]
   -d, --distance-from-end <DISTANCE_FROM_END>                    Minimum distance from the end of a fiber to call a nucleosome or MSP [default: 45]
+      --min-ml-score <MIN_ML_SCORE>                              Minium score in the ML tag to use in predicting nucleosomes [default: 125]
   -h, --help                                                     Print help
   -V, --version                                                  Print version
 

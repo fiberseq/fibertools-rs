@@ -61,18 +61,6 @@ The python API is still in development and not stable; however, you can find the
 
 **Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Finkbeiner, C., Li, T., Whittington, D., Stergachis, A. B., & **Vollger, M. R.** (2023). Fibertools: fast and accurate DNA-m6A calling using single-molecule long-read sequencing. _bioRxiv_. https://doi.org/10.1101/2023.04.20.537673
 
-# Read the fibertools library docs
-
-You can find the docs for the latest release here:
-[https://docs.rs/fibertools-rs/latest/fibertools_rs/](https://docs.rs/fibertools-rs/latest/fibertools_rs/)
-or download from source and run:
-
-```
-cargo doc --open
-```
-
-and the docs will open in your browser.
-
 # TODO items
 
 - [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
@@ -80,20 +68,12 @@ and the docs will open in your browser.
 - [ ] Improve progress bar for predict-m6a.
   - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
 - [x] Add a python API (see py-ft for progress)
-  - [x] extract api
-  - [x] center api
-  - [ ] improve docs
   - [ ] add default data viz
   - [ ] add conversion to pandas data frame or maybe anndata
 - [x] GPU support
   - [ ] see if I can simplify or statically link PyTorch to get it onto bioconda
   - [ ] Detect GPU memory to set batch size dynamically.
 - [ ] Add unaligned, secondary, supplemental reads to the test bam.
-- [x] add option result to bamlift
-- [x] improve speed of liftover closest in bamlift. It takes about 50% of the time.
-- [x] Add more test cases, learn about test modules in folders
-- [x] Set filters for ML depending on the model used
 
 # Contributing
-
 If you would like to contribute to `fibertools-rs`, please see the [CONTRIBUTING.md](/CONTRIBUTING.md) file for more information.
