@@ -158,6 +158,7 @@ impl CenteredFiberData {
         &[Option<i64>],
         &[Option<i64>],
         &[Option<i64>],
+        &[u8],
     ) {
         if self.reference {
             (
@@ -169,6 +170,7 @@ impl CenteredFiberData {
                 &self.fiber.nuc.reference_ends,
                 &self.fiber.msp.reference_starts,
                 &self.fiber.msp.reference_ends,
+                &self.fiber.msp.qual,
             )
         } else {
             (
@@ -180,14 +182,15 @@ impl CenteredFiberData {
                 &self.fiber.nuc.ends,
                 &self.fiber.msp.starts,
                 &self.fiber.msp.ends,
+                &self.fiber.msp.qual,
             )
         }
     }
 
     pub fn write(&self) -> String {
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en) = self.grab_data();
+        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
             join_by_str_option(m6a, ","),
             join_by_str(m6a_qual, ","),
@@ -197,6 +200,7 @@ impl CenteredFiberData {
             join_by_str_option(nuc_en, ","),
             join_by_str_option(msp_st, ","),
             join_by_str_option(msp_en, ","),
+            join_by_str(fire, ","),
             self.get_sequence(),
         )
     }
@@ -247,12 +251,12 @@ impl CenteredFiberData {
 
     pub fn write_long(&self) -> String {
         let mut rtn = String::new();
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en) = self.grab_data();
+        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
         for (t, vals) in [
             ("m6a", (m6a, None, Some(m6a_qual))),
             ("5mC", (cpg, None, Some(cpg_qual))),
             ("nuc", (nuc_st, Some(nuc_en), None)),
-            ("msp", (msp_st, Some(msp_en), None)),
+            ("msp", (msp_st, Some(msp_en), Some(fire))),
         ] {
             let starts = vals.0.iter().collect::<Vec<_>>();
             let ends: Vec<Option<i64>> = match vals.1 {

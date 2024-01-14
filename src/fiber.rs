@@ -376,7 +376,7 @@ impl FiberseqData {
             x.push_str("fiber_qual\t")
         }
         x.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ec",
             "rq",
             "total_AT_bp",
@@ -390,6 +390,7 @@ impl FiberseqData {
             "ref_nuc_lengths",
             "msp_starts",
             "msp_lengths",
+            "fire",
             "ref_msp_starts",
             "ref_msp_lengths",
             "m6a",
@@ -443,6 +444,7 @@ impl FiberseqData {
         let m6a_qual = self.m6a.qual.iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = self.cpg.starts.len();
         let cpg_qual = self.cpg.qual.iter().map(|a| Some(*a as i64)).collect();
+        let fire = self.msp.qual.iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -491,6 +493,7 @@ impl FiberseqData {
             &self.nuc.reference_lengths,
             &self.msp.starts,
             &self.msp.lengths,
+            &fire,
             &self.msp.reference_starts,
             &self.msp.reference_lengths,
             &self.m6a.starts,
