@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.7 (2024-01-10)
+## 0.3.7 (2024-01-24)
+
+<csr-id-85b6a7180e8aa3f306deed66287ed8abd48c0cff/>
+<csr-id-7b1e93362bce2d88c9af39fbe0e17bb2c71a01ba/>
+<csr-id-76326aa133a1dfd84a14ef987f7275e3f9191476/>
+<csr-id-1e08da2d9a5f5d4e6f8d26f46bc1d95c29f4692d/>
+<csr-id-e6e45a3176369a21c8b7106c97a52644a2d596ce/>
+<csr-id-cd1894501787e76c5590f471b43f7b6b441235ac/>
+<csr-id-d33aed7543af326ca2096b5e675f9a83369741e5/>
+<csr-id-df416375797b65a35055d8746083e522ece2fc57/>
+<csr-id-ff5759efc4a11580d585abe52f4fbe97b44f948e/>
+<csr-id-c7331897aaf9ec5b2a574aa07155675b7dee9a68/>
+<csr-id-09249cbe1d46f4019a1943766b7a7c6ce22d732e/>
+<csr-id-3cf7a30cd115133138bf097b56b81b728756b545/>
 
 ### Chore
 
@@ -18,6 +31,18 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-d33aed7543af326ca2096b5e675f9a83369741e5/> update.
  - <csr-id-df416375797b65a35055d8746083e522ece2fc57/> update.
  - <csr-id-ff5759efc4a11580d585abe52f4fbe97b44f948e/> update.
+
+### Chore
+
+ - <csr-id-81dcb9b0f0b43df614b7be981d72d04d8b9a3479/> pyft lock
+ - <csr-id-56b0db1305712fee0c17dc0d05077dc3f262a7d4/> readme and help pages
+ - <csr-id-622a44591a713d644ec1cc9637e87e7cd7aa2262/> readme and help pages
+ - <csr-id-b093f3aa4231ffc5c69b108e5032e86d2454ffaf/> whitespace
+ - <csr-id-62f4f49fc3810d4d9d291b32ba067cc7af6de367/> simplify colos
+ - <csr-id-6393bd8692095aa77de54fb848d508769cda8480/> CI
+ - <csr-id-dc7c74a837bb42cda668a22a4cd7e7589e88df08/> CI
+ - <csr-id-616f8da1bc2b05d617faeaaf6d540e6d3b82e433/> clippy
+ - <csr-id-b6da9feab69869b0d75707b5067ac615d03dd64d/> improved error msg
 
 ### New Features
 
@@ -60,6 +85,12 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-68550723237be3674783a86d11b3277ec09339d3/> add simplify options to center
  - <csr-id-c4d0c936f2d812d1f32c9455595f6141ff0b94fd/> add hp tag to center
  - <csr-id-eb5c54eb40d2b0efffa7fff30d607be4bfba9d66/> add hp tag to center
+ - <csr-id-9bac006224838961532c3754a9a24032860780c8/> center and extract now include fire scores in the range of 0-255
+ - <csr-id-be89a6134cc2a56e7e08bcb3466736767bb33dac/> better fire paralization
+ - <csr-id-ea06c18388ee4c60d36d88c1bb16ca8d03cc390d/> update pyft to have a writer function
+ - <csr-id-c83b5a090dc7f24093bacea12ef638462da9251e/> update pyft to have a writer function
+ - <csr-id-3bb2f45a437673cb70da5bfc3f115bdafc39f21c/> update pyft to have a writer function
+ - <csr-id-e98ceed4e60f8bd75bda7c10eec174049b94b366/> update pyft
 
 ### Bug Fixes
 
@@ -68,6 +99,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  - <csr-id-3a7134c519bee739b6258025d9e6888331f8494c/> make an iterator for fiberseq records
  - <csr-id-7ba5d14b07251c76071eb09eaa42cdf1df09e2d2/> try and better use threads.
  - <csr-id-43cc3dc7367b725f8e60f9d21c044dc638638f1f/> try and better use threads.
+ - <csr-id-16ef1b6c6047c5e3b963810280c1c62f2096d47c/> GBDT made a semvar breaking change, fixing and locking depandancies.
 
 ### Other
 
@@ -79,10 +111,10 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 72 commits contributed to the release over the course of 81 calendar days.
- - 93 days passed between releases.
- - 56 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
+ - 18 commits contributed to the release over the course of 14 calendar days.
+ - 14 days passed between releases.
+ - 16 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 unique issue was worked on: [#38](https://github.com/fiberseq/fibertools-rs/issues/38)
 
 ### Commit Details
 
@@ -90,79 +122,26 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <details><summary>view details</summary>
 
+ * **[#38](https://github.com/fiberseq/fibertools-rs/issues/38)**
+    - Refactor ([`a24ce8e`](https://github.com/fiberseq/fibertools-rs/commit/a24ce8ee1b1b169371cfcf0fe9b378266045994d))
  * **Uncategorized**
-    - Clippy ([`1f27489`](https://github.com/fiberseq/fibertools-rs/commit/1f2748914d155e8f55409df9ae9c161c5b3cf562))
-    - Release fibertools-rs v0.3.6 ([`2f4a9ce`](https://github.com/fiberseq/fibertools-rs/commit/2f4a9ce4a5fc0c98fe78803eaad7aca3e5765d72))
-    - Clippy ([`ca10f3e`](https://github.com/fiberseq/fibertools-rs/commit/ca10f3eb018e1186f4713e1ce47b2ba777c5ec63))
-    - Paths ([`78e9b44`](https://github.com/fiberseq/fibertools-rs/commit/78e9b448b1ede8a14d02649e8e3360eed6521c3c))
-    - Release fibertools-rs v0.3.6 ([`cf6891e`](https://github.com/fiberseq/fibertools-rs/commit/cf6891e61aaa2f14b382dc10e48214cb0c4e02ae))
-    - FIRE extract update ([`7ddcf19`](https://github.com/fiberseq/fibertools-rs/commit/7ddcf19be2814d616b3a337fcfe17944f0c5d1c5))
-    - FIRE extract update ([`bfed259`](https://github.com/fiberseq/fibertools-rs/commit/bfed25908b7380f535eaac05d53caa1402a3d097))
-    - Adding code outline for footprinting tool ([`c733189`](https://github.com/fiberseq/fibertools-rs/commit/c7331897aaf9ec5b2a574aa07155675b7dee9a68))
-    - Typo in wget ([`a7f24d8`](https://github.com/fiberseq/fibertools-rs/commit/a7f24d826f13a5d014e4de0952ac8fd2c4509cb1))
-    - Update CI ([`6e3bf75`](https://github.com/fiberseq/fibertools-rs/commit/6e3bf754fedc5fc51b38405756b66417029aa307))
-    - Add skip no m6a opts ([`a98c064`](https://github.com/fiberseq/fibertools-rs/commit/a98c06411dc19e443b7d6e519271150aebfff804))
-    - Clippy ([`026862a`](https://github.com/fiberseq/fibertools-rs/commit/026862a80f3e2972cbe927adfca990ea741b2ad1))
-    - Speed up extracting decorators, and move make decorators a struct ([`7176aa4`](https://github.com/fiberseq/fibertools-rs/commit/7176aa43e8631b2ea9ed4e63a912d7eca45a61af))
-    - Adding a fire bed+ extract for the fire pipeline. ([`cebf54c`](https://github.com/fiberseq/fibertools-rs/commit/cebf54c21dac19a63e86d251b39b35e9e85ff7cb))
-    - FIRE now works in fibertools! TODO add info to extract, etc. ([`8db7b41`](https://github.com/fiberseq/fibertools-rs/commit/8db7b4187294429dbc1bb0eac02dcc9eeb14c9a7))
-    - Adding rle information to fire feats ([`3edee57`](https://github.com/fiberseq/fibertools-rs/commit/3edee57927c8c92a883183da4ccfe26b7829f21e))
-    - Adding rle information to fire feats ([`b10a8c4`](https://github.com/fiberseq/fibertools-rs/commit/b10a8c40689606c454554d4843322abafa292e91))
-    - Adding rle information to fire feats ([`c459196`](https://github.com/fiberseq/fibertools-rs/commit/c4591964da5251b8a93c41c6afa0bd368ffe08a6))
-    - Adding rle information to fire feats ([`3a96904`](https://github.com/fiberseq/fibertools-rs/commit/3a96904f558f72245fdffe2817a0ca5a7b3afb3e))
-    - Adding rle information to fire feats ([`babb017`](https://github.com/fiberseq/fibertools-rs/commit/babb017266dcd3c0b6beb63d8f2da65f7b4c73fc))
-    - Adding rle information to fire feats ([`f830405`](https://github.com/fiberseq/fibertools-rs/commit/f830405d775e265790228400ac0c2fe5c2c33661))
-    - Adding rle information to fire feats ([`b954aab`](https://github.com/fiberseq/fibertools-rs/commit/b954aab4022692cf5f9143bc8bb0cae067296f14))
-    - Adding rle information to fire feats ([`fd11b45`](https://github.com/fiberseq/fibertools-rs/commit/fd11b45c62f633c98872fcd3ca2250963eb75961))
-    - Adding rle information to fire feats ([`7c7c2c3`](https://github.com/fiberseq/fibertools-rs/commit/7c7c2c3a9f045f96f522ea407035b7d05d2000ae))
-    - Adding rle information to fire feats ([`e1f9897`](https://github.com/fiberseq/fibertools-rs/commit/e1f989722a1979d1fe1a0b3bde4fff1c2971c02d))
-    - Adding rle information to fire feats ([`7fac8c7`](https://github.com/fiberseq/fibertools-rs/commit/7fac8c74bd322dce45b36abea71fffda64a70055))
-    - Adding rle information to fire feats ([`be21ec1`](https://github.com/fiberseq/fibertools-rs/commit/be21ec1fa6ab2de4fd89c9df9639c5c71a2d210a))
-    - Adding rle information to fire feats ([`20985ab`](https://github.com/fiberseq/fibertools-rs/commit/20985ab8029090e9225f367faa5f920b32e085b7))
-    - Adding rle information to fire feats ([`0166d77`](https://github.com/fiberseq/fibertools-rs/commit/0166d777a815aecd3d3d1e2f4e8d6e43c1172d8d))
-    - Adding rle information to fire feats ([`53ee8b4`](https://github.com/fiberseq/fibertools-rs/commit/53ee8b40d44e89bec6f4e4c1fbc6013b326692f7))
-    - Adding rle information to fire feats ([`6ab4844`](https://github.com/fiberseq/fibertools-rs/commit/6ab4844c9e32c9a03337e36aa09f80462643c0cf))
-    - Adding rle information to fire feats ([`e4510e0`](https://github.com/fiberseq/fibertools-rs/commit/e4510e0e8ba22d74845d95531ccb185055447436))
-    - Adding rle information to fire feats ([`ee27328`](https://github.com/fiberseq/fibertools-rs/commit/ee2732871e072271c9f18cb33458e59feb994da3))
-    - Adding rle information to fire feats ([`efb4372`](https://github.com/fiberseq/fibertools-rs/commit/efb4372d2b59e82925a0c22d6002cd6e8e404a55))
-    - Cli ([`09249cb`](https://github.com/fiberseq/fibertools-rs/commit/09249cbe1d46f4019a1943766b7a7c6ce22d732e))
-    - Clippy ([`3cf7a30`](https://github.com/fiberseq/fibertools-rs/commit/3cf7a30cd115133138bf097b56b81b728756b545))
-    - Update fire model ([`a7b9883`](https://github.com/fiberseq/fibertools-rs/commit/a7b98834cb8fdb0ecf6b832d11e90a0a1f492518))
-    - Use threads better, fire feats ([`de02c26`](https://github.com/fiberseq/fibertools-rs/commit/de02c2686f0ad3911123c392133ca680216a837d))
-    - Use threads better, fire feats ([`9ac73b7`](https://github.com/fiberseq/fibertools-rs/commit/9ac73b76e0ee791b2f4445cff1f4c07b23ca2adf))
-    - Use threads better, fire feats ([`6d00af8`](https://github.com/fiberseq/fibertools-rs/commit/6d00af8092cb0a77fd59e5b7a7af5fd6356decbd))
-    - Use threads better, fire feats ([`fe23936`](https://github.com/fiberseq/fibertools-rs/commit/fe239360d09012e96210ac16561a5493f72946e6))
-    - Clean and move to FIRE ([`dea26a5`](https://github.com/fiberseq/fibertools-rs/commit/dea26a545075b26c00f52f1b62ee5ae815a62095))
-    - Clean and move to FIRE ([`34b2c8f`](https://github.com/fiberseq/fibertools-rs/commit/34b2c8f795e21ae232850a03eb22c30a6aecea5d))
-    - Clean and move to FIRE ([`1b3eccf`](https://github.com/fiberseq/fibertools-rs/commit/1b3eccfb30adf4c05c0d57981c7126f6a6273e73))
-    - Clean and move to FIRE ([`77a90bb`](https://github.com/fiberseq/fibertools-rs/commit/77a90bbec650ca518c700250959939504f2c5fbf))
-    - Start working on decorators ([`1671411`](https://github.com/fiberseq/fibertools-rs/commit/16714115ebdf1c2ffaf7e0dd5d0a064996c8b186))
-    - Start working on decorators ([`1443446`](https://github.com/fiberseq/fibertools-rs/commit/1443446a9b676172735a9d6c29dc3d0e75ce7e81))
-    - Add trace to ml mm parser ([`85b6a71`](https://github.com/fiberseq/fibertools-rs/commit/85b6a7180e8aa3f306deed66287ed8abd48c0cff))
-    - FIRE io ([`9839e24`](https://github.com/fiberseq/fibertools-rs/commit/9839e24972cd55c6786545824c5bd2b041e3ca7a))
-    - Speed up writing FIRE results ([`51149cb`](https://github.com/fiberseq/fibertools-rs/commit/51149cb14806a6a393b099ab845061f8ea3e7ee0))
-    - Add a min ML options to add-nucs and keep working on FIRE predictions ([`bcca38f`](https://github.com/fiberseq/fibertools-rs/commit/bcca38ffdcc05c483387f81facbe2a7d10f064c7))
-    - Allow for the unaligned read start and read end ([`d50f338`](https://github.com/fiberseq/fibertools-rs/commit/d50f3388aef6875b2f5a502874eb6d5712e61040))
-    - Allow for the unaligned read start and read end ([`51ea0b9`](https://github.com/fiberseq/fibertools-rs/commit/51ea0b9661c9887e5e95375ef9af36ec04f1e371))
-    - Make an iterator for fiberseq records ([`3a7134c`](https://github.com/fiberseq/fibertools-rs/commit/3a7134c519bee739b6258025d9e6888331f8494c))
-    - Typo ([`f3af8c6`](https://github.com/fiberseq/fibertools-rs/commit/f3af8c671d929c8e9536eedcd35769f2af82db3c))
-    - Try and better use threads. ([`7ba5d14`](https://github.com/fiberseq/fibertools-rs/commit/7ba5d14b07251c76071eb09eaa42cdf1df09e2d2))
-    - Try and better use threads. ([`43cc3dc`](https://github.com/fiberseq/fibertools-rs/commit/43cc3dc7367b725f8e60f9d21c044dc638638f1f))
-    - Fire progress indicator. ([`1814ee4`](https://github.com/fiberseq/fibertools-rs/commit/1814ee48ed342a73920560a134b2a3bec5fd6c5e))
-    - Add ability to print FIRE features to a text file, TODO predict FIREs in rust. ([`77f60b9`](https://github.com/fiberseq/fibertools-rs/commit/77f60b934b3f1de1fae4d3de70af9db0d74e5a79))
-    - Move prediction into a feature only avalible through Cargo, since bioocnda wont let me do large installs anymore. ([`564cc96`](https://github.com/fiberseq/fibertools-rs/commit/564cc96d77ce10a40f8793afe6166dc2e397b5b3))
-    - Add simplify options to center ([`6855072`](https://github.com/fiberseq/fibertools-rs/commit/68550723237be3674783a86d11b3277ec09339d3))
-    - Add hp tag to center ([`c4d0c93`](https://github.com/fiberseq/fibertools-rs/commit/c4d0c936f2d812d1f32c9455595f6141ff0b94fd))
-    - Add hp tag to center ([`eb5c54e`](https://github.com/fiberseq/fibertools-rs/commit/eb5c54eb40d2b0efffa7fff30d607be4bfba9d66))
-    - Start thinking about geting fire features ([`f163c02`](https://github.com/fiberseq/fibertools-rs/commit/f163c02277dd6267f6c2f7fba3574edb5a5cf86e))
-    - Update. ([`7b1e933`](https://github.com/fiberseq/fibertools-rs/commit/7b1e93362bce2d88c9af39fbe0e17bb2c71a01ba))
-    - Update. ([`76326aa`](https://github.com/fiberseq/fibertools-rs/commit/76326aa133a1dfd84a14ef987f7275e3f9191476))
-    - Update. ([`1e08da2`](https://github.com/fiberseq/fibertools-rs/commit/1e08da2d9a5f5d4e6f8d26f46bc1d95c29f4692d))
-    - Update. ([`e6e45a3`](https://github.com/fiberseq/fibertools-rs/commit/e6e45a3176369a21c8b7106c97a52644a2d596ce))
-    - Update. ([`cd18945`](https://github.com/fiberseq/fibertools-rs/commit/cd1894501787e76c5590f471b43f7b6b441235ac))
-    - Update. ([`d33aed7`](https://github.com/fiberseq/fibertools-rs/commit/d33aed7543af326ca2096b5e675f9a83369741e5))
-    - Update. ([`df41637`](https://github.com/fiberseq/fibertools-rs/commit/df416375797b65a35055d8746083e522ece2fc57))
-    - Update. ([`ff5759e`](https://github.com/fiberseq/fibertools-rs/commit/ff5759efc4a11580d585abe52f4fbe97b44f948e))
+    - Pyft lock ([`81dcb9b`](https://github.com/fiberseq/fibertools-rs/commit/81dcb9b0f0b43df614b7be981d72d04d8b9a3479))
+    - GBDT made a semvar breaking change, fixing and locking depandancies. ([`16ef1b6`](https://github.com/fiberseq/fibertools-rs/commit/16ef1b6c6047c5e3b963810280c1c62f2096d47c))
+    - Readme and help pages ([`56b0db1`](https://github.com/fiberseq/fibertools-rs/commit/56b0db1305712fee0c17dc0d05077dc3f262a7d4))
+    - Readme and help pages ([`622a445`](https://github.com/fiberseq/fibertools-rs/commit/622a44591a713d644ec1cc9637e87e7cd7aa2262))
+    - Center and extract now include fire scores in the range of 0-255 ([`9bac006`](https://github.com/fiberseq/fibertools-rs/commit/9bac006224838961532c3754a9a24032860780c8))
+    - Better fire paralization ([`be89a61`](https://github.com/fiberseq/fibertools-rs/commit/be89a6134cc2a56e7e08bcb3466736767bb33dac))
+    - Whitespace ([`b093f3a`](https://github.com/fiberseq/fibertools-rs/commit/b093f3aa4231ffc5c69b108e5032e86d2454ffaf))
+    - Simplify colos ([`62f4f49`](https://github.com/fiberseq/fibertools-rs/commit/62f4f49fc3810d4d9d291b32ba067cc7af6de367))
+    - CI ([`6393bd8`](https://github.com/fiberseq/fibertools-rs/commit/6393bd8692095aa77de54fb848d508769cda8480))
+    - CI ([`dc7c74a`](https://github.com/fiberseq/fibertools-rs/commit/dc7c74a837bb42cda668a22a4cd7e7589e88df08))
+    - Clippy ([`616f8da`](https://github.com/fiberseq/fibertools-rs/commit/616f8da1bc2b05d617faeaaf6d540e6d3b82e433))
+    - Update pyft to have a writer function ([`ea06c18`](https://github.com/fiberseq/fibertools-rs/commit/ea06c18388ee4c60d36d88c1bb16ca8d03cc390d))
+    - Update pyft to have a writer function ([`c83b5a0`](https://github.com/fiberseq/fibertools-rs/commit/c83b5a090dc7f24093bacea12ef638462da9251e))
+    - Update pyft to have a writer function ([`3bb2f45`](https://github.com/fiberseq/fibertools-rs/commit/3bb2f45a437673cb70da5bfc3f115bdafc39f21c))
+    - Update pyft ([`e98ceed`](https://github.com/fiberseq/fibertools-rs/commit/e98ceed4e60f8bd75bda7c10eec174049b94b366))
+    - Improved error msg ([`b6da9fe`](https://github.com/fiberseq/fibertools-rs/commit/b6da9feab69869b0d75707b5067ac615d03dd64d))
+    - Unused ([`5824b74`](https://github.com/fiberseq/fibertools-rs/commit/5824b74d75673f95c39568f764bf05ee87ae9349))
 </details>
 
 ## 0.3.6 (2023-10-09)
