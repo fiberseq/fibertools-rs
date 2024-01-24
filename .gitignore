@@ -17,3 +17,4 @@ flamegraph*
 tests/data/chr20*bam*
 hub.txt
 *test.bam*
+py-ft/Cargo.lock
