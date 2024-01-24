@@ -21,7 +21,7 @@ pub fn get_saved_gbdt_model(predict_options: &PredictOptions) -> &'static GBDT {
             .to_str()
             .expect("Unable to convert the path of the named temp file to an &str.");
         fs::write(temp_file_name, json).expect("Unable to write file");
-        let model = GBDT::from_xgoost_dump(temp_file_name, "binary:logistic")
+        let model = GBDT::from_xgboost_dump(temp_file_name, "binary:logistic")
             .expect("failed to load model");
         fs::remove_file(temp_file_name).expect("Unable to remove temp model file");
         model
