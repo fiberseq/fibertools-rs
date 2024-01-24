@@ -1,8 +1,6 @@
 **/target/**
 target/**
 *.code-workspace
-Cargo.lock
-**/Cargo.lock
 tmp*
 temp*
 dists/**

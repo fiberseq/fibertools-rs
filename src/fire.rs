@@ -45,7 +45,7 @@ fn get_model(fire_opts: &FireOptions) -> (GBDT, MapPrecisionValues) {
     log::info!("Using model: {}", model_file);
     // load model
     let model =
-        GBDT::from_xgoost_dump(&model_file, "binary:logistic").expect("failed to load FIRE model");
+        GBDT::from_xgboost_dump(&model_file, "binary:logistic").expect("failed to load FIRE model");
     if remove_temp_file {
         fs::remove_file(model_file).expect("Unable to remove temp file");
     }
