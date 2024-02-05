@@ -7,12 +7,17 @@ use burn::backend::Wgpu;
 use burn::backend::wgpu::WgpuDevice;
 pub type BurnBackend = Wgpu;
 pub type BurnDevice = WgpuDevice;
-*/
 
 use burn::backend::ndarray::NdArrayDevice;
 use burn::backend::NdArray;
 pub type BurnBackend = NdArray;
 pub type BurnDevice = NdArrayDevice;
+*/
+
+use burn::backend::candle::CandleDevice;
+use burn::backend::Candle;
+pub type BurnBackend = Candle;
+pub type BurnDevice = CandleDevice;
 
 use super::predict_m6a::{LAYERS, WINDOW};
 

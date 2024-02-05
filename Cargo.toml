@@ -44,7 +44,7 @@ tempfile = "3.3.0"
 derive_builder = "0.12.0"
 gzp = "0.11.3"
 niffler = {version = "2.5.0", default-features = false, features = ["gz"]}
-burn = { version = "0.12", optional = true, features = ["wgpu", "ndarray"] }
+burn = { version = "0.12", optional = true, features = ["wgpu", "ndarray", "candle"] }
 
 [features]
 cli = ["dep:clap", "dep:clap_complete", "dep:clap_mangen", "dep:console"]
