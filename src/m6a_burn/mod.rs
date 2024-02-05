@@ -50,6 +50,8 @@ impl BurnModels {
         let three_two = three_two::Model::default();
         let revio = revio::Model::default();
         let device = BurnDevice::default();
+        // log info about the device used
+        log::info!("Using {:?} for Burn device.", device);
         Self {
             two_zero,
             two_two,
