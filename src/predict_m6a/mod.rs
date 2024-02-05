@@ -1,5 +1,4 @@
 use super::*;
-use anyhow::anyhow;
 use bio::alphabets::dna::revcomp;
 use bio_io;
 use cli::PredictM6AOptions;
@@ -13,15 +12,107 @@ use rust_htslib::{
     bam::record::{Aux, AuxArray},
     bam::Read,
 };
+use serde::Deserialize;
 use std::collections::BTreeMap;
-
 // sub modules
+#[cfg(feature = "predict")]
 pub mod cnn;
-mod xgb;
+pub mod xgb;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 pub const MIN_F32_PRED: f32 = 1.0e-46;
+// json precision tables
+pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
+pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
+pub static SEMI_JSON_3_2: &str = include_str!("../../models/3.2_semi_torch.json");
+pub static SEMI_JSON_REVIO: &str = include_str!("../../models/Revio_semi_torch.json");
+
+#[derive(Debug, Deserialize)]
+pub struct PrecisionTable {
+    pub columns: Vec<String>,
+    pub data: Vec<(f32, u8)>,
+}
+impl PrecisionTable {
+    fn get_precision_table_and_ml(
+        predict_options: &PredictOptions,
+    ) -> Result<(Option<PrecisionTable>, u8)> {
+        let mut min_ml = 0;
+        let mut precision_json = "".to_string();
+
+        if let Ok(_file) = std::env::var("FT_MODEL") {
+            min_ml = 244;
+        } else if predict_options.semi {
+            log::info!("Using semi-supervised CNN m6A model.");
+            match predict_options.polymerase {
+                PbChem::Two => {
+                    precision_json = SEMI_JSON_2_0.to_string();
+                    min_ml = 230;
+                }
+                PbChem::TwoPointTwo => {
+                    precision_json = SEMI_JSON_2_2.to_string();
+                    min_ml = 244;
+                }
+                PbChem::ThreePointTwo => {
+                    precision_json = SEMI_JSON_3_2.to_string();
+                    min_ml = 244;
+                }
+                PbChem::Revio => {
+                    precision_json = SEMI_JSON_REVIO.to_string();
+                    min_ml = 254;
+                }
+            }
+        } else if predict_options.cnn {
+            match predict_options.polymerase {
+                PbChem::Two => {
+                    min_ml = 200;
+                }
+                PbChem::TwoPointTwo => {
+                    min_ml = 215;
+                }
+                _ => (),
+            }
+        } else {
+            match predict_options.polymerase {
+                PbChem::Two => {
+                    min_ml = 250;
+                }
+                PbChem::TwoPointTwo => {
+                    min_ml = 245;
+                }
+                _ => (),
+            }
+        };
+
+        // load precision json from env var if needed
+        if let Ok(json) = std::env::var("FT_JSON") {
+            log::info!("Loading precision table from environment variable.");
+            precision_json =
+                std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
+        }
+
+        // load the precision table
+        let precision_table: Option<PrecisionTable> = if predict_options.semi {
+            Some(
+                serde_json::from_str(&precision_json)
+                    .expect("Precision table JSON was not well-formatted"),
+            )
+        } else {
+            None
+        };
+
+        // set the variables for ML
+        let final_min_ml = match predict_options.min_ml_score {
+            Some(x) => {
+                log::info!("Using provided minimum ML tag score: {}", x);
+                x
+            }
+            None => min_ml,
+        };
+        Ok((precision_table, final_min_ml))
+    }
+}
+
 #[derive(Debug)]
 pub struct PredictOptions {
     pub keep: bool,
@@ -36,13 +127,13 @@ pub struct PredictOptions {
     pub model: Vec<u8>,
     pub min_ml: u8,
     pub nuc_opts: cli::AddNucleosomeOptions,
+    pub burn_models: m6a_burn::BurnModels,
 }
 
 impl PredictOptions {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
-        _xgb: bool,
         mut cnn: bool,
         semi: bool,
         full_float: bool,
@@ -73,6 +164,7 @@ impl PredictOptions {
             model: vec![],
             min_ml: 0,
             nuc_opts,
+            burn_models: m6a_burn::BurnModels::new(),
         };
         options.add_model().expect("Error loading model");
         options
@@ -80,96 +172,35 @@ impl PredictOptions {
 
     fn add_model(&mut self) -> Result<()> {
         let mut model: Vec<u8> = vec![];
-        let mut min_ml = 0;
-        let mut precision_json = "".to_string();
 
-        if let Ok(file) = std::env::var("FT_MODEL") {
-            log::info!("Loading model from environment variable.");
-            model = std::fs::read(file).expect("Unable to open model file in FT_MODEL");
-            min_ml = 244;
-        } else if self.semi {
-            log::info!("Using semi-supervised CNN m6A model.");
-            match self.polymerase {
-                PbChem::Two => {
-                    model = cnn::SEMI.to_vec();
-                    precision_json = cnn::SEMI_JSON_2_0.to_string();
-                    min_ml = 230;
-                }
-                PbChem::TwoPointTwo => {
-                    model = cnn::SEMI_2_2.to_vec();
-                    precision_json = cnn::SEMI_JSON_2_2.to_string();
-                    min_ml = 244;
-                }
-                PbChem::ThreePointTwo => {
-                    model = cnn::SEMI_3_2.to_vec();
-                    precision_json = cnn::SEMI_JSON_3_2.to_string();
-                    min_ml = 244;
-                }
-                PbChem::Revio => {
-                    model = cnn::SEMI_REVIO.to_vec();
-                    precision_json = cnn::SEMI_JSON_REVIO.to_string();
-                    min_ml = 254;
-                }
-            }
-        } else if self.cnn {
-            log::info!("Using CNN m6A model.");
-            match self.polymerase {
-                PbChem::Two => {
-                    model = cnn::PT.to_vec();
-                    min_ml = 200;
-                }
-                PbChem::TwoPointTwo => {
-                    model = cnn::PT_2_2.to_vec();
-                    min_ml = 215;
-                }
-                _ => (),
+        if self.semi || self.cnn {
+            #[cfg(feature = "predict")]
+            {
+                model = cnn::get_model_vec(&self)?
             }
         } else {
             log::info!("Using XGBoost m6A model.");
             match self.polymerase {
                 PbChem::Two => {
                     model = xgb::JSON.as_bytes().to_vec();
-                    min_ml = 250;
                 }
                 PbChem::TwoPointTwo => {
                     model = xgb::JSON_2_2.as_bytes().to_vec();
-                    min_ml = 245;
                 }
                 _ => (),
             }
         };
 
-        // load precision json from env var if needed
-        if let Ok(json) = std::env::var("FT_JSON") {
-            log::info!("Loading precision table from environment variable.");
-            precision_json =
-                std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
-        }
+        let (precision_table, min_ml) = PrecisionTable::get_precision_table_and_ml(self)?;
 
-        // load the precision table
-        if self.semi {
-            let precision_table: cnn::PrecisionTable = serde_json::from_str(&precision_json)
-                .expect("Precision table JSON was not well-formatted");
+        // load precision table into map if not None
+        if let Some(precision_table) = precision_table {
             for (cnn_score, precision) in precision_table.data {
                 self.map.insert(OrderedFloat(cnn_score), precision);
             }
         }
 
-        // error if no model is found
-        if model.is_empty() {
-            return Err(anyhow!(
-                "Selected model chemistry combination is not available."
-            ));
-        }
-
-        // set the variables for ML
-        self.min_ml = match self.min_ml_score {
-            Some(x) => {
-                log::info!("Using provided minimum ML tag score: {}", x);
-                x
-            }
-            None => min_ml,
-        };
+        self.min_ml = min_ml;
         self.model = model;
         Ok(())
     }
@@ -216,10 +247,6 @@ impl PredictOptions {
             (x * 255.0).round() as u8
         }
     }
-}
-enum WhichML {
-    Xgb,
-    Cnn,
 }
 
 /// ```
@@ -521,16 +548,15 @@ pub fn predict_m6a_on_records(
 }
 
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
-    let _which_ml = WhichML::Xgb;
-    let _which_ml = if predict_options.cnn {
-        WhichML::Cnn
-    } else {
-        WhichML::Xgb
-    };
-
-    match _which_ml {
-        WhichML::Xgb => xgb::predict_with_xgb(windows, count, predict_options),
-        WhichML::Cnn => cnn::predict_with_cnn(windows, count, predict_options),
+    #[cfg(feature = "burn")]
+    {
+        predict_options
+            .burn_models
+            .forward(predict_options, windows, count)
+    }
+    #[cfg(feature = "predict")]
+    {
+        cnn::predict_with_cnn(windows, count, predict_options)
     }
 }
 
@@ -565,7 +591,6 @@ pub fn read_bam_into_fiberdata(
     // switch to the internal predict options
     let predict_options = PredictOptions::new(
         predict_options.keep,
-        false,
         predict_options.cnn,
         predict_options.semi,
         predict_options.full_float,
@@ -599,5 +624,17 @@ pub fn read_bam_into_fiberdata(
 
         total_read += chunk.len();
         log::info!("Finished predicting m6A for {} reads", total_read);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_precision_json_validity() {
+        for file in [SEMI_JSON_2_0, SEMI_JSON_2_2] {
+            let _p: PrecisionTable =
+                serde_json::from_str(file).expect("Precision table JSON was not well-formatted");
+        }
     }
 }

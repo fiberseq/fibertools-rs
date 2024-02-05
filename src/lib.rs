@@ -12,7 +12,6 @@ pub mod cli;
 pub mod extract;
 /// Add nucleosomes to a bam file
 pub mod nucleosomes;
-#[cfg(feature = "predict")]
 /// m6A prediction
 pub mod predict_m6a;
 /// Remove base modifications from a bam record
@@ -32,9 +31,10 @@ pub mod bio_io;
 
 pub mod bamranges;
 
+pub mod m6a_burn;
+
 use anyhow::Result;
 use bio_io::*;
-#[cfg(feature = "predict")]
 use itertools::Itertools;
 use rust_htslib::{bam, bam::Read};
 use std::env;

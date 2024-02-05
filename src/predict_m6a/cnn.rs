@@ -1,5 +1,7 @@
 use super::predict_m6a::{LAYERS, WINDOW};
+use super::PbChem;
 use super::PredictOptions;
+use anyhow;
 use spin;
 use std::fs;
 use tch;
@@ -13,12 +15,6 @@ pub static SEMI: &[u8] = include_bytes!("../../models/2.0_semi_torch.pt");
 pub static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
 pub static SEMI_3_2: &[u8] = include_bytes!("../../models/3.2_semi_torch.pt");
 pub static SEMI_REVIO: &[u8] = include_bytes!("../../models/Revio_semi_torch.pt");
-
-// json precision tables
-pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
-pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
-pub static SEMI_JSON_3_2: &str = include_str!("../../models/3.2_semi_torch.json");
-pub static SEMI_JSON_REVIO: &str = include_str!("../../models/Revio_semi_torch.json");
 
 pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
@@ -67,23 +63,38 @@ pub fn predict_with_cnn(
     x.chunks(2).map(|c| c[0]).collect()
 }
 
-use serde::Deserialize;
-#[derive(Debug, Deserialize)]
-pub struct PrecisionTable {
-    //pub cnn_score: Vec<f32>,
-    //pub precision_u8: Vec<u8>,
-    pub columns: Vec<String>,
-    pub data: Vec<(f32, u8)>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_precision_json_validity() {
-        for file in [SEMI_JSON_2_0, SEMI_JSON_2_2] {
-            let _p: PrecisionTable =
-                serde_json::from_str(file).expect("Precision table JSON was not well-formatted");
+pub fn get_model_vec(predict_options: &PredictOptions) -> anyhow::Result<Vec<u8>> {
+    let mut model: Vec<u8> = vec![];
+    if let Ok(file) = std::env::var("FT_MODEL") {
+        log::info!("Loading model from environment variable.");
+        model = std::fs::read(file).expect("Unable to open model file in FT_MODEL");
+    } else if predict_options.semi {
+        log::info!("Using semi-supervised CNN m6A model.");
+        match predict_options.polymerase {
+            PbChem::Two => {
+                model = SEMI.to_vec();
+            }
+            PbChem::TwoPointTwo => {
+                model = SEMI_2_2.to_vec();
+            }
+            PbChem::ThreePointTwo => {
+                model = SEMI_3_2.to_vec();
+            }
+            PbChem::Revio => {
+                model = SEMI_REVIO.to_vec();
+            }
         }
-    }
+    } else if predict_options.cnn {
+        log::info!("Using CNN m6A model.");
+        match predict_options.polymerase {
+            PbChem::Two => {
+                model = PT.to_vec();
+            }
+            PbChem::TwoPointTwo => {
+                model = PT_2_2.to_vec();
+            }
+            _ => (),
+        }
+    };
+    Ok(model)
 }
