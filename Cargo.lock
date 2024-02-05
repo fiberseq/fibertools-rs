@@ -1418,6 +1418,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "spin",
+ "tch",
  "tempfile",
 ]
 

@@ -3,7 +3,6 @@ use super::predict_m6a::PredictOptions;
 use burn::tensor::{Shape, Tensor};
 // burn backend
 /*
-
 use burn::backend::candle::CandleDevice;
 use burn::backend::Candle;
 pub type BurnBackend = Candle;
@@ -14,7 +13,6 @@ use burn::backend::NdArray;
 pub type BurnBackend = NdArray;
 pub type BurnDevice = NdArrayDevice;
 */
-
 use burn::backend::wgpu::WgpuDevice;
 use burn::backend::Wgpu;
 pub type BurnBackend = Wgpu;
