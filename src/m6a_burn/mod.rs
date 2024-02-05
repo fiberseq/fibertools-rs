@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use super::bio_io::PbChem;
 use super::predict_m6a::PredictOptions;
 use burn::tensor::{Shape, Tensor};
@@ -53,6 +51,7 @@ impl BurnModels {
         let three_two = three_two::Model::default();
         let revio = revio::Model::default();
         let device = BurnDevice::default();
+
         // log info about the device used
         log::info!("Using {:?} for Burn device.", device);
         Self {
