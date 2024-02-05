@@ -1,16 +1,18 @@
 use super::bio_io::PbChem;
 use super::predict_m6a::PredictOptions;
-use burn::backend::wgpu::WgpuDevice;
-// burn backend
-use burn::backend::Wgpu;
 use burn::tensor::{Shape, Tensor};
+// burn backend
+/*
+use burn::backend::Wgpu;
+use burn::backend::wgpu::WgpuDevice;
 pub type BurnBackend = Wgpu;
 pub type BurnDevice = WgpuDevice;
+*/
 
-//use burn::backend::NdArray;
-//use burn::backend::ndarray::NdArrayDevice;
-//pub type BurnBackend = NdArray;
-//pub type BurnDevice = NdArrayDevice;
+use burn::backend::ndarray::NdArrayDevice;
+use burn::backend::NdArray;
+pub type BurnBackend = NdArray;
+pub type BurnDevice = NdArrayDevice;
 
 use super::predict_m6a::{LAYERS, WINDOW};
 
