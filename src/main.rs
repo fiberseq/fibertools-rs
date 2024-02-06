@@ -58,13 +58,17 @@ pub fn main() -> Result<(), Error> {
         }
         #[allow(unused)]
         Some(Commands::PredictM6A(predict_m6a_opts)) => {
-            //#[cfg(feature = "predict")]
+            #[cfg(not(feature = "tch"))]
+            {
+                log::warn!("m6A predictions are slower without the pytorch backend. Consider recompiling via cargo with: `--all-features`.")
+            }
             {
                 let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
                 let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
                 predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
             }
-            /*#[cfg(not(feature = "predict"))]
+            //#[cfg(feature = "tch")]
+            /*#[cfg(not(feature = "tch"))]
             {
                 log::error!("m6A predictions are not enabled with this install of fibertools.");
                 log::error!("Please recompile with: `--all-features`.");

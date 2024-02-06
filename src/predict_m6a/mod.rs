@@ -15,7 +15,7 @@ use rust_htslib::{
 use serde::Deserialize;
 use std::collections::BTreeMap;
 // sub modules
-#[cfg(feature = "predict")]
+#[cfg(feature = "tch")]
 pub mod cnn;
 pub mod xgb;
 
@@ -174,7 +174,7 @@ impl PredictOptions {
         let mut model: Vec<u8> = vec![];
 
         if self.semi || self.cnn {
-            #[cfg(feature = "predict")]
+            #[cfg(feature = "tch")]
             {
                 model = cnn::get_model_vec(&self)?
             }
@@ -547,17 +547,16 @@ pub fn predict_m6a_on_records(
     data.iter().flatten().count()
 }
 
+#[cfg(feature = "tch")]
 pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
-    #[cfg(feature = "burn")]
-    {
-        predict_options
-            .burn_models
-            .forward(predict_options, windows, count)
-    }
-    #[cfg(feature = "predict")]
-    {
-        cnn::predict_with_cnn(windows, count, predict_options)
-    }
+    cnn::predict_with_cnn(windows, count, predict_options)
+}
+
+#[cfg(not(feature = "tch"))]
+pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
+    predict_options
+        .burn_models
+        .forward(predict_options, windows, count)
 }
 
 fn _fake_apply_model(_: &[f32], count: usize, _: &PredictOptions) -> Vec<f32> {
