@@ -109,10 +109,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use burn::backend::ndarray::NdArrayDevice;
-    use burn::backend::NdArray;
-    pub type BurnBackend = NdArray;
-    pub type BurnDevice = NdArrayDevice;
+    use burn::backend::candle::CandleDevice;
+    use burn::backend::Candle;
+    pub type BurnBackend = Candle;
+    pub type BurnDevice = CandleDevice;
 
     #[test]
     fn test_revio_onnx() {
