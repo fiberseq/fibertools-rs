@@ -109,6 +109,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use burn::backend::ndarray::NdArrayDevice;
+    use burn::backend::NdArray;
+    pub type BurnBackend = NdArray;
+    pub type BurnDevice = NdArrayDevice;
+
     #[test]
     fn test_revio_onnx() {
         let device = BurnDevice::default();
