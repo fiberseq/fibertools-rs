@@ -2,6 +2,7 @@ use super::predict_m6a::{LAYERS, WINDOW};
 use super::PbChem;
 use super::PredictOptions;
 use anyhow;
+use burn::tensor::backend::Backend;
 use spin;
 use std::fs;
 use tch;
@@ -16,7 +17,9 @@ pub static SEMI_2_2: &[u8] = include_bytes!("../../models/2.2_semi_torch.pt");
 pub static SEMI_3_2: &[u8] = include_bytes!("../../models/3.2_semi_torch.pt");
 pub static SEMI_REVIO: &[u8] = include_bytes!("../../models/Revio_semi_torch.pt");
 
-pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch::CModule {
+pub fn get_saved_pytorch_model<B: Backend>(
+    predict_options: &PredictOptions<B>,
+) -> &'static tch::CModule {
     INIT_PT.call_once(|| {
         // set threads to one, since rayon will dispatch multiple at once anyways
         tch::set_num_threads(1);
@@ -37,10 +40,10 @@ pub fn get_saved_pytorch_model(predict_options: &PredictOptions) -> &'static tch
     })
 }
 
-pub fn predict_with_cnn(
+pub fn predict_with_cnn<B: Backend>(
     windows: &[f32],
     count: usize,
-    predict_options: &PredictOptions,
+    predict_options: &PredictOptions<B>,
 ) -> Vec<f32> {
     //log::debug!("{}", tch::get_num_threads());
     let model = get_saved_pytorch_model(predict_options);
@@ -63,7 +66,7 @@ pub fn predict_with_cnn(
     x.chunks(2).map(|c| c[0]).collect()
 }
 
-pub fn get_model_vec(predict_options: &PredictOptions) -> anyhow::Result<Vec<u8>> {
+pub fn get_model_vec<B: Backend>(predict_options: &PredictOptions<B>) -> anyhow::Result<Vec<u8>> {
     let mut model: Vec<u8> = vec![];
     if let Ok(file) = std::env::var("FT_MODEL") {
         log::info!("Loading model from environment variable.");
