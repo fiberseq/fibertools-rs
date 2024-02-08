@@ -1,6 +1,7 @@
 use super::*;
 use bio::alphabets::dna::revcomp;
 use bio_io;
+use burn::tensor::backend::Backend;
 use cli::PredictM6AOptions;
 use nucleosomes;
 use ordered_float::OrderedFloat;
@@ -17,7 +18,6 @@ use std::collections::BTreeMap;
 // sub modules
 #[cfg(feature = "tch")]
 pub mod cnn;
-pub mod xgb;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
@@ -33,88 +33,12 @@ pub struct PrecisionTable {
     pub columns: Vec<String>,
     pub data: Vec<(f32, u8)>,
 }
-impl PrecisionTable {
-    fn get_precision_table_and_ml(
-        predict_options: &PredictOptions,
-    ) -> Result<(Option<PrecisionTable>, u8)> {
-        let mut min_ml = 0;
-        let mut precision_json = "".to_string();
-
-        if let Ok(_file) = std::env::var("FT_MODEL") {
-            min_ml = 244;
-        } else if predict_options.semi {
-            log::info!("Using semi-supervised CNN m6A model.");
-            match predict_options.polymerase {
-                PbChem::Two => {
-                    precision_json = SEMI_JSON_2_0.to_string();
-                    min_ml = 230;
-                }
-                PbChem::TwoPointTwo => {
-                    precision_json = SEMI_JSON_2_2.to_string();
-                    min_ml = 244;
-                }
-                PbChem::ThreePointTwo => {
-                    precision_json = SEMI_JSON_3_2.to_string();
-                    min_ml = 244;
-                }
-                PbChem::Revio => {
-                    precision_json = SEMI_JSON_REVIO.to_string();
-                    min_ml = 254;
-                }
-            }
-        } else if predict_options.cnn {
-            match predict_options.polymerase {
-                PbChem::Two => {
-                    min_ml = 200;
-                }
-                PbChem::TwoPointTwo => {
-                    min_ml = 215;
-                }
-                _ => (),
-            }
-        } else {
-            match predict_options.polymerase {
-                PbChem::Two => {
-                    min_ml = 250;
-                }
-                PbChem::TwoPointTwo => {
-                    min_ml = 245;
-                }
-                _ => (),
-            }
-        };
-
-        // load precision json from env var if needed
-        if let Ok(json) = std::env::var("FT_JSON") {
-            log::info!("Loading precision table from environment variable.");
-            precision_json =
-                std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
-        }
-
-        // load the precision table
-        let precision_table: Option<PrecisionTable> = if predict_options.semi {
-            Some(
-                serde_json::from_str(&precision_json)
-                    .expect("Precision table JSON was not well-formatted"),
-            )
-        } else {
-            None
-        };
-
-        // set the variables for ML
-        let final_min_ml = match predict_options.min_ml_score {
-            Some(x) => {
-                log::info!("Using provided minimum ML tag score: {}", x);
-                x
-            }
-            None => min_ml,
-        };
-        Ok((precision_table, final_min_ml))
-    }
-}
 
 #[derive(Debug)]
-pub struct PredictOptions {
+pub struct PredictOptions<B>
+where
+    B: Backend,
+{
     pub keep: bool,
     pub cnn: bool,
     pub semi: bool,
@@ -127,10 +51,13 @@ pub struct PredictOptions {
     pub model: Vec<u8>,
     pub min_ml: u8,
     pub nuc_opts: cli::AddNucleosomeOptions,
-    pub burn_models: m6a_burn::BurnModels,
+    pub burn_models: m6a_burn::BurnModels<B>,
 }
 
-impl PredictOptions {
+impl<B> PredictOptions<B>
+where
+    B: Backend,
+{
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
@@ -170,6 +97,82 @@ impl PredictOptions {
         options
     }
 
+    fn get_precision_table_and_ml(&self) -> Result<(Option<PrecisionTable>, u8)> {
+        let mut min_ml = 0;
+        let mut precision_json = "".to_string();
+
+        if let Ok(_file) = std::env::var("FT_MODEL") {
+            min_ml = 244;
+        } else if self.semi {
+            log::info!("Using semi-supervised CNN m6A model.");
+            match self.polymerase {
+                PbChem::Two => {
+                    precision_json = SEMI_JSON_2_0.to_string();
+                    min_ml = 230;
+                }
+                PbChem::TwoPointTwo => {
+                    precision_json = SEMI_JSON_2_2.to_string();
+                    min_ml = 244;
+                }
+                PbChem::ThreePointTwo => {
+                    precision_json = SEMI_JSON_3_2.to_string();
+                    min_ml = 244;
+                }
+                PbChem::Revio => {
+                    precision_json = SEMI_JSON_REVIO.to_string();
+                    min_ml = 254;
+                }
+            }
+        } else if self.cnn {
+            match self.polymerase {
+                PbChem::Two => {
+                    min_ml = 200;
+                }
+                PbChem::TwoPointTwo => {
+                    min_ml = 215;
+                }
+                _ => (),
+            }
+        } else {
+            match self.polymerase {
+                PbChem::Two => {
+                    min_ml = 250;
+                }
+                PbChem::TwoPointTwo => {
+                    min_ml = 245;
+                }
+                _ => (),
+            }
+        };
+
+        // load precision json from env var if needed
+        if let Ok(json) = std::env::var("FT_JSON") {
+            log::info!("Loading precision table from environment variable.");
+            precision_json =
+                std::fs::read_to_string(json).expect("Unable to read file specified by FT_JSON");
+        }
+
+        // load the precision table
+        let precision_table: Option<PrecisionTable> = if self.semi {
+            Some(
+                serde_json::from_str(&precision_json)
+                    .expect("Precision table JSON was not well-formatted"),
+            )
+        } else {
+            None
+        };
+
+        // set the variables for ML
+        let final_min_ml = match self.min_ml_score {
+            Some(x) => {
+                log::info!("Using provided minimum ML tag score: {}", x);
+                x
+            }
+            None => min_ml,
+        };
+        Ok((precision_table, final_min_ml))
+    }
+
     fn add_model(&mut self) -> Result<()> {
         let mut model: Vec<u8> = vec![];
 
@@ -179,19 +182,10 @@ impl PredictOptions {
                 model = cnn::get_model_vec(&self)?
             }
         } else {
-            log::info!("Using XGBoost m6A model.");
-            match self.polymerase {
-                PbChem::Two => {
-                    model = xgb::JSON.as_bytes().to_vec();
-                }
-                PbChem::TwoPointTwo => {
-                    model = xgb::JSON_2_2.as_bytes().to_vec();
-                }
-                _ => (),
-            }
+            panic!("No model was loaded.");
         };
 
-        let (precision_table, min_ml) = PrecisionTable::get_precision_table_and_ml(self)?;
+        let (precision_table, min_ml) = self.get_precision_table_and_ml()?;
 
         // load precision table into map if not None
         if let Some(precision_table) = precision_table {
@@ -247,6 +241,144 @@ impl PredictOptions {
             (x * 255.0).round() as u8
         }
     }
+
+    /// group reads together for predictions so we have to move data to the GPU less often
+    pub fn predict_m6a_on_records(&self, records: Vec<&mut bam::Record>) -> usize {
+        // data windows for all the records in this chunk
+        let data: Vec<Option<(DataWidows, DataWidows)>> = records
+            .iter()
+            .map(|rec| get_m6a_data_windows(rec))
+            .collect();
+        // collect ml windows into one vector
+        let mut all_ml_data = vec![];
+        let mut all_count = 0;
+        data.iter().flatten().for_each(|(a, t)| {
+            all_ml_data.extend(a.windows.clone());
+            all_count += a.count;
+            all_ml_data.extend(t.windows.clone());
+            all_count += t.count;
+        });
+        let predictions = self.apply_model(&all_ml_data, all_count);
+        assert_eq!(predictions.len(), all_count);
+        // split ml results back to all the records and modify the MM ML tags
+        assert_eq!(data.len(), records.len());
+        let mut cur_predict_st = 0;
+        for (option_data, record) in data.iter().zip(records) {
+            // base mods in the exiting record
+            let mut cur_basemods = basemods::BaseMods::new(record, 0);
+            cur_basemods.drop_m6a();
+            log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+            // check if there is any data
+            let (a_data, t_data) = match option_data {
+                Some((a_data, t_data)) => (a_data, t_data),
+                None => continue,
+            };
+            // iterate over A and then T basemods
+            for data in &[a_data, t_data] {
+                let cur_predict_en = cur_predict_st + data.count;
+                let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
+
+                cur_predict_st += data.count;
+                cur_basemods.base_mods.push(self.basemod_from_ml(
+                    record,
+                    cur_predictions,
+                    &data.positions,
+                    &data.base_mod,
+                ));
+            }
+            // write the ml and mm tags
+            cur_basemods.add_mm_and_ml_tags(record);
+
+            //let modified_bases_forward = cur_basemods.forward_m6a().0;
+            let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
+
+            // adding the nucleosomes
+            nucleosomes::add_nucleosomes_to_record(record, &modified_bases_forward, &self.nuc_opts);
+
+            // clear the existing data
+            if !self.keep {
+                record.remove_aux(b"fp").unwrap_or(());
+                record.remove_aux(b"fi").unwrap_or(());
+                record.remove_aux(b"rp").unwrap_or(());
+                record.remove_aux(b"ri").unwrap_or(());
+            }
+        }
+        assert_eq!(cur_predict_st, predictions.len());
+        data.iter().flatten().count()
+    }
+
+    /// Create a basemod object form our predictions
+    pub fn basemod_from_ml(
+        &self,
+        record: &mut bam::Record,
+        predictions: &[f32],
+        positions: &[usize],
+        base_mod: &str,
+    ) -> basemods::BaseMod {
+        let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
+            Vec<u8>,
+            Vec<f32>,
+            Vec<i64>,
+        ) = predictions
+            .iter()
+            .zip(positions.iter())
+            .map(|(&x, &pos)| (self.float_to_u8(x), x, pos as i64))
+            .filter(|(ml, _, _)| *ml >= self.min_ml_value())
+            .multiunzip();
+
+        log::debug!(
+            "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
+            full_probabilities_forward
+                .iter()
+                .filter(|&x| *x <= 1.0 / 255.0)
+                .filter(|&x| *x > 0.0)
+                .count(),
+            full_probabilities_forward
+                .iter()
+                .filter(|&x| *x <= 0.0)
+                .filter(|&x| *x > -0.00000001)
+                .count(),
+            predictions.len()
+        );
+
+        // add full probabilities if needed requested
+        if self.full_float {
+            let mut mp = bio_io::get_f32_tag(record, b"mp");
+            record.remove_aux(b"mp").unwrap_or(());
+            mp.extend(&full_probabilities_forward);
+            let aux_array: AuxArray<f32> = (&mp).into();
+            let aux_array_field = Aux::ArrayFloat(aux_array);
+            record.push_aux(b"mp", aux_array_field).unwrap();
+        }
+
+        let base_mod = base_mod.as_bytes();
+        let modified_base = base_mod[0];
+        let strand = base_mod[1] as char;
+        let modification_type = base_mod[2] as char;
+
+        basemods::BaseMod::new(
+            record,
+            modified_base,
+            strand,
+            modification_type,
+            modified_bases_forward,
+            modified_probabilities_forward,
+        )
+    }
+    /*
+    #[cfg(feature = "tch")]
+    pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
+        cnn::predict_with_cnn(windows, count, self)
+    }
+    #[cfg(not(feature = "tch"))]
+     */
+    pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
+        self.burn_models.forward(self, windows, count)
+    }
+
+    fn _fake_apply_model(&self, _: &[f32], count: usize) -> Vec<f32> {
+        vec![0.0; count]
+    }
 }
 
 /// ```
@@ -273,65 +405,6 @@ pub fn hot_one_dna(seq: &[u8]) -> Vec<f32> {
         }
     }
     out
-}
-
-/// Create a basemod object form our predictions
-pub fn basemod_from_ml(
-    record: &mut bam::Record,
-    predict_options: &PredictOptions,
-    predictions: &[f32],
-    positions: &[usize],
-    base_mod: &str,
-) -> basemods::BaseMod {
-    let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
-        Vec<u8>,
-        Vec<f32>,
-        Vec<i64>,
-    ) = predictions
-        .iter()
-        .zip(positions.iter())
-        .map(|(&x, &pos)| (predict_options.float_to_u8(x), x, pos as i64))
-        .filter(|(ml, _, _)| *ml >= predict_options.min_ml_value())
-        .multiunzip();
-
-    log::debug!(
-        "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
-        full_probabilities_forward
-            .iter()
-            .filter(|&x| *x <= 1.0 / 255.0)
-            .filter(|&x| *x > 0.0)
-            .count(),
-        full_probabilities_forward
-            .iter()
-            .filter(|&x| *x <= 0.0)
-            .filter(|&x| *x > -0.00000001)
-            .count(),
-        predictions.len()
-    );
-
-    // add full probabilities if needed requested
-    if predict_options.full_float {
-        let mut mp = bio_io::get_f32_tag(record, b"mp");
-        record.remove_aux(b"mp").unwrap_or(());
-        mp.extend(&full_probabilities_forward);
-        let aux_array: AuxArray<f32> = (&mp).into();
-        let aux_array_field = Aux::ArrayFloat(aux_array);
-        record.push_aux(b"mp", aux_array_field).unwrap();
-    }
-
-    let base_mod = base_mod.as_bytes();
-    let modified_base = base_mod[0];
-    let strand = base_mod[1] as char;
-    let modification_type = base_mod[2] as char;
-
-    basemods::BaseMod::new(
-        record,
-        modified_base,
-        strand,
-        modification_type,
-        modified_bases_forward,
-        modified_probabilities_forward,
-    )
 }
 
 struct DataWidows {
@@ -474,95 +547,6 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     Some((a_data, t_data))
 }
 
-/// group reads together for predictions so we have to move data to the GPU less often
-pub fn predict_m6a_on_records(
-    records: Vec<&mut bam::Record>,
-    predict_options: &PredictOptions,
-) -> usize {
-    // data windows for all the records in this chunk
-    let data: Vec<Option<(DataWidows, DataWidows)>> = records
-        .iter()
-        .map(|rec| get_m6a_data_windows(rec))
-        .collect();
-    // collect ml windows into one vector
-    let mut all_ml_data = vec![];
-    let mut all_count = 0;
-    data.iter().flatten().for_each(|(a, t)| {
-        all_ml_data.extend(a.windows.clone());
-        all_count += a.count;
-        all_ml_data.extend(t.windows.clone());
-        all_count += t.count;
-    });
-    let predictions = apply_model(&all_ml_data, all_count, predict_options);
-    assert_eq!(predictions.len(), all_count);
-    // split ml results back to all the records and modify the MM ML tags
-    assert_eq!(data.len(), records.len());
-    let mut cur_predict_st = 0;
-    for (option_data, record) in data.iter().zip(records) {
-        // base mods in the exiting record
-        let mut cur_basemods = basemods::BaseMods::new(record, 0);
-        cur_basemods.drop_m6a();
-        log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
-        // check if there is any data
-        let (a_data, t_data) = match option_data {
-            Some((a_data, t_data)) => (a_data, t_data),
-            None => continue,
-        };
-        // iterate over A and then T basemods
-        for data in &[a_data, t_data] {
-            let cur_predict_en = cur_predict_st + data.count;
-            let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
-
-            cur_predict_st += data.count;
-            cur_basemods.base_mods.push(basemod_from_ml(
-                record,
-                predict_options,
-                cur_predictions,
-                &data.positions,
-                &data.base_mod,
-            ));
-        }
-        // write the ml and mm tags
-        cur_basemods.add_mm_and_ml_tags(record);
-
-        //let modified_bases_forward = cur_basemods.forward_m6a().0;
-        let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
-
-        // adding the nucleosomes
-        nucleosomes::add_nucleosomes_to_record(
-            record,
-            &modified_bases_forward,
-            &predict_options.nuc_opts,
-        );
-
-        // clear the existing data
-        if !predict_options.keep {
-            record.remove_aux(b"fp").unwrap_or(());
-            record.remove_aux(b"fi").unwrap_or(());
-            record.remove_aux(b"rp").unwrap_or(());
-            record.remove_aux(b"ri").unwrap_or(());
-        }
-    }
-    assert_eq!(cur_predict_st, predictions.len());
-    data.iter().flatten().count()
-}
-
-#[cfg(feature = "tch")]
-pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
-    cnn::predict_with_cnn(windows, count, predict_options)
-}
-
-#[cfg(not(feature = "tch"))]
-pub fn apply_model(windows: &[f32], count: usize, predict_options: &PredictOptions) -> Vec<f32> {
-    predict_options
-        .burn_models
-        .forward(predict_options, windows, count)
-}
-
-fn _fake_apply_model(_: &[f32], count: usize, _: &PredictOptions) -> Vec<f32> {
-    vec![0.0; count]
-}
-
 pub fn read_bam_into_fiberdata(
     bam: &mut bam::Reader,
     out: &mut bam::Writer,
@@ -587,8 +571,15 @@ pub fn read_bam_into_fiberdata(
         min_ml_score: 0,
     };
 
+    #[cfg(feature = "tch")]
+    type MlBackend = burn::backend::LibTorch;
+    #[cfg(not(feature = "tch"))]
+    log::warn!("m6A predictions are slower without the pytorch backend. Consider recompiling via cargo with: `--all-features`. For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html.");
+    #[cfg(not(feature = "tch"))]
+    type MlBackend = burn::backend::Wgpu;
+
     // switch to the internal predict options
-    let predict_options = PredictOptions::new(
+    let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
         predict_options.keep,
         predict_options.cnn,
         predict_options.semi,
@@ -610,7 +601,7 @@ pub fn read_bam_into_fiberdata(
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
-            .map(|recs| predict_m6a_on_records(recs, &predict_options))
+            .map(|recs| predict_options.predict_m6a_on_records(recs))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
