@@ -505,6 +505,7 @@ pub fn add_fire_to_rec(
     }
     let aux_array: AuxArray<u8> = (&precisions).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
+    record.remove_aux(b"aq").unwrap_or(()); // remove any existing ML field
     rec.record
         .push_aux(b"aq", aux_array_field)
         .expect("Cannot add FIRE precision to bam");
