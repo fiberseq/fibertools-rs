@@ -495,9 +495,6 @@ pub fn add_fire_to_rec(
     model: &GBDT,
     precision_table: &MapPrecisionValues,
 ) {
-    if fire_opts.skip_no_m6a && rec.m6a.starts.is_empty() {
-        return;
-    }
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
     if rec.record.is_reverse() {
@@ -546,6 +543,13 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
             });
             for rec in recs {
+                // skip if no m6a
+                // check for minimum number of MSPs
+                if (fire_opts.skip_no_m6a && rec.m6a.starts.is_empty())
+                    || (fire_opts.min_msp > 0 && (rec.msp.starts.len() < fire_opts.min_msp))
+                {
+                    continue;
+                }
                 out.write(&rec.record)?;
             }
         }
