@@ -221,6 +221,9 @@ pub struct FireOptions {
     /// Skip reads without at least `N` MSP calls
     #[clap(long, default_value = "0")]
     pub min_msp: usize,
+    /// Skip reads without an average MSP size greater than `N`
+    #[clap(long, default_value = "0")]
+    pub min_ave_msp_size: i64,
     /// Width of bin for feature collection
     #[clap(short, long, default_value = "40")]
     pub width_bin: i64,
