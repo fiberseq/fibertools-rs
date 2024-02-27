@@ -537,7 +537,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
-        let mut skip_because_max_msp_length = 0;
+        let mut skip_because_ave_msp_length = 0;
         for recs in &FiberseqRecords::new(&mut bam, 0).chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
@@ -545,26 +545,26 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
             });
             for rec in recs {
                 let n_msps = rec.msp.starts.len();
-                let max_msp_len = *rec.msp.lengths.iter().flatten().max().unwrap_or(&0);
+                //let max_msp_len = *rec.msp.lengths.iter().flatten().max().unwrap_or(&0);
+                let ave_msp_size = rec.msp.lengths.iter().flatten().sum::<i64>() / n_msps as i64;
                 // skip if no m6a
                 // check for minimum number of MSPs
                 if (fire_opts.skip_no_m6a && rec.m6a.starts.is_empty())
                     || (fire_opts.min_msp > 0 && n_msps < fire_opts.min_msp)
                 {
                     continue;
-                } else if fire_opts.min_msp > 0
-                    && max_msp_len < fire_opts.min_msp_length_for_positive_fire_call
-                {
-                    skip_because_max_msp_length += 1;
+                } else if ave_msp_size < fire_opts.min_ave_msp_size {
+                    skip_because_ave_msp_length += 1;
                     continue;
                 }
                 out.write(&rec.record)?;
             }
         }
-        if skip_because_max_msp_length > 0 {
+        if skip_because_ave_msp_length > 0 {
             log::info!(
-                "Skipped {} records because they had no MSPs or too short MSPs",
-                skip_because_max_msp_length
+                "Skipped {} records because they had an average MSP length less than {}",
+                skip_because_ave_msp_length,
+                fire_opts.min_ave_msp_size
             );
         }
     }
