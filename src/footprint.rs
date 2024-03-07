@@ -1,4 +1,5 @@
 use crate::center::CenterPosition;
+use crate::fiber;
 
 use super::bam_writer;
 use super::bio_io;
@@ -45,6 +46,71 @@ impl FootprintYaml {
 
     pub fn max_pos(&self) -> i64 {
         self.modules[self.modules.len() - 1].1
+    }
+}
+
+pub struct ReferenceMotif<'a> {
+    chrom: String,
+    start: i64,
+    end: i64,
+    footprint: &'a FootprintYaml,
+}
+
+impl ReferenceMotif<'_> {
+    pub fn spans(&self, start: i64, end: i64) -> bool {
+        // check if coordinates span the motif
+        self.start > start && self.end < end
+    }
+}
+
+pub struct Footprint<'a> {
+    n_spanning_fibers: usize,
+    n_spanning_msps: usize,
+    has_spanning_msp: Vec<bool>,
+    motif: &'a ReferenceMotif<'a>,
+    fibers: Vec<&'a FiberseqData>,
+}
+
+impl<'a> Footprint<'a> {
+    pub fn new(motif: &'a ReferenceMotif, in_fibers: &'a Vec<FiberseqData>) -> Self {
+        let mut fibers = vec![];
+        for fiber in in_fibers {
+            // add if fiber spans the footprint
+            if motif.spans(fiber.record.reference_start(), fiber.record.reference_end()) {
+                fibers.push(fiber);
+            }
+        }
+
+        let mut footprint = Self {
+            n_spanning_fibers: fibers.len(),
+            n_spanning_msps: 0,
+            has_spanning_msp: vec![],
+            motif,
+            fibers,
+        };
+        // add the number of msps that span the footprint
+        footprint.spanning_msps();
+        footprint
+    }
+
+    fn spanning_msps(&mut self) {
+        for fiber in self.fibers.iter() {
+            let mut has_spanning_msp = false;
+            for msp in &fiber.msp {
+                // skip if there is no mapping of the msp
+                match msp.3 {
+                    Some((rs, re, _rl)) => {
+                        if self.motif.spans(rs, re) {
+                            self.n_spanning_msps += 1;
+                            has_spanning_msp = true;
+                            break;
+                        }
+                    }
+                    None => continue,
+                }
+            }
+            self.has_spanning_msp.push(has_spanning_msp);
+        }
     }
 }
 
