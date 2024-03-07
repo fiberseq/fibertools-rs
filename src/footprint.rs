@@ -1,10 +1,8 @@
-use crate::center::CenterPosition;
-use crate::fiber;
-
 use super::bam_writer;
 use super::bio_io;
 use super::cli::FootprintOptions;
 use super::fiber::*;
+use crate::center::CenterPosition;
 use anyhow;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::{bam, bam::*};
@@ -50,7 +48,7 @@ impl FootprintYaml {
 }
 
 pub struct ReferenceMotif<'a> {
-    chrom: String,
+    pub chrom: String,
     start: i64,
     end: i64,
     footprint: &'a FootprintYaml,
@@ -64,10 +62,10 @@ impl ReferenceMotif<'_> {
 }
 
 pub struct Footprint<'a> {
-    n_spanning_fibers: usize,
-    n_spanning_msps: usize,
-    has_spanning_msp: Vec<bool>,
-    footprint_codes: Vec<u16>,
+    pub n_spanning_fibers: usize,
+    pub n_spanning_msps: usize,
+    pub has_spanning_msp: Vec<bool>,
+    pub footprint_codes: Vec<u16>,
     motif: &'a ReferenceMotif<'a>,
     fibers: Vec<&'a FiberseqData>,
 }
