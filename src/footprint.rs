@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_yaml;
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FootprintYaml {
-    modules: Vec<(i64, i64)>,
+    modules: Vec<(usize, usize)>,
 }
 
 impl FootprintYaml {
@@ -44,7 +44,7 @@ impl FootprintYaml {
         Ok(())
     }
 
-    pub fn max_pos(&self) -> i64 {
+    pub fn max_pos(&self) -> usize {
         self.modules[self.modules.len() - 1].1
     }
 }
@@ -67,6 +67,7 @@ pub struct Footprint<'a> {
     n_spanning_fibers: usize,
     n_spanning_msps: usize,
     has_spanning_msp: Vec<bool>,
+    footprint_codes: Vec<u16>,
     motif: &'a ReferenceMotif<'a>,
     fibers: Vec<&'a FiberseqData>,
 }
@@ -85,11 +86,13 @@ impl<'a> Footprint<'a> {
             n_spanning_fibers: fibers.len(),
             n_spanning_msps: 0,
             has_spanning_msp: vec![],
+            footprint_codes: vec![],
             motif,
             fibers,
         };
         // add the number of msps that span the footprint
         footprint.spanning_msps();
+        footprint.establish_footprints();
         footprint
     }
 
@@ -111,6 +114,43 @@ impl<'a> Footprint<'a> {
             }
             self.has_spanning_msp.push(has_spanning_msp);
         }
+    }
+
+    fn establish_footprints(&mut self) {
+        for (fiber, has_msp) in self.fibers.iter().zip(self.has_spanning_msp.iter()) {
+            let mut footprint_code = 0;
+            if *has_msp {
+                footprint_code = self.footprint_code(fiber);
+            }
+            self.footprint_codes.push(footprint_code);
+        }
+    }
+
+    fn footprint_code(&self, fiber: &FiberseqData) -> u16 {
+        // denote that we have a spanning msp
+        let mut footprint_code = 1 << 0;
+        let motif_end = self.motif.footprint.max_pos();
+
+        // make a binary vector over the motif indicating the presence of an m6a
+        let mut m6a_vec = vec![false; motif_end + 1];
+        for m6a in fiber.m6a.reference_starts.iter().flatten() {
+            if m6a < &self.motif.start || m6a > &self.motif.end {
+                continue;
+            }
+            let m6a_rel_pos = m6a - self.motif.start;
+            m6a_vec[m6a_rel_pos as usize] = true;
+        }
+
+        // mark modules within the motif footprint based on the presence of an m6a
+        for (i, (start, end)) in self.motif.footprint.modules.iter().enumerate() {
+            let count = m6a_vec[*start..*end].iter().filter(|&&x| x).count();
+            // the module doesn't have an m6a, so it is a footprint
+            if count == 0 {
+                footprint_code |= 1 << (i + 1);
+            }
+        }
+
+        footprint_code
     }
 }
 
