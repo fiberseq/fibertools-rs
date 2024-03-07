@@ -9,7 +9,7 @@ use std::vec::IntoIter;
 #[pyclass]
 /// Class for fiberseq data. This class corresponds to a single record in the bam file.
 pub struct Fiberdata {
-    /// Number of ccs passes
+    /// Number of c_s
     #[pyo3(get, set)]
     pub ec: i64,
     /// Name of the read
@@ -146,6 +146,7 @@ impl Fiberdata {
             starts: fiber.nuc.starts.clone(),
             ends: fiber.nuc.ends.clone(),
             lengths: fiber.nuc.lengths.clone(),
+            qual: fiber.nuc.qual.clone(),
             reference_starts: fiber.nuc.reference_starts.clone(),
             reference_ends: fiber.nuc.reference_ends.clone(),
             reference_lengths: fiber.nuc.reference_lengths.clone(),
@@ -154,6 +155,7 @@ impl Fiberdata {
             starts: fiber.msp.starts.clone(),
             ends: fiber.msp.ends.clone(),
             lengths: fiber.msp.lengths.clone(),
+            qual: fiber.msp.qual.clone(),
             reference_starts: fiber.msp.reference_starts.clone(),
             reference_ends: fiber.msp.reference_ends.clone(),
             reference_lengths: fiber.msp.reference_lengths.clone(),
@@ -391,6 +393,9 @@ pub struct Ranges {
     /// Range lengths
     #[pyo3(get, set)]
     pub lengths: Vec<Option<i64>>,
+    /// quals
+    #[pyo3(get, set)]
+    pub qual: Vec<u8>,
     /// Reference starts
     #[pyo3(get, set)]
     pub reference_starts: Vec<Option<i64>>,
@@ -408,6 +413,7 @@ impl Ranges {
     pub fn new(
         starts: Vec<Option<i64>>,
         lengths: Vec<Option<i64>>,
+        qual: Vec<u8>,
         reference_starts: Vec<Option<i64>>,
         reference_lengths: Vec<Option<i64>>,
     ) -> Self {
@@ -431,6 +437,7 @@ impl Ranges {
             starts,
             ends,
             lengths,
+            qual,
             reference_starts,
             reference_ends,
             reference_lengths,

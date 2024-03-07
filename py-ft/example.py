@@ -10,6 +10,8 @@ for fiber in tqdm.tqdm(fiberbam.fetch(*rgn)):
     fiber.ec
     # the mps start positions
     fiber.msp.starts
+    # the fire quality scores of the MSPs
+    fiber.msp.qual
     # print the nuc reference starts
     fiber.nuc.reference_starts
     # lift query (fiber) positions to reference positions
