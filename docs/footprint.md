@@ -26,7 +26,8 @@ For each following bit the bit is set of that module is footprinted by that fibe
 
 Here are some examples in python for how you could test a footprint code in a few ways:
 ```python
-fp_code = 0b1001
+fp_code = 0b1001 # this is a value of 9, but in binary it is 1001
+
 # test if the first bit is set, there is a spanning MSP
 (fp_code & 1) > 0
 
