@@ -110,6 +110,7 @@ pub struct Footprint<'a> {
     pub n_spanning_fibers: usize,
     pub n_spanning_msps: usize,
     pub has_spanning_msp: Vec<bool>,
+    pub msp_fire_scores: Vec<u8>,
     pub n_overlapping_nucs: usize,
     pub has_overlapping_nucleosome: Vec<bool>,
     pub footprint_codes: Vec<u16>,
@@ -131,6 +132,7 @@ impl<'a> Footprint<'a> {
             n_spanning_fibers: fibers.len(),
             n_spanning_msps: 0,
             has_spanning_msp: vec![],
+            msp_fire_scores: vec![],
             n_overlapping_nucs: 0,
             has_overlapping_nucleosome: vec![],
             footprint_codes: vec![],
@@ -147,13 +149,15 @@ impl<'a> Footprint<'a> {
     fn spanning_msps(&mut self) {
         for fiber in self.fibers.iter() {
             let mut has_spanning_msp = false;
+            let mut msp_qual = 0;
             for msp in &fiber.msp {
                 // skip if there is no mapping of the msp
-                match msp.3 {
+                match msp.4 {
                     Some((rs, re, _rl)) => {
                         if self.motif.spans(rs, re) {
                             self.n_spanning_msps += 1;
                             has_spanning_msp = true;
+                            msp_qual = msp.3;
                             break;
                         }
                     }
@@ -161,6 +165,7 @@ impl<'a> Footprint<'a> {
                 }
             }
             self.has_spanning_msp.push(has_spanning_msp);
+            self.msp_fire_scores.push(msp_qual);
         }
     }
 
@@ -169,7 +174,7 @@ impl<'a> Footprint<'a> {
         for fiber in self.fibers.iter() {
             let mut has_overlapping_nucleosome = false;
             for nuc in &fiber.nuc {
-                match nuc.3 {
+                match nuc.4 {
                     Some((rs, re, _rl)) => {
                         if self.motif.overlaps(rs, re) {
                             self.n_overlapping_nucs += 1;
@@ -257,7 +262,7 @@ impl<'a> Footprint<'a> {
             .map(|x| format!("module_{}", x + 1))
             .collect::<Vec<_>>()
             .join("\t");
-        out += "\tfootprint_codes\tfiber_names";
+        out += "\tfootprint_codes\tfire_quals\tfiber_names";
         out
     }
 }
@@ -283,8 +288,13 @@ impl std::fmt::Display for Footprint<'_> {
             .join("\t"));
 
         out += &format!(
-            "\t{}\t{}",
+            "\t{}\t{}\t{}",
             self.footprint_codes
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            self.msp_fire_scores
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()
