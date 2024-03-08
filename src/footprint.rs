@@ -228,7 +228,7 @@ impl std::fmt::Display for Footprint<'_> {
                 .collect::<Vec<_>>()
                 .join(","),
         );
-        write!(f, "{}\n", out)
+        writeln!(f, "{}", out)
     }
 }
 
