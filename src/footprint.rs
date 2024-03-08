@@ -181,19 +181,42 @@ impl<'a> Footprint<'a> {
 
         footprint_code
     }
+
+    pub fn footprinted_by_module_count(&self) -> Vec<usize> {
+        let mut out = vec![];
+        for i in 0..self.motif.footprint.modules.len() {
+            let count = self
+                .footprint_codes
+                .iter()
+                .filter(|&&x| x & (1 << (i + 1)) != 0)
+                .count();
+            out.push(count);
+        }
+        out
+    }
 }
 
 impl std::fmt::Display for Footprint<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut out = vec![];
-        out.push(format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        let mut out = format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t",
             self.motif.chrom,
             self.motif.start,
             self.motif.end,
             self.motif.strand,
             self.n_spanning_fibers,
             self.n_spanning_msps,
+        );
+
+        out += &(self
+            .footprinted_by_module_count()
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join("\t"));
+
+        out += &format!(
+            "\t{}\t{}",
             self.footprint_codes
                 .iter()
                 .map(|x| x.to_string())
@@ -204,8 +227,8 @@ impl std::fmt::Display for Footprint<'_> {
                 .map(|x| String::from_utf8_lossy(x.record.qname()))
                 .collect::<Vec<_>>()
                 .join(","),
-        ));
-        write!(f, "{}", out.join("\n"))
+        );
+        write!(f, "{}\n", out)
     }
 }
 
