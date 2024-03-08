@@ -58,11 +58,18 @@ pub struct ReferenceMotif<'a> {
 }
 
 impl<'a> ReferenceMotif<'a> {
-    pub fn new(line: &str, footprint: &'a FootprintYaml) -> Self {
+    pub fn new(line: &str, footprint: &'a FootprintYaml) -> anyhow::Result<Self> {
         let tokens = line.split('\t').collect::<Vec<_>>();
         assert!(tokens.len() >= 3);
         let st = tokens[1].parse::<i64>().unwrap();
-        let en = tokens[2].parse::<i64>().unwrap();
+        // subtract 1 from the end to make it inclusive ranges []
+        let en = tokens[2].parse::<i64>().unwrap() - 1;
+        anyhow::ensure!(
+            st <= en,
+            "BED start must be less than or equal to the end: {}",
+            line
+        );
+
         // get the strand for the 6 or 4th column
         let strand =
             if (tokens.len() >= 6 && tokens[5] == "-") || (tokens.len() >= 4 && tokens[3] == "-") {
@@ -71,13 +78,21 @@ impl<'a> ReferenceMotif<'a> {
                 '+'
             };
 
-        Self {
+        anyhow::ensure!(
+            en - st == footprint.max_pos() as i64,
+            "Motif length in the BED record ({}) does not match to the total length ({}) in the footprint YAML:\n{}",
+            en - st + 1,
+            footprint.max_pos() + 1,
+            line
+        );
+
+        Ok(Self {
             chrom: tokens[0].to_string(),
             start: st,
             end: en,
             strand,
             footprint,
-        }
+        })
     }
 
     pub fn spans(&self, start: i64, end: i64) -> bool {
@@ -182,16 +197,35 @@ impl<'a> Footprint<'a> {
         footprint_code
     }
 
+    pub fn is_footprinted(&self, module: usize) -> Vec<bool> {
+        let mut rtn = vec![];
+        for footprint_code in &self.footprint_codes {
+            if footprint_code & (1 << (module + 1)) != 0 {
+                rtn.push(true);
+            } else {
+                rtn.push(false);
+            }
+        }
+        rtn
+    }
+
     pub fn footprinted_by_module_count(&self) -> Vec<usize> {
         let mut out = vec![];
         for i in 0..self.motif.footprint.modules.len() {
-            let count = self
-                .footprint_codes
-                .iter()
-                .filter(|&&x| x & (1 << (i + 1)) != 0)
-                .count();
+            let count = self.is_footprinted(i).iter().filter(|&&x| x).count();
             out.push(count);
         }
+        out
+    }
+
+    pub fn out_bed_header(&self) -> String {
+        let mut out = format!("#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\t");
+        out += &(0..self.motif.footprint.modules.len())
+            .into_iter()
+            .map(|x| format!("module_{}", x + 1))
+            .collect::<Vec<_>>()
+            .join("\t");
+        out += "\tfootprint_codes\tfiber_names";
         out
     }
 }
@@ -254,18 +288,23 @@ pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::E
     bam.set_threads(8)?;
 
     let reader = bio_io::buffer_from(&opts.bed)?;
+    let mut first = true;
     // read lines in opts.bed
     for line in reader.lines() {
         let line = line?;
         if line.starts_with('#') {
             continue;
         }
-        let motif = ReferenceMotif::new(&line, &yaml);
+        let motif = ReferenceMotif::new(&line, &yaml)?;
         bam.fetch((&motif.chrom, motif.start, motif.end))?;
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         let fibers = FiberseqData::from_records(records, &header_view, 0);
 
         let footprint = Footprint::new(&motif, &fibers);
+        if first {
+            writeln!(out, "{}", footprint.out_bed_header())?;
+            first = false;
+        }
         out.write_all(format!("{}", footprint).as_bytes())?;
     }
     Ok(())
