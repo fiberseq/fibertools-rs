@@ -110,7 +110,7 @@ pub struct Footprint<'a> {
     pub n_spanning_fibers: usize,
     pub n_spanning_msps: usize,
     pub has_spanning_msp: Vec<bool>,
-    pub msp_fire_scores: Vec<u8>,
+    pub msp_fire_scores: Vec<i16>,
     pub n_overlapping_nucs: usize,
     pub has_overlapping_nucleosome: Vec<bool>,
     pub footprint_codes: Vec<u16>,
@@ -149,7 +149,7 @@ impl<'a> Footprint<'a> {
     fn spanning_msps(&mut self) {
         for fiber in self.fibers.iter() {
             let mut has_spanning_msp = false;
-            let mut msp_qual = 0;
+            let mut msp_qual = -1;
             for msp in &fiber.msp {
                 // skip if there is no mapping of the msp
                 match msp.4 {
@@ -157,7 +157,7 @@ impl<'a> Footprint<'a> {
                         if self.motif.spans(rs, re) {
                             self.n_spanning_msps += 1;
                             has_spanning_msp = true;
-                            msp_qual = msp.3;
+                            msp_qual = msp.3 as i16;
                             break;
                         }
                     }

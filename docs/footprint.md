@@ -35,7 +35,7 @@ The footprinting output table is a tab-separated file with the same number of en
 | n_overlapping_nucs | The number of fibers that have an intersecting nucleosome. |
 | module_X | The number of fibers that are footprinted in module X. The number of module columns is determined by the footprinting yaml. |
 | footprint_codes | Comma separated list of footprint codes for each fiber. See details below. |
-| fire_quals | Comma separated list of fire qualities for each fiber. Zero if the MSP is not spanning or present (will also be zero if FIRE has not been applied). |
+| fire_quals | Comma separated list of fire qualities for each fiber. -1 if the MSP is not spanning or present. Note all fire_quals will be 0 or -1 if FIRE has not been applied to the bam. |
 | fiber_names | Comma separated list of fiber names that span the motif. Names share the same index as the previous column, so they can be matched with footprint codes. |
 
 ## Footprint codes
