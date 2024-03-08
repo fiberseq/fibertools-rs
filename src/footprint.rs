@@ -1,9 +1,11 @@
-use super::bam_writer;
+use std::io::BufRead;
+
 use super::bio_io;
 use super::cli::FootprintOptions;
 use super::fiber::*;
 use crate::center::CenterPosition;
 use anyhow;
+//use rayon::prelude::*;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::{bam, bam::*};
 use serde::{Deserialize, Serialize};
@@ -49,12 +51,35 @@ impl FootprintYaml {
 
 pub struct ReferenceMotif<'a> {
     pub chrom: String,
-    start: i64,
-    end: i64,
+    pub start: i64,
+    pub end: i64,
+    pub strand: char,
     footprint: &'a FootprintYaml,
 }
 
-impl ReferenceMotif<'_> {
+impl<'a> ReferenceMotif<'a> {
+    pub fn new(line: &str, footprint: &'a FootprintYaml) -> Self {
+        let tokens = line.split('\t').collect::<Vec<_>>();
+        assert!(tokens.len() >= 3);
+        let st = tokens[1].parse::<i64>().unwrap();
+        let en = tokens[2].parse::<i64>().unwrap();
+        // get the strand for the 6 or 4th column
+        let strand =
+            if (tokens.len() >= 6 && tokens[5] == "-") || (tokens.len() >= 4 && tokens[3] == "-") {
+                '-'
+            } else {
+                '+'
+            };
+
+        Self {
+            chrom: tokens[0].to_string(),
+            start: st,
+            end: en,
+            strand,
+            footprint,
+        }
+    }
+
     pub fn spans(&self, start: i64, end: i64) -> bool {
         // check if coordinates span the motif
         self.start > start && self.end < end
@@ -132,11 +157,17 @@ impl<'a> Footprint<'a> {
         // make a binary vector over the motif indicating the presence of an m6a
         let mut m6a_vec = vec![false; motif_end + 1];
         for m6a in fiber.m6a.reference_starts.iter().flatten() {
-            if m6a < &self.motif.start || m6a > &self.motif.end {
+            if m6a < &self.motif.start {
                 continue;
+            }
+            if m6a >= &self.motif.end {
+                break;
             }
             let m6a_rel_pos = m6a - self.motif.start;
             m6a_vec[m6a_rel_pos as usize] = true;
+            if self.motif.strand == '-' {
+                m6a_vec.reverse();
+            }
         }
 
         // mark modules within the motif footprint based on the presence of an m6a
@@ -149,6 +180,32 @@ impl<'a> Footprint<'a> {
         }
 
         footprint_code
+    }
+}
+
+impl std::fmt::Display for Footprint<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut out = vec![];
+        out.push(format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            self.motif.chrom,
+            self.motif.start,
+            self.motif.end,
+            self.motif.strand,
+            self.n_spanning_fibers,
+            self.n_spanning_msps,
+            self.footprint_codes
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            self.fibers
+                .iter()
+                .map(|x| String::from_utf8_lossy(x.record.qname()))
+                .collect::<Vec<_>>()
+                .join(","),
+        ));
+        write!(f, "{}", out.join("\n"))
     }
 }
 
@@ -166,31 +223,27 @@ pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::E
     yaml.check_for_valid_input()?;
     log::debug!("YAML: {:?}", yaml);
 
-    let bed_records = super::center::read_center_positions(&opts.bed)?;
     let bam = bio_io::bam_reader(&opts.bam, 1);
     let header = bam::Header::from_template(bam.header());
     let header_view = bam::HeaderView::from_header(&header);
-    let mut out = bam_writer(&opts.out, &bam, 8);
+    let mut out = bio_io::writer(&opts.out)?;
     let mut bam = rust_htslib::bam::IndexedReader::from_path(&opts.bam)?;
     bam.set_threads(8)?;
 
-    for bed_rec in bed_records {
-        bam.fetch((&bed_rec.chrom, bed_rec.position, bed_rec.position + 1))
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Failed to fetch region: {}:{}-{}",
-                    &bed_rec.chrom,
-                    bed_rec.position,
-                    bed_rec.position + 1
-                )
-            });
-
+    let reader = bio_io::buffer_from(&opts.bed)?;
+    // read lines in opts.bed
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with('#') {
+            continue;
+        }
+        let motif = ReferenceMotif::new(&line, &yaml);
+        bam.fetch((&motif.chrom, motif.start, motif.end))?;
         let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
         let fibers = FiberseqData::from_records(records, &header_view, 0);
-        for fiber in fibers {
-            out.write(&fiber.record)?;
-        }
-    }
 
+        let footprint = Footprint::new(&motif, &fibers);
+        out.write_all(format!("{}", footprint).as_bytes())?;
+    }
     Ok(())
 }
