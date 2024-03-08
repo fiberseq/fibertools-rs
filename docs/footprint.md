@@ -32,6 +32,7 @@ The footprinting output table is a tab-separated file with the same number of en
 | strand               | The strand of the motif.                              |
 | n_spanning_fibers      | The number of fibers that span the motif.            |
 | n_spanning_msps | The number of msp that span the motif.                     |
+| n_overlapping_nucs | The number of fibers that have an intersecting nucleosome. |
 | module_X | The number of fibers that are footprinted in module X. The number of module columns is determined by the footprinting yaml. |
 | footprint_codes | Comma separated list of footprint codes for each fiber. See details below. |
 | fiber_names | Comma separated list of fiber names that span the motif. Names share the same index as the previous column, so they can be matched with footprint codes. |

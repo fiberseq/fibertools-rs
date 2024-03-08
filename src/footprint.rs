@@ -99,12 +99,19 @@ impl<'a> ReferenceMotif<'a> {
         // check if coordinates span the motif
         self.start > start && self.end < end
     }
+
+    pub fn overlaps(&self, start: i64, end: i64) -> bool {
+        // check if coordinates overlap the motif
+        self.start < end && self.end > start
+    }
 }
 
 pub struct Footprint<'a> {
     pub n_spanning_fibers: usize,
     pub n_spanning_msps: usize,
     pub has_spanning_msp: Vec<bool>,
+    pub n_overlapping_nucs: usize,
+    pub has_overlapping_nucleosome: Vec<bool>,
     pub footprint_codes: Vec<u16>,
     motif: &'a ReferenceMotif<'a>,
     fibers: Vec<&'a FiberseqData>,
@@ -124,6 +131,8 @@ impl<'a> Footprint<'a> {
             n_spanning_fibers: fibers.len(),
             n_spanning_msps: 0,
             has_spanning_msp: vec![],
+            n_overlapping_nucs: 0,
+            has_overlapping_nucleosome: vec![],
             footprint_codes: vec![],
             motif,
             fibers,
@@ -131,6 +140,7 @@ impl<'a> Footprint<'a> {
         // add the number of msps that span the footprint
         footprint.spanning_msps();
         footprint.establish_footprints();
+        footprint.overlapping_nucleosomes();
         footprint
     }
 
@@ -151,6 +161,27 @@ impl<'a> Footprint<'a> {
                 }
             }
             self.has_spanning_msp.push(has_spanning_msp);
+        }
+    }
+
+    pub fn overlapping_nucleosomes(&mut self) {
+        // for each fiber, check if there is a nucleosome that overlaps with the motif
+        for fiber in self.fibers.iter() {
+            let mut has_overlapping_nucleosome = false;
+            for nuc in &fiber.nuc {
+                match nuc.3 {
+                    Some((rs, re, _rl)) => {
+                        if self.motif.overlaps(rs, re) {
+                            self.n_overlapping_nucs += 1;
+                            has_overlapping_nucleosome = true;
+                            break;
+                        }
+                    }
+                    None => continue,
+                }
+            }
+            self.has_overlapping_nucleosome
+                .push(has_overlapping_nucleosome);
         }
     }
 
@@ -219,7 +250,9 @@ impl<'a> Footprint<'a> {
     }
 
     pub fn out_bed_header(&self) -> String {
-        let mut out = format!("#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\t");
+        let mut out = format!(
+            "#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\tn_overlapping_nucs\t"
+        );
         out += &(0..self.motif.footprint.modules.len())
             .into_iter()
             .map(|x| format!("module_{}", x + 1))
@@ -233,13 +266,14 @@ impl<'a> Footprint<'a> {
 impl std::fmt::Display for Footprint<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut out = format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.motif.chrom,
             self.motif.start,
             self.motif.end,
             self.motif.strand,
             self.n_spanning_fibers,
             self.n_spanning_msps,
+            self.n_overlapping_nucs,
         );
 
         out += &(self
