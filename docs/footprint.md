@@ -28,12 +28,12 @@ Here are some examples in python for how you could test a footprint code in a fe
 ```python
 fp_code = 0b1001 # this is a value of 9, but in binary it is 1001
 
-# test if the first bit is set, there is a spanning MSP
+# test if the first bit is set, there is a spanning MSP, true in this example
 (fp_code & 1) > 0
 
-# test if the first module is footprinted, is false in this example
+# test if the first module is footprinted, false in this example
 (fp_code & (1 << 1)) > 0 
 
-# test if the third module is footprinted, is true in this example
+# test if the third module is footprinted, true in this example
 (fp_code & (1 << 3)) > 0
 ```
