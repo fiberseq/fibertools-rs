@@ -21,7 +21,7 @@ Modules must start at zero, end at the length of the motif, be sorted, and be co
 
 ## Description of output columns
 
-The footprinting output table is a tab-separated file with the following columns:
+The footprinting output table is a tab-separated file with the same number of entries as the input BED file and the following columns:
 
 
 | Column               | Description                                                        |
