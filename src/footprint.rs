@@ -250,11 +250,10 @@ impl<'a> Footprint<'a> {
     }
 
     pub fn out_bed_header(&self) -> String {
-        let mut out = format!(
+        let mut out =
             "#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\tn_overlapping_nucs\t"
-        );
+                .to_string();
         out += &(0..self.motif.footprint.modules.len())
-            .into_iter()
             .map(|x| format!("module_{}", x + 1))
             .collect::<Vec<_>>()
             .join("\t");
