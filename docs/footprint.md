@@ -1,6 +1,25 @@
 # `ft-footprint`
 
-## description of column in the footprinting output table
+## Usage
+```bash
+ft footprint [OPTIONS] <BAM> <BED> <YAML> <OUT>
+```
+The `BAM` file is an indexed fiber-seq bam file.
+
+The `BED` file is a bed file with the motifs you'd like to test for footprints. This should include the strand the motif is on.
+
+The `YAML` file is a file that describes the modules within the motif that can be footprinted. e.g. a CTCF `yaml` with its multiple binding sites might look like:
+```yaml
+modules:
+  - [0, 8]
+  - [8, 16]
+  - [16, 23]
+  - [23, 29]
+  - [29, 35]
+```
+Modules must start at zero, end at the length of the motif, be sorted, and be contiguous with one another. At most 15 modules are allowed, and the intervals are 0-based, half-open (like `BED`).
+
+## Description of output columns
 
 The footprinting output table is a tab-separated file with the following columns:
 
