@@ -79,10 +79,10 @@ impl<'a> ReferenceMotif<'a> {
             };
 
         anyhow::ensure!(
-            en - st == footprint.max_pos() as i64,
+            en - st + 1 == footprint.max_pos() as i64,
             "Motif length in the BED record ({}) does not match to the total length ({}) in the footprint YAML:\n{}",
             en - st + 1,
-            footprint.max_pos() + 1,
+            footprint.max_pos(),
             line
         );
 
@@ -168,9 +168,9 @@ impl<'a> Footprint<'a> {
         // denote that we have a spanning msp
         let mut footprint_code = 1 << 0;
         let motif_end = self.motif.footprint.max_pos();
-
         // make a binary vector over the motif indicating the presence of an m6a
-        let mut m6a_vec = vec![false; motif_end + 1];
+        let mut m6a_vec = vec![false; motif_end];
+
         for m6a in fiber.m6a.reference_starts.iter().flatten() {
             if m6a < &self.motif.start {
                 continue;
