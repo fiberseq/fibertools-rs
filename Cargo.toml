@@ -66,6 +66,9 @@ predicates = "3.0.3"
 [profile.dev]
 opt-level = 0
 
+[profile.test]
+opt-level = 2
+
 [profile.release]
 codegen-units = 1
 debug = true
