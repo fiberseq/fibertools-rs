@@ -28,7 +28,7 @@ Install
 Example
 =======
 .. highlight:: python
-.. include:: ../example.py
+.. include:: ../examples/example.py
    :literal:
 .. highlight:: none
 
