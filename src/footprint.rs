@@ -211,14 +211,14 @@ impl<'a> Footprint<'a> {
             if m6a < &self.motif.start {
                 continue;
             }
-            if m6a >= &self.motif.end {
+            if m6a > &self.motif.end {
                 break;
             }
             let m6a_rel_pos = m6a - self.motif.start;
             m6a_vec[m6a_rel_pos as usize] = true;
-            if self.motif.strand == '-' {
-                m6a_vec.reverse();
-            }
+        }
+        if self.motif.strand == '-' {
+            m6a_vec.reverse();
         }
 
         // mark modules within the motif footprint based on the presence of an m6a
@@ -277,7 +277,7 @@ impl std::fmt::Display for Footprint<'_> {
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.motif.chrom,
             self.motif.start,
-            self.motif.end,
+            self.motif.end + 1,
             self.motif.strand,
             self.n_spanning_fibers,
             self.n_spanning_msps,
