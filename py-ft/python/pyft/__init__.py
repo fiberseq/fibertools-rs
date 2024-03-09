@@ -86,7 +86,7 @@ def read_and_center_footprint_table(f):
     # rename the columns to match the centering output style
     dfm["centering_position"] = dfm["start"] 
     # swap start and end if the footprint is on the reverse strand
-    dfm.loc[dfm.strand == "-", "centering_position"] = dfm.loc[dfm.strand == "-", "end"] 
+    dfm.loc[dfm.strand == "-", "centering_position"] = dfm.loc[dfm.strand == "-", "end"] - 1
     dfm["centered_position_type"] = "not-footprinted"
     dfm.loc[dfm.has_spanning_msp & dfm.footprinted, "centered_position_type"] = "footprinted"
     dfm["query_name"] = dfm["fiber_name"]
