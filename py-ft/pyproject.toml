@@ -10,7 +10,7 @@ classifiers = [
 ]
 name = "pyft"
 requires-python = ">=3.7"
-dependencies = ["pandas>=2.0"]
+dependencies = ["pandas>=2.0", "altair>=5.0", "vegafusion[embed]"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

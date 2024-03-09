@@ -1,6 +1,8 @@
 # this imports all the rust functions
 from .pyft import *
 import pandas as pd
+import altair as alt
+alt.data_transformers.enable("vegafusion")
 
 
 def footprint_code_to_vec(footprint_code, n_modules):
@@ -59,4 +61,48 @@ def read_footprint_table(f, long=False):
     # get the right int columns
     df = df.infer_objects()
     df.rename(columns={"#chrom": "chrom"}, inplace=True)
+    return df
+
+
+
+def read_and_center_footprint_table(f):
+    df = read_footprint_table(f, long=True)
+    # add how many modules are present in each row
+    module_columns = [c for c in df.columns if c.startswith("module:")]
+    df["n_footprints"] = df[module_columns].sum(axis=1)
+    df["first_footprint"] = df[module_columns].idxmax(axis=1)
+
+    # example of reading in a footprinting table
+    not_module_columns = [col for col in df.columns if not col.startswith("module:")]
+
+    dfm = df.melt(ignore_index=False, id_vars=not_module_columns, value_name='footprinted').reset_index()
+    dfm[["module", "centered_start", "centered_end"]] = dfm["variable"].str.split(':|-', n=2, expand=True)
+    dfm["centered_start"] = dfm["centered_start"].astype(int)
+    dfm["centered_end"] = dfm["centered_end"].astype(int)
+    dfm = dfm.infer_objects()
+    dfm["region"] = dfm.chrom + ":" + dfm.start.astype(str) + "-" + dfm.end.astype(str)
+    dfm.sort_values(["region", "n_footprints", "first_footprint"], ascending=False, inplace=True)
+
+    # rename the columns to match the centering output style
+    dfm["centering_position"] = dfm["start"] 
+    # swap start and end if the footprint is on the reverse strand
+    dfm.loc[dfm.strand == "-", "centering_position"] = dfm.loc[dfm.strand == "-", "end"] 
+    dfm["centered_position_type"] = "not-footprinted"
+    dfm.loc[dfm.has_spanning_msp & dfm.footprinted, "centered_position_type"] = "footprinted"
+    dfm["query_name"] = dfm["fiber_name"]
+    
+    dfm.drop(
+        columns=["module", "variable", "n_modules",
+                "index", "first_footprint", "n_footprints",
+                "n_spanning_fibers", "n_spanning_msps", "n_overlapping_nucs",
+                "fiber_name", "start", "end"
+                ],
+        inplace=True,
+        axis=1
+    )
+    return dfm
+
+def read_center_table(f):
+    df = pd.read_csv(f, sep="\t")
+    df = df.infer_objects()
     return df
