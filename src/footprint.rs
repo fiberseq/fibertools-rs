@@ -258,8 +258,12 @@ impl<'a> Footprint<'a> {
         let mut out =
             "#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\tn_overlapping_nucs\t"
                 .to_string();
-        out += &(0..self.motif.footprint.modules.len())
-            .map(|x| format!("module_{}", x + 1))
+        out += &self
+            .motif
+            .footprint
+            .modules
+            .iter()
+            .map(|(st, en)| format!("module:{}-{}", st, en))
             .collect::<Vec<_>>()
             .join("\t");
         out += "\tfootprint_codes\tfire_quals\tfiber_names";

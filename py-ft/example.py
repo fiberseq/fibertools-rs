@@ -1,5 +1,8 @@
+# import pyft
+# from pyft import pyft
 import pyft
 import tqdm
+
 
 bam_f = "../tests/data/center.bam"
 fiberbam = pyft.Fiberbam(bam_f)
@@ -26,3 +29,8 @@ for fiber in fiberbam.center(rgn[0], start=rgn[1], end=rgn[2], strand="-"):
     # returns the same fiber object as above; however, all the positions have been modified to be relative to the region fetched
     # print(fiber.msp.reference_starts)
     continue
+
+
+# example of reading in a footprinting table
+df = pyft.read_footprint_table("../tests/data/ctcf-footprints.bed.gz", long=True)
+print(df)
