@@ -175,14 +175,14 @@ def _add_fiber_to_data_dict(
     add_standard_columns()
     data_dict["type"].append("m6a")
     data_dict["start"].append(fiber.m6a.reference_starts)
-    data_dict["end"].append(base_mod_end(fiber.m6a.reference_starts))
+    data_dict["end"].append(fiber.m6a.get_reference_ends())
     data_dict["qual"].append(fiber.m6a.ml)
 
     # for 5mC
     add_standard_columns()
     data_dict["type"].append("5mC")
     data_dict["start"].append(fiber.cpg.reference_starts)
-    data_dict["end"].append(base_mod_end(fiber.cpg.reference_starts))
+    data_dict["end"].append(fiber.cpg.get_reference_ends())
     data_dict["qual"].append(fiber.cpg.ml)
 
 

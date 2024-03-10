@@ -357,14 +357,14 @@ impl Fiberiter {
 #[derive(Clone)]
 pub struct Basemods {
     /// Basemod starts
-    #[pyo3(get, set)]
-    pub starts: Vec<Option<i64>>,
+    #[pyo3(get)]
+    starts: Vec<Option<i64>>,
     /// Basemod reference starts
-    #[pyo3(get, set)]
-    pub reference_starts: Vec<Option<i64>>,
+    #[pyo3(get)]
+    reference_starts: Vec<Option<i64>>,
     /// Basemod ML
-    #[pyo3(get, set)]
-    pub ml: Vec<u8>,
+    #[pyo3(get)]
+    ml: Vec<u8>,
 }
 
 #[pymethods]
@@ -376,6 +376,28 @@ impl Basemods {
             reference_starts,
             ml,
         }
+    }
+
+    /// return reference ends, start + 1
+    pub fn get_reference_ends(&self) -> Vec<Option<i64>> {
+        self.reference_starts
+            .iter()
+            .map(|x| match x {
+                Some(x) => Some(x + 1),
+                None => None,
+            })
+            .collect()
+    }
+
+    /// return ends, start + 1
+    pub fn get_ends(&self) -> Vec<Option<i64>> {
+        self.starts
+            .iter()
+            .map(|x| match x {
+                Some(x) => Some(x + 1),
+                None => None,
+            })
+            .collect()
     }
 }
 
