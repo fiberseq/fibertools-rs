@@ -24,7 +24,7 @@ def empty_data_dict():
 
 def footprint_code_to_vec(footprint_code, n_modules):
     """
-    Convert a footprint code to a vector of length 10
+    Convert a footprint code to a boolean vector of length n_modules
     """
     rtn = []
     for i in range(1, n_modules + 1):
@@ -135,7 +135,7 @@ def read_and_center_footprint_table(f):
 
 def read_center_table(f):
     """
-    Read a output of ft-center into a pandas dataframe
+    Read a ft-center bed into a pandas dataframe
     """
     df = pd.read_csv(f, sep="\t")
     df = df.infer_objects()
@@ -188,7 +188,7 @@ def _add_fiber_to_data_dict(
 
 def region_to_centered_df(fiberbam, region, strand="+", max_flank=None):
     """
-    Takes a fiberbam and a region and returns a dataframe with reference centered positions in a pandas dataframe
+    Takes a fiberbam and a region and returns a pandas dataframe with reference centered positions
     """
     data_dict = empty_data_dict()
     for fiber in fiberbam.center(
@@ -209,7 +209,7 @@ def region_to_centered_df(fiberbam, region, strand="+", max_flank=None):
 
 def region_to_df(fiberbam, region):
     """
-    Takes a fiberbam and a region and returns a dataframe pandas dataframe with fibers
+    Takes a fiberbam and a region and returns a pandas dataframe with fibers
     that overlap the region
     """
     data_dict = empty_data_dict()
