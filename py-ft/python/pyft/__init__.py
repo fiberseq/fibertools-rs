@@ -5,18 +5,21 @@ import altair as alt
 
 alt.data_transformers.enable("vegafusion")
 
-DATA_DICT_FMT = {
-    "chrom": [],
-    "fiber_start": [],
-    "fiber_end": [],
-    "query_name": [],
-    "strand": [],
-    "type": [],
-    "start": [],
-    "end": [],
-    "qual": [],
-}
 WIDE_COLUMNS = ["start", "end", "qual"]
+
+
+def empty_data_dict():
+    return {
+        "chrom": [],
+        "fiber_start": [],
+        "fiber_end": [],
+        "fiber_name": [],
+        "strand": [],
+        "type": [],
+        "start": [],
+        "end": [],
+        "qual": [],
+    }
 
 
 def footprint_code_to_vec(footprint_code, n_modules):
@@ -74,7 +77,10 @@ def read_footprint_table(f, long=False):
 
     # get the right int columns
     df = df.infer_objects()
-    df.rename(columns={"#chrom": "chrom"}, inplace=True)
+    df.rename(
+        columns={"#chrom": "chrom", "start": "motif_start", "end": "motif_end"},
+        inplace=True,
+    )
     return df
 
 
@@ -94,28 +100,20 @@ def read_and_center_footprint_table(f):
     dfm = df.melt(
         ignore_index=False, id_vars=not_module_columns, value_name="footprinted"
     ).reset_index()
-    dfm[["module", "centered_start", "centered_end"]] = dfm["variable"].str.split(
-        ":|-", n=2, expand=True
-    )
-    dfm["centered_start"] = dfm["centered_start"].astype(int)
-    dfm["centered_end"] = dfm["centered_end"].astype(int)
+    dfm[["module", "start", "end"]] = dfm["variable"].str.split(":|-", n=2, expand=True)
+    dfm["start"] = dfm["start"].astype(int)
+    dfm["end"] = dfm["end"].astype(int)
     dfm = dfm.infer_objects()
-    dfm["region"] = dfm.chrom + ":" + dfm.start.astype(str) + "-" + dfm.end.astype(str)
-    dfm.sort_values(
-        ["region", "n_footprints", "first_footprint"], ascending=False, inplace=True
-    )
 
     # rename the columns to match the centering output style
-    dfm["centering_position"] = dfm["start"]
+    dfm["centering_position"] = dfm["motif_start"]
     # swap start and end if the footprint is on the reverse strand
     dfm.loc[dfm.strand == "-", "centering_position"] = (
-        dfm.loc[dfm.strand == "-", "end"] - 1
+        dfm.loc[dfm.strand == "-", "motif_end"] - 1
     )
-    dfm["centered_position_type"] = "not-footprinted"
-    dfm.loc[
-        dfm.has_spanning_msp & dfm.footprinted, "centered_position_type"
-    ] = "footprinted"
-    dfm["query_name"] = dfm["fiber_name"]
+    dfm["centering_strand"] = dfm["strand"]
+    dfm["type"] = "not-footprinted"
+    dfm.loc[dfm.has_spanning_msp & dfm.footprinted, "type"] = "footprinted"
 
     dfm.drop(
         columns=[
@@ -128,9 +126,6 @@ def read_and_center_footprint_table(f):
             "n_spanning_fibers",
             "n_spanning_msps",
             "n_overlapping_nucs",
-            "fiber_name",
-            "start",
-            "end",
         ],
         inplace=True,
         axis=1,
@@ -150,20 +145,18 @@ def read_center_table(f):
 def _add_fiber_to_data_dict(
     fiber,
     data_dict,
-    centering_position=None,
-    centering_strand=None,
 ):
     # sub function to add fiber data to a dictionary
     def add_standard_columns():
         data_dict["chrom"].append(fiber.chrom)
-        if centering_position is not None and "centering_position" in data_dict:
-            data_dict["centering_position"].append(centering_position)
-            data_dict["centering_strand"].append(centering_strand)
         data_dict["fiber_start"].append(fiber.start)
         data_dict["fiber_end"].append(fiber.end)
         data_dict["strand"].append(fiber.strand)
-        data_dict["query_name"].append(fiber.qname)
+        data_dict["fiber_name"].append(fiber.qname)
 
+    def base_mod_end(list_of_starts):
+        # add one to the vaules as long as they are not None
+        return [x + 1 if x is not None else None for x in list_of_starts]
     # for msp
     add_standard_columns()
     data_dict["type"].append("msp")
@@ -182,32 +175,35 @@ def _add_fiber_to_data_dict(
     add_standard_columns()
     data_dict["type"].append("m6a")
     data_dict["start"].append(fiber.m6a.reference_starts)
-    data_dict["end"].append(fiber.m6a.reference_starts)
+    data_dict["end"].append(base_mod_end(fiber.m6a.reference_starts))
     data_dict["qual"].append(fiber.m6a.ml)
 
     # for 5mC
     add_standard_columns()
     data_dict["type"].append("5mC")
     data_dict["start"].append(fiber.cpg.reference_starts)
-    data_dict["end"].append(fiber.cpg.reference_starts)
+    data_dict["end"].append(base_mod_end(fiber.cpg.reference_starts))
     data_dict["qual"].append(fiber.cpg.ml)
 
 
-def region_to_centered_df(fiberbam, region, strand="+"):
+def region_to_centered_df(fiberbam, region, strand="+", max_flank=None):
     """
     Takes a fiberbam and a region and returns a dataframe with reference centered positions in a pandas dataframe
     """
-    data_dict = DATA_DICT_FMT.copy()
-    data_dict["centering_position"] = []
-    data_dict["centering_strand"] = []
-
+    data_dict = empty_data_dict()
     for fiber in fiberbam.center(
         region[0], start=region[1], end=region[2], strand=strand
     ):
-        _add_fiber_to_data_dict(
-            fiber, data_dict, centering_position=region[1], centering_strand=strand
-        )
+        _add_fiber_to_data_dict(fiber, data_dict)
     df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
+    df["centering_position"] = region[1]
+    if strand == "-":
+        df["centering_position"] = region[2] - 1
+    df["centering_strand"] = strand
+
+    # trim the dataframe to only include fibers that overlap
+    if max_flank is not None:
+        df = df[(df.start < +max_flank) & (df.end > -max_flank)]
     return df
 
 
@@ -216,7 +212,7 @@ def region_to_df(fiberbam, region):
     Takes a fiberbam and a region and returns a dataframe pandas dataframe with fibers
     that overlap the region
     """
-    data_dict = DATA_DICT_FMT.copy()
+    data_dict = empty_data_dict()
     for fiber in fiberbam.fetch(
         region[0],
         start=region[1],
