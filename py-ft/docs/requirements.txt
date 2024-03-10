@@ -3,5 +3,6 @@ sphinx_bootstrap_theme
 sphinx<7.0.0
 sphinx-autodoc-typehints
 sphinx-rtd-theme==1.2.2
-docutils
+docutils<0.20,>=0.18.1
+setuptools
 #sphinxawesome-theme

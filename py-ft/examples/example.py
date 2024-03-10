@@ -32,17 +32,17 @@ for fiber in fiberbam.center(rgn[0], start=rgn[1], end=rgn[2], strand="-"):
 
 
 # example of reading in a footprinting table
-df = pyft.read_footprint_table("../tests/data/ctcf-footprints.bed.gz", long=True)
+df = pyft.utils.read_footprint_table("../tests/data/ctcf-footprints.bed.gz", long=True)
 print(df)
 
 # read in a footprinting table and center the positions
-df = pyft.read_and_center_footprint_table("../tests/data/ctcf-footprints.bed.gz")
+df = pyft.utils.read_and_center_footprint_table("../tests/data/ctcf-footprints.bed.gz")
 print(df)
 
 # read a region of a fiberbam into a pandas dataframe
-df = pyft.region_to_df(fiberbam, rgn)
+df = pyft.utils.region_to_df(fiberbam, rgn)
 print(df)
 
 # read a region of a fiberbam into a pandas dataframe and center the positions
-df = pyft.region_to_centered_df(fiberbam, rgn, strand="-")
+df = pyft.utils.region_to_centered_df(fiberbam, rgn, strand="-")
 print(df)
