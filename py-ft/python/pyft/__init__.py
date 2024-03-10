@@ -2,7 +2,21 @@
 from .pyft import *
 import pandas as pd
 import altair as alt
+
 alt.data_transformers.enable("vegafusion")
+
+DATA_DICT_FMT = {
+    "chrom": [],
+    "fiber_start": [],
+    "fiber_end": [],
+    "query_name": [],
+    "strand": [],
+    "type": [],
+    "start": [],
+    "end": [],
+    "qual": [],
+}
+WIDE_COLUMNS = ["start", "end", "qual"]
 
 
 def footprint_code_to_vec(footprint_code, n_modules):
@@ -64,7 +78,6 @@ def read_footprint_table(f, long=False):
     return df
 
 
-
 def read_and_center_footprint_table(f):
     """
     Read a ft-footprint bed into a pandas dataframe and reformat the data to reflect ft-center output
@@ -78,32 +91,52 @@ def read_and_center_footprint_table(f):
     # example of reading in a footprinting table
     not_module_columns = [col for col in df.columns if not col.startswith("module:")]
 
-    dfm = df.melt(ignore_index=False, id_vars=not_module_columns, value_name='footprinted').reset_index()
-    dfm[["module", "centered_start", "centered_end"]] = dfm["variable"].str.split(':|-', n=2, expand=True)
+    dfm = df.melt(
+        ignore_index=False, id_vars=not_module_columns, value_name="footprinted"
+    ).reset_index()
+    dfm[["module", "centered_start", "centered_end"]] = dfm["variable"].str.split(
+        ":|-", n=2, expand=True
+    )
     dfm["centered_start"] = dfm["centered_start"].astype(int)
     dfm["centered_end"] = dfm["centered_end"].astype(int)
     dfm = dfm.infer_objects()
     dfm["region"] = dfm.chrom + ":" + dfm.start.astype(str) + "-" + dfm.end.astype(str)
-    dfm.sort_values(["region", "n_footprints", "first_footprint"], ascending=False, inplace=True)
+    dfm.sort_values(
+        ["region", "n_footprints", "first_footprint"], ascending=False, inplace=True
+    )
 
     # rename the columns to match the centering output style
-    dfm["centering_position"] = dfm["start"] 
+    dfm["centering_position"] = dfm["start"]
     # swap start and end if the footprint is on the reverse strand
-    dfm.loc[dfm.strand == "-", "centering_position"] = dfm.loc[dfm.strand == "-", "end"] - 1
+    dfm.loc[dfm.strand == "-", "centering_position"] = (
+        dfm.loc[dfm.strand == "-", "end"] - 1
+    )
     dfm["centered_position_type"] = "not-footprinted"
-    dfm.loc[dfm.has_spanning_msp & dfm.footprinted, "centered_position_type"] = "footprinted"
+    dfm.loc[
+        dfm.has_spanning_msp & dfm.footprinted, "centered_position_type"
+    ] = "footprinted"
     dfm["query_name"] = dfm["fiber_name"]
-    
+
     dfm.drop(
-        columns=["module", "variable", "n_modules",
-                "index", "first_footprint", "n_footprints",
-                "n_spanning_fibers", "n_spanning_msps", "n_overlapping_nucs",
-                "fiber_name", "start", "end"
-                ],
+        columns=[
+            "module",
+            "variable",
+            "n_modules",
+            "index",
+            "first_footprint",
+            "n_footprints",
+            "n_spanning_fibers",
+            "n_spanning_msps",
+            "n_overlapping_nucs",
+            "fiber_name",
+            "start",
+            "end",
+        ],
         inplace=True,
-        axis=1
+        axis=1,
     )
     return dfm
+
 
 def read_center_table(f):
     """
@@ -114,61 +147,81 @@ def read_center_table(f):
     return df
 
 
+def _add_fiber_to_data_dict(
+    fiber,
+    data_dict,
+    centering_position=None,
+    centering_strand=None,
+):
+    # sub function to add fiber data to a dictionary
+    def add_standard_columns():
+        data_dict["chrom"].append(fiber.chrom)
+        if centering_position is not None and "centering_position" in data_dict:
+            data_dict["centering_position"].append(centering_position)
+            data_dict["centering_strand"].append(centering_strand)
+        data_dict["fiber_start"].append(fiber.start)
+        data_dict["fiber_end"].append(fiber.end)
+        data_dict["strand"].append(fiber.strand)
+        data_dict["query_name"].append(fiber.qname)
+
+    # for msp
+    add_standard_columns()
+    data_dict["type"].append("msp")
+    data_dict["start"].append(fiber.msp.reference_starts)
+    data_dict["end"].append(fiber.msp.reference_ends)
+    data_dict["qual"].append(fiber.msp.qual)
+
+    # for nuc
+    add_standard_columns()
+    data_dict["type"].append("nuc")
+    data_dict["start"].append(fiber.nuc.reference_starts)
+    data_dict["end"].append(fiber.nuc.reference_ends)
+    data_dict["qual"].append(fiber.nuc.qual)
+
+    # for m6a
+    add_standard_columns()
+    data_dict["type"].append("m6a")
+    data_dict["start"].append(fiber.m6a.reference_starts)
+    data_dict["end"].append(fiber.m6a.reference_starts)
+    data_dict["qual"].append(fiber.m6a.ml)
+
+    # for 5mC
+    add_standard_columns()
+    data_dict["type"].append("5mC")
+    data_dict["start"].append(fiber.cpg.reference_starts)
+    data_dict["end"].append(fiber.cpg.reference_starts)
+    data_dict["qual"].append(fiber.cpg.ml)
+
+
 def region_to_centered_df(fiberbam, region, strand="+"):
     """
     Takes a fiberbam and a region and returns a dataframe with reference centered positions in a pandas dataframe
     """
-    data_dict = {
-        "chrom": [],
-        "centering_position": [],
-        "strand": [],
-        "query_name": [],
-        "centered_position_type": [],
-        "centered_start": [],
-        "centered_end": [],
-        "centered_qual": [],
-    }
-    def add_standard_columns(fiber, data_dict):
-        data_dict["chrom"].append(region[0])
-        data_dict["centering_position"].append(region[1])
-        data_dict["strand"].append(strand)
-        data_dict["query_name"].append(fiber.qname)
-    
-    for fiber in fiberbam.center(region[0], start=region[1], end=region[2], strand=strand):        
-        # for msp
-        add_standard_columns(fiber, data_dict)
-        data_dict["centered_position_type"].append("msp")
-        data_dict["centered_start"].append(fiber.msp.reference_starts)
-        data_dict["centered_end"].append(fiber.msp.reference_ends)
-        data_dict["centered_qual"].append(fiber.msp.qual)
-        
-        # for nuc
-        add_standard_columns(fiber, data_dict)
-        data_dict["centered_position_type"].append("nuc")
-        data_dict["centered_start"].append(fiber.nuc.reference_starts)
-        data_dict["centered_end"].append(fiber.nuc.reference_ends)
-        data_dict["centered_qual"].append(fiber.nuc.qual)
-        
-        # for m6a 
-        add_standard_columns(fiber, data_dict)
-        data_dict["centered_position_type"].append("m6a")
-        data_dict["centered_start"].append(fiber.m6a.reference_starts)
-        data_dict["centered_end"].append(fiber.m6a.reference_starts)
-        data_dict["centered_qual"].append(fiber.m6a.ml)
-        
-        # for 5mC
-        add_standard_columns(fiber, data_dict)
-        data_dict["centered_position_type"].append("5mC")
-        data_dict["centered_start"].append(fiber.cpg.reference_starts)
-        data_dict["centered_end"].append(fiber.cpg.reference_starts)
-        data_dict["centered_qual"].append(fiber.cpg.ml)
-   
-    wide_columns = ["centered_start", "centered_end", "centered_qual"]
-    df = pd.DataFrame.from_dict(data_dict).explode(wide_columns)
-    return df
-        
-        
-        
+    data_dict = DATA_DICT_FMT.copy()
+    data_dict["centering_position"] = []
+    data_dict["centering_strand"] = []
 
-    
-    
+    for fiber in fiberbam.center(
+        region[0], start=region[1], end=region[2], strand=strand
+    ):
+        _add_fiber_to_data_dict(
+            fiber, data_dict, centering_position=region[1], centering_strand=strand
+        )
+    df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
+    return df
+
+
+def region_to_df(fiberbam, region):
+    """
+    Takes a fiberbam and a region and returns a dataframe pandas dataframe with fibers
+    that overlap the region
+    """
+    data_dict = DATA_DICT_FMT.copy()
+    for fiber in fiberbam.fetch(
+        region[0],
+        start=region[1],
+        end=region[2],
+    ):
+        _add_fiber_to_data_dict(fiber, data_dict)
+    df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
+    return df

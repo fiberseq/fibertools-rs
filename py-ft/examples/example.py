@@ -37,3 +37,6 @@ print(df)
 
 df = pyft.region_to_centered_df(fiberbam, rgn, strand="-")
 print(df)
+
+df = pyft.region_to_df(fiberbam, rgn)
+print(df)
