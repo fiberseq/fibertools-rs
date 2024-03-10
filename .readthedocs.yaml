@@ -11,13 +11,12 @@ build:
     - cmake
   tools:
     python: "3.10"
-    rust: "1.70"
+    rust: ">=1.75"
 
 python:
   install:
     - requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
-      
 #conda:
 #    environment: py-ft/docs/environment.yml
