@@ -66,6 +66,9 @@ def read_footprint_table(f, long=False):
 
 
 def read_and_center_footprint_table(f):
+    """
+    Read a ft-footprint bed into a pandas dataframe and reformat the data to reflect ft-center output
+    """
     df = read_footprint_table(f, long=True)
     # add how many modules are present in each row
     module_columns = [c for c in df.columns if c.startswith("module:")]
@@ -103,6 +106,69 @@ def read_and_center_footprint_table(f):
     return dfm
 
 def read_center_table(f):
+    """
+    Read a output of ft-center into a pandas dataframe
+    """
     df = pd.read_csv(f, sep="\t")
     df = df.infer_objects()
     return df
+
+
+def region_to_centered_df(fiberbam, region, strand="+"):
+    """
+    Takes a fiberbam and a region and returns a dataframe with reference centered positions in a pandas dataframe
+    """
+    data_dict = {
+        "chrom": [],
+        "centering_position": [],
+        "strand": [],
+        "query_name": [],
+        "centered_position_type": [],
+        "centered_start": [],
+        "centered_end": [],
+        "centered_qual": [],
+    }
+    def add_standard_columns(fiber, data_dict):
+        data_dict["chrom"].append(region[0])
+        data_dict["centering_position"].append(region[1])
+        data_dict["strand"].append(strand)
+        data_dict["query_name"].append(fiber.qname)
+    
+    for fiber in fiberbam.center(region[0], start=region[1], end=region[2], strand=strand):        
+        # for msp
+        add_standard_columns(fiber, data_dict)
+        data_dict["centered_position_type"].append("msp")
+        data_dict["centered_start"].append(fiber.msp.reference_starts)
+        data_dict["centered_end"].append(fiber.msp.reference_ends)
+        data_dict["centered_qual"].append(fiber.msp.qual)
+        
+        # for nuc
+        add_standard_columns(fiber, data_dict)
+        data_dict["centered_position_type"].append("nuc")
+        data_dict["centered_start"].append(fiber.nuc.reference_starts)
+        data_dict["centered_end"].append(fiber.nuc.reference_ends)
+        data_dict["centered_qual"].append(fiber.nuc.qual)
+        
+        # for m6a 
+        add_standard_columns(fiber, data_dict)
+        data_dict["centered_position_type"].append("m6a")
+        data_dict["centered_start"].append(fiber.m6a.reference_starts)
+        data_dict["centered_end"].append(fiber.m6a.reference_starts)
+        data_dict["centered_qual"].append(fiber.m6a.ml)
+        
+        # for 5mC
+        add_standard_columns(fiber, data_dict)
+        data_dict["centered_position_type"].append("5mC")
+        data_dict["centered_start"].append(fiber.cpg.reference_starts)
+        data_dict["centered_end"].append(fiber.cpg.reference_starts)
+        data_dict["centered_qual"].append(fiber.cpg.ml)
+   
+    wide_columns = ["centered_start", "centered_end", "centered_qual"]
+    df = pd.DataFrame.from_dict(data_dict).explode(wide_columns)
+    return df
+        
+        
+        
+
+    
+    

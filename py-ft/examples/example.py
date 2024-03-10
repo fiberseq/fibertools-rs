@@ -7,7 +7,7 @@ import tqdm
 bam_f = "../tests/data/center.bam"
 fiberbam = pyft.Fiberbam(bam_f)
 out_fiberbam = pyft.Fiberwriter("test.bam", bam_f)
-rgn = ["chr1", 15_323_697, 120_000_000]
+rgn = ["chr22", 26_354_169, 26_354_170]
 for fiber in tqdm.tqdm(fiberbam.fetch(*rgn)):
     # the number of ccs passes
     fiber.ec
@@ -33,4 +33,7 @@ for fiber in fiberbam.center(rgn[0], start=rgn[1], end=rgn[2], strand="-"):
 
 # example of reading in a footprinting table
 df = pyft.read_footprint_table("../tests/data/ctcf-footprints.bed.gz", long=True)
+print(df)
+
+df = pyft.region_to_centered_df(fiberbam, rgn, strand="-")
 print(df)
