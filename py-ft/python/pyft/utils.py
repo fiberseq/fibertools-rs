@@ -1,8 +1,10 @@
 import pandas as pd
 import altair as alt
+
 alt.data_transformers.enable("vegafusion")
 
 WIDE_COLUMNS = ["start", "end", "qual"]
+
 
 def empty_data_dict():
     return {
@@ -153,6 +155,7 @@ def _add_fiber_to_data_dict(
     def base_mod_end(list_of_starts):
         # add one to the vaules as long as they are not None
         return [x + 1 if x is not None else None for x in list_of_starts]
+
     # for msp
     add_standard_columns()
     data_dict["type"].append("msp")
@@ -182,7 +185,9 @@ def _add_fiber_to_data_dict(
     data_dict["qual"].append(fiber.cpg.ml)
 
 
-def region_to_centered_df(fiberbam, region, strand="+", max_flank=None):
+def region_to_centered_df(
+    fiberbam, region, strand="+", max_flank=None, min_basemod_qual=125
+):
     """
     Takes a fiberbam and a region and returns a pandas dataframe with reference centered positions
     """
@@ -200,10 +205,13 @@ def region_to_centered_df(fiberbam, region, strand="+", max_flank=None):
     # trim the dataframe to only include fibers that overlap
     if max_flank is not None:
         df = df[(df.start < +max_flank) & (df.end > -max_flank)]
+
+    is_basemod = df.type.isin(["m6a", "5mC"])
+    df = df[~(is_basemod & (df.qual < min_basemod_qual))]
     return df
 
 
-def region_to_df(fiberbam, region):
+def region_to_df(fiberbam, region, min_basemod_qual=125):
     """
     Takes a fiberbam and a region and returns a pandas dataframe with fibers
     that overlap the region
@@ -216,4 +224,6 @@ def region_to_df(fiberbam, region):
     ):
         _add_fiber_to_data_dict(fiber, data_dict)
     df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
+    is_basemod = df.type.isin(["m6a", "5mC"])
+    df = df[~(is_basemod & (df.qual < min_basemod_qual))]
     return df
