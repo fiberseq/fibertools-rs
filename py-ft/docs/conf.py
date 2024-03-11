@@ -8,8 +8,8 @@ import sys
 
 # import sphinx
 # import sphinx.ext.autosummary as autosummary
-sys.path.insert(0, os.path.abspath("../"))
-#sys.path.insert(0, os.path.abspath("../python/pyft"))
+#sys.path.insert(0, os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath("../python/pyft"))
 import pyft
 
 # -- Project information -----------------------------------------------------
