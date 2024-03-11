@@ -1,3 +1,3 @@
 # this imports all the rust functions
 from .pyft import *
-from . import utils as utils
+from . import utils
