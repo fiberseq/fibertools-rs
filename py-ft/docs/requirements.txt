@@ -1,8 +1,8 @@
 m2r2
 sphinx_bootstrap_theme
 sphinx<7.0.0
-sphinx-autodoc-typehints
+sphinx-autodoc-typehints==1.23.0
 sphinx-rtd-theme==1.2.2
-docutils<0.20,>=0.18.1
-setuptools
+docutils==0.18.1
+setuptools==69.1.1
 #sphinxawesome-theme
