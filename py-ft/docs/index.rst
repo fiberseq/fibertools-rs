@@ -1,3 +1,6 @@
+Getting started
+---------------
+
 pyft: python bindings for fibertools-rs
 ---------------------------------------
 
@@ -38,7 +41,6 @@ Indices and tables
     :hidden:
     :maxdepth: 2
     :caption: pyft
-    :titlesonly:
     
     self
     api.rst
