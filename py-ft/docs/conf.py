@@ -34,6 +34,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     # "edit_on_github",
     "m2r2",
+    # include markdown
+    "nbsphinx",
 ]
 
 # source_suffix = '.rst'
