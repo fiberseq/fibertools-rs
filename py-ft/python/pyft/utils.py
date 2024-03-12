@@ -4,7 +4,10 @@ import altair as alt
 alt.data_transformers.enable("vegafusion")
 
 WIDE_COLUMNS = ["start", "end", "qual"]
-
+M6A_COLOR = "#800080"
+M5C_COLOR = "#8B4513"
+NUC_COLOR = "#A9A9A9"
+MSP_COLOR = "#9370db"
 
 def empty_data_dict():
     return {
