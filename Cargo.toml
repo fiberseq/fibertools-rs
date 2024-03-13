@@ -72,3 +72,5 @@ opt-level = 2
 codegen-units = 1
 debug = true
 lto = "thin"
+
+
