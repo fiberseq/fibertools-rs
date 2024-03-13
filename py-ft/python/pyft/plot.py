@@ -27,7 +27,7 @@ def centered_chart(
         nuc_color (_type_, optional): _description_. Defaults to NUC_COLOR.
         msp_color (_type_, optional): _description_. Defaults to MSP_COLOR.
         auto_sort (bool, optional): _description_. Defaults to True.
-        
+
     Returns:
         altair.Chart
     """
