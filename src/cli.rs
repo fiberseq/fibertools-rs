@@ -204,6 +204,28 @@ pub struct PredictM6AOptions {
     pub batch_size: usize,
 }
 
+impl PredictM6AOptions {
+    pub fn default() -> Self {
+        Self {
+            bam: "-".to_string(),
+            out: "-".to_string(),
+            nucleosome_length: NUC_LEN.parse().unwrap(),
+            combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
+            min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
+            distance_from_end: DIST_FROM_END.parse().unwrap(),
+            allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
+            keep: false,
+            min_ml_score: None,
+            all_calls: false,
+            xgb: false,
+            cnn: false,
+            semi: true,
+            full_float: false,
+            batch_size: 1,
+        }
+    }
+}
+
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct FireOptions {
     /// Bam HiFi file with m6A and MSP calls

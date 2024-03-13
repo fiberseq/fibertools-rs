@@ -574,7 +574,7 @@ pub fn read_bam_into_fiberdata(
     #[cfg(feature = "tch")]
     type MlBackend = burn::backend::LibTorch;
     #[cfg(not(feature = "tch"))]
-    log::warn!("m6A predictions are slower without the pytorch backend. Consider recompiling via cargo with: `--all-features`. For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html.");
+    log::warn!("\n WARNING: m6A predictions are slower without the pytorch backend.\nConsider recompiling via cargo with: `--all-features`.\nFor detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html.\n");
     #[cfg(not(feature = "tch"))]
     type MlBackend = burn::backend::Candle;
 
