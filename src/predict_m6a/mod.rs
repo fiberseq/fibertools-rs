@@ -30,7 +30,7 @@ pub struct PrecisionTable {
 #[derive(Debug)]
 pub struct PredictOptions<B>
 where
-    B: Backend,
+    B: Backend<Device = m6a_burn::BurnDevice>,
 {
     pub keep: bool,
     pub min_ml_score: Option<u8>,
@@ -46,7 +46,7 @@ where
 
 impl<B> PredictOptions<B>
 where
-    B: Backend,
+    B: Backend<Device = m6a_burn::BurnDevice>,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

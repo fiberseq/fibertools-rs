@@ -1,26 +1,8 @@
 use super::bio_io::PbChem;
 use super::predict_m6a::PredictOptions;
+use super::predict_m6a::{LAYERS, WINDOW};
 use burn::tensor::backend::Backend;
 use burn::tensor::{Shape, Tensor};
-// burn backend
-/*
-use burn::backend::candle::CandleDevice;
-use burn::backend::Candle;
-pub type BurnBackend = Candle;
-pub type BurnDevice = CandleDevice;
-
-use burn::backend::ndarray::NdArrayDevice;
-use burn::backend::NdArray;
-pub type BurnBackend = NdArray;
-pub type BurnDevice = NdArrayDevice;
-
-use burn::backend::wgpu::WgpuDevice;
-use burn::backend::Wgpu;
-type BurnBackend = Wgpu;
-type BurnDevice = WgpuDevice;
-*/
-
-use super::predict_m6a::{LAYERS, WINDOW};
 
 pub mod two_zero {
     include!(concat!(env!("OUT_DIR"), "/m6a_burn/two_zero.rs"));
@@ -35,32 +17,42 @@ pub mod revio {
     include!(concat!(env!("OUT_DIR"), "/m6a_burn/revio.rs"));
 }
 
+#[cfg(feature = "tch")]
+pub type BurnDevice = burn::backend::libtorch::LibTorchDevice;
+#[cfg(not(feature = "tch"))]
+pub type BurnDevice = burn::backend::candle::CandleDevice;
+
 /// B is for the burn backend and D is for the device
 #[derive(Debug)]
 pub struct BurnModels<B>
 where
-    B: Backend,
+    B: Backend<Device = BurnDevice>,
 {
     pub two_zero: two_zero::Model<B>,
     pub two_two: two_two::Model<B>,
     pub three_two: three_two::Model<B>,
     pub revio: revio::Model<B>,
-    pub device: B::Device,
+    pub device: BurnDevice,
 }
 
 impl<B> BurnModels<B>
 where
-    B: Backend,
+    B: Backend<Device = BurnDevice>,
 {
     pub fn new() -> Self {
         let two_zero = two_zero::Model::default();
         let two_two = two_two::Model::default();
         let three_two = three_two::Model::default();
         let revio = revio::Model::default();
+
+        #[cfg(not(feature = "tch"))]
         let device = B::Device::default();
+        #[cfg(feature = "tch")]
+        let device = Self::get_libtorch_device();
 
         // log info about the device used
         log::info!("Using {:?} for Burn device.", device);
+
         Self {
             two_zero,
             two_two,
@@ -68,6 +60,19 @@ where
             revio,
             device,
         }
+    }
+
+    #[cfg(feature = "tch")]
+    fn get_libtorch_device() -> BurnDevice {
+        use burn::backend::libtorch::LibTorchDevice;
+        let device = if tch::utils::has_cuda() {
+            LibTorchDevice::Cuda(0)
+        //} else if tch::utils::has_mps() {
+        //LibTorchDevice::Mps
+        } else {
+            LibTorchDevice::Cpu
+        };
+        device
     }
 
     pub fn forward(&self, opts: &PredictOptions<B>, windows: &[f32], count: usize) -> Vec<f32> {
@@ -99,7 +104,7 @@ where
 
 impl<B> Default for BurnModels<B>
 where
-    B: Backend,
+    B: Backend<Device = BurnDevice>,
 {
     fn default() -> Self {
         Self::new()
