@@ -73,6 +73,7 @@ where
         } else {
             LibTorchDevice::Cpu
         };
+        log::info!("Number of threads for Torch: {}", tch::get_num_threads());
         device
     }
 

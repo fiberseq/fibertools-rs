@@ -44,6 +44,9 @@ pub fn main() -> Result<(), Error> {
         .build_global()
         .unwrap();
 
+    #[cfg(feature = "tch")]
+    tch::set_num_threads(args.threads.try_into().unwrap());
+
     match &args.command {
         Some(Commands::Extract(extract_opts)) => {
             // read in the bam from stdin or from a file
