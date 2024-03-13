@@ -9,7 +9,7 @@ use std::vec::IntoIter;
 #[pyclass]
 /// Class for fiberseq data. This class corresponds to a single record in the bam file.
 pub struct Fiberdata {
-    /// Number of ccs passes
+    /// Number of c_s
     #[pyo3(get, set)]
     pub ec: i64,
     /// Name of the read
@@ -146,6 +146,7 @@ impl Fiberdata {
             starts: fiber.nuc.starts.clone(),
             ends: fiber.nuc.ends.clone(),
             lengths: fiber.nuc.lengths.clone(),
+            qual: fiber.nuc.qual.clone(),
             reference_starts: fiber.nuc.reference_starts.clone(),
             reference_ends: fiber.nuc.reference_ends.clone(),
             reference_lengths: fiber.nuc.reference_lengths.clone(),
@@ -154,6 +155,7 @@ impl Fiberdata {
             starts: fiber.msp.starts.clone(),
             ends: fiber.msp.ends.clone(),
             lengths: fiber.msp.lengths.clone(),
+            qual: fiber.msp.qual.clone(),
             reference_starts: fiber.msp.reference_starts.clone(),
             reference_ends: fiber.msp.reference_ends.clone(),
             reference_lengths: fiber.msp.reference_lengths.clone(),
@@ -355,14 +357,14 @@ impl Fiberiter {
 #[derive(Clone)]
 pub struct Basemods {
     /// Basemod starts
-    #[pyo3(get, set)]
-    pub starts: Vec<Option<i64>>,
+    #[pyo3(get)]
+    starts: Vec<Option<i64>>,
     /// Basemod reference starts
-    #[pyo3(get, set)]
-    pub reference_starts: Vec<Option<i64>>,
+    #[pyo3(get)]
+    reference_starts: Vec<Option<i64>>,
     /// Basemod ML
-    #[pyo3(get, set)]
-    pub ml: Vec<u8>,
+    #[pyo3(get)]
+    ml: Vec<u8>,
 }
 
 #[pymethods]
@@ -374,6 +376,28 @@ impl Basemods {
             reference_starts,
             ml,
         }
+    }
+
+    /// return reference ends, start + 1
+    pub fn get_reference_ends(&self) -> Vec<Option<i64>> {
+        self.reference_starts
+            .iter()
+            .map(|x| match x {
+                Some(x) => Some(x + 1),
+                None => None,
+            })
+            .collect()
+    }
+
+    /// return ends, start + 1
+    pub fn get_ends(&self) -> Vec<Option<i64>> {
+        self.starts
+            .iter()
+            .map(|x| match x {
+                Some(x) => Some(x + 1),
+                None => None,
+            })
+            .collect()
     }
 }
 
@@ -391,6 +415,9 @@ pub struct Ranges {
     /// Range lengths
     #[pyo3(get, set)]
     pub lengths: Vec<Option<i64>>,
+    /// quals
+    #[pyo3(get, set)]
+    pub qual: Vec<u8>,
     /// Reference starts
     #[pyo3(get, set)]
     pub reference_starts: Vec<Option<i64>>,
@@ -408,6 +435,7 @@ impl Ranges {
     pub fn new(
         starts: Vec<Option<i64>>,
         lengths: Vec<Option<i64>>,
+        qual: Vec<u8>,
         reference_starts: Vec<Option<i64>>,
         reference_lengths: Vec<Option<i64>>,
     ) -> Self {
@@ -431,6 +459,7 @@ impl Ranges {
             starts,
             ends,
             lengths,
+            qual,
             reference_starts,
             reference_ends,
             reference_lengths,

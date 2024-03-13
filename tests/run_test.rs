@@ -80,3 +80,18 @@ fn test_strip_basemods() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(predicate::str::contains("done! Time elapsed:"));
     Ok(())
 }
+
+#[test]
+fn test_footprint() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ft")?;
+    cmd.arg("footprint")
+        .arg("-v")
+        .arg("tests/data/ctcf.bam")
+        .arg("tests/data/ctcf.bed.gz")
+        .arg("tests/data/ctcf.yaml")
+        .arg("/dev/null");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("done! Time elapsed:"));
+    Ok(())
+}

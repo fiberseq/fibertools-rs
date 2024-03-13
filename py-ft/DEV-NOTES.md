@@ -8,5 +8,8 @@ source .env/bin/activate
 ```
 
 
-# Remote pip install of dev branch
-pip install -e 'git+https://github.com/fiberseq/fibertools-rs.git@refactor#egg=pyft&subdirectory=py-ft'
+# Remote pip install of another branch
+in this case the other branch is called `footprint`.
+```bash
+pip install -e 'git+https://github.com/fiberseq/fibertools-rs.git@footprint#egg=pyft&subdirectory=py-ft'   
+```

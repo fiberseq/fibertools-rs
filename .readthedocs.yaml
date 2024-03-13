@@ -10,14 +10,13 @@ build:
   apt_packages:
     - cmake
   tools:
-    python: "3.10"
-    rust: "1.70"
+    python: "3.12"
+    rust: "1.75"
 
 python:
   install:
     - requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
-      
 #conda:
 #    environment: py-ft/docs/environment.yml

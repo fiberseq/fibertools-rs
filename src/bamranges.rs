@@ -260,7 +260,7 @@ impl Ranges {
 }
 
 impl<'a> IntoIterator for &'a Ranges {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
     type IntoIter = RangesIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -277,7 +277,7 @@ pub struct RangesIterator<'a> {
 }
 
 impl<'a> Iterator for RangesIterator<'a> {
-    type Item = (i64, i64, i64, Option<(i64, i64, i64)>);
+    type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.row.starts.len() {
             return None;
@@ -285,6 +285,7 @@ impl<'a> Iterator for RangesIterator<'a> {
         let start = self.row.starts[self.index]?;
         let end = self.row.ends[self.index]?;
         let length = self.row.lengths[self.index]?;
+        let qual = self.row.qual[self.index];
         let reference_start = self.row.reference_starts[self.index];
         let reference_end = self.row.reference_ends[self.index];
         let reference_length = self.row.reference_lengths[self.index];
@@ -293,6 +294,6 @@ impl<'a> Iterator for RangesIterator<'a> {
             _ => None,
         };
         self.index += 1;
-        Some((start, end, length, reference))
+        Some((start, end, length, qual, reference))
     }
 }
