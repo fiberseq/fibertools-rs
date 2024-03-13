@@ -14,7 +14,6 @@ pub struct FiberOut {
     pub simplify: bool,
     pub quality: bool,
     pub min_ml_score: u8,
-    pub full_float: bool,
 }
 
 impl FiberOut {
@@ -29,7 +28,6 @@ impl FiberOut {
         simplify: bool,
         quality: bool,
         min_ml_score: u8,
-        full_float: bool,
     ) -> Result<Self> {
         let m6a = match m6a {
             Some(m6a) => Some(writer(m6a)?),
@@ -51,11 +49,6 @@ impl FiberOut {
             Some(all) => Some(writer(all)?),
             None => None,
         };
-        // set to zero
-        let mut min_ml_score = min_ml_score;
-        if full_float {
-            min_ml_score = 0;
-        }
 
         Ok(FiberOut {
             m6a,
@@ -67,7 +60,6 @@ impl FiberOut {
             simplify,
             quality,
             min_ml_score,
-            full_float,
         })
     }
 }
@@ -131,7 +123,7 @@ pub fn process_bam_chunk(
         Some(all) => {
             let out: Vec<String> = fiber_data
                 .par_iter()
-                .map(|r| r.write_all(out_files.simplify, out_files.quality, out_files.full_float))
+                .map(|r| r.write_all(out_files.simplify, out_files.quality))
                 .collect();
             for line in out {
                 write_to_file(&line, all);
@@ -152,7 +144,6 @@ pub fn extract_contained(bam: &mut bam::Reader, extract_opts: &ExtractOptions) {
         extract_opts.simplify,
         extract_opts.quality,
         extract_opts.min_ml_score,
-        extract_opts.full_float,
     )
     .unwrap();
 

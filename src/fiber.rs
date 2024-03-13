@@ -403,7 +403,7 @@ impl FiberseqData {
         x
     }
 
-    pub fn write_all(&self, simplify: bool, quality: bool, _full_float: bool) -> String {
+    pub fn write_all(&self, simplify: bool, quality: bool) -> String {
         // PB features
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;

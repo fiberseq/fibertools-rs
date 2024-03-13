@@ -169,43 +169,15 @@ pub struct PredictM6AOptions {
     /// Keep all m6A calls regardless of how low the ML value is
     #[clap(short, long, help_heading = "Developer-Options")]
     pub all_calls: bool,
-    /// Use the XGBoost model for prediction
-    #[clap(long, help_heading = "Developer-Options")]
-    pub xgb: bool,
-    /// Use the CNN model for prediction
-    #[clap(long, help_heading = "Developer-Options")]
-    pub cnn: bool,
-    /// Use the semi-supervised CNN model for prediction [default: true]
-    #[clap(
-          short,
-          long,
-          default_value_ifs([
-              ("cnn", "true", "false"),
-              ("xgb", "false", "true"),
-          ]),
-          help_heading = "Developer-Options",
-      )]
-    pub semi: bool,
-    /// Add a bam tag (mp) with the full floating point predictions of the ML model
-    ///
-    /// For debugging only.
-    #[clap(short, long, help_heading = "Developer-Options")]
-    pub full_float: bool,
     /// Number of reads to include in batch prediction
     ///
     /// Increasing improves GPU performance at the cost of memory.
-    #[clap(
-        short,
-        long,
-        default_value = "1",
-        default_value_if("cnn", "true", "1"),
-        help_heading = "Developer-Options"
-    )]
+    #[clap(short, long, default_value = "1", help_heading = "Developer-Options")]
     pub batch_size: usize,
 }
 
-impl PredictM6AOptions {
-    pub fn default() -> Self {
+impl std::default::Default for PredictM6AOptions {
+    fn default() -> Self {
         Self {
             bam: "-".to_string(),
             out: "-".to_string(),
@@ -217,10 +189,6 @@ impl PredictM6AOptions {
             keep: false,
             min_ml_score: None,
             all_calls: false,
-            xgb: false,
-            cnn: false,
-            semi: true,
-            full_float: false,
             batch_size: 1,
         }
     }
@@ -404,9 +372,6 @@ pub struct ExtractOptions {
     /// Include per base quality scores in "fiber_qual"
     #[clap(short, long, help_heading = "All-Format-Options")]
     pub quality: bool,
-    /// Add the full floating point predictions of the ML model
-    #[clap(short, long, help_heading = "All-Format-Options")]
-    pub full_float: bool,
     /// Simplify output by remove fiber sequence
     #[clap(short, long, help_heading = "All-Format-Options")]
     pub simplify: bool,

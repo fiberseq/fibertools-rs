@@ -67,36 +67,16 @@ pub fn predict_with_cnn<B: Backend>(
 }
 
 pub fn get_model_vec<B: Backend>(predict_options: &PredictOptions<B>) -> anyhow::Result<Vec<u8>> {
-    let mut model: Vec<u8> = vec![];
-    if let Ok(file) = std::env::var("FT_MODEL") {
+    let model = if let Ok(file) = std::env::var("FT_MODEL") {
         log::info!("Loading model from environment variable.");
-        model = std::fs::read(file).expect("Unable to open model file in FT_MODEL");
-    } else if predict_options.semi {
+        std::fs::read(file).expect("Unable to open model file in FT_MODEL")
+    } else {
         log::info!("Using semi-supervised CNN m6A model.");
         match predict_options.polymerase {
-            PbChem::Two => {
-                model = SEMI.to_vec();
-            }
-            PbChem::TwoPointTwo => {
-                model = SEMI_2_2.to_vec();
-            }
-            PbChem::ThreePointTwo => {
-                model = SEMI_3_2.to_vec();
-            }
-            PbChem::Revio => {
-                model = SEMI_REVIO.to_vec();
-            }
-        }
-    } else if predict_options.cnn {
-        log::info!("Using CNN m6A model.");
-        match predict_options.polymerase {
-            PbChem::Two => {
-                model = PT.to_vec();
-            }
-            PbChem::TwoPointTwo => {
-                model = PT_2_2.to_vec();
-            }
-            _ => (),
+            PbChem::Two => SEMI.to_vec(),
+            PbChem::TwoPointTwo => SEMI_2_2.to_vec(),
+            PbChem::ThreePointTwo => SEMI_3_2.to_vec(),
+            PbChem::Revio => SEMI_REVIO.to_vec(),
         }
     };
     Ok(model)

@@ -8,11 +8,7 @@ use ordered_float::OrderedFloat;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
-use rust_htslib::{
-    bam,
-    bam::record::{Aux, AuxArray},
-    bam::Read,
-};
+use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 // sub modules
@@ -40,9 +36,6 @@ where
     B: Backend,
 {
     pub keep: bool,
-    pub cnn: bool,
-    pub semi: bool,
-    pub full_float: bool,
     pub min_ml_score: Option<u8>,
     pub all_calls: bool,
     pub polymerase: PbChem,
@@ -61,18 +54,12 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
-        mut cnn: bool,
-        semi: bool,
-        full_float: bool,
         min_ml_score: Option<u8>,
         all_calls: bool,
         polymerase: PbChem,
         batch_size: usize,
         nuc_opts: cli::AddNucleosomeOptions,
     ) -> Self {
-        if semi {
-            cnn = true;
-        }
         // set up a precision table
         let mut map = BTreeMap::new();
         map.insert(OrderedFloat(0.0), 0);
@@ -80,9 +67,6 @@ where
         // return prediction options
         let mut options = PredictOptions {
             keep,
-            cnn,
-            semi,
-            full_float,
             min_ml_score,
             all_calls,
             polymerase,
@@ -98,50 +82,28 @@ where
     }
 
     fn get_precision_table_and_ml(&self) -> Result<(Option<PrecisionTable>, u8)> {
-        let mut min_ml = 0;
         let mut precision_json = "".to_string();
-
-        if let Ok(_file) = std::env::var("FT_MODEL") {
-            min_ml = 244;
-        } else if self.semi {
+        let min_ml = if let Ok(_file) = std::env::var("FT_MODEL") {
+            244
+        } else {
             log::info!("Using semi-supervised CNN m6A model.");
             match self.polymerase {
                 PbChem::Two => {
                     precision_json = SEMI_JSON_2_0.to_string();
-                    min_ml = 230;
+                    230
                 }
                 PbChem::TwoPointTwo => {
                     precision_json = SEMI_JSON_2_2.to_string();
-                    min_ml = 244;
+                    244
                 }
                 PbChem::ThreePointTwo => {
                     precision_json = SEMI_JSON_3_2.to_string();
-                    min_ml = 244;
+                    244
                 }
                 PbChem::Revio => {
                     precision_json = SEMI_JSON_REVIO.to_string();
-                    min_ml = 254;
+                    254
                 }
-            }
-        } else if self.cnn {
-            match self.polymerase {
-                PbChem::Two => {
-                    min_ml = 200;
-                }
-                PbChem::TwoPointTwo => {
-                    min_ml = 215;
-                }
-                _ => (),
-            }
-        } else {
-            match self.polymerase {
-                PbChem::Two => {
-                    min_ml = 250;
-                }
-                PbChem::TwoPointTwo => {
-                    min_ml = 245;
-                }
-                _ => (),
             }
         };
 
@@ -153,14 +115,10 @@ where
         }
 
         // load the precision table
-        let precision_table: Option<PrecisionTable> = if self.semi {
-            Some(
-                serde_json::from_str(&precision_json)
-                    .expect("Precision table JSON was not well-formatted"),
-            )
-        } else {
-            None
-        };
+        let precision_table: Option<PrecisionTable> = Some(
+            serde_json::from_str(&precision_json)
+                .expect("Precision table JSON was not well-formatted"),
+        );
 
         // set the variables for ML
         let final_min_ml = match self.min_ml_score {
@@ -174,16 +132,12 @@ where
     }
 
     fn add_model(&mut self) -> Result<()> {
-        let mut model: Vec<u8> = vec![];
+        self.model = vec![];
 
-        if self.semi || self.cnn {
-            #[cfg(feature = "tch")]
-            {
-                model = cnn::get_model_vec(&self)?
-            }
-        } else {
-            panic!("No model was loaded.");
-        };
+        #[cfg(feature = "tch")]
+        {
+            self.model = cnn::get_model_vec(self)?
+        }
 
         let (precision_table, min_ml) = self.get_precision_table_and_ml()?;
 
@@ -195,7 +149,6 @@ where
         }
 
         self.min_ml = min_ml;
-        self.model = model;
         Ok(())
     }
 
@@ -235,11 +188,7 @@ where
     }
 
     pub fn float_to_u8(&self, x: f32) -> u8 {
-        if self.semi {
-            self.precision_from_float(x)
-        } else {
-            (x * 255.0).round() as u8
-        }
+        self.precision_from_float(x)
     }
 
     /// group reads together for predictions so we have to move data to the GPU less often
@@ -341,16 +290,6 @@ where
             predictions.len()
         );
 
-        // add full probabilities if needed requested
-        if self.full_float {
-            let mut mp = bio_io::get_f32_tag(record, b"mp");
-            record.remove_aux(b"mp").unwrap_or(());
-            mp.extend(&full_probabilities_forward);
-            let aux_array: AuxArray<f32> = (&mp).into();
-            let aux_array_field = Aux::ArrayFloat(aux_array);
-            record.push_aux(b"mp", aux_array_field).unwrap();
-        }
-
         let base_mod = base_mod.as_bytes();
         let modified_base = base_mod[0];
         let strand = base_mod[1] as char;
@@ -365,7 +304,6 @@ where
             modified_probabilities_forward,
         )
     }
-
     #[cfg(feature = "tch")]
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         cnn::predict_with_cnn(windows, count, self)
@@ -586,9 +524,6 @@ pub fn read_bam_into_fiberdata(
     // switch to the internal predict options
     let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
         predict_options.keep,
-        predict_options.cnn,
-        predict_options.semi,
-        predict_options.full_float,
         predict_options.min_ml_score,
         predict_options.all_calls,
         find_pb_polymerase(&header),
