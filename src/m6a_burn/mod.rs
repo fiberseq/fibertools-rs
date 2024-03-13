@@ -1,6 +1,7 @@
 use super::bio_io::PbChem;
 use super::predict_m6a::PredictOptions;
 use super::predict_m6a::{LAYERS, WINDOW};
+use burn::module::Module;
 use burn::tensor::backend::Backend;
 use burn::tensor::{Shape, Tensor};
 
@@ -40,15 +41,15 @@ where
     B: Backend<Device = BurnDevice>,
 {
     pub fn new() -> Self {
-        let two_zero = two_zero::Model::default();
-        let two_two = two_two::Model::default();
-        let three_two = three_two::Model::default();
-        let revio = revio::Model::default();
-
         #[cfg(not(feature = "tch"))]
         let device = B::Device::default();
         #[cfg(feature = "tch")]
         let device = Self::get_libtorch_device();
+
+        let two_zero = two_zero::Model::default().to_device(&device);
+        let two_two = two_two::Model::default().to_device(&device);
+        let three_two = three_two::Model::default().to_device(&device);
+        let revio = revio::Model::default().to_device(&device);
 
         // log info about the device used
         log::info!("Using {:?} for Burn device.", device);
@@ -67,8 +68,8 @@ where
         use burn::backend::libtorch::LibTorchDevice;
         let device = if tch::utils::has_cuda() {
             LibTorchDevice::Cuda(0)
-        //} else if tch::utils::has_mps() {
-        //LibTorchDevice::Mps
+        } else if tch::utils::has_mps() {
+            LibTorchDevice::Mps
         } else {
             LibTorchDevice::Cpu
         };
