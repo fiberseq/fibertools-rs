@@ -365,13 +365,13 @@ where
             modified_probabilities_forward,
         )
     }
-    /*
+
     #[cfg(feature = "tch")]
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         cnn::predict_with_cnn(windows, count, self)
     }
+
     #[cfg(not(feature = "tch"))]
-     */
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         self.burn_models.forward(self, windows, count)
     }
@@ -573,10 +573,15 @@ pub fn read_bam_into_fiberdata(
 
     #[cfg(feature = "tch")]
     type MlBackend = burn::backend::LibTorch;
+    #[cfg(feature = "tch")]
+    log::info!("Using LibTorch for ML backend.");
+
     #[cfg(not(feature = "tch"))]
     log::warn!("\n WARNING: m6A predictions are slower without the pytorch backend.\nConsider recompiling via cargo with: `--all-features`.\nFor detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html.\n");
     #[cfg(not(feature = "tch"))]
     type MlBackend = burn::backend::Candle;
+    #[cfg(not(feature = "tch"))]
+    log::info!("Using Candle for ML backend.");
 
     // switch to the internal predict options
     let predict_options: PredictOptions<MlBackend> = PredictOptions::new(

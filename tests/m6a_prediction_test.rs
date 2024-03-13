@@ -40,10 +40,10 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
 #[test]
 fn test_m6a_prediction() {
     let files = vec![
-        "tests/data/all.bam",
-        "tests/data/two_two.bam",
-        "tests/data/three_two.bam",
-        "tests/data/revio.bam",
+        "tests/data/all.bam",       // tests 2.0 chemistry
+        "tests/data/two_two.bam",   // tests 2.2 chemistry
+        "tests/data/three_two.bam", // tests 3.2 chemistry
+        "tests/data/revio.bam",     // tests revio chemistry
     ];
 
     let results_before_this_predict = files
