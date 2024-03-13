@@ -556,7 +556,6 @@ pub fn read_bam_into_fiberdata(
         chunk.iter().for_each(|r| out.write(r).unwrap());
 
         total_read += chunk.len();
-        log::info!("Finished predicting m6A for {} reads", total_read);
     }
 }
 
