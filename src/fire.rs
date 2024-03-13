@@ -372,7 +372,7 @@ impl<'a> FireFeats<'a> {
         let msp_data = self.rec.msp.into_iter().collect_vec();
         self.fire_feats = msp_data
             .into_iter()
-            .map(|(s, e, _l, refs)| {
+            .map(|(s, e, _l, _q, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
             })
@@ -495,9 +495,6 @@ pub fn add_fire_to_rec(
     model: &GBDT,
     precision_table: &MapPrecisionValues,
 ) {
-    if fire_opts.skip_no_m6a && rec.m6a.starts.is_empty() {
-        return;
-    }
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
     if rec.record.is_reverse() {
@@ -505,6 +502,7 @@ pub fn add_fire_to_rec(
     }
     let aux_array: AuxArray<u8> = (&precisions).into();
     let aux_array_field = Aux::ArrayU8(aux_array);
+    rec.record.remove_aux(b"aq").unwrap_or(()); // remove any existing ML field
     rec.record
         .push_aux(b"aq", aux_array_field)
         .expect("Cannot add FIRE precision to bam");
@@ -539,15 +537,46 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
+        let mut skip_because_no_m6a = 0;
+        let mut skip_because_num_msp = 0;
+        let mut skip_because_ave_msp_length = 0;
         for recs in &FiberseqRecords::new(&mut bam, 0).chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
             });
             for rec in recs {
+                let n_msps = rec.msp.starts.len();
+                if fire_opts.skip_no_m6a || fire_opts.min_msp > 0 || fire_opts.min_ave_msp_size > 0
+                {
+                    // skip no calls
+                    if rec.m6a.starts.is_empty() || n_msps == 0 {
+                        skip_because_no_m6a += 1;
+                        continue;
+                    }
+                    //let max_msp_len = *rec.msp.lengths.iter().flatten().max().unwrap_or(&0);
+                    if n_msps < fire_opts.min_msp {
+                        skip_because_num_msp += 1;
+                        continue;
+                    }
+                    let ave_msp_size =
+                        rec.msp.lengths.iter().flatten().sum::<i64>() / n_msps as i64;
+                    if ave_msp_size < fire_opts.min_ave_msp_size {
+                        skip_because_ave_msp_length += 1;
+                        continue;
+                    }
+                }
                 out.write(&rec.record)?;
             }
         }
+        log::info!(
+                "Skipped {} records because they had an average MSP length less than {}; {} records because they had fewer than {} MSPs; and {} records because they had no m6A sites",
+                skip_because_ave_msp_length,
+                fire_opts.min_ave_msp_size,
+                skip_because_num_msp,
+                fire_opts.min_msp,
+                skip_because_no_m6a,
+            );
     }
     Ok(())
 }

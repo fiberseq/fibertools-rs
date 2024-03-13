@@ -218,6 +218,12 @@ pub struct FireOptions {
     /// Don't write reads with no m6A calls to the output bam
     #[clap(short, long)]
     pub skip_no_m6a: bool,
+    /// Skip reads without at least `N` MSP calls
+    #[clap(long, default_value = "0")]
+    pub min_msp: usize,
+    /// Skip reads without an average MSP size greater than `N`
+    #[clap(long, default_value = "0")]
+    pub min_ave_msp_size: i64,
     /// Width of bin for feature collection
     #[clap(short, long, default_value = "40")]
     pub width_bin: i64,

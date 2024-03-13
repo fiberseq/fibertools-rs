@@ -8,7 +8,8 @@ import sys
 
 # import sphinx
 # import sphinx.ext.autosummary as autosummary
-sys.path.insert(0, os.path.abspath("../"))
+# sys.path.insert(0, os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath("../python/pyft"))
 import pyft
 
 # -- Project information -----------------------------------------------------
@@ -33,6 +34,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     # "edit_on_github",
     "m2r2",
+    # include markdown
+    "nbsphinx",
 ]
 
 # source_suffix = '.rst'
