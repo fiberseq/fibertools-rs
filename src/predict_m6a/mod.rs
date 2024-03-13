@@ -11,9 +11,6 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-// sub modules
-#[cfg(feature = "tch")]
-pub mod cnn;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
@@ -133,11 +130,6 @@ where
 
     fn add_model(&mut self) -> Result<()> {
         self.model = vec![];
-
-        #[cfg(feature = "tch")]
-        {
-            self.model = cnn::get_model_vec(self)?
-        }
 
         let (precision_table, min_ml) = self.get_precision_table_and_ml()?;
 
@@ -305,14 +297,6 @@ where
         )
     }
 
-    /*
-    #[cfg(feature = "tch")]
-    pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
-        cnn::predict_with_cnn(windows, count, self)
-    }
-
-    #[cfg(not(feature = "tch"))]
-     */
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         self.burn_models.forward(self, windows, count)
     }
@@ -518,8 +502,6 @@ pub fn read_bam_into_fiberdata(
     log::info!("Using LibTorch for ML backend.");
 
     #[cfg(not(feature = "tch"))]
-    log::warn!("\n WARNING: m6A predictions are slower without the pytorch backend.\nConsider recompiling via cargo with: `--all-features`.\nFor detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html.\n");
-    #[cfg(not(feature = "tch"))]
     type MlBackend = burn::backend::Candle;
     #[cfg(not(feature = "tch"))]
     log::info!("Using Candle for ML backend.");
@@ -538,7 +520,6 @@ pub fn read_bam_into_fiberdata(
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
     // iterate over chunks
-    let mut total_read = 0;
     for mut chunk in bam_chunk_iter {
         // add m6a calls
         let number_of_reads_with_predictions = chunk
@@ -554,8 +535,6 @@ pub fn read_bam_into_fiberdata(
 
         // write to output
         chunk.iter().for_each(|r| out.write(r).unwrap());
-
-        total_read += chunk.len();
     }
 }
 
