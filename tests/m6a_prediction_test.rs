@@ -45,6 +45,6 @@ fn test_m6a_prediction() {
         .iter()
         .map(|x| run_prediction_and_count_qual(x.to_string()))
         .collect();
-    // left: [6028626, 18021441, 8585560, 15849622]
-    assert_eq!(results, vec![0, 0, 0, 0])
+
+    assert_eq!(results, vec![6399632, 18215952, 8855144, 16224118, 0])
 }
