@@ -304,12 +304,15 @@ where
             modified_probabilities_forward,
         )
     }
+
+    /*
     #[cfg(feature = "tch")]
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         cnn::predict_with_cnn(windows, count, self)
     }
 
     #[cfg(not(feature = "tch"))]
+     */
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
         self.burn_models.forward(self, windows, count)
     }
