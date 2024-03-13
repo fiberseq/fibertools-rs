@@ -372,7 +372,7 @@ impl<'a> FireFeats<'a> {
         let msp_data = self.rec.msp.into_iter().collect_vec();
         self.fire_feats = msp_data
             .into_iter()
-            .map(|(s, e, _l, refs)| {
+            .map(|(s, e, _l, _q, refs)| {
                 let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
                 (rs, re, self.msp_get_fire_features(s, e))
             })
