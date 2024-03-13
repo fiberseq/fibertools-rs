@@ -21,13 +21,9 @@ Install
 
     pip install pyft
 
-
-Example
-=======
-.. highlight:: python
-.. include:: ../examples/example.py
-   :literal:
-.. highlight:: none
+Vignettes
+=========
+The `vignettes <vignettes/index.rst>`_ are a good place to start to understand the capabilities of pyft.
 
 Indices and tables
 ==================

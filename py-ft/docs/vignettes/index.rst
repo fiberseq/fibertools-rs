@@ -7,4 +7,5 @@ Here are some examples of `pyft` in action:
    :maxdepth: 1
    :titlesonly:
 
-   example.ipynb
+   basic-usage-examples.py
+   centered-plot.ipynb
