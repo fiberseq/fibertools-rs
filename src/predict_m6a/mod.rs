@@ -518,7 +518,6 @@ pub fn read_bam_into_fiberdata(
 
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
-
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
         // add m6a calls
@@ -538,6 +537,7 @@ pub fn read_bam_into_fiberdata(
     }
 }
 
+/// tests
 #[cfg(test)]
 mod tests {
     use super::*;
