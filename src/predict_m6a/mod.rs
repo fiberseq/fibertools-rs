@@ -543,7 +543,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_precision_json_validity() {
-        for file in [SEMI_JSON_2_0, SEMI_JSON_2_2] {
+        for file in [SEMI_JSON_2_0, SEMI_JSON_2_2, SEMI_JSON_3_2, SEMI_JSON_REVIO] {
             let _p: PrecisionTable =
                 serde_json::from_str(file).expect("Precision table JSON was not well-formatted");
         }
