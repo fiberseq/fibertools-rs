@@ -308,6 +308,7 @@ pub struct FootprintOptions {
     /// yaml describing the modules of the footprint
     pub yaml: String,
     /// Output bam
+    #[clap(short, long, default_value = "-")]
     pub out: String,
 }
 
