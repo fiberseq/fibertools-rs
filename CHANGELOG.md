@@ -5,7 +5,123 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 (2024-03-20)
+
+### Chore
+
+ - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
+ - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
+ - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
+
+### New Features
+
+ - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> convert pytorch models to onnx to allow more backends
+   This PR uses onnx files instead of pytorch files and moves the backend
+   of m6a prediction to burn-rs instead of tch-rs.
+   
+   This allows us to use other ML backends in addition to pytorch, which
+   means we can still run m6a prediction without the massive pytorch
+   libraries and get the same results at the cost of some performance.
+   
+   I have also added tests for m6a predictions for each PacBio chemistry to
+   ensure that the number and quality of predictions are identical to
+   previous versions regardless of backend. Will also be a useful test in
+   the future.
+   
+   
+   I also add a lot of new functionality to pyft.
+   
+   This will be the basis of ft v0.4.0 when merged.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 7 calendar days.
+ - 20 days passed between releases.
+ - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **[#43](https://github.com/fiberseq/fibertools-rs/issues/43)**
+    - Footprinting ([`0429ff0`](https://github.com/fiberseq/fibertools-rs/commit/0429ff03a0f437f2d777d7b08b71efc930aa2898))
+ * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
+    - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
+ * **Uncategorized**
+    - Ignore notebook ([`212b2c9`](https://github.com/fiberseq/fibertools-rs/commit/212b2c97b6e796aba879c92822640abe15561a36))
+    - Sync lock with branch ([`285db7d`](https://github.com/fiberseq/fibertools-rs/commit/285db7d2c044de140ed550bbe2bf617233b6f55e))
+    - Sync lock with branch ([`17b8cb6`](https://github.com/fiberseq/fibertools-rs/commit/17b8cb6642bbee5f0e2813515d8256516dccb48d))
+</details>
+
+## 0.3.9 (2024-02-28)
+
+### Chore
+
+ - <csr-id-b0b9b6b8b11c7bd6be8906294897723f3b9c7167/> Release fibertools-rs version 0.3.9
+ - <csr-id-4e524b1156a72d5787e626c5ddb9b884471d51a7/> tch update
+ - <csr-id-39133fdff9c3aca578c18385477fd8b21f7e4682/> tch update
+ - <csr-id-bbd76d25ab3f15cf5dcb7bebd1788dcc3a357815/> pyft lock
+ - <csr-id-f401efe4f3372fc6f1ee07daede818d73f9e9c77/> pyft lock
+ - <csr-id-24954a493bde458c43a2ab9cc1b1db92548ef43d/> pyft lock
+
+### New Features
+
+ - <csr-id-6bd988f9daf0d751b8fbc3a1f844ddd5a1264e9b/> add optional min msp filter to fire output
+ - <csr-id-c3a6e82a043938b3ffb83d1f2872030b516f6644/> add optional min msp filter to fire output
+ - <csr-id-b0bbb5823899d95a8788d7632052368c737c05ed/> add optional min msp filter to fire output
+ - <csr-id-32d8c57bdc92397b287ac430bce3783364c0a829/> add optional min msp filter to fire output
+
+### Bug Fixes
+
+ - <csr-id-77f5ad4405895499ec335f4d6193867bba3d1e98/> typo
+ - <csr-id-f89c95be36c88dfeebdfe17d101573201ab192e0/> allow overwritting fire qual
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 12 commits contributed to the release over the course of 35 calendar days.
+ - 35 days passed between releases.
+ - 12 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Release fibertools-rs version 0.3.9 ([`b0b9b6b`](https://github.com/fiberseq/fibertools-rs/commit/b0b9b6b8b11c7bd6be8906294897723f3b9c7167))
+    - Tch update ([`4e524b1`](https://github.com/fiberseq/fibertools-rs/commit/4e524b1156a72d5787e626c5ddb9b884471d51a7))
+    - Tch update ([`39133fd`](https://github.com/fiberseq/fibertools-rs/commit/39133fdff9c3aca578c18385477fd8b21f7e4682))
+    - Add optional min msp filter to fire output ([`6bd988f`](https://github.com/fiberseq/fibertools-rs/commit/6bd988f9daf0d751b8fbc3a1f844ddd5a1264e9b))
+    - Add optional min msp filter to fire output ([`c3a6e82`](https://github.com/fiberseq/fibertools-rs/commit/c3a6e82a043938b3ffb83d1f2872030b516f6644))
+    - Add optional min msp filter to fire output ([`b0bbb58`](https://github.com/fiberseq/fibertools-rs/commit/b0bbb5823899d95a8788d7632052368c737c05ed))
+    - Add optional min msp filter to fire output ([`32d8c57`](https://github.com/fiberseq/fibertools-rs/commit/32d8c57bdc92397b287ac430bce3783364c0a829))
+    - Typo ([`77f5ad4`](https://github.com/fiberseq/fibertools-rs/commit/77f5ad4405895499ec335f4d6193867bba3d1e98))
+    - Allow overwritting fire qual ([`f89c95b`](https://github.com/fiberseq/fibertools-rs/commit/f89c95be36c88dfeebdfe17d101573201ab192e0))
+    - Pyft lock ([`bbd76d2`](https://github.com/fiberseq/fibertools-rs/commit/bbd76d25ab3f15cf5dcb7bebd1788dcc3a357815))
+    - Pyft lock ([`f401efe`](https://github.com/fiberseq/fibertools-rs/commit/f401efe4f3372fc6f1ee07daede818d73f9e9c77))
+    - Pyft lock ([`24954a4`](https://github.com/fiberseq/fibertools-rs/commit/24954a493bde458c43a2ab9cc1b1db92548ef43d))
+</details>
+
 ## 0.3.8 (2024-01-24)
+
+<csr-id-81dcb9b0f0b43df614b7be981d72d04d8b9a3479/>
+<csr-id-56b0db1305712fee0c17dc0d05077dc3f262a7d4/>
+<csr-id-622a44591a713d644ec1cc9637e87e7cd7aa2262/>
+<csr-id-b093f3aa4231ffc5c69b108e5032e86d2454ffaf/>
+<csr-id-62f4f49fc3810d4d9d291b32ba067cc7af6de367/>
+<csr-id-6393bd8692095aa77de54fb848d508769cda8480/>
+<csr-id-dc7c74a837bb42cda668a22a4cd7e7589e88df08/>
+<csr-id-616f8da1bc2b05d617faeaaf6d540e6d3b82e433/>
+<csr-id-b6da9feab69869b0d75707b5067ac615d03dd64d/>
 
 ### Chore
 
@@ -36,7 +152,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 14 calendar days.
+ - 20 commits contributed to the release over the course of 14 calendar days.
  - 14 days passed between releases.
  - 16 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 1 unique issue was worked on: [#38](https://github.com/fiberseq/fibertools-rs/issues/38)
@@ -50,6 +166,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  * **[#38](https://github.com/fiberseq/fibertools-rs/issues/38)**
     - Refactor ([`a24ce8e`](https://github.com/fiberseq/fibertools-rs/commit/a24ce8ee1b1b169371cfcf0fe9b378266045994d))
  * **Uncategorized**
+    - Release fibertools-rs v0.3.8 ([`672bd9c`](https://github.com/fiberseq/fibertools-rs/commit/672bd9c70fcd43976ae53e7e751c96c6c3469c80))
     - Release fibertools-rs v0.3.7 ([`aaca6be`](https://github.com/fiberseq/fibertools-rs/commit/aaca6be84a656636ec87050a4cf6f38f6e7789da))
     - Pyft lock ([`81dcb9b`](https://github.com/fiberseq/fibertools-rs/commit/81dcb9b0f0b43df614b7be981d72d04d8b9a3479))
     - GBDT made a semvar breaking change, fixing and locking depandancies. ([`16ef1b6`](https://github.com/fiberseq/fibertools-rs/commit/16ef1b6c6047c5e3b963810280c1c62f2096d47c))
