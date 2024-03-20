@@ -1,4 +1,4 @@
-# pyft: `ft` API for Python
+# pyft: Python API
 
 Python bindings for fibertools-rs.
 
