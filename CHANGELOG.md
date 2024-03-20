@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.1 (2024-03-20)
+
+### Chore
+
+ - <csr-id-61967b45e2427eafdba6700c3aa4151ca4ba17c1/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-93de92f6dbe3b8d5e596967f002d19ef0cd30458/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-3a47fa8f33664c37c5ae9283b376360b7dff914d/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-0a9ab3f816b0f52b8519b42b407577528dd14b19/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-0b8f6a299120760452091ee3f14a4442d3876637/> make cargo publish smaller
+ - <csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/> make cargo publish smaller
+ - <csr-id-8a581721e0f45b6d6e774b38f7201142bd1f9eba/> make cargo publish smaller
+ - <csr-id-1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be/> make cargo publish smaller
+ - <csr-id-9a96cb31a28c25cbcd3f01a87b6f976071b0899e/> make cargo publish smaller
+ - <csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/> make test data smaller
+ - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
+ - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
+ - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
+
+### New Features
+
+ - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> convert pytorch models to onnx to allow more backends
+   This PR uses onnx files instead of pytorch files and moves the backend
+   of m6a prediction to burn-rs instead of tch-rs.
+   
+   This allows us to use other ML backends in addition to pytorch, which
+   means we can still run m6a prediction without the massive pytorch
+   libraries and get the same results at the cost of some performance.
+   
+   I have also added tests for m6a predictions for each PacBio chemistry to
+   ensure that the number and quality of predictions are identical to
+   previous versions regardless of backend. Will also be a useful test in
+   the future.
+   
+   
+   I also add a lot of new functionality to pyft.
+   
+   This will be the basis of ft v0.4.0 when merged.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 23 commits contributed to the release over the course of 7 calendar days.
+ - 20 days passed between releases.
+ - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **[#43](https://github.com/fiberseq/fibertools-rs/issues/43)**
+    - Footprinting ([`0429ff0`](https://github.com/fiberseq/fibertools-rs/commit/0429ff03a0f437f2d777d7b08b71efc930aa2898))
+ * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
+    - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
+ * **Uncategorized**
+    - Make test data larger again since I remove the whole dir from cargo publish ([`61967b4`](https://github.com/fiberseq/fibertools-rs/commit/61967b45e2427eafdba6700c3aa4151ca4ba17c1))
+    - Make test data larger again since I remove the whole dir from cargo publish ([`93de92f`](https://github.com/fiberseq/fibertools-rs/commit/93de92f6dbe3b8d5e596967f002d19ef0cd30458))
+    - Make test data larger again since I remove the whole dir from cargo publish ([`3a47fa8`](https://github.com/fiberseq/fibertools-rs/commit/3a47fa8f33664c37c5ae9283b376360b7dff914d))
+    - Make test data larger again since I remove the whole dir from cargo publish ([`0a9ab3f`](https://github.com/fiberseq/fibertools-rs/commit/0a9ab3f816b0f52b8519b42b407577528dd14b19))
+    - Release fibertools-rs v0.4.0 ([`5f5fac5`](https://github.com/fiberseq/fibertools-rs/commit/5f5fac5c1336cba6d59dbeda464f34f8655e4070))
+    - Release fibertools-rs v0.4.0 ([`01748de`](https://github.com/fiberseq/fibertools-rs/commit/01748de0fcaf07e67ecf330615389c3d29c7e9fe))
+    - Make cargo publish smaller ([`0b8f6a2`](https://github.com/fiberseq/fibertools-rs/commit/0b8f6a299120760452091ee3f14a4442d3876637))
+    - Release fibertools-rs v0.4.0 ([`3656e4b`](https://github.com/fiberseq/fibertools-rs/commit/3656e4b9ce3a0c3e7287f0abe04af72c608ecd98))
+    - Release fibertools-rs v0.4.0 ([`e4815ad`](https://github.com/fiberseq/fibertools-rs/commit/e4815ad4c22acf94249063588ab48357fd2aab7b))
+    - Make cargo publish smaller ([`2be96e2`](https://github.com/fiberseq/fibertools-rs/commit/2be96e24685037d23d7b9f1a8a4e18e53c5dda4a))
+    - Release fibertools-rs v0.4.0 ([`4c505e0`](https://github.com/fiberseq/fibertools-rs/commit/4c505e0a165a527b2a7cb338d2414a263a11ce80))
+    - Make cargo publish smaller ([`8a58172`](https://github.com/fiberseq/fibertools-rs/commit/8a581721e0f45b6d6e774b38f7201142bd1f9eba))
+    - Release fibertools-rs v0.4.0 ([`31881bf`](https://github.com/fiberseq/fibertools-rs/commit/31881bfe94986035c343d762c3ecd67c051b2cbf))
+    - Make cargo publish smaller ([`1d7de11`](https://github.com/fiberseq/fibertools-rs/commit/1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be))
+    - Make cargo publish smaller ([`9a96cb3`](https://github.com/fiberseq/fibertools-rs/commit/9a96cb31a28c25cbcd3f01a87b6f976071b0899e))
+    - Release fibertools-rs v0.4.0 ([`9e29925`](https://github.com/fiberseq/fibertools-rs/commit/9e2992599d89b2c71c8be31b711f471d8e08735a))
+    - Make test data smaller ([`cbdda1a`](https://github.com/fiberseq/fibertools-rs/commit/cbdda1a80fd3a06472b4ef3123949b5d1afa46ad))
+    - Release fibertools-rs v0.4.0 ([`5eba406`](https://github.com/fiberseq/fibertools-rs/commit/5eba4063dfa39103c712eb68ce583d906eb8c453))
+    - Ignore notebook ([`212b2c9`](https://github.com/fiberseq/fibertools-rs/commit/212b2c97b6e796aba879c92822640abe15561a36))
+    - Sync lock with branch ([`285db7d`](https://github.com/fiberseq/fibertools-rs/commit/285db7d2c044de140ed550bbe2bf617233b6f55e))
+    - Sync lock with branch ([`17b8cb6`](https://github.com/fiberseq/fibertools-rs/commit/17b8cb6642bbee5f0e2813515d8256516dccb48d))
+</details>
+
 ## 0.4.0 (2024-03-20)
 
 <csr-id-212b2c97b6e796aba879c92822640abe15561a36/>
@@ -63,44 +144,6 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
    I also add a lot of new functionality to pyft.
    
    This will be the basis of ft v0.4.0 when merged.
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 18 commits contributed to the release over the course of 7 calendar days.
- - 20 days passed between releases.
- - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **[#43](https://github.com/fiberseq/fibertools-rs/issues/43)**
-    - Footprinting ([`0429ff0`](https://github.com/fiberseq/fibertools-rs/commit/0429ff03a0f437f2d777d7b08b71efc930aa2898))
- * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
-    - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
- * **Uncategorized**
-    - Release fibertools-rs v0.4.0 ([`01748de`](https://github.com/fiberseq/fibertools-rs/commit/01748de0fcaf07e67ecf330615389c3d29c7e9fe))
-    - Make cargo publish smaller ([`0b8f6a2`](https://github.com/fiberseq/fibertools-rs/commit/0b8f6a299120760452091ee3f14a4442d3876637))
-    - Release fibertools-rs v0.4.0 ([`3656e4b`](https://github.com/fiberseq/fibertools-rs/commit/3656e4b9ce3a0c3e7287f0abe04af72c608ecd98))
-    - Release fibertools-rs v0.4.0 ([`e4815ad`](https://github.com/fiberseq/fibertools-rs/commit/e4815ad4c22acf94249063588ab48357fd2aab7b))
-    - Make cargo publish smaller ([`2be96e2`](https://github.com/fiberseq/fibertools-rs/commit/2be96e24685037d23d7b9f1a8a4e18e53c5dda4a))
-    - Release fibertools-rs v0.4.0 ([`4c505e0`](https://github.com/fiberseq/fibertools-rs/commit/4c505e0a165a527b2a7cb338d2414a263a11ce80))
-    - Make cargo publish smaller ([`8a58172`](https://github.com/fiberseq/fibertools-rs/commit/8a581721e0f45b6d6e774b38f7201142bd1f9eba))
-    - Release fibertools-rs v0.4.0 ([`31881bf`](https://github.com/fiberseq/fibertools-rs/commit/31881bfe94986035c343d762c3ecd67c051b2cbf))
-    - Make cargo publish smaller ([`1d7de11`](https://github.com/fiberseq/fibertools-rs/commit/1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be))
-    - Make cargo publish smaller ([`9a96cb3`](https://github.com/fiberseq/fibertools-rs/commit/9a96cb31a28c25cbcd3f01a87b6f976071b0899e))
-    - Release fibertools-rs v0.4.0 ([`9e29925`](https://github.com/fiberseq/fibertools-rs/commit/9e2992599d89b2c71c8be31b711f471d8e08735a))
-    - Make test data smaller ([`cbdda1a`](https://github.com/fiberseq/fibertools-rs/commit/cbdda1a80fd3a06472b4ef3123949b5d1afa46ad))
-    - Release fibertools-rs v0.4.0 ([`5eba406`](https://github.com/fiberseq/fibertools-rs/commit/5eba4063dfa39103c712eb68ce583d906eb8c453))
-    - Ignore notebook ([`212b2c9`](https://github.com/fiberseq/fibertools-rs/commit/212b2c97b6e796aba879c92822640abe15561a36))
-    - Sync lock with branch ([`285db7d`](https://github.com/fiberseq/fibertools-rs/commit/285db7d2c044de140ed550bbe2bf617233b6f55e))
-    - Sync lock with branch ([`17b8cb6`](https://github.com/fiberseq/fibertools-rs/commit/17b8cb6642bbee5f0e2813515d8256516dccb48d))
-</details>
 
 ## 0.3.9 (2024-02-28)
 
