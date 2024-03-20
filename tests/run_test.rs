@@ -89,6 +89,7 @@ fn test_footprint() -> Result<(), Box<dyn std::error::Error>> {
         .arg("tests/data/ctcf.bam")
         .arg("tests/data/ctcf.bed.gz")
         .arg("tests/data/ctcf.yaml")
+        .arg("-o")
         .arg("/dev/null");
     cmd.assert()
         .success()

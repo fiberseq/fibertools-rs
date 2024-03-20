@@ -44,6 +44,9 @@ pub fn main() -> Result<(), Error> {
         .build_global()
         .unwrap();
 
+    #[cfg(feature = "tch")]
+    tch::set_num_threads(args.threads.try_into().unwrap());
+
     match &args.command {
         Some(Commands::Extract(extract_opts)) => {
             // read in the bam from stdin or from a file
@@ -58,19 +61,17 @@ pub fn main() -> Result<(), Error> {
         }
         #[allow(unused)]
         Some(Commands::PredictM6A(predict_m6a_opts)) => {
-            #[cfg(feature = "predict")]
-            {
-                let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
-                let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
-                predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
-            }
-            #[cfg(not(feature = "predict"))]
-            {
-                log::error!("m6A predictions are not enabled with this install of fibertools.");
-                log::error!("Please recompile with: `--all-features`.");
-                log::error!("If fibertools was installed via bioconda you will not be able to do m6A predictions. Recent size limits on packages prevent us from including the pytorch libraries necessary for predictions within the bioconda install. Please install via Cargo following the directions here: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
-                )
-            }
+            #[cfg(not(feature = "tch"))]
+            log::warn!(
+                "\n{}\n\t{}\n\t{}\n", 
+                "WARNING: m6A predictions are slower without the pytorch backend.".bright_yellow().bold(),
+                "Consider recompiling via cargo with: `--all-features`.",
+                "For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
+            );
+
+            let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
+            let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
+            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
         }
         Some(Commands::ClearKinetics { bam, out }) => {
             let mut bam = bam_reader(bam, args.threads);
