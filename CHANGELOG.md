@@ -24,6 +24,10 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ### Chore
 
+ - <csr-id-0b8f6a299120760452091ee3f14a4442d3876637/> make cargo publish smaller
+
+### Chore
+
  - <csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/> make cargo publish smaller
 
 ### Chore
@@ -63,9 +67,9 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 15 commits contributed to the release over the course of 7 calendar days.
+ - 17 commits contributed to the release over the course of 7 calendar days.
  - 20 days passed between releases.
- - 9 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
 
 ### Commit Details
@@ -79,6 +83,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
     - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
  * **Uncategorized**
+    - Make cargo publish smaller ([`0b8f6a2`](https://github.com/fiberseq/fibertools-rs/commit/0b8f6a299120760452091ee3f14a4442d3876637))
+    - Release fibertools-rs v0.4.0 ([`3656e4b`](https://github.com/fiberseq/fibertools-rs/commit/3656e4b9ce3a0c3e7287f0abe04af72c608ecd98))
     - Release fibertools-rs v0.4.0 ([`e4815ad`](https://github.com/fiberseq/fibertools-rs/commit/e4815ad4c22acf94249063588ab48357fd2aab7b))
     - Make cargo publish smaller ([`2be96e2`](https://github.com/fiberseq/fibertools-rs/commit/2be96e24685037d23d7b9f1a8a4e18e53c5dda4a))
     - Release fibertools-rs v0.4.0 ([`4c505e0`](https://github.com/fiberseq/fibertools-rs/commit/4c505e0a165a527b2a7cb338d2414a263a11ce80))
