@@ -12,7 +12,7 @@ readme = "README.md"
 repository = "https://github.com/fiberseq/fibertools-rs"
 version = "0.4.0"
 # exclude python vignettes and docs from cargo publish since they are too large
-exclude = ["/py-ft/*"]
+exclude = ["py-ft/", "tests/data/"]
 
 [[bin]]
 name = "ft"
