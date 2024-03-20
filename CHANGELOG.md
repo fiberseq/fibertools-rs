@@ -7,11 +7,19 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## 0.4.0 (2024-03-20)
 
+<csr-id-212b2c97b6e796aba879c92822640abe15561a36/>
+<csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/>
+<csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/>
+
 ### Chore
 
  - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
  - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
  - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
+
+### Chore
+
+ - <csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/> make test data smaller
 
 ### New Features
 
@@ -37,9 +45,9 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 7 calendar days.
+ - 7 commits contributed to the release over the course of 7 calendar days.
  - 20 days passed between releases.
- - 4 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
 
 ### Commit Details
@@ -53,12 +61,21 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
     - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
  * **Uncategorized**
+    - Make test data smaller ([`cbdda1a`](https://github.com/fiberseq/fibertools-rs/commit/cbdda1a80fd3a06472b4ef3123949b5d1afa46ad))
+    - Release fibertools-rs v0.4.0 ([`5eba406`](https://github.com/fiberseq/fibertools-rs/commit/5eba4063dfa39103c712eb68ce583d906eb8c453))
     - Ignore notebook ([`212b2c9`](https://github.com/fiberseq/fibertools-rs/commit/212b2c97b6e796aba879c92822640abe15561a36))
     - Sync lock with branch ([`285db7d`](https://github.com/fiberseq/fibertools-rs/commit/285db7d2c044de140ed550bbe2bf617233b6f55e))
     - Sync lock with branch ([`17b8cb6`](https://github.com/fiberseq/fibertools-rs/commit/17b8cb6642bbee5f0e2813515d8256516dccb48d))
 </details>
 
 ## 0.3.9 (2024-02-28)
+
+<csr-id-b0b9b6b8b11c7bd6be8906294897723f3b9c7167/>
+<csr-id-4e524b1156a72d5787e626c5ddb9b884471d51a7/>
+<csr-id-39133fdff9c3aca578c18385477fd8b21f7e4682/>
+<csr-id-bbd76d25ab3f15cf5dcb7bebd1788dcc3a357815/>
+<csr-id-f401efe4f3372fc6f1ee07daede818d73f9e9c77/>
+<csr-id-24954a493bde458c43a2ab9cc1b1db92548ef43d/>
 
 ### Chore
 
