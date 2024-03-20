@@ -9,24 +9,10 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ### Chore
 
- - <csr-id-61967b45e2427eafdba6700c3aa4151ca4ba17c1/> make test data larger again since I remove the whole dir from cargo publish
- - <csr-id-93de92f6dbe3b8d5e596967f002d19ef0cd30458/> make test data larger again since I remove the whole dir from cargo publish
- - <csr-id-3a47fa8f33664c37c5ae9283b376360b7dff914d/> make test data larger again since I remove the whole dir from cargo publish
- - <csr-id-0a9ab3f816b0f52b8519b42b407577528dd14b19/> make test data larger again since I remove the whole dir from cargo publish
- - <csr-id-0b8f6a299120760452091ee3f14a4442d3876637/> make cargo publish smaller
- - <csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/> make cargo publish smaller
- - <csr-id-8a581721e0f45b6d6e774b38f7201142bd1f9eba/> make cargo publish smaller
- - <csr-id-1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be/> make cargo publish smaller
- - <csr-id-9a96cb31a28c25cbcd3f01a87b6f976071b0899e/> make cargo publish smaller
- - <csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/> make test data smaller
- - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
- - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
- - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
+ ### New Features
 
-### New Features
-
- - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> convert pytorch models to onnx to allow more backends
-   This PR uses onnx files instead of pytorch files and moves the backend
+ - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> 
+   This release uses onnx files instead of pytorch files and moves the backend
    of m6a prediction to burn-rs instead of tch-rs.
    
    This allows us to use other ML backends in addition to pytorch, which
@@ -37,12 +23,9 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
    ensure that the number and quality of predictions are identical to
    previous versions regardless of backend. Will also be a useful test in
    the future.
-   
-   
-   I also add a lot of new functionality to pyft.
-   
-   This will be the basis of ft v0.4.0 when merged.
 
+   This release also adds the new `ft-footprint` command to the `ft` CLI. 
+   
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -88,62 +71,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## 0.4.0 (2024-03-20)
 
-<csr-id-212b2c97b6e796aba879c92822640abe15561a36/>
-<csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/>
-<csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/>
-<csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/>
-<csr-id-1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be/>
-<csr-id-9a96cb31a28c25cbcd3f01a87b6f976071b0899e/>
-<csr-id-8a581721e0f45b6d6e774b38f7201142bd1f9eba/>
-<csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/>
-<csr-id-0b8f6a299120760452091ee3f14a4442d3876637/>
-
-### Chore
-
- - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
- - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
- - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
-
-### Chore
-
- - <csr-id-0b8f6a299120760452091ee3f14a4442d3876637/> make cargo publish smaller
-
-### Chore
-
- - <csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/> make cargo publish smaller
-
-### Chore
-
- - <csr-id-8a581721e0f45b6d6e774b38f7201142bd1f9eba/> make cargo publish smaller
-
-### Chore
-
- - <csr-id-1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be/> make cargo publish smaller
- - <csr-id-9a96cb31a28c25cbcd3f01a87b6f976071b0899e/> make cargo publish smaller
-
-### Chore
-
- - <csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/> make test data smaller
-
-### New Features
-
- - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> convert pytorch models to onnx to allow more backends
-   This PR uses onnx files instead of pytorch files and moves the backend
-   of m6a prediction to burn-rs instead of tch-rs.
-   
-   This allows us to use other ML backends in addition to pytorch, which
-   means we can still run m6a prediction without the massive pytorch
-   libraries and get the same results at the cost of some performance.
-   
-   I have also added tests for m6a predictions for each PacBio chemistry to
-   ensure that the number and quality of predictions are identical to
-   previous versions regardless of backend. Will also be a useful test in
-   the future.
-   
-   
-   I also add a lot of new functionality to pyft.
-   
-   This will be the basis of ft v0.4.0 when merged.
+0.4.0 failed to publish due to test data being too small. The release was re-published as 0.4.1 with the test data excluded from cargo publish.
 
 ## 0.3.9 (2024-02-28)
 
