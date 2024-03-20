@@ -1,5 +1,6 @@
 ```
-Extract fiberseq data into plain text files. See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs
+Extract fiberseq data into plain text files. See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description
+of the outputs
 
 Usage: ft extract [OPTIONS] [BAM]
 
@@ -19,9 +20,8 @@ Options:
   -V, --version                      Print version
 
 All-Format-Options:
-  -q, --quality     Include per base quality scores in "fiber_qual"
-  -f, --full-float  Add the full floating point predictions of the ML model
-  -s, --simplify    Simplify output by remove fiber sequence
+  -q, --quality   Include per base quality scores in "fiber_qual"
+  -s, --simplify  Simplify output by remove fiber sequence
 
 Global-Options:
   -t, --threads <THREADS>  Threads [default: 8]

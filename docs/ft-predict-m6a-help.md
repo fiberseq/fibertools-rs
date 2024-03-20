@@ -1,5 +1,6 @@
 ```
-Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as)
+Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl,
+ns) and MTase sensitive patches (al, as)
 
 Usage: ft predict-m6a [OPTIONS] [BAM] [OUT]
 
@@ -50,20 +51,6 @@ Developer-Options:
 
   -a, --all-calls
           Keep all m6A calls regardless of how low the ML value is
-
-      --xgb
-          Use the XGBoost model for prediction
-
-      --cnn
-          Use the CNN model for prediction
-
-  -s, --semi
-          Use the semi-supervised CNN model for prediction [default: true]
-
-  -f, --full-float
-          Add a bam tag (mp) with the full floating point predictions of the ML model
-          
-          For debugging only.
 
   -b, --batch-size <BATCH_SIZE>
           Number of reads to include in batch prediction
