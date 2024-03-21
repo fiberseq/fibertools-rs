@@ -73,15 +73,19 @@ pub fn main() -> Result<(), Error> {
             let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
             predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
         }
-        Some(Commands::ClearKinetics { bam, out }) => {
-            let mut bam = bam_reader(bam, args.threads);
-            let mut out = bam_writer(out, &bam, args.threads);
+        Some(Commands::ClearKinetics(clear_kinetics_opts)) => {
+            let mut bam = bam_reader(&clear_kinetics_opts.bam, args.threads);
+            let mut out = bam_writer(&clear_kinetics_opts.out, &bam, args.threads);
             fibertools_rs::clear_kinetics(&mut bam, &mut out);
         }
-        Some(Commands::StripBasemods { bam, out, basemod }) => {
-            let mut bam = bam_reader(bam, args.threads);
-            let mut out = bam_writer(out, &bam, args.threads);
-            fibertools_rs::strip_basemods::strip_base_mods(&mut bam, &mut out, basemod);
+        Some(Commands::StripBasemods(strip_basemods_opts)) => {
+            let mut bam = bam_reader(&strip_basemods_opts.bam, args.threads);
+            let mut out = bam_writer(&strip_basemods_opts.out, &bam, args.threads);
+            fibertools_rs::strip_basemods::strip_base_mods(
+                &mut bam,
+                &mut out,
+                &strip_basemods_opts.basemod,
+            );
         }
         Some(Commands::AddNucleosomes(nuc_opts)) => {
             add_nucleosomes_to_bam(nuc_opts, args.threads);
@@ -95,9 +99,12 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::TrackDecorators(decorator_opts)) => {
             fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
         }
-        Some(Commands::Completions { shell }) => {
-            log::info!("Generating completion file for {:?}...", shell);
-            cli::print_completions(*shell, &mut cli::make_cli_app());
+        Some(Commands::Completions(completion_opts)) => {
+            log::info!(
+                "Generating completion file for {:?}...",
+                completion_opts.shell
+            );
+            cli::print_completions(completion_opts.shell, &mut cli::make_cli_app());
         }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());

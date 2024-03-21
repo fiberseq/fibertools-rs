@@ -78,46 +78,27 @@ pub enum Commands {
     AddNucleosomes(AddNucleosomeOptions),
     /// Add FIREs (Fiber-seq Inferred Regulatory Elements) to a bam file with m6a predictions
     Fire(FireOptions),
-    /// Add footprints to a bam file with m6a predictions
-    Footprint(FootprintOptions),
     /// Extract fiberseq data into plain text files.
+    ///
     /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
     Extract(ExtractOptions),
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs.
+    ///
     ///  See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output.
     #[clap(visible_aliases = &["c", "ct"])]
     Center(CenterOptions),
+    /// Infer footprints from fiberseq data
+    Footprint(FootprintOptions),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
     /// Remove HiFi kinetics tags from the input bam file
-    ClearKinetics {
-        /// Bam HiFi file with kinetics
-        #[clap(default_value = "-")]
-        bam: String,
-        /// Output bam file without hifi kinetics
-        #[clap(default_value = "-")]
-        out: String,
-    },
+    ClearKinetics(ClearKineticsOptions),
     /// Strip out select base modifications
-    StripBasemods {
-        /// Bam HiFi file with base mods
-        #[clap(default_value = "-")]
-        bam: String,
-        /// Output bam file
-        #[clap(default_value = "-")]
-        out: String,
-        #[clap(short, long, default_value = "m6A",  value_parser(["m6A","6mA", "5mC","CpG"]))]
-        /// base modification to strip out of the bam file
-        basemod: String,
-    },
+    StripBasemods(StripBasemodsOptions),
     /// Make command line completions
     #[clap(hide = true)]
-    Completions {
-        /// If provided, outputs the completion file for given shell
-        #[arg(value_enum)]
-        shell: Shell,
-    },
+    Completions(CompletionOptions),
     /// Make a man page for fibertools-rs
     ///
     /// Writes file for `man` to stdout.
@@ -376,4 +357,34 @@ pub struct ExtractOptions {
     /// Simplify output by remove fiber sequence
     #[clap(short, long, help_heading = "All-Format-Options")]
     pub simplify: bool,
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct ClearKineticsOptions {
+    /// Bam HiFi file with kinetics
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output bam file without hifi kinetics
+    #[clap(default_value = "-")]
+    pub out: String,
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct StripBasemodsOptions {
+    /// Bam HiFi file with base mods
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output bam file
+    #[clap(default_value = "-")]
+    pub out: String,
+    #[clap(short, long, default_value = "m6A",  value_parser(["m6A","6mA", "5mC","CpG"]))]
+    /// base modification to strip out of the bam file
+    pub basemod: String,
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct CompletionOptions {
+    /// If provided, outputs the completion file for given shell
+    #[arg(value_enum)]
+    pub shell: Shell,
 }
