@@ -221,6 +221,13 @@ impl<'a> Iterator for BamChunk<'a> {
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
             let r = r.unwrap();
+            if r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0 {
+                log::warn!(
+                    "Skipping read ({}) because it has been hard clipped. This read will be excluded from calculations and any output.",
+                    String::from_utf8_lossy(r.qname())
+                );
+                continue;
+            }
             cur_vec.push(r);
         }
 

@@ -3,7 +3,7 @@ Please feel free to open PRs! But first make sure you code passes tests, and ple
 ```bash
 cargo test --all-features
 ```
-Also format your code and check it with clingy:
+Also format your code and check it with clippy before submitting a PR:
 ```bash
 cargo fmt 
 cargo clippy --workspace
