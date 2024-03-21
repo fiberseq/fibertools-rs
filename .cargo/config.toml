@@ -8,8 +8,8 @@ rustflags = [
 [target.x86_64-unknown-linux-gnu]
 rustflags = [
     "-C", "link-arg=-Wl,--allow-shlib-undefined", 
-    #"-C", "link-arg=-fno-lto",
-    #"-C", "target-cpu=native",
+    "-C", "link-arg=-fno-lto",
+    "-C", "target-cpu=native",
 ]
 
 # this breaks my build on my mac. I don't know why

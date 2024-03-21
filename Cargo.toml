@@ -83,9 +83,9 @@ incremental = true
 
 [profile.release]
 strip="debuginfo"
-#codegen-units = 1
+codegen-units = 1
 debug = false
-#lto = true
-#panic = "abort"
+lto = true
+panic = "abort"
 
 
