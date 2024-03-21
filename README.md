@@ -53,6 +53,9 @@ Extracts Fiber-seq data from a bam file into plain text. [Help page for extract]
 Center Fiber-seq reads (bam) around reference position(s). [Help page for center](/docs/center.md).
 ![Center](/assets/img/center.png)
 
+## `ft footprint`
+Footprint Fiber-seq reads (bam) around reference motifs(s). [Help page for footprint](/docs/footprint.md).
+
 # Python API (`pyft`)
 
 The python API is still in development and not stable; however, you can find the current code progress in the [py-ft](/py-ft) folder. More information available at [readthedocs](https://py-ft.readthedocs.io/en/latest/).
