@@ -15,6 +15,7 @@ fn main() {
 
     // Generate the model code and state file from the ONNX file.
     use burn_import::onnx::ModelGen;
+    use burn_import::onnx::RecordType;
     for x in &[
         "src/m6a_burn/two_zero.onnx",
         "src/m6a_burn/two_two.onnx",
@@ -24,7 +25,8 @@ fn main() {
         ModelGen::new()
             .input(x) // Path to the ONNX model
             .out_dir("m6a_burn/") // Directory for the generated Rust source file (under target/)
-            //.embed_states(true)
+            .record_type(RecordType::Bincode)
+            .embed_states(true)
             .run_from_script();
     }
 }
