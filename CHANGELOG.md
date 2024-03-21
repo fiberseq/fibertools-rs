@@ -5,14 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.2 (2024-03-21)
+
+### Chore
+
+ - <csr-id-d98cfa8cef7831d70fb4e8ebd2cccf38169e68cf/> clean docs
+ - <csr-id-b4600cde832842ebdea80ca9485fb7f241d447e0/> clean docs
+ - <csr-id-0222a23b3b412555d89af6e2dbc5a5160bc1bcf1/> clean changelog
+ - <csr-id-fc4260d820084e0a9f321c2a681091b96770b93e/> update helps
+ - <csr-id-fee819ae1b1d03d841abffd51a7698ae024443b1/> clean cargo config
+ - <csr-id-069c6c95c575a60928998aab2e69044494ef3c55/> clean
+ - <csr-id-a06a949d048a52600797d78fff8f35dfeccac136/> clean
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 7 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 unique issue was worked on: [#47](https://github.com/fiberseq/fibertools-rs/issues/47)
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **[#47](https://github.com/fiberseq/fibertools-rs/issues/47)**
+    - 0.4.2 ([`bb7eff1`](https://github.com/fiberseq/fibertools-rs/commit/bb7eff193c7c47b290467b690cadde4066667487))
+ * **Uncategorized**
+    - Version ([`47be701`](https://github.com/fiberseq/fibertools-rs/commit/47be70198c732b506b8e66b42b77cde3080aa15b))
+    - Clean docs ([`d98cfa8`](https://github.com/fiberseq/fibertools-rs/commit/d98cfa8cef7831d70fb4e8ebd2cccf38169e68cf))
+    - Clean docs ([`b4600cd`](https://github.com/fiberseq/fibertools-rs/commit/b4600cde832842ebdea80ca9485fb7f241d447e0))
+    - Clean changelog ([`0222a23`](https://github.com/fiberseq/fibertools-rs/commit/0222a23b3b412555d89af6e2dbc5a5160bc1bcf1))
+    - Update helps ([`fc4260d`](https://github.com/fiberseq/fibertools-rs/commit/fc4260d820084e0a9f321c2a681091b96770b93e))
+    - Clean cargo config ([`fee819a`](https://github.com/fiberseq/fibertools-rs/commit/fee819ae1b1d03d841abffd51a7698ae024443b1))
+    - Clean ([`069c6c9`](https://github.com/fiberseq/fibertools-rs/commit/069c6c95c575a60928998aab2e69044494ef3c55))
+    - Clean ([`a06a949`](https://github.com/fiberseq/fibertools-rs/commit/a06a949d048a52600797d78fff8f35dfeccac136))
+</details>
+
 ## 0.4.1 (2024-03-20)
 
 ### Chore
 
- ### New Features
+### Chore
 
- - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> 
-   This release uses onnx files instead of pytorch files and moves the backend
+ - <csr-id-61967b45e2427eafdba6700c3aa4151ca4ba17c1/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-93de92f6dbe3b8d5e596967f002d19ef0cd30458/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-3a47fa8f33664c37c5ae9283b376360b7dff914d/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-0a9ab3f816b0f52b8519b42b407577528dd14b19/> make test data larger again since I remove the whole dir from cargo publish
+ - <csr-id-0b8f6a299120760452091ee3f14a4442d3876637/> make cargo publish smaller
+ - <csr-id-2be96e24685037d23d7b9f1a8a4e18e53c5dda4a/> make cargo publish smaller
+ - <csr-id-8a581721e0f45b6d6e774b38f7201142bd1f9eba/> make cargo publish smaller
+ - <csr-id-1d7de118fbf56e6fbaa5e895f3ce0e1931c8f1be/> make cargo publish smaller
+ - <csr-id-9a96cb31a28c25cbcd3f01a87b6f976071b0899e/> make cargo publish smaller
+ - <csr-id-cbdda1a80fd3a06472b4ef3123949b5d1afa46ad/> make test data smaller
+ - <csr-id-212b2c97b6e796aba879c92822640abe15561a36/> ignore notebook
+ - <csr-id-285db7d2c044de140ed550bbe2bf617233b6f55e/> sync lock with branch
+ - <csr-id-17b8cb6642bbee5f0e2813515d8256516dccb48d/> sync lock with branch
+
+### New Features
+
+ - <csr-id-547b8150f9159b41985dc59b77b254f148b200b0/> This release uses onnx files instead of pytorch files and moves the backend
    of m6a prediction to burn-rs instead of tch-rs.
    
    This allows us to use other ML backends in addition to pytorch, which
@@ -23,14 +78,14 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
    ensure that the number and quality of predictions are identical to
    previous versions regardless of backend. Will also be a useful test in
    the future.
-
-   This release also adds the new `ft-footprint` command to the `ft` CLI. 
    
+   This release also adds the new `ft-footprint` command to the `ft` CLI.
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 23 commits contributed to the release over the course of 7 calendar days.
+ - 24 commits contributed to the release over the course of 7 calendar days.
  - 20 days passed between releases.
  - 14 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 2 unique issues were worked on: [#43](https://github.com/fiberseq/fibertools-rs/issues/43), [#46](https://github.com/fiberseq/fibertools-rs/issues/46)
@@ -46,6 +101,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
  * **[#46](https://github.com/fiberseq/fibertools-rs/issues/46)**
     - Convert pytorch models to onnx to allow more backends ([`547b815`](https://github.com/fiberseq/fibertools-rs/commit/547b8150f9159b41985dc59b77b254f148b200b0))
  * **Uncategorized**
+    - Release fibertools-rs v0.4.1 ([`a123dac`](https://github.com/fiberseq/fibertools-rs/commit/a123dac23ba02d0d9d4ac8c4f8ffc4532f6d6516))
     - Make test data larger again since I remove the whole dir from cargo publish ([`61967b4`](https://github.com/fiberseq/fibertools-rs/commit/61967b45e2427eafdba6700c3aa4151ca4ba17c1))
     - Make test data larger again since I remove the whole dir from cargo publish ([`93de92f`](https://github.com/fiberseq/fibertools-rs/commit/93de92f6dbe3b8d5e596967f002d19ef0cd30458))
     - Make test data larger again since I remove the whole dir from cargo publish ([`3a47fa8`](https://github.com/fiberseq/fibertools-rs/commit/3a47fa8f33664c37c5ae9283b376360b7dff914d))
