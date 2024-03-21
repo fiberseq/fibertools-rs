@@ -64,19 +64,5 @@ The python API is still in development and not stable; however, you can find the
 
 **Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Finkbeiner, C., Li, T., Whittington, D., Stergachis, A. B., & **Vollger, M. R.** (2023). DNA-m6A calling and integrated long-read epigenetic and genetic analysis with **fibertools**. _bioRxiv_. https://doi.org/10.1101/2023.04.20.537673
 
-# TODO items
-
-- [ ] Use new iterator for `ft extract` and group writes to try and improve the speed
-- [ ] long format extract command
-- [ ] Improve progress bar for predict-m6a.
-  - [ ] Get size of bam, say how far we are through the bam in terms of MB/GB?
-- [x] Add a python API (see py-ft for progress)
-  - [ ] add default data viz
-  - [ ] add conversion to pandas data frame or maybe anndata
-- [x] GPU support
-  - [ ] see if I can simplify or statically link PyTorch to get it onto bioconda
-  - [ ] Detect GPU memory to set batch size dynamically.
-- [ ] Add unaligned, secondary, supplemental reads to the test bam.
-
 # Contributing
 If you would like to contribute to `fibertools-rs`, please see the [CONTRIBUTING.md](/CONTRIBUTING.md) file for more information.
