@@ -20,6 +20,9 @@ pub mod strip_basemods;
 /// add fire data
 pub mod fire;
 
+/// make a fire track from a bam file
+pub mod firetrack;
+
 /// add decorators
 pub mod decorator;
 
