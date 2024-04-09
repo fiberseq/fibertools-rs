@@ -92,6 +92,8 @@ pub enum Commands {
     Footprint(FootprintOptions),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
+    /// make a FDR track from a FIRE bam
+    FireTrack(FireTrackOptions),
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics(ClearKineticsOptions),
     /// Strip out select base modifications
@@ -387,4 +389,14 @@ pub struct CompletionOptions {
     /// If provided, outputs the completion file for given shell
     #[arg(value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct FireTrackOptions {
+    /// Bam HiFi file with m6A and MSP calls
+    #[clap(default_value = "-")]
+    pub bam: String,
+    /// Output file (bam by default, table if --feats_to_text is used, and bed9 + if --extract is used)
+    #[clap(default_value = "-")]
+    pub out: String,
 }
