@@ -77,7 +77,7 @@ impl FireTrack {
                     if q < MIN_FIRE_QUAL {
                         continue;
                     }
-                    let score_update =  (1.0 - q as f32 / 255.0).log10() * -50.0;
+                    let score_update = (1.0 - q as f32 / 255.0).log10() * -50.0;
                     for i in rs..re {
                         let i = (i + shuffle_offset) as usize;
                         self.fire_coverage[i] += 1;
@@ -104,7 +104,7 @@ impl FireTrack {
     }
 }
 
-pub struct FiberseqPileup <'a>{
+pub struct FiberseqPileup<'a> {
     pub all_data: FireTrack,
     pub hap1_data: FireTrack,
     pub hap2_data: FireTrack,
@@ -170,8 +170,7 @@ impl<'a> FiberseqPileup<'a> {
             "#chrom\tpos",
             "coverage\tfire_coverage\tscore\tnuc_coverage\tmsp_coverage\tm6a_coverage\tcpg_coverage",
             "coverage_H1\tfire_coverage_H1\tscore_H1\tnuc_coverage_H1\tmsp_coverage_H1\tm6a_coverage_H1\tcpg_coverage_H1",
-            "coverage_H2\tfire_coverage_H2\tscore_H2\tnuc_coverage_H2\tmsp_coverage_H2\tm6a_coverage_H2\tcpg_coverage_H2"
-            
+            "coverage_H2\tfire_coverage_H2\tscore_H2\tnuc_coverage_H2\tmsp_coverage_H2\tm6a_coverage_H2\tcpg_coverage_H2",
         )
     }
 
@@ -181,11 +180,8 @@ impl<'a> FiberseqPileup<'a> {
         self.hap2_data.calculate_scores();
     }
 
-    pub fn write(
-        &self,
-        out: &mut Box<dyn Write>,
-    ) -> Result<(), anyhow::Error> {
-        if !self.has_data{
+    pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
+        if !self.has_data {
             return Ok(());
         }
 
@@ -217,10 +213,6 @@ impl<'a> FiberseqPileup<'a> {
     }
 }
 
-
-
-
-
 fn run_rgn(
     chrom: &str,
     rgn: FetchDefinition,
@@ -240,7 +232,6 @@ fn run_rgn(
     pileup.write(out)?;
     Ok(())
 }
-
 
 /// extract existing fire calls into a bed9+ like file
 pub fn pileup_track(pileup_opts: &PileupOptions) -> Result<(), anyhow::Error> {
@@ -263,10 +254,15 @@ pub fn pileup_track(pileup_opts: &PileupOptions) -> Result<(), anyhow::Error> {
         None => {
             for chrom in header.target_names() {
                 let rgn = FetchDefinition::String(chrom);
-                run_rgn(&String::from_utf8_lossy(chrom), rgn, &mut bam, &mut out, pileup_opts)?;
+                run_rgn(
+                    &String::from_utf8_lossy(chrom),
+                    rgn,
+                    &mut bam,
+                    &mut out,
+                    pileup_opts,
+                )?;
             }
         }
-        
     }
     Ok(())
 }
