@@ -92,8 +92,8 @@ pub enum Commands {
     Footprint(FootprintOptions),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
-    /// make a FDR track from a FIRE bam
-    FireTrack(FireTrackOptions),
+    /// make a pileup track from a FIRE bam
+    Pileup(PileupOptions),
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics(ClearKineticsOptions),
     /// Strip out select base modifications
@@ -392,11 +392,17 @@ pub struct CompletionOptions {
 }
 
 #[derive(Args, Debug, PartialEq, Eq)]
-pub struct FireTrackOptions {
-    /// Bam HiFi file with m6A and MSP calls
-    #[clap(default_value = "-")]
+pub struct PileupOptions {
+    /// Indexed bam HiFi file with m6A and MSP calls
     pub bam: String,
-    /// Output file (bam by default, table if --feats_to_text is used, and bed9 + if --extract is used)
-    #[clap(default_value = "-")]
+    /// Region string to make a pileup of.
+    /// If not provided will make a pileup of the whole genome
+    #[clap(default_value = None)]
+    pub rgn: Option<String>,
+    /// Output file
+    #[clap(short, long, default_value = "-")]
     pub out: String,
+    /// Keep zero coverage regions
+    #[clap(short, long)]
+    pub keep_zeros: bool,
 }

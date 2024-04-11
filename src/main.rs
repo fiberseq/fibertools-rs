@@ -96,8 +96,8 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Footprint(footprint_opts)) => {
             fibertools_rs::footprint::start_finding_footprints(footprint_opts)?;
         }
-        Some(Commands::FireTrack(_fire_track_opts)) => {
-            todo!("implement fire track");
+        Some(Commands::Pileup(pileup_opts)) => {
+            fibertools_rs::pileup::pileup_track(pileup_opts)?;
         }
         Some(Commands::TrackDecorators(decorator_opts)) => {
             fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
