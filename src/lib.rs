@@ -1,6 +1,3 @@
-/// Data structure for fiberseq data
-pub mod fiber;
-
 /// Add and remove base modifications from a bam record
 pub mod basemods;
 /// Center fiberseq information around a reference position
@@ -10,18 +7,18 @@ pub mod center;
 pub mod cli;
 /// Extract fiberseq data into plain text formats
 pub mod extract;
+/// Data structure for fiberseq data
+pub mod fiber;
+/// add fire data
+pub mod fire;
 /// Add nucleosomes to a bam file
 pub mod nucleosomes;
+/// make a fire track from a bam file
+pub mod pileup;
 /// m6A prediction
 pub mod predict_m6a;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
-
-/// add fire data
-pub mod fire;
-
-/// make a fire track from a bam file
-pub mod firetrack;
 
 /// add decorators
 pub mod decorator;
@@ -39,6 +36,7 @@ pub mod m6a_burn;
 use anyhow::Result;
 use bio_io::*;
 use itertools::Itertools;
+use rust_htslib::bam::FetchDefinition;
 use rust_htslib::{bam, bam::Read};
 use std::env;
 use std::io::Write;
@@ -139,4 +137,21 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
         program_id,
         program_version,
     )
+}
+
+pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
+    if rgn.contains(':') {
+        let (chrom, rest) = rgn.split(':').collect_tuple().unwrap();
+        let (start, end) = rest.split('-').collect_tuple().unwrap();
+        (
+            FetchDefinition::RegionString(
+                chrom.as_bytes(),
+                start.parse().unwrap(),
+                end.parse().unwrap(),
+            ),
+            chrom.to_string(),
+        )
+    } else {
+        (FetchDefinition::String(rgn.as_bytes()), rgn.to_string())
+    }
 }
