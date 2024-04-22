@@ -192,32 +192,32 @@ pub struct FireOptions {
     #[clap(short, long)]
     pub skip_no_m6a: bool,
     /// Skip reads without at least `N` MSP calls
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "0", env = "MIN_MSP")]
     pub min_msp: usize,
     /// Skip reads without an average MSP size greater than `N`
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "0", env)]
     pub min_ave_msp_size: i64,
     /// Width of bin for feature collection
-    #[clap(short, long, default_value = "40")]
+    #[clap(short, long, default_value = "40", env)]
     pub width_bin: i64,
     /// Number of bins to collect
-    #[clap(short, long, default_value = "9")]
+    #[clap(short, long, default_value = "9", env)]
     pub bin_num: i64,
     /// Calculate stats for the highest X bp window within each MSP
     /// Should be a fair amount higher than the expected linker length.
-    #[clap(long, default_value = "100")]
+    #[clap(long, default_value = "100", env)]
     pub best_window_size: i64,
     /// Use 5mC data in FIREs
     #[clap(short, long)]
     pub use_5mc: bool,
     /// Minium length of msp to call a FIRE
-    #[clap(short, long, default_value = "85")]
+    #[clap(short, long, default_value = "85", env)]
     pub min_msp_length_for_positive_fire_call: i64,
-    /// optional path to a model json file
-    #[clap(long)]
+    /// Optional path to a model json file
+    #[clap(long, env = "FIRE_MODEL")]
     pub model: Option<String>,
     /// Optional path to a FDR table
-    #[clap(long)]
+    #[clap(long, env)]
     pub fdr_table: Option<String>,
     /// Output FIREs features for training in a table format
     #[clap(short, long)]
