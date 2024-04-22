@@ -1,4 +1,4 @@
-use anyhow::{bail, Error, Ok, Result};
+use anyhow::{Error, Ok, Result};
 use bio_io::*;
 use colored::Colorize;
 use env_logger::{Builder, Target};
