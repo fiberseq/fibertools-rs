@@ -208,7 +208,7 @@ pub struct FireOptions {
     #[clap(long, default_value = "100", env)]
     pub best_window_size: i64,
     /// Use 5mC data in FIREs
-    #[clap(short, long)]
+    #[clap(short, long, hide = true)]
     pub use_5mc: bool,
     /// Minium length of msp to call a FIRE
     #[clap(short, long, default_value = "85", env)]
