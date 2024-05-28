@@ -213,7 +213,8 @@ pub struct FireOptions {
     /// Minium length of msp to call a FIRE
     #[clap(short, long, default_value = "85", env)]
     pub min_msp_length_for_positive_fire_call: i64,
-    /// Optional path to a model json file
+    /// Optional path to a model json file.
+    /// If not provided ft will use the default model (recommended).
     #[clap(long, env = "FIRE_MODEL")]
     pub model: Option<String>,
     /// Optional path to a FDR table
