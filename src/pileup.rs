@@ -14,6 +14,17 @@ use rust_htslib::bam::{FetchDefinition, IndexedReader};
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 
+#[derive(Debug, PartialEq)]
+pub struct FireRow<'a> {
+    pub score: &'a f32,
+    pub coverage: &'a i32,
+    pub fire_coverage: &'a i32,
+    pub msp_coverage: &'a i32,
+    pub nuc_coverage: &'a i32,
+    pub cpg_coverage: &'a i32,
+    pub m6a_coverage: &'a i32,
+}
+
 pub struct FireTrack {
     pub chrom_len: usize,
     pub raw_scores: Vec<f32>,
@@ -102,6 +113,18 @@ impl FireTrack {
             }
         }
     }
+
+    pub fn row(&self, i: usize) -> FireRow {
+        FireRow {
+            score: &self.scores[i],
+            coverage: &self.coverage[i],
+            fire_coverage: &self.fire_coverage[i],
+            msp_coverage: &self.msp_coverage[i],
+            nuc_coverage: &self.nuc_coverage[i],
+            cpg_coverage: &self.cpg_coverage[i],
+            m6a_coverage: &self.m6a_coverage[i],
+        }
+    }
 }
 
 pub struct FiberseqPileup<'a> {
@@ -136,7 +159,7 @@ impl<'a> FiberseqPileup<'a> {
 
     pub fn add_records(
         &mut self,
-        records: bam::Records<'a, IndexedReader>,
+        records: std::iter::Peekable<bam::Records<'a, IndexedReader>>,
     ) -> Result<(), anyhow::Error> {
         records
             .map(|r| r.unwrap())
@@ -161,56 +184,116 @@ impl<'a> FiberseqPileup<'a> {
                     }
                 }
             });
+        self.calculate_scores();
         Ok(())
     }
 
     pub fn header() -> String {
         format!(
             "{}\t{}\t{}\t{}\n",
-            "#chrom\tpos",
+            "#chrom\tstart\tend",
             "coverage\tfire_coverage\tscore\tnuc_coverage\tmsp_coverage\tm6a_coverage\tcpg_coverage",
             "coverage_H1\tfire_coverage_H1\tscore_H1\tnuc_coverage_H1\tmsp_coverage_H1\tm6a_coverage_H1\tcpg_coverage_H1",
             "coverage_H2\tfire_coverage_H2\tscore_H2\tnuc_coverage_H2\tmsp_coverage_H2\tm6a_coverage_H2\tcpg_coverage_H2",
         )
     }
 
-    pub fn calculate_scores(&mut self) {
+    fn calculate_scores(&mut self) {
         self.all_data.calculate_scores();
         self.hap1_data.calculate_scores();
         self.hap2_data.calculate_scores();
+    }
+
+    /// check if the ith row has the same data as the previous row
+    /// if it does, return true, otherwise return false
+    /// this is used to determine if the data should be written to the output
+    pub fn is_same_as_previous(&self, i: usize) -> bool {
+        if i == 0
+            || (self.all_data.row(i) == self.all_data.row(i - 1)
+                && self.hap1_data.row(i) == self.hap1_data.row(i - 1)
+                && self.hap2_data.row(i) == self.hap2_data.row(i - 1))
+        {
+            return true;
+        }
+        false
+    }
+
+    fn wait_to_write(&self, i: usize) -> bool {
+        // write every row
+        if self.pileup_opts.per_base {
+            return false;
+        }
+        self.is_same_as_previous(i) && i != self.chrom_len - 1
     }
 
     pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         if !self.has_data {
             return Ok(());
         }
-
+        let mut write_start_index = 0;
+        let mut write_end_index = 0;
         for i in 0..self.chrom_len {
-            if !self.pileup_opts.keep_zeros && self.all_data.coverage[i] == 0 {
+            // do we have the same data as the previous row?
+            if self.wait_to_write(i) {
+                write_end_index = i;
                 continue;
-            }
-            let mut line = format!("{}\t{}\t", self.chrom, i);
-            for data in [&self.all_data, &self.hap1_data, &self.hap2_data] {
-                line += &format!(
-                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-                    data.coverage[i],
-                    data.fire_coverage[i],
-                    data.scores[i],
-                    data.nuc_coverage[i],
-                    data.msp_coverage[i],
-                    data.m6a_coverage[i],
-                    data.cpg_coverage[i],
+            } else {
+                let mut line = format!(
+                    "{}\t{}\t{}\t",
+                    self.chrom,
+                    write_start_index,
+                    write_end_index + 1
                 );
-            }
-            // remove the last tab
-            line.pop();
-            line += "\n";
+                for data in [&self.all_data, &self.hap1_data, &self.hap2_data] {
+                    line += &format!(
+                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+                        data.coverage[write_start_index],
+                        data.fire_coverage[write_start_index],
+                        data.scores[write_start_index],
+                        data.nuc_coverage[write_start_index],
+                        data.msp_coverage[write_start_index],
+                        data.m6a_coverage[write_start_index],
+                        data.cpg_coverage[write_start_index],
+                    );
+                }
 
-            out.write_all(line.as_bytes())?;
+                // don't write empty lines unless keep_zeros is set
+                if self.pileup_opts.keep_zeros || self.all_data.coverage[write_start_index] > 0 {
+                    // remove the last tab
+                    line.pop();
+                    line += "\n";
+                    out.write_all(line.as_bytes())?;
+                }
+
+                // reset the write indexes
+                write_start_index = i;
+                write_end_index = i;
+            }
         }
         out.flush()?;
         Ok(())
     }
+}
+
+/// split up a FetchDefinition into multiple regions of a certain size
+/// TODO set up run_rgn to take a list of regions and multithread it
+pub fn split_fetch_definition<'a>(
+    rgn: &'a FetchDefinition,
+    chrom_len: usize,
+    window_size: usize,
+) -> Vec<(i64, i64)> {
+    let (start, end) = match rgn {
+        FetchDefinition::RegionString(_chrom, start, end) => (*start, *end),
+        _ => (0, chrom_len as i64),
+    };
+    let mut rgns = vec![];
+    let mut cur_start = start;
+    while cur_start < end {
+        let cur_end = std::cmp::min(cur_start + window_size as i64, end);
+        rgns.push((cur_start, cur_end));
+        cur_start = cur_end;
+    }
+    rgns
 }
 
 fn run_rgn(
@@ -220,15 +303,20 @@ fn run_rgn(
     out: &mut Box<dyn Write>,
     pileup_opts: &PileupOptions,
 ) -> Result<(), anyhow::Error> {
-    log::info!("Processing region: {}", chrom);
     let tid = bam.header().tid(chrom.as_bytes()).unwrap();
     let chrom_len = bam.header().target_len(tid).unwrap() as usize;
+
     bam.fetch(rgn)?;
-    let records = bam.records();
+    let mut records = bam.records().peekable();
+    // skip if there are no records and keep_zeros is not set
+    if records.peek().is_none() && !pileup_opts.keep_zeros {
+        return Ok(());
+    }
     // make the pileup
     let mut pileup = FiberseqPileup::new(chrom, chrom_len, pileup_opts);
+    log::info!("Processing records for {}", chrom);
     pileup.add_records(records)?;
-    pileup.calculate_scores();
+    log::info!("Writing pileup for {}", chrom);
     pileup.write(out)?;
     Ok(())
 }

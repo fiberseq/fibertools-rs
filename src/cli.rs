@@ -406,4 +406,7 @@ pub struct PileupOptions {
     /// Keep zero coverage regions
     #[clap(short, long)]
     pub keep_zeros: bool,
+    /// Write output one base at a time even if the values do not change
+    #[clap(short, long)]
+    pub per_base: bool,
 }
