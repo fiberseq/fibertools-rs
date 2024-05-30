@@ -92,7 +92,7 @@ pub enum Commands {
     Footprint(FootprintOptions),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
-    /// make a pileup track from a FIRE bam
+    /// Make a pileup track of Fiber-seq features from a FIRE bam
     Pileup(PileupOptions),
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics(ClearKineticsOptions),
