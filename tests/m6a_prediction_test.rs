@@ -15,6 +15,7 @@ fn sum_qual(bam: &mut Reader) -> usize {
             .map(|x| x as usize)
             .sum::<usize>();
     }
+    eprintln!("sum {:?}", sum);
     // now count for the input bam file as well
     sum
 }
@@ -36,25 +37,32 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
     sum_qual(&mut predicted_bam)
 }
 
-/// This function predicts m6A for all the fibers in a the test bam file and test the sum of their quality scores against the expected value.
-#[test]
-fn test_m6a_prediction() {
-    let files = vec![
-        "tests/data/all.bam",       // tests 2.0 chemistry
-        "tests/data/two_two.bam",   // tests 2.2 chemistry
-        "tests/data/three_two.bam", // tests 3.2 chemistry
-        "tests/data/revio.bam",     // tests revio chemistry
-    ];
-
-    let results_before_this_predict = files
-        .iter()
-        .map(|x| sum_qual(&mut bio_io::bam_reader(x, 1)))
-        .collect::<Vec<usize>>();
-
-    let results: Vec<usize> = files
-        .iter()
-        .map(|x| run_prediction_and_count_qual(x.to_string()))
-        .collect();
-
+fn run_comparison(file: &str) {
+    let files = vec![file];
+    eprintln!("{:?}", files);
+    let results_before_this_predict = sum_qual(&mut bio_io::bam_reader(file, 1));
+    eprintln!("{:?}", results_before_this_predict);
+    let results = run_prediction_and_count_qual(file.to_string());
+    eprintln!("{:?}", results);
     assert_eq!(results, results_before_this_predict);
+}
+
+#[test]
+fn test_two_zero_prediction() {
+    run_comparison("tests/data/all.bam");
+}
+
+#[test]
+fn test_two_two_m6a_prediction() {
+    run_comparison("tests/data/two_two.bam");
+}
+
+#[test]
+fn test_three_two_m6a_prediction() {
+    run_comparison("tests/data/three_two.bam");
+}
+
+#[test]
+fn test_revio_m6a_prediction() {
+    run_comparison("tests/data/revio.bam");
 }
