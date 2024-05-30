@@ -16,16 +16,33 @@ const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 
 #[derive(Debug, PartialEq)]
 pub struct FireRow<'a> {
-    pub score: &'a f32,
     pub coverage: &'a i32,
     pub fire_coverage: &'a i32,
-    pub msp_coverage: &'a i32,
+    pub score: &'a f32,
     pub nuc_coverage: &'a i32,
+    pub msp_coverage: &'a i32,
     pub cpg_coverage: &'a i32,
     pub m6a_coverage: &'a i32,
+    pileup_opts: &'a PileupOptions,
 }
 
-pub struct FireTrack {
+impl std::fmt::Display for FireRow<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut rtn = format!(
+            "\t{}\t{}\t{}\t{}\t{}",
+            self.coverage, self.fire_coverage, self.score, self.nuc_coverage, self.msp_coverage
+        );
+        if self.pileup_opts.m6a {
+            rtn += &format!("\t{}", self.m6a_coverage);
+        }
+        if self.pileup_opts.cpg {
+            rtn += &format!("\t{}", self.cpg_coverage);
+        }
+        write!(f, "{}", rtn)
+    }
+}
+
+pub struct FireTrack<'a> {
     pub chrom_len: usize,
     pub raw_scores: Vec<f32>,
     pub scores: Vec<f32>,
@@ -35,10 +52,11 @@ pub struct FireTrack {
     pub nuc_coverage: Vec<i32>,
     pub cpg_coverage: Vec<i32>,
     pub m6a_coverage: Vec<i32>,
+    pileup_opts: &'a PileupOptions,
 }
 
-impl FireTrack {
-    pub fn new(chrom_len: usize) -> Self {
+impl<'a> FireTrack<'a> {
+    pub fn new(chrom_len: usize, pileup_opts: &'a PileupOptions) -> Self {
         let raw_scores = vec![-1.0; chrom_len];
         let scores = vec![-1.0; chrom_len];
         Self {
@@ -51,6 +69,7 @@ impl FireTrack {
             nuc_coverage: vec![0; chrom_len],
             cpg_coverage: vec![0; chrom_len],
             m6a_coverage: vec![0; chrom_len],
+            pileup_opts,
         }
     }
 
@@ -98,10 +117,15 @@ impl FireTrack {
                 _ => continue,
             }
         }
+
         Self::add_range_set(&mut self.nuc_coverage, &fiber.nuc);
         Self::add_range_set(&mut self.msp_coverage, &fiber.msp);
-        Self::add_range_set(&mut self.m6a_coverage, &fiber.m6a);
-        Self::add_range_set(&mut self.cpg_coverage, &fiber.cpg);
+        if self.pileup_opts.m6a {
+            Self::add_range_set(&mut self.m6a_coverage, &fiber.m6a);
+        }
+        if self.pileup_opts.cpg {
+            Self::add_range_set(&mut self.cpg_coverage, &fiber.cpg);
+        }
     }
 
     pub fn calculate_scores(&mut self) {
@@ -123,14 +147,15 @@ impl FireTrack {
             nuc_coverage: &self.nuc_coverage[i],
             cpg_coverage: &self.cpg_coverage[i],
             m6a_coverage: &self.m6a_coverage[i],
+            pileup_opts: self.pileup_opts,
         }
     }
 }
 
 pub struct FiberseqPileup<'a> {
-    pub all_data: FireTrack,
-    pub hap1_data: FireTrack,
-    pub hap2_data: FireTrack,
+    pub all_data: FireTrack<'a>,
+    pub hap1_data: FireTrack<'a>,
+    pub hap2_data: FireTrack<'a>,
     pub chrom: String,
     pub chrom_len: usize,
     has_data: bool,
@@ -139,9 +164,9 @@ pub struct FiberseqPileup<'a> {
 
 impl<'a> FiberseqPileup<'a> {
     pub fn new(chrom: &str, chrom_len: usize, pileup_opts: &'a PileupOptions) -> Self {
-        let all_data = FireTrack::new(chrom_len);
-        let hap1_data = FireTrack::new(chrom_len);
-        let hap2_data = FireTrack::new(chrom_len);
+        let all_data = FireTrack::new(chrom_len, pileup_opts);
+        let hap1_data = FireTrack::new(chrom_len, pileup_opts);
+        let hap2_data = FireTrack::new(chrom_len, pileup_opts);
         Self {
             all_data,
             hap1_data,
@@ -177,9 +202,9 @@ impl<'a> FiberseqPileup<'a> {
                 }
                 for fiber in fibers {
                     self.all_data.update_with_fiber(&fiber);
-                    if fiber.get_hp() == "H1" {
+                    if fiber.get_hp() == "H1" && self.pileup_opts.haps {
                         self.hap1_data.update_with_fiber(&fiber);
-                    } else if fiber.get_hp() == "H2" {
+                    } else if fiber.get_hp() == "H2" && self.pileup_opts.haps {
                         self.hap2_data.update_with_fiber(&fiber);
                     }
                 }
@@ -188,14 +213,28 @@ impl<'a> FiberseqPileup<'a> {
         Ok(())
     }
 
-    pub fn header() -> String {
-        format!(
-            "{}\t{}\t{}\t{}\n",
-            "#chrom\tstart\tend",
-            "coverage\tfire_coverage\tscore\tnuc_coverage\tmsp_coverage\tm6a_coverage\tcpg_coverage",
-            "coverage_H1\tfire_coverage_H1\tscore_H1\tnuc_coverage_H1\tmsp_coverage_H1\tm6a_coverage_H1\tcpg_coverage_H1",
-            "coverage_H2\tfire_coverage_H2\tscore_H2\tnuc_coverage_H2\tmsp_coverage_H2\tm6a_coverage_H2\tcpg_coverage_H2",
-        )
+    pub fn header(pileup_opts: &PileupOptions) -> String {
+        let mut header = format!("{}\t{}\t{}", "#chrom", "start", "end");
+
+        let haps = if pileup_opts.haps {
+            vec!["", "_H1", "_H2"]
+        } else {
+            vec![""]
+        };
+        for hap in haps {
+            header += &format!(
+                "\t{}{hap}\t{}{hap}\t{}{hap}\t{}{hap}\t{}{hap}",
+                "coverage", "fire_coverage", "score", "nuc_coverage", "msp_coverage",
+            );
+            if pileup_opts.m6a {
+                header += &format!("\t{}{hap}", "m6a_coverage");
+            }
+            if pileup_opts.cpg {
+                header += &format!("\t{}{hap}", "cpg_coverage");
+            }
+        }
+        header += "\n";
+        header
     }
 
     fn calculate_scores(&mut self) {
@@ -239,32 +278,25 @@ impl<'a> FiberseqPileup<'a> {
                 continue;
             } else {
                 let mut line = format!(
-                    "{}\t{}\t{}\t",
+                    "{}\t{}\t{}",
                     self.chrom,
                     write_start_index,
                     write_end_index + 1
                 );
-                for data in [&self.all_data, &self.hap1_data, &self.hap2_data] {
-                    line += &format!(
-                        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
-                        data.coverage[write_start_index],
-                        data.fire_coverage[write_start_index],
-                        data.scores[write_start_index],
-                        data.nuc_coverage[write_start_index],
-                        data.msp_coverage[write_start_index],
-                        data.m6a_coverage[write_start_index],
-                        data.cpg_coverage[write_start_index],
-                    );
+                // add in the data
+                let hap_data = if self.pileup_opts.haps {
+                    vec![&self.all_data, &self.hap1_data, &self.hap2_data]
+                } else {
+                    vec![&self.all_data]
+                };
+                for data in hap_data {
+                    line += data.row(write_start_index).to_string().as_str();
                 }
-
                 // don't write empty lines unless keep_zeros is set
                 if self.pileup_opts.keep_zeros || self.all_data.coverage[write_start_index] > 0 {
-                    // remove the last tab
-                    line.pop();
                     line += "\n";
                     out.write_all(line.as_bytes())?;
                 }
-
                 // reset the write indexes
                 write_start_index = i;
                 write_end_index = i;
@@ -330,7 +362,7 @@ pub fn pileup_track(pileup_opts: &PileupOptions) -> Result<(), anyhow::Error> {
 
     let mut out = bio_io::writer(&pileup_opts.out)?;
     // add the header
-    out.write_all(FiberseqPileup::header().as_bytes())?;
+    out.write_all(FiberseqPileup::header(pileup_opts).as_bytes())?;
 
     match &pileup_opts.rgn {
         // if a region is specified, only process that region

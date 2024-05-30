@@ -403,6 +403,15 @@ pub struct PileupOptions {
     /// Output file
     #[clap(short, long, default_value = "-")]
     pub out: String,
+    /// include m6A calls
+    #[clap(short, long)]
+    pub m6a: bool,
+    /// include 5mC calls
+    #[clap(short, long)]
+    pub cpg: bool,
+    /// For each column add two new columns with the hap1 and hap2 specific data.
+    #[clap(short, long)]
+    pub haps: bool,
     /// Keep zero coverage regions
     #[clap(short, long)]
     pub keep_zeros: bool,
