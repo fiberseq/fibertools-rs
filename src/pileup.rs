@@ -277,8 +277,8 @@ impl<'a> FiberseqPileup<'a> {
 
 /// split up a FetchDefinition into multiple regions of a certain size
 /// TODO set up run_rgn to take a list of regions and multithread it
-pub fn split_fetch_definition<'a>(
-    rgn: &'a FetchDefinition,
+pub fn split_fetch_definition(
+    rgn: &FetchDefinition,
     chrom_len: usize,
     window_size: usize,
 ) -> Vec<(i64, i64)> {
