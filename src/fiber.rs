@@ -80,6 +80,9 @@ impl FiberseqData {
     }
 
     pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
+        if head_view.target_count() == 0 {
+            return HashMap::new();
+        }
         let target_u8s = head_view.target_names();
         let tids = target_u8s
             .iter()

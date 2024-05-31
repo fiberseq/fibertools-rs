@@ -39,7 +39,9 @@ log = "0.4"
 ordered-float = "3.4.0"
 rayon = "1.8"
 regex = "1.9.1"
-rust-htslib = "0.43"
+rust-htslib = {version="^0.43.0"}
+
+
 serde = {version = "1.0.104", features = ["derive"], optional = false}
 serde_json = {version = "1.0.48", optional = false}
 serde_yaml = "0.9"

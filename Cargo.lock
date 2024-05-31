@@ -2011,9 +2011,9 @@ dependencies = [
 
 [[package]]
 name = "hts-sys"
-version = "2.1.1"
+version = "2.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "deebfb779c734d542e7f14c298597914b9b5425e4089aef482eacb5cab941915"
+checksum = "e9f348d14cb4e50444e39fcd6b00302fe2ed2bc88094142f6278391d349a386d"
 dependencies = [
  "bzip2-sys",
  "cc",
