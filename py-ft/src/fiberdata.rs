@@ -238,7 +238,6 @@ impl Fiberbam {
         };
 
         let head_view = bam::HeaderView::from_header(&self.header);
-        let target_dict = FiberseqData::dict_from_head_view(&head_view);
 
         self.bam.fetch(fetch_args).expect("unable to fetch region");
         let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
