@@ -4,6 +4,7 @@ use fibertools_rs::fiber::FiberseqData;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
+use std::collections::HashMap;
 use std::time;
 use std::vec::IntoIter;
 #[pyclass]
@@ -219,6 +220,7 @@ pub struct Fiberbam {
     bam: bam::IndexedReader,
     reader: bam::Reader,
     header: bam::Header,
+    target_dict: HashMap<i32, String>,
     start: time::Instant,
 }
 
@@ -236,6 +238,8 @@ impl Fiberbam {
         };
 
         let head_view = bam::HeaderView::from_header(&self.header);
+        let target_dict = FiberseqData::dict_from_head_view(&head_view);
+
         self.bam.fetch(fetch_args).expect("unable to fetch region");
         let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
 
@@ -267,11 +271,14 @@ impl Fiberbam {
         reader.set_threads(threads).unwrap();
 
         let header = bam::Header::from_template(bam.header());
+        let head_view = bam::HeaderView::from_header(&header);
+        let target_dict = FiberseqData::dict_from_head_view(&head_view);
         let start = time::Instant::now();
         Self {
             bam,
             reader,
             header,
+            target_dict,
             start,
         }
     }
@@ -324,7 +331,8 @@ impl Fiberbam {
         match data {
             Some(record) => {
                 let record = record.unwrap();
-                let fiber = FiberseqData::new(record, None, 0);
+                let target_name = self.target_dict.get(&record.tid());
+                let fiber = FiberseqData::new(record, target_name, 0);
                 IterNextOutput::Yield(Fiberdata::new(fiber, None))
             }
             None => IterNextOutput::Return("Ended"),
