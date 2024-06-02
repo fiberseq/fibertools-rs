@@ -127,22 +127,6 @@ pub fn clear_kinetics(opts: &mut cli::ClearKineticsOptions) {
     }
     bar.finish();
 }
-/*
-/// Write to a bam file.
-pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
-    let program_name = "fibertools-rs";
-    let program_id = "ft";
-    let program_version = VERSION;
-    program_bam_writer(
-        out,
-        template_bam,
-        threads,
-        program_name,
-        program_id,
-        program_version,
-    )
-}
- */
 
 pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
     if rgn.contains(':') {
