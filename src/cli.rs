@@ -41,11 +41,17 @@ pub struct InputBam {
     /// For other commands, this should be a bam file with m6A calls.
     #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
     pub bam: String,
-    /// BAM bit flags to filter, equivalent to `-F` in samtools view
-    #[clap(global = true, short = 'F', long = "filter", default_value = "0")]
+    /// BAM bit flags to filter on, equivalent to `-F` in samtools view
+    #[clap(
+        global = true,
+        short = 'F',
+        long = "filter",
+        default_value = "0",
+        help_heading = "BAM-Options"
+    )]
     pub bit_flag: u16,
     /// Minium score in the ML tag to use or include in the output
-    #[clap(short, long, default_value = MIN_ML_SCORE)]
+    #[clap(long="ml", default_value = MIN_ML_SCORE, help_heading = "BAM-Options")]
     pub min_ml_score: u8,
     #[clap(flatten)]
     pub global: GlobalOpts,
@@ -90,7 +96,7 @@ pub struct GlobalOpts {
         short,
         long,
         default_value_t = 8,
-        //help_heading = "Global-Options"
+        help_heading = "Global-Options"
     )]
     pub threads: usize,
 
@@ -264,7 +270,7 @@ pub struct FireOptions {
     #[clap(short, long, hide = true)]
     pub use_5mc: bool,
     /// Minium length of msp to call a FIRE
-    #[clap(short, long, default_value = "85", env)]
+    #[clap(long, default_value = "85", env)]
     pub min_msp_length_for_positive_fire_call: i64,
     /// Optional path to a model json file.
     /// If not provided ft will use the default model (recommended).
@@ -453,7 +459,7 @@ pub struct PileupOptions {
     #[clap(short, long)]
     pub cpg: bool,
     /// For each column add two new columns with the hap1 and hap2 specific data.
-    #[clap(short, long)]
+    #[clap(long)]
     pub haps: bool,
     /// Keep zero coverage regions
     #[clap(short, long)]

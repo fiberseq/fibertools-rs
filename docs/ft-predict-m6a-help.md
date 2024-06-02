@@ -5,7 +5,11 @@ Usage: ft predict-m6a [OPTIONS] [BAM] [OUT]
 
 Arguments:
   [BAM]
-          Bam HiFi file with kinetics
+          Input BAM file. If no path is provided extract will read bam data from stdin.
+          
+          For m6A prediction, this should be a HiFi bam file with kinetics data.
+          
+          For other commands, this should be a bam file with m6A calls.
           
           [default: -]
 
@@ -44,19 +48,16 @@ Options:
   -V, --version
           Print version
 
-Developer-Options:
-  -m, --min-ml-score <MIN_ML_SCORE>
-          Set a minimum ML score to keep on instead of using the model specific minimum ML score
-
-  -a, --all-calls
-          Keep all m6A calls regardless of how low the ML value is
-
-  -b, --batch-size <BATCH_SIZE>
-          Number of reads to include in batch prediction
+BAM-Options:
+  -F, --filter <BIT_FLAG>
+          BAM bit flags to filter on, equivalent to `-F` in samtools view
           
-          Increasing improves GPU performance at the cost of memory.
+          [default: 0]
+
+      --ml <MIN_ML_SCORE>
+          Minium score in the ML tag to use or include in the output
           
-          [default: 1]
+          [default: 125]
 
 Global-Options:
   -t, --threads <THREADS>
@@ -70,4 +71,18 @@ Debug-Options:
 
       --quiet
           Turn off all logging
+
+Developer-Options:
+      --force-min-ml-score <FORCE_MIN_ML_SCORE>
+          Force a different minimum ML score
+
+      --all-calls
+          Keep all m6A calls regardless of how low the ML value is
+
+  -b, --batch-size <BATCH_SIZE>
+          Number of reads to include in batch prediction
+          
+          Increasing improves GPU performance at the cost of memory.
+          
+          [default: 1]
 ```
