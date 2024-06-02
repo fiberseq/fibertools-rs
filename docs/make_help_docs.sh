@@ -4,10 +4,18 @@ echo $LIBTORCH
 export LD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 export DYLD_LIBRARY_PATH=${LIBTORCH}/lib:$LD_LIBRARY_PATH
 
-for subcommand in "" "extract" "center" "predict-m6a" "fire" "add-nucleosomes" "footprint" "clear-kinetics" "strip-basemods" "track-decorators" "pileup"; do
+out="docs/help.md"
+echo "# Help pages for fibertools subcommands" >$out
+echo "" >>$out
+
+for subcommand in "" "predict-m6a" "fire" "extract" "center" "add-nucleosomes" "footprint" "clear-kinetics" "strip-basemods" "track-decorators" "pileup"; do
     echo $subcommand
-    out="docs/ft-${subcommand}-help.md"
-    echo '```' >$out
+    #out="docs/ft-${subcommand}-help.md"
+
+    echo "## \`ft $subcommand\`" >>$out
+
+    echo '```' >>$out
     cargo run -- $subcommand --help >>$out
     echo '```' >>$out
+    echo "" >>$out
 done
