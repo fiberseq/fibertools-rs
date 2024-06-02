@@ -11,7 +11,7 @@ pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
     console::set_colors_enabled(true);
     let pg_start = Instant::now();
-    let args = cli::make_cli_parse();
+    let mut args = cli::make_cli_parse();
     let matches = cli::make_cli_app().get_matches();
     let subcommand = matches.subcommand_name().unwrap();
 
@@ -45,7 +45,7 @@ pub fn main() -> Result<(), Error> {
     #[cfg(feature = "tch")]
     tch::set_num_threads(args.global.threads.try_into().unwrap());
 
-    match &args.command {
+    match &mut args.command {
         Some(Commands::Extract(extract_opts)) => {
             extract::extract_contained(extract_opts);
         }

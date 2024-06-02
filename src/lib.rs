@@ -109,9 +109,10 @@ pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: b
 }
 
 /// clear kinetics from a hifi bam
-pub fn clear_kinetics(opts: &cli::ClearKineticsOptions) {
+pub fn clear_kinetics(opts: &mut cli::ClearKineticsOptions) {
     let mut bam = opts.input.bam_reader();
-    let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
+    let mut out = opts.input.bam_writer(&opts.out);
+    //let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
 
     let bar = bio_io::no_length_progress_bar();
     for rec in bam.records() {
@@ -126,7 +127,7 @@ pub fn clear_kinetics(opts: &cli::ClearKineticsOptions) {
     }
     bar.finish();
 }
-
+/*
 /// Write to a bam file.
 pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
     let program_name = "fibertools-rs";
@@ -141,6 +142,7 @@ pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam:
         program_version,
     )
 }
+ */
 
 pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
     if rgn.contains(':') {

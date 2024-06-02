@@ -32,7 +32,7 @@ pub fn get_styles() -> clap::builder::Styles {
         .placeholder(placeholder_style)
 }
 
-#[derive(Debug, Args, PartialEq, Eq)]
+#[derive(Debug, Args)]
 pub struct InputBam {
     /// Input BAM file. If no path is provided stdin is used. For m6A prediction, this should be a HiFi bam file with kinetics data. For other commands, this should be a bam file with m6A calls.
     #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
@@ -51,16 +51,21 @@ pub struct InputBam {
     pub min_ml_score: u8,
     #[clap(flatten)]
     pub global: GlobalOpts,
+    #[clap(skip)]
+    pub header: Option<bam::Header>,
 }
 
 impl InputBam {
-    pub fn bam_reader(&self) -> bam::Reader {
-        bio_io::bam_reader(&self.bam, self.global.threads)
+    pub fn bam_reader(&mut self) -> bam::Reader {
+        let bam = bio_io::bam_reader(&self.bam, self.global.threads);
+        self.header = Some(bam::Header::from_template(bam.header()));
+        bam
     }
 
-    pub fn indexed_bam_reader(&self) -> bam::IndexedReader {
+    pub fn indexed_bam_reader(&mut self) -> bam::IndexedReader {
         let mut bam =
             bam::IndexedReader::from_path(&self.bam).expect("unable to open indexed bam file");
+        self.header = Some(bam::Header::from_template(bam.header()));
         bam.set_threads(self.global.threads).unwrap();
         bam
     }
@@ -71,6 +76,24 @@ impl InputBam {
         fr.set_bit_flag_filter(self.bit_flag);
         fr
     }
+
+    pub fn bam_writer(&self, out: &str) -> bam::Writer {
+        let v = bam::HeaderView::from_header(self.header.as_ref().expect(
+            "Input bam must be opened before creating a writer with the input bam as a template.",
+        ));
+        let header = bam::Header::from_template(&v);
+        let program_name = "fibertools-rs";
+        let program_id = "ft";
+        let program_version = super::VERSION;
+        bio_io::program_bam_writer_from_header(
+            out,
+            header,
+            self.global.threads,
+            program_name,
+            program_id,
+            program_version,
+        )
+    }
 }
 
 impl std::default::Default for InputBam {
@@ -80,6 +103,7 @@ impl std::default::Default for InputBam {
             bit_flag: 0,
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
             global: GlobalOpts::default(),
+            header: None,
         }
     }
 }
@@ -194,7 +218,7 @@ pub fn make_cli_app() -> Command {
     Cli::command()
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct PredictM6AOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -233,7 +257,7 @@ impl std::default::Default for PredictM6AOptions {
     }
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct FireOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -280,7 +304,7 @@ pub struct FireOptions {
     pub feats_to_text: bool,
 }
 
-#[derive(Args, Debug, PartialEq, Eq, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct NucleosomeParameters {
     /// Minium nucleosome length
     #[clap(short, long, default_value = NUC_LEN)]
@@ -311,7 +335,7 @@ impl std::default::Default for NucleosomeParameters {
     }
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct AddNucleosomeOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -334,7 +358,7 @@ pub struct DecoratorOptions {
     pub decorator: String,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct FootprintOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -349,7 +373,7 @@ pub struct FootprintOptions {
     pub out: String,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct CenterOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -371,7 +395,7 @@ pub struct CenterOptions {
     pub simplify: bool,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct ExtractOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -409,7 +433,7 @@ pub struct ExtractOptions {
     pub simplify: bool,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct ClearKineticsOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -418,7 +442,7 @@ pub struct ClearKineticsOptions {
     pub out: String,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct StripBasemodsOptions {
     #[clap(flatten)]
     pub input: InputBam,
@@ -437,7 +461,7 @@ pub struct CompletionOptions {
     pub shell: Shell,
 }
 
-#[derive(Args, Debug, PartialEq, Eq)]
+#[derive(Args, Debug)]
 pub struct PileupOptions {
     #[clap(flatten)]
     pub input: InputBam,

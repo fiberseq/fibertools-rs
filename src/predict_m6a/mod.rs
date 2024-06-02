@@ -472,13 +472,9 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     Some((a_data, t_data))
 }
 
-pub fn read_bam_into_fiberdata(predict_options: &PredictM6AOptions) {
+pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
     let mut bam = predict_options.input.bam_reader();
-    let mut out = bam_writer(
-        &predict_options.out,
-        &bam,
-        predict_options.input.global.threads,
-    );
+    let mut out = predict_options.input.bam_writer(&predict_options.out);
     let header = bam::Header::from_template(bam.header());
     // log the options
     log::info!(
