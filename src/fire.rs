@@ -508,7 +508,7 @@ pub fn add_fire_to_rec(
     log::trace!("precisions: {:?}", precisions);
 }
 
-pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
+pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error> {
     let (model, precision_table) = get_model(fire_opts);
     let mut bam = fire_opts.input.bam_reader();
 
@@ -536,7 +536,7 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     }
     // add FIRE prediction to bam file
     else {
-        let mut out = bam_writer(&fire_opts.out, &bam, 8);
+        let mut out = fire_opts.input.bam_writer(&fire_opts.out);
         let fibers = fire_opts.input.fibers(&mut bam);
         let mut skip_because_no_m6a = 0;
         let mut skip_because_num_msp = 0;

@@ -6,9 +6,9 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::bam::Read;
 use rust_htslib::bam::Record;
 
-pub fn strip_base_mods(opts: &StripBasemodsOptions) {
+pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
     let mut bam = opts.input.bam_reader();
-    let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
+    let mut out = opts.input.bam_writer(&opts.out);
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
 

@@ -210,7 +210,7 @@ pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator>) {
     (bed12_from_fiber(fiber), decorators)
 }
 
-pub fn get_decorators_from_bam(dec_opts: &DecoratorOptions) -> Result<(), anyhow::Error> {
+pub fn get_decorators_from_bam(dec_opts: &mut DecoratorOptions) -> Result<(), anyhow::Error> {
     let mut bam = dec_opts.input.bam_reader();
     let mut bed12 = bio_io::writer(&dec_opts.bed12)?;
     let mut decorator = bio_io::writer(&dec_opts.decorator)?;

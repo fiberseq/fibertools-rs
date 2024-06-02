@@ -321,7 +321,7 @@ pub fn define_footprint(fiber: FiberseqData, bed_rec: CenterPosition, _modules: 
     {}
 }
 
-pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::Error> {
+pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyhow::Error> {
     let yaml_buff = bio_io::buffer_from(&opts.yaml)?;
     let yaml: FootprintYaml = serde_yaml::from_reader(yaml_buff)?;
     yaml.check_for_valid_input()?;

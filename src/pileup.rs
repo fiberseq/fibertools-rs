@@ -14,7 +14,7 @@ use rust_htslib::bam::{FetchDefinition, IndexedReader};
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct FireRow<'a> {
     pub coverage: &'a i32,
     pub fire_coverage: &'a i32,
@@ -24,6 +24,18 @@ pub struct FireRow<'a> {
     pub cpg_coverage: &'a i32,
     pub m6a_coverage: &'a i32,
     pileup_opts: &'a PileupOptions,
+}
+
+impl PartialEq for FireRow<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.coverage == other.coverage
+            && self.fire_coverage == other.fire_coverage
+            && self.score == other.score
+            && self.nuc_coverage == other.nuc_coverage
+            && self.msp_coverage == other.msp_coverage
+            && self.cpg_coverage == other.cpg_coverage
+            && self.m6a_coverage == other.m6a_coverage
+    }
 }
 
 impl std::fmt::Display for FireRow<'_> {
@@ -354,7 +366,7 @@ fn run_rgn(
 }
 
 /// extract existing fire calls into a bed9+ like file
-pub fn pileup_track(pileup_opts: &PileupOptions) -> Result<(), anyhow::Error> {
+pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error> {
     // read in the bam from stdin or from a file
     let mut bam = pileup_opts.input.indexed_bam_reader();
     let header = bam.header().clone();

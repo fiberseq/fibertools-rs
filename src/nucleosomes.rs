@@ -229,9 +229,9 @@ pub fn add_nucleosomes_to_record(
     }
 }
 
-pub fn add_nucleosomes_to_bam(nuc_opts: &AddNucleosomeOptions) {
+pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
     let mut bam = nuc_opts.input.bam_reader();
-    let mut out = bam_writer(&nuc_opts.out, &bam, nuc_opts.input.global.threads);
+    let mut out = nuc_opts.input.bam_writer(&nuc_opts.out);
 
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);

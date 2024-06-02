@@ -350,7 +350,7 @@ pub fn center(
     }
 }
 
-pub fn center_fiberdata(center_opts: &CenterOptions) -> anyhow::Result<()> {
+pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
     let mut bam = center_opts.input.indexed_bam_reader();
     let center_positions = center::read_center_positions(&center_opts.bed)?;
 

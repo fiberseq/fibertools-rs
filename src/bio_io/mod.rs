@@ -125,17 +125,14 @@ pub fn buffer_from<P: AsRef<Path>>(
 BAM IO
 */
 
-/// Write to a bam file.
-pub fn program_bam_writer(
+pub fn program_bam_writer_from_header(
     out: &str,
-    template_bam: &bam::Reader,
+    mut header: bam::Header,
     threads: usize,
     program_name: &str,
     program_id: &str,
     program_version: &str,
 ) -> bam::Writer {
-    let mut header = bam::Header::from_template(template_bam.header());
-
     // add to the header
     let header_string = String::from_utf8_lossy(&header.to_bytes()).to_string();
     let mut header_rec = bam::header::HeaderRecord::new(b"PG");
@@ -170,6 +167,26 @@ pub fn program_bam_writer(
     };
     out.set_threads(threads).unwrap();
     out
+}
+
+/// Write to a bam file.
+pub fn program_bam_writer(
+    out: &str,
+    template_bam: &bam::Reader,
+    threads: usize,
+    program_name: &str,
+    program_id: &str,
+    program_version: &str,
+) -> bam::Writer {
+    let header = bam::Header::from_template(template_bam.header());
+    program_bam_writer_from_header(
+        out,
+        header,
+        threads,
+        program_name,
+        program_id,
+        program_version,
+    )
 }
 
 /// Open bam file

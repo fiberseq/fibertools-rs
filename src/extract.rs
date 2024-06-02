@@ -126,7 +126,7 @@ pub fn process_bam_chunk(fiber_data: Vec<FiberseqData>, out_files: &mut FiberOut
     }
 }
 
-pub fn extract_contained(extract_opts: &ExtractOptions) {
+pub fn extract_contained(extract_opts: &mut ExtractOptions) {
     let mut bam = extract_opts.input.bam_reader();
     let mut out_files = FiberOut::new(
         &extract_opts.m6a,
