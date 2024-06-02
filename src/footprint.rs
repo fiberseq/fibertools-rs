@@ -327,12 +327,11 @@ pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::E
     yaml.check_for_valid_input()?;
     log::debug!("YAML: {:?}", yaml);
 
-    let bam = bio_io::bam_reader(&opts.bam, 1);
+    let bam = opts.input.bam_reader();
     let header = bam::Header::from_template(bam.header());
     let header_view = bam::HeaderView::from_header(&header);
     let mut out = bio_io::writer(&opts.out)?;
-    let mut bam = rust_htslib::bam::IndexedReader::from_path(&opts.bam)?;
-    bam.set_threads(8)?;
+    let mut bam = opts.input.indexed_bam_reader();
 
     let reader = bio_io::buffer_from(&opts.bed)?;
     let mut first = true;

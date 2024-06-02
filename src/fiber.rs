@@ -537,18 +537,25 @@ pub struct FiberseqRecords<'a> {
 }
 
 impl<'a> FiberseqRecords<'a> {
-    pub fn new(bam: &'a mut bam::Reader, min_ml_score: u8) -> Self {
+    pub fn new(bam: &'a mut bam::Reader) -> Self {
         let header = bam.header().clone();
         let bam_recs = bam.records();
         let bam_chunk = BamChunk::new(bam_recs, None);
         let cur_chunk: Vec<FiberseqData> = vec![];
-
         FiberseqRecords {
             bam_chunk,
             header,
-            min_ml_score,
+            min_ml_score: 0,
             cur_chunk,
         }
+    }
+
+    pub fn set_min_ml_score(&mut self, min_ml_score: u8) {
+        self.min_ml_score = min_ml_score;
+    }
+
+    pub fn set_bit_flag_filter(&mut self, filter_bit_flag: u16) {
+        self.bam_chunk.set_bit_flag_filter(filter_bit_flag);
     }
 }
 

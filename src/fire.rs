@@ -1,7 +1,6 @@
 use super::cli::FireOptions;
 use super::fiber::FiberseqData;
 use super::*;
-use crate::fiber::FiberseqRecords;
 use anyhow;
 use bam::record::{Aux, AuxArray};
 use decorator::get_fire_color;
@@ -511,13 +510,14 @@ pub fn add_fire_to_rec(
 
 pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     let (model, precision_table) = get_model(fire_opts);
-    let mut bam = bio_io::bam_reader(&fire_opts.bam, 8);
+    let mut bam = fire_opts.input.bam_reader();
 
     // write features to text file
     if fire_opts.feats_to_text {
+        let fibers = fire_opts.input.fibers(&mut bam);
         let mut first = true;
         let mut out_buffer = bio_io::writer(&fire_opts.out)?;
-        for chunk in &FiberseqRecords::new(&mut bam, 0).chunks(1_000) {
+        for chunk in &fibers.chunks(1_000) {
             if first {
                 out_buffer.write_all(FireFeats::fire_feats_header(fire_opts).as_bytes())?;
                 first = false;
@@ -537,10 +537,11 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
     // add FIRE prediction to bam file
     else {
         let mut out = bam_writer(&fire_opts.out, &bam, 8);
+        let fibers = fire_opts.input.fibers(&mut bam);
         let mut skip_because_no_m6a = 0;
         let mut skip_because_num_msp = 0;
         let mut skip_because_ave_msp_length = 0;
-        for recs in &FiberseqRecords::new(&mut bam, 0).chunks(2_000) {
+        for recs in &fibers.chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
@@ -584,14 +585,12 @@ pub fn add_fire_to_bam(fire_opts: &FireOptions) -> Result<(), anyhow::Error> {
 /// extract existing fire calls into a bed9+ like file
 pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<(), anyhow::Error> {
     let mut out_buffer = bio_io::writer(&fire_opts.out)?;
+    let fibers = fire_opts.input.fibers(bam);
     //let header =
     //"#chrom\tstart\tend\tname\tscore\tstrand\tthickStart\tthickEnd\titemRgb\tfdr\tHP\n";
     //out_buffer.write_all(header.as_bytes())?;
 
-    for rec in FiberseqRecords::new(bam, 0) {
-        if rec.record.is_secondary() || rec.record.is_supplementary() || rec.record.is_unmapped() {
-            continue;
-        }
+    for rec in fibers {
         let start_iter = rec
             .msp
             .reference_starts

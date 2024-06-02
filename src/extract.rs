@@ -2,7 +2,6 @@ use super::fiber::FiberseqData;
 use super::*;
 use crate::cli::ExtractOptions;
 use rayon::prelude::*;
-use rust_htslib::{bam, bam::HeaderView, bam::Read};
 
 pub struct FiberOut {
     pub m6a: Option<Box<dyn Write>>,
@@ -64,13 +63,7 @@ impl FiberOut {
     }
 }
 
-pub fn process_bam_chunk(
-    records: Vec<bam::Record>,
-    out_files: &mut FiberOut,
-    head_view: &HeaderView,
-) {
-    let fiber_data = FiberseqData::from_records(records, head_view, out_files.min_ml_score);
-
+pub fn process_bam_chunk(fiber_data: Vec<FiberseqData>, out_files: &mut FiberOut) {
     match &mut out_files.m6a {
         Some(m6a) => {
             let out: Vec<String> = fiber_data
@@ -133,7 +126,8 @@ pub fn process_bam_chunk(
     }
 }
 
-pub fn extract_contained(bam: &mut bam::Reader, extract_opts: &ExtractOptions) {
+pub fn extract_contained(extract_opts: &ExtractOptions) {
+    let mut bam = extract_opts.input.bam_reader();
     let mut out_files = FiberOut::new(
         &extract_opts.m6a,
         &extract_opts.cpg,
@@ -143,12 +137,9 @@ pub fn extract_contained(bam: &mut bam::Reader, extract_opts: &ExtractOptions) {
         extract_opts.reference,
         extract_opts.simplify,
         extract_opts.quality,
-        extract_opts.min_ml_score,
+        extract_opts.input.min_ml_score,
     )
     .unwrap();
-
-    let header = bam::Header::from_template(bam.header());
-    let head_view = bam::HeaderView::from_header(&header);
 
     // print the header if in all mode
     match &mut out_files.all {
@@ -165,8 +156,8 @@ pub fn extract_contained(bam: &mut bam::Reader, extract_opts: &ExtractOptions) {
 
     // process bam in chunks
     // keeps mem pretty low, about 1GB per thread
-    let bam_chunk_iter = BamChunk::new(bam.records(), None);
-    for chunk in bam_chunk_iter {
-        process_bam_chunk(chunk, &mut out_files, &head_view);
+    let fibers = extract_opts.input.fibers(&mut bam);
+    for chunk in &fibers.chunks(1_000) {
+        process_bam_chunk(chunk.collect(), &mut out_files);
     }
 }

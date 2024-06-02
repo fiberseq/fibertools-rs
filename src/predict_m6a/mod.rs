@@ -40,7 +40,7 @@ where
     map: BTreeMap<OrderedFloat<f32>, u8>,
     pub model: Vec<u8>,
     pub min_ml: u8,
-    pub nuc_opts: cli::AddNucleosomeOptions,
+    pub nuc_opts: cli::NucleosomeParameters,
     pub burn_models: m6a_burn::BurnModels<B>,
 }
 
@@ -55,7 +55,7 @@ where
         all_calls: bool,
         polymerase: PbChem,
         batch_size: usize,
-        nuc_opts: cli::AddNucleosomeOptions,
+        nuc_opts: cli::NucleosomeParameters,
     ) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();
@@ -472,29 +472,19 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     Some((a_data, t_data))
 }
 
-pub fn read_bam_into_fiberdata(
-    bam: &mut bam::Reader,
-    out: &mut bam::Writer,
-    predict_options: &PredictM6AOptions,
-) {
+pub fn read_bam_into_fiberdata(predict_options: &PredictM6AOptions) {
+    let mut bam = predict_options.input.bam_reader();
+    let mut out = bam_writer(
+        &predict_options.out,
+        &bam,
+        predict_options.input.global.threads,
+    );
     let header = bam::Header::from_template(bam.header());
     // log the options
     log::info!(
         "{} reads included at once in batch prediction.",
         predict_options.batch_size
     );
-
-    // set up nuc options
-    let nuc_opts = super::cli::AddNucleosomeOptions {
-        bam: "-".to_string(),
-        out: "-".to_string(),
-        nucleosome_length: predict_options.nucleosome_length,
-        combined_nucleosome_length: predict_options.combined_nucleosome_length,
-        min_distance_added: predict_options.min_distance_added,
-        distance_from_end: predict_options.distance_from_end,
-        allowed_m6a_skips: predict_options.allowed_m6a_skips,
-        min_ml_score: 0,
-    };
 
     #[cfg(feature = "tch")]
     type MlBackend = burn::backend::LibTorch;
@@ -509,11 +499,11 @@ pub fn read_bam_into_fiberdata(
     // switch to the internal predict options
     let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
         predict_options.keep,
-        predict_options.min_ml_score,
+        predict_options.force_min_ml_score,
         predict_options.all_calls,
         find_pb_polymerase(&header),
         predict_options.batch_size,
-        nuc_opts,
+        predict_options.nuc.clone(),
     );
 
     // read in bam data

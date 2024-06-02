@@ -188,6 +188,7 @@ pub struct BamChunk<'a> {
     pub chunk_size: usize,
     pub pre_chunk_done: u64,
     pub bar: ProgressBar,
+    pub bit_flag_filter: u16,
 }
 
 impl<'a> BamChunk<'a> {
@@ -199,7 +200,12 @@ impl<'a> BamChunk<'a> {
             chunk_size,
             pre_chunk_done: 0,
             bar,
+            bit_flag_filter: 0,
         }
+    }
+
+    pub fn set_bit_flag_filter(&mut self, bit_flag: u16) {
+        self.bit_flag_filter = bit_flag;
     }
 }
 
@@ -226,6 +232,10 @@ impl<'a> Iterator for BamChunk<'a> {
                     "Skipping read ({}) because it has been hard clipped. This read will be excluded from calculations and any output.",
                     String::from_utf8_lossy(r.qname())
                 );
+                continue;
+            }
+            // filter by bit flag
+            if r.flags() & self.bit_flag_filter != 0 {
                 continue;
             }
             cur_vec.push(r);

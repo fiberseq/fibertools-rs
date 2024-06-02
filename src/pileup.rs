@@ -356,7 +356,7 @@ fn run_rgn(
 /// extract existing fire calls into a bed9+ like file
 pub fn pileup_track(pileup_opts: &PileupOptions) -> Result<(), anyhow::Error> {
     // read in the bam from stdin or from a file
-    let mut bam = bam::IndexedReader::from_path(pileup_opts.bam.clone())?;
+    let mut bam = pileup_opts.input.indexed_bam_reader();
     let header = bam.header().clone();
     bam.set_threads(8).unwrap();
 

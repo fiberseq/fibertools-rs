@@ -109,7 +109,10 @@ pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: b
 }
 
 /// clear kinetics from a hifi bam
-pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
+pub fn clear_kinetics(opts: &cli::ClearKineticsOptions) {
+    let mut bam = opts.input.bam_reader();
+    let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
+
     let bar = bio_io::no_length_progress_bar();
     for rec in bam.records() {
         let mut record = rec.unwrap();
