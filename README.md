@@ -31,17 +31,17 @@ However, due to size constraints in `bioconda` this version does not support con
 ft --help
 ```
 
-[Help page for fibertools](/docs/ft--help.md)
+[Help page for fibertools](/docs/help.md)
 
 # Highlighted subcommands for `fibertools-rs`
 
 ### `ft predict-m6a`
 
-Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. [Help page for predict-m6a](/docs/ft-predict-m6a-help.md).
+Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. [Help page for predict-m6a](/docs/help.md#ft-predict-m6a).
 
 ### `ft add-nucleosomes`
 
-Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling. [Help page for add-nucleosomes](/docs/ft-add-nucleosomes-help.md).
+Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling. [Help page for add-nucleosomes](/docs/help.md#ft-add-nucleosomes).
 
 ### `ft extract`
 
