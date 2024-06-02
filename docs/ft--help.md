@@ -11,6 +11,7 @@ Commands:
   center            This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs [aliases: c, ct]
   footprint         Infer footprints from fiberseq data
   track-decorators  Make decorated bed files for fiberseq data
+  pileup            Make a pileup track of Fiber-seq features from a FIRE bam
   clear-kinetics    Remove HiFi kinetics tags from the input bam file
   strip-basemods    Strip out select base modifications
   help              Print this message or the help of the given subcommand(s)

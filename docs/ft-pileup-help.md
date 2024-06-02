@@ -1,7 +1,7 @@
 ```
-Infer footprints from fiberseq data
+Make a pileup track of Fiber-seq features from a FIRE bam
 
-Usage: ft footprint [OPTIONS] --bed <BED> --yaml <YAML> [BAM]
+Usage: ft pileup [OPTIONS] [BAM] [RGN]
 
 Arguments:
   [BAM]
@@ -13,17 +13,29 @@ Arguments:
           
           [default: -]
 
+  [RGN]
+          Region string to make a pileup of. If not provided will make a pileup of the whole genome
+
 Options:
-  -b, --bed <BED>
-          BED file with the regions to footprint. Should all contain the same motif with proper strand information, and ideally be ChIP-seq peaks
-
-  -y, --yaml <YAML>
-          yaml describing the modules of the footprint
-
   -o, --out <OUT>
-          Output bam
+          Output file
           
           [default: -]
+
+  -m, --m6a
+          include m6A calls
+
+  -c, --cpg
+          include 5mC calls
+
+      --haps
+          For each column add two new columns with the hap1 and hap2 specific data
+
+  -k, --keep-zeros
+          Keep zero coverage regions
+
+  -p, --per-base
+          Write output one base at a time even if the values do not change
 
   -h, --help
           Print help (see a summary with '-h')
