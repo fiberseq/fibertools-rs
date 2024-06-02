@@ -34,11 +34,7 @@ pub fn get_styles() -> clap::builder::Styles {
 
 #[derive(Debug, Args, PartialEq, Eq)]
 pub struct InputBam {
-    /// Input BAM file. If no path is provided extract will read bam data from stdin.
-    ///
-    /// For m6A prediction, this should be a HiFi bam file with kinetics data.
-    ///
-    /// For other commands, this should be a bam file with m6A calls.
+    /// Input BAM file. If no path is provided stdin is used. For m6A prediction, this should be a HiFi bam file with kinetics data. For other commands, this should be a bam file with m6A calls.
     #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
     pub bam: String,
     /// BAM bit flags to filter on, equivalent to `-F` in samtools view
