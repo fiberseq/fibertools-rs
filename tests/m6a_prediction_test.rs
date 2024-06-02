@@ -4,7 +4,7 @@ use rust_htslib::bam::Reader;
 use tempfile::NamedTempFile;
 
 fn sum_qual(bam: &mut Reader) -> usize {
-    let fibers = fibertools_rs::fiber::FiberseqRecords::new(bam, 0);
+    let fibers = fibertools_rs::fiber::FiberseqRecords::new(bam);
     // sum up all quality scores across all fibers
     let mut sum = 0;
     for fiber in fibers {
@@ -23,13 +23,14 @@ fn sum_qual(bam: &mut Reader) -> usize {
 fn run_prediction_and_count_qual(inbam: String) -> usize {
     let named_tmp_bam_out = NamedTempFile::new().unwrap();
     let out_str = named_tmp_bam_out.path().to_str().unwrap();
-    let predict_options = fibertools_rs::cli::PredictM6AOptions::default();
-    let mut bam = bio_io::bam_reader(&inbam, 1);
+    let mut predict_options = fibertools_rs::cli::PredictM6AOptions::default();
+    predict_options.input.bam = inbam.clone();
+    predict_options.input.global.threads = 1;
+    predict_options.out = out_str.to_string();
+
     {
-        // make a fake named temp file with the extension bam
-        let mut out = fibertools_rs::bam_writer(out_str, &bam, 1);
         // run prediction
-        fibertools_rs::predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, &predict_options);
+        fibertools_rs::predict_m6a::read_bam_into_fiberdata(&predict_options);
     }
 
     // read in the output bam and check the sum of the quality scores

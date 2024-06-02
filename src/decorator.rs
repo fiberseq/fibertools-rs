@@ -1,7 +1,6 @@
 use super::cli::DecoratorOptions;
 use super::fiber::FiberseqData;
 use super::*;
-use crate::fiber::FiberseqRecords;
 use anyhow;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use std::cmp::Ordering;
@@ -212,14 +211,11 @@ pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator>) {
 }
 
 pub fn get_decorators_from_bam(dec_opts: &DecoratorOptions) -> Result<(), anyhow::Error> {
-    let mut bam = bio_io::bam_reader(&dec_opts.bam, 8);
+    let mut bam = dec_opts.input.bam_reader();
     let mut bed12 = bio_io::writer(&dec_opts.bed12)?;
     let mut decorator = bio_io::writer(&dec_opts.decorator)?;
 
-    for rec in FiberseqRecords::new(&mut bam, dec_opts.min_ml_score) {
-        if rec.record.is_secondary() || rec.record.is_supplementary() || rec.record.is_unmapped() {
-            continue;
-        }
+    for rec in dec_opts.input.fibers(&mut bam) {
         let (fiber_bed12, fiber_decorator) = decorator_from_bam(&rec);
         bed12.write_all(fiber_bed12.as_bytes())?;
         for fiber_decorator in fiber_decorator {

@@ -1,7 +1,12 @@
+use crate::fiber::FiberseqRecords;
+
+use super::bio_io;
 use super::nucleosomes::*;
 use anstyle;
 use clap::{Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::{generate, Generator, Shell};
+use rust_htslib::bam;
+use rust_htslib::bam::Read;
 use std::{fmt::Debug, io};
 
 pub static MIN_ML_SCORE: &str = "125";
@@ -27,6 +32,92 @@ pub fn get_styles() -> clap::builder::Styles {
         .placeholder(placeholder_style)
 }
 
+#[derive(Debug, Args, PartialEq, Eq)]
+pub struct InputBam {
+    /// Input BAM file. If no path is provided extract will read bam data from stdin.
+    ///
+    /// For m6A prediction, this should be a HiFi bam file with kinetics data.
+    ///
+    /// For other commands, this should be a bam file with m6A calls.
+    #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
+    pub bam: String,
+    /// BAM bit flags to filter, equivalent to `-F` in samtools view
+    #[clap(global = true, short = 'F', long = "filter", default_value = "0")]
+    pub bit_flag: u16,
+    /// Minium score in the ML tag to use or include in the output
+    #[clap(short, long, default_value = MIN_ML_SCORE)]
+    pub min_ml_score: u8,
+    #[clap(flatten)]
+    pub global: GlobalOpts,
+}
+
+impl InputBam {
+    pub fn bam_reader(&self) -> bam::Reader {
+        bio_io::bam_reader(&self.bam, self.global.threads)
+    }
+
+    pub fn indexed_bam_reader(&self) -> bam::IndexedReader {
+        let mut bam =
+            bam::IndexedReader::from_path(&self.bam).expect("unable to open indexed bam file");
+        bam.set_threads(self.global.threads).unwrap();
+        bam
+    }
+
+    pub fn fibers<'a>(&self, bam: &'a mut bam::Reader) -> FiberseqRecords<'a> {
+        let mut fr = FiberseqRecords::new(bam);
+        fr.set_min_ml_score(self.min_ml_score);
+        fr.set_bit_flag_filter(self.bit_flag);
+        fr
+    }
+}
+
+impl std::default::Default for InputBam {
+    fn default() -> Self {
+        Self {
+            bam: "-".to_string(),
+            bit_flag: 0,
+            min_ml_score: MIN_ML_SCORE.parse().unwrap(),
+            global: GlobalOpts::default(),
+        }
+    }
+}
+
+#[derive(Debug, Args, PartialEq, Eq)]
+pub struct GlobalOpts {
+    /// Threads
+    #[clap(
+        global = true,
+        short,
+        long,
+        default_value_t = 8,
+        //help_heading = "Global-Options"
+    )]
+    pub threads: usize,
+
+    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace]
+    #[clap(
+        global = true,
+        short,
+        long,
+        action = clap::ArgAction::Count,
+        help_heading = "Debug-Options"
+    )]
+    pub verbose: u8,
+    /// Turn off all logging
+    #[clap(global = true, long, help_heading = "Debug-Options")]
+    pub quiet: bool,
+}
+
+impl std::default::Default for GlobalOpts {
+    fn default() -> Self {
+        Self {
+            threads: 8,
+            verbose: 0,
+            quiet: false,
+        }
+    }
+}
+
 #[derive(Parser)]
 #[clap(
     author,
@@ -40,27 +131,8 @@ pub fn get_styles() -> clap::builder::Styles {
 #[command(version = super::LONG_VERSION)]
 #[command(styles=get_styles())]
 pub struct Cli {
-    /// Threads
-    #[clap(
-        global = true,
-        short,
-        long,
-        default_value_t = 8,
-        help_heading = "Global-Options"
-    )]
-    pub threads: usize,
-    /// Logging level [-v: Info, -vv: Debug, -vvv: Trace]
-    #[clap(
-        global = true,
-        short,
-        long,
-        action = clap::ArgAction::Count,
-        help_heading = "Debug-Options"
-    )]
-    pub verbose: u8,
-    /// Turn off all logging
-    #[clap(global = true, long, help_heading = "Debug-Options")]
-    pub quiet: bool,
+    #[clap(flatten)]
+    pub global: GlobalOpts,
     /// Subcommands for fibertools-rs
     #[clap(subcommand)]
     pub command: Option<Commands>,
@@ -122,35 +194,21 @@ pub fn make_cli_app() -> Command {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct PredictM6AOptions {
-    /// Bam HiFi file with kinetics
-    #[clap(default_value = "-")]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Output bam file with m6A calls in new/extended MM and ML bam tags
     #[clap(default_value = "-")]
     pub out: String,
-    /// Minium nucleosome length
-    #[clap(short, long, default_value = NUC_LEN)]
-    pub nucleosome_length: i64,
-    /// Minium nucleosome length when combining over a single m6A
-    #[clap(short, long, default_value = COMBO_NUC_LEN)]
-    pub combined_nucleosome_length: i64,
-    /// Minium distance needed to add to an already existing nuc by crossing an m6a
-    #[clap(long, default_value = MIN_DIST_ADDED)]
-    pub min_distance_added: i64,
-    /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-    #[clap(short, long, default_value = DIST_FROM_END)]
-    pub distance_from_end: i64,
-    /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
-    #[clap(long, default_value = ALLOWED_SKIPS, hide = true)]
-    pub allowed_m6a_skips: i64,
+    #[clap(flatten)]
+    pub nuc: NucleosomeParameters,
     /// Keep hifi kinetics data
     #[clap(short, long)]
     pub keep: bool,
-    /// Set a minimum ML score to keep on instead of using the model specific minimum ML score.
-    #[clap(short, long, help_heading = "Developer-Options")]
-    pub min_ml_score: Option<u8>,
+    /// Force a different minimum ML score
+    #[clap(long, help_heading = "Developer-Options")]
+    pub force_min_ml_score: Option<u8>,
     /// Keep all m6A calls regardless of how low the ML value is
-    #[clap(short, long, help_heading = "Developer-Options")]
+    #[clap(long, help_heading = "Developer-Options")]
     pub all_calls: bool,
     /// Number of reads to include in batch prediction
     ///
@@ -162,15 +220,11 @@ pub struct PredictM6AOptions {
 impl std::default::Default for PredictM6AOptions {
     fn default() -> Self {
         Self {
-            bam: "-".to_string(),
+            input: InputBam::default(),
             out: "-".to_string(),
-            nucleosome_length: NUC_LEN.parse().unwrap(),
-            combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
-            min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
-            distance_from_end: DIST_FROM_END.parse().unwrap(),
-            allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
+            nuc: NucleosomeParameters::default(),
             keep: false,
-            min_ml_score: None,
+            force_min_ml_score: None,
             all_calls: false,
             batch_size: 1,
         }
@@ -179,9 +233,8 @@ impl std::default::Default for PredictM6AOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct FireOptions {
-    /// Bam HiFi file with m6A and MSP calls
-    #[clap(default_value = "-")]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Output file (bam by default, table if --feats_to_text is used, and bed9 + if --extract is used)
     #[clap(default_value = "-")]
     pub out: String,
@@ -225,14 +278,8 @@ pub struct FireOptions {
     pub feats_to_text: bool,
 }
 
-#[derive(Args, Debug)]
-pub struct AddNucleosomeOptions {
-    /// Bam HiFi file with m6A calls
-    #[clap(default_value = "-")]
-    pub bam: String,
-    /// Output bam file with nucleosome calls
-    #[clap(default_value = "-")]
-    pub out: String,
+#[derive(Args, Debug, PartialEq, Eq, Clone)]
+pub struct NucleosomeParameters {
     /// Minium nucleosome length
     #[clap(short, long, default_value = NUC_LEN)]
     pub nucleosome_length: i64,
@@ -240,7 +287,7 @@ pub struct AddNucleosomeOptions {
     #[clap(short, long, default_value = COMBO_NUC_LEN)]
     pub combined_nucleosome_length: i64,
     /// Minium distance needed to add to an already existing nuc by crossing an m6a
-    #[clap(short, long, default_value = MIN_DIST_ADDED)]
+    #[clap(long, default_value = MIN_DIST_ADDED)]
     pub min_distance_added: i64,
     /// Minimum distance from the end of a fiber to call a nucleosome or MSP
     #[clap(short, long, default_value = DIST_FROM_END)]
@@ -248,48 +295,52 @@ pub struct AddNucleosomeOptions {
     /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
     #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]
     pub allowed_m6a_skips: i64,
-    /// Minium score in the ML tag to use in predicting nucleosomes
-    #[clap(long, default_value = MIN_ML_SCORE)]
-    pub min_ml_score: u8,
 }
-impl AddNucleosomeOptions {
-    pub fn default_value() -> Self {
+
+impl std::default::Default for NucleosomeParameters {
+    fn default() -> Self {
         Self {
-            bam: "-".to_string(),
-            out: "-".to_string(),
             nucleosome_length: NUC_LEN.parse().unwrap(),
             combined_nucleosome_length: COMBO_NUC_LEN.parse().unwrap(),
             min_distance_added: MIN_DIST_ADDED.parse().unwrap(),
             distance_from_end: DIST_FROM_END.parse().unwrap(),
             allowed_m6a_skips: ALLOWED_SKIPS.parse().unwrap(),
-            min_ml_score: MIN_ML_SCORE.parse().unwrap(),
         }
     }
 }
 
+#[derive(Args, Debug, PartialEq, Eq)]
+pub struct AddNucleosomeOptions {
+    #[clap(flatten)]
+    pub input: InputBam,
+    /// Output bam file with nucleosome calls
+    #[clap(default_value = "-")]
+    pub out: String,
+    #[clap(flatten)]
+    pub nuc: NucleosomeParameters,
+}
+
 #[derive(Args)]
 pub struct DecoratorOptions {
-    /// Bam HiFi file with m6A calls
-    #[clap(default_value = "-")]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Output path for bed12 file to be decorated
     #[clap(short, long)]
     pub bed12: String,
     /// Output path for decorator bed file
     #[clap(short, long, default_value = "-")]
     pub decorator: String,
-    /// Minium score in the ML tag to include in the output
-    #[clap(short, long, default_value = MIN_ML_SCORE)]
-    pub min_ml_score: u8,
 }
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct FootprintOptions {
-    /// Indexed and aligned bam file with m6A and MSP calls
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// BED file with the regions to footprint. Should all contain the same motif with proper strand information, and ideally be ChIP-seq peaks.
+    #[clap(short, long)]
     pub bed: String,
     /// yaml describing the modules of the footprint
+    #[clap(short, long)]
     pub yaml: String,
     /// Output bam
     #[clap(short, long, default_value = "-")]
@@ -298,14 +349,12 @@ pub struct FootprintOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct CenterOptions {
-    /// Aligned Fiber-seq bam file.
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but only after the 6th is.        
     /// If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position.
+    #[clap(short, long)]
     pub bed: String,
-    /// Minium score in the ML tag to include in the output
-    #[clap(short, long, default_value = MIN_ML_SCORE)]
-    pub min_ml_score: u8,
     /// Set a maximum distance from the start of the motif to keep a feature
     #[clap(short, long)]
     pub dist: Option<i64>,
@@ -322,9 +371,8 @@ pub struct CenterOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct ExtractOptions {
-    /// Input fiberseq bam file. If no path is provided extract will read bam data from stdin.
-    #[arg(default_value = "-", value_hint = ValueHint::AnyPath)]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Report in reference sequence coordinates
     #[clap(short, long, default_value = "true",
           default_value_ifs([
@@ -336,9 +384,6 @@ pub struct ExtractOptions {
     /// Report positions in the molecular sequence coordinates
     #[clap(long, default_value = "false")]
     pub molecular: bool,
-    /// Minium score in the ML tag to include in the output
-    #[clap(short, long, default_value = MIN_ML_SCORE)]
-    pub min_ml_score: u8,
     /// Output path for m6a bed12
     #[clap(long)]
     pub m6a: Option<String>,
@@ -364,9 +409,8 @@ pub struct ExtractOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct ClearKineticsOptions {
-    /// Bam HiFi file with kinetics
-    #[clap(default_value = "-")]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Output bam file without hifi kinetics
     #[clap(default_value = "-")]
     pub out: String,
@@ -374,9 +418,8 @@ pub struct ClearKineticsOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct StripBasemodsOptions {
-    /// Bam HiFi file with base mods
-    #[clap(default_value = "-")]
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Output bam file
     #[clap(default_value = "-")]
     pub out: String,
@@ -394,8 +437,8 @@ pub struct CompletionOptions {
 
 #[derive(Args, Debug, PartialEq, Eq)]
 pub struct PileupOptions {
-    /// Indexed bam HiFi file with m6A and MSP calls
-    pub bam: String,
+    #[clap(flatten)]
+    pub input: InputBam,
     /// Region string to make a pileup of.
     /// If not provided will make a pileup of the whole genome
     #[clap(default_value = None)]
