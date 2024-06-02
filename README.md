@@ -45,14 +45,14 @@ Add nucleosomes to a bam that file already contains m6a predictions. Note, this 
 
 ### `ft extract`
 
-Extracts Fiber-seq data from a bam file into plain text. [Help page for extract](/docs/extract.md).
+Extracts Fiber-seq data from a bam file into plain text. [Docs for extract](/docs/extract.md).
 
 ### `ft center`
 
-Center Fiber-seq reads (bam) around reference position(s). [Help page for center](/docs/center.md).
+Center Fiber-seq reads (bam) around reference position(s). [Docs for center](/docs/center.md).
 
 ### `ft footprint`
-Footprint Fiber-seq reads (bam) around reference motifs(s). [Help page for footprint](/docs/footprint.md).
+Footprint Fiber-seq reads (bam) around reference motifs(s). [Docs for footprint](/docs/footprint.md).
 
 # Python API (`pyft`)
 
