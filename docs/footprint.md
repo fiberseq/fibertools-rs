@@ -2,7 +2,7 @@
 
 ## Usage
 ```bash
-ft footprint [OPTIONS] <BAM> <BED> <YAML>
+ft footprint [OPTIONS] <BAM> --bed <BED> --yaml <YAML>
 ```
 The `BAM` file is an indexed fiber-seq bam file.
 
