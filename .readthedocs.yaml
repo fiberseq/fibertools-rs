@@ -10,7 +10,7 @@ build:
   apt_packages:
     - cmake
   tools:
-    python: "3.6"
+    python: "3.7"
     rust: "1.75"
 
 python:
