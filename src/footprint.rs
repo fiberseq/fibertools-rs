@@ -13,6 +13,7 @@ use serde_yaml;
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FootprintYaml {
     modules: Vec<(usize, usize)>,
+    motif_span: Option<(usize, usize)>,
 }
 
 impl FootprintYaml {
@@ -97,7 +98,11 @@ impl<'a> ReferenceMotif<'a> {
 
     pub fn spans(&self, start: i64, end: i64) -> bool {
         // check if coordinates span the motif
-        self.start > start && self.end < end
+        //self.start > start && self.end < end
+        match self.footprint.motif_span {
+            Some((motif_st, motif_en)) => (motif_st as i64) > start && (motif_en as i64) < end,
+            None => self.start > start && self.end < end,
+        }
     }
 
     pub fn overlaps(&self, start: i64, end: i64) -> bool {
