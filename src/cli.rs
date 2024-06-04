@@ -283,12 +283,21 @@ pub struct FireOptions {
     /// Output file (BAM by default, table of MSP features if `--feats-to-text` is used, and bed9 + if `--extract`` is used)
     #[clap(default_value = "-")]
     pub out: String,
+    /// use a human model for FIRE calling
+    #[clap(hide = true, long, env)]
+    pub human: bool,
+    /// use a yeasr model for FIRE calling
+    #[clap(hide = true, long, env)]
+    pub yeast: bool,
     /// Output just FIRE elements in bed9 format
     #[clap(short, long)]
     pub extract: bool,
     /// When extracting bed9 format include all MSPs and nucleosomes
     #[clap(long)]
     pub all: bool,
+    /// Output FIREs features for training in a table format
+    #[clap(short, long)]
+    pub feats_to_text: bool,
     /// Don't write reads with no m6A calls to the output bam
     #[clap(short, long)]
     pub skip_no_m6a: bool,
@@ -299,7 +308,12 @@ pub struct FireOptions {
     #[clap(long, default_value = "0", env)]
     pub min_ave_msp_size: i64,
     /// Width of bin for feature collection
-    #[clap(short, long, default_value = "40", env)]
+    #[clap(short, long, default_value = "40", env, 
+        default_value_ifs([
+            ("human", "true", "40"),
+            ("yeast", "true", "100")
+        ])
+    )]
     pub width_bin: i64,
     /// Number of bins to collect
     #[clap(short, long, default_value = "9", env)]
@@ -321,9 +335,6 @@ pub struct FireOptions {
     /// Optional path to a FDR table
     #[clap(long, env)]
     pub fdr_table: Option<String>,
-    /// Output FIREs features for training in a table format
-    #[clap(short, long)]
-    pub feats_to_text: bool,
 }
 
 #[derive(Args, Debug, Clone)]
