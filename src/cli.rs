@@ -56,6 +56,18 @@ pub struct InputBam {
 }
 
 impl InputBam {
+    pub fn skip_unaligned(&mut self) {
+        self.bit_flag |= 4;
+    }
+
+    pub fn skip_secondary(&mut self) {
+        self.bit_flag |= 256;
+    }
+
+    pub fn skip_supplementary(&mut self) {
+        self.bit_flag |= 2048;
+    }
+
     pub fn bam_reader(&mut self) -> bam::Reader {
         let bam = bio_io::bam_reader(&self.bam, self.global.threads);
         self.header = Some(bam::Header::from_template(bam.header()));
@@ -77,11 +89,18 @@ impl InputBam {
         fr
     }
 
+    pub fn header_view(&self) -> bam::HeaderView {
+        bam::HeaderView::from_header(self.header.as_ref().expect(
+            "Input bam must be opened before opening the header or creating a writer with the input bam as a template.",
+        ))
+    }
+
+    pub fn header(&self) -> bam::Header {
+        bam::Header::from_template(&self.header_view())
+    }
+
     pub fn bam_writer(&self, out: &str) -> bam::Writer {
-        let v = bam::HeaderView::from_header(self.header.as_ref().expect(
-            "Input bam must be opened before creating a writer with the input bam as a template.",
-        ));
-        let header = bam::Header::from_template(&v);
+        let header = self.header();
         let program_name = "fibertools-rs";
         let program_id = "ft";
         let program_version = super::VERSION;
@@ -267,6 +286,9 @@ pub struct FireOptions {
     /// Output just FIRE elements in bed9 format
     #[clap(short, long)]
     pub extract: bool,
+    /// when extracting bed9 format include all MSPs and nucleosomes
+    #[clap(long)]
+    pub all: bool,
     /// Don't write reads with no m6A calls to the output bam
     #[clap(short, long)]
     pub skip_no_m6a: bool,

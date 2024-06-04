@@ -355,9 +355,8 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
     let center_positions = center::read_center_positions(&center_opts.bed)?;
 
     // header needed for the contig name...
-    let header = bam::Header::from_template(bam.header());
-    let header_view = bam::HeaderView::from_header(&header);
-    //
+    let header_view = center_opts.input.header_view();
+    // output buffer
     let mut buffer = bio_io::writer("-").unwrap();
 
     if center_opts.wide {

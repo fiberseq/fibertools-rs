@@ -609,6 +609,9 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
                     100.0 - *qual as f32 / 255.0 * 100.0
                 } else {
                     // we are now in nucleosomes
+                    if !fire_opts.all {
+                        continue;
+                    }
                     101.0
                 };
                 let color = get_fire_color(fdr);
