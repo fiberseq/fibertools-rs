@@ -129,13 +129,13 @@ Arguments:
 
 Options:
   -e, --extract                                                                        Output just FIRE elements in bed9 format
+      --all                                                                            when extracting bed9 format include all MSPs and nucleosomes
   -s, --skip-no-m6a                                                                    Don't write reads with no m6A calls to the output bam
       --min-msp <MIN_MSP>                                                              Skip reads without at least `N` MSP calls [env: MIN_MSP=] [default: 0]
       --min-ave-msp-size <MIN_AVE_MSP_SIZE>                                            Skip reads without an average MSP size greater than `N` [env: MIN_AVE_MSP_SIZE=] [default: 0]
   -w, --width-bin <WIDTH_BIN>                                                          Width of bin for feature collection [env: WIDTH_BIN=] [default: 40]
   -b, --bin-num <BIN_NUM>                                                              Number of bins to collect [env: BIN_NUM=] [default: 9]
-      --best-window-size <BEST_WINDOW_SIZE>                                            Calculate stats for the highest X bp window within each MSP Should be a fair amount higher than the expected linker length [env:
-                                                                                       BEST_WINDOW_SIZE=] [default: 100]
+      --best-window-size <BEST_WINDOW_SIZE>                                            Calculate stats for the highest X bp window within each MSP Should be a fair amount higher than the expected linker length [env: BEST_WINDOW_SIZE=] [default: 100]
       --min-msp-length-for-positive-fire-call <MIN_MSP_LENGTH_FOR_POSITIVE_FIRE_CALL>  Minium length of msp to call a FIRE [env: MIN_MSP_LENGTH_FOR_POSITIVE_FIRE_CALL=] [default: 85]
       --model <MODEL>                                                                  Optional path to a model json file. If not provided ft will use the default model (recommended) [env: FIRE_MODEL=]
       --fdr-table <FDR_TABLE>                                                          Optional path to a FDR table [env: FDR_TABLE=]
@@ -245,9 +245,9 @@ Arguments:
 
 Options:
   -b, --bed <BED>
-          Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also
-          be checked for the strand but only after the 6th is. If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if
-          on the minus strand. This means that profiles of motifs in both the forward and minus orientation will align to the same central position
+          Bed file on which to center fiberseq reads. Data is adjusted to the start position of the bed file and corrected for strand if the strand is indicated in the 6th column of the bed file. The 4th column will also be checked for the strand but
+          only after the 6th is. If you include strand information in the 4th (or 6th) column it will orient data accordingly and use the end position of bed record instead of the start if on the minus strand. This means that profiles of motifs in both
+          the forward and minus orientation will align to the same central position
 
   -d, --dist <DIST>
           Set a maximum distance from the start of the motif to keep a feature
