@@ -280,13 +280,13 @@ impl std::default::Default for PredictM6AOptions {
 pub struct FireOptions {
     #[clap(flatten)]
     pub input: InputBam,
-    /// Output file (bam by default, table if --feats_to_text is used, and bed9 + if --extract is used)
+    /// Output file (BAM by default, table of MSP features if `--feats-to-text` is used, and bed9 + if `--extract`` is used)
     #[clap(default_value = "-")]
     pub out: String,
     /// Output just FIRE elements in bed9 format
     #[clap(short, long)]
     pub extract: bool,
-    /// when extracting bed9 format include all MSPs and nucleosomes
+    /// When extracting bed9 format include all MSPs and nucleosomes
     #[clap(long)]
     pub all: bool,
     /// Don't write reads with no m6A calls to the output bam
