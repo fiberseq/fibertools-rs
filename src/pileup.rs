@@ -350,6 +350,7 @@ fn run_rgn(
     let tid = bam.header().tid(chrom.as_bytes()).unwrap();
     let chrom_len = bam.header().target_len(tid).unwrap() as usize;
 
+    log::info!("Fetching records for {}", chrom);
     bam.fetch(rgn)?;
     let mut records = bam.records().peekable();
     // skip if there are no records and keep_zeros is not set
