@@ -1,0 +1,6 @@
+[book]
+authors = ["Mitchell Robert Vollger"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Fibertools"
