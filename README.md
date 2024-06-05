@@ -13,7 +13,7 @@
 [![crates.io downloads](https://img.shields.io/crates/d/fibertools-rs?color=orange&label=downloads)](https://crates.io/crates/fibertools-rs)
 [![DOI](https://zenodo.org/badge/517338593.svg)](https://zenodo.org/badge/latestdoi/517338593)
 
-`fibertools-rs` a CLI tool for creating and interacting with Fiber-seq BAM files. For more details read the [book](https://fiberseq.github.io/fibertools-rs/index.html).
+`fibertools-rs` a CLI tool for creating and interacting with Fiber-seq BAM files. For more details read the [book](https://fiberseq.github.io/fibertools-rs/).
 
 # Install [![Conda (channel only)](https://img.shields.io/conda/vn/bioconda/fibertools-rs?color=green)](https://anaconda.org/bioconda/fibertools-rs)
 
