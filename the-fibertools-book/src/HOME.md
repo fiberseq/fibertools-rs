@@ -10,9 +10,13 @@
 [![crates.io downloads](https://img.shields.io/crates/d/fibertools-rs?color=orange&label=downloads)](https://crates.io/crates/fibertools-rs)
 [![DOI](https://zenodo.org/badge/517338593.svg)](https://zenodo.org/badge/latestdoi/517338593)
 
-This is the book for `fibertools` (`ft`) which is a CLI tool for creating and interacting with Fiber-seq bam files. The main features include:
+This is the book for `fibertools` (`ft`) which is a CLI tool for **creating and interacting with Fiber-seq BAM** files. 
 
-* **Predicting m6A** sites from PacBio Fiber-seq data
-* Identifying **<ins>F</ins>iber-seq <ins>I</ins>nferred <ins>R</ins>egulatory <ins>E</ins>lements** (FIREs)
-* [Extracting](extracting.md) Fiber-seq results into plain text files.
+**Key features** include:
+* [Predicting m6A](creatings/predict.md) sites from PacBio Fiber-seq data
+* [Identifying FIREs](creating/fire.md) (**<ins>F</ins>iber-seq <ins>I</ins>nferred <ins>R</ins>egulatory <ins>E</ins>lements**)
+* [Extracting](extracting/extract.md) Fiber-seq results into plain text files.
+* [Centering](extracting/center.md) Fiber-seq results around a given position.
+
+However, a complete list of subcommands and their help pages can be found [here](help.md).
 
