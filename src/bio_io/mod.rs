@@ -128,7 +128,6 @@ BAM IO
 pub fn program_bam_writer_from_header(
     out: &str,
     mut header: bam::Header,
-    threads: usize,
     program_name: &str,
     program_id: &str,
     program_version: &str,
@@ -160,44 +159,32 @@ pub fn program_bam_writer_from_header(
     log::trace!("{:?}", String::from_utf8_lossy(&header.to_bytes()));
 
     // make the writer
-    let mut out = if out == "-" {
+    if out == "-" {
         bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
     } else {
         bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
-    };
-    out.set_threads(threads).unwrap();
-    out
+    }
 }
 
 /// Write to a bam file.
 pub fn program_bam_writer(
     out: &str,
     template_bam: &bam::Reader,
-    threads: usize,
     program_name: &str,
     program_id: &str,
     program_version: &str,
 ) -> bam::Writer {
     let header = bam::Header::from_template(template_bam.header());
-    program_bam_writer_from_header(
-        out,
-        header,
-        threads,
-        program_name,
-        program_id,
-        program_version,
-    )
+    program_bam_writer_from_header(out, header, program_name, program_id, program_version)
 }
 
 /// Open bam file
-pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
-    let mut bam = if bam == "-" {
+pub fn bam_reader(bam: &str) -> bam::Reader {
+    if bam == "-" {
         bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
     } else {
         bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-    };
-    bam.set_threads(threads).unwrap();
-    bam
+    }
 }
 // This is a bam chunk reader
 pub struct BamChunk<'a> {

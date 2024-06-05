@@ -69,7 +69,9 @@ impl InputBam {
     }
 
     pub fn bam_reader(&mut self) -> bam::Reader {
-        let bam = bio_io::bam_reader(&self.bam, self.global.threads);
+        let mut bam = bio_io::bam_reader(&self.bam);
+        bam.set_threads(self.global.threads)
+            .expect("unable to set threads for bam reader");
         self.header = Some(bam::Header::from_template(bam.header()));
         bam
     }
@@ -104,14 +106,16 @@ impl InputBam {
         let program_name = "fibertools-rs";
         let program_id = "ft";
         let program_version = super::VERSION;
-        bio_io::program_bam_writer_from_header(
+        let mut out = bio_io::program_bam_writer_from_header(
             out,
             header,
-            self.global.threads,
             program_name,
             program_id,
             program_version,
-        )
+        );
+        out.set_threads(self.global.threads)
+            .expect("unable to set threads for bam writer");
+        out
     }
 }
 
