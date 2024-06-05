@@ -45,6 +45,8 @@ pub fn main() -> Result<(), Error> {
     #[cfg(feature = "tch")]
     tch::set_num_threads(args.global.threads.try_into().unwrap());
 
+    log::debug!("Command line options: {:?}", args.command);
+
     match &mut args.command {
         Some(Commands::Extract(extract_opts)) => {
             extract::extract_contained(extract_opts);

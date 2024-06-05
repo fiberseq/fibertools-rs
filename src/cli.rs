@@ -186,7 +186,7 @@ pub struct Cli {
 ///
 /// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
 ///
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
     #[clap(visible_aliases = &["m6A", "m6a"])]
@@ -379,7 +379,7 @@ pub struct AddNucleosomeOptions {
     pub nuc: NucleosomeParameters,
 }
 
-#[derive(Args)]
+#[derive(Args, Debug)]
 pub struct DecoratorOptions {
     #[clap(flatten)]
     pub input: InputBam,
