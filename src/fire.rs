@@ -19,7 +19,6 @@ pub static FIRE_MODEL: &str = include_str!("../models/FIRE.gbdt.json");
 pub static FIRE_CONF_JSON: &str = include_str!("../models/FIRE.conf.json");
 
 fn get_model(fire_opts: &FireOptions) -> (GBDT, MapPrecisionValues) {
-    log::trace!("CLI options: {:?}", fire_opts);
     let mut remove_temp_file = false;
     // load defaults or passed in options
     let (model_file, fdr_table_file) = match (&fire_opts.model, &fire_opts.fdr_table) {
