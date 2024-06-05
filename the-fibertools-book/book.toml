@@ -4,3 +4,17 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Fibertools"
+
+[build]
+build-dir = "book"                # the directory where the output is placed
+create-missing = false             # whether or not to create missing pages
+use-default-preprocessors = true  # use the default preprocessors
+extra-watch-dirs = []             # directories to watch for triggering builds
+
+
+[output.html]
+default-theme = "dark"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/fiberseq/fibertools-rs"
+git-repository-icon = "fa-github"
+edit-url-template = "https://github.com/fiberseq/fibertools-rs/edit/master/the-fibertools-book/{path}"
