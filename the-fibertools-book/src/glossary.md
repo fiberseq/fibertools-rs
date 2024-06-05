@@ -1,7 +1,7 @@
 # Glossary of Fiber-seq terms
 
 ### Fiber-seq protocol
-A treatment of DNA chromatin fibers with the Hia5 enzyme which preferentially methylates accessible adenosines. The fibers are then sequenced using a long-read platform that can detect the m6A modifications. 
+A treatment of DNA chromatin fibers with the Hia5 enzyme which preferentially methylates accessible adenosines. The fibers are then sequenced using a long-read platform that can detect the [m6A](#m6a) modifications. 
 
 ### Fiber-seq read or fiber
 A DNA fiber that has been sequenced using the Fiber-seq protocol and has [m6A](#m6a) modifications called. 
