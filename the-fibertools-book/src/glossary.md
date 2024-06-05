@@ -9,6 +9,8 @@ A nucleosome inferred from the Fiber-seq data. The nucleosome position along the
 ### MSP
 **Methyltransferase sensitive patch**: A stretch of a Fiber-seq read that has a high density of m6A sites. Specifically it is defined as a region that is inferred to be not occluded by a nucleosome. 
 
-
 ### FIREs
 **Fiber-seq Inferred Regulatory Elements**: MSPs that are inferred to be regulatory elements based on features of the MSP including m6A density. 
+
+### Internucleosomal linker region
+Any MSP that is **not** a FIRE element.
