@@ -357,6 +357,7 @@ fn run_rgn(
         return Ok(());
     }
     // make the pileup
+    log::info!("Initializing pileup for {}", chrom);
     let mut pileup = FiberseqPileup::new(chrom, chrom_len, pileup_opts);
     log::info!("Processing records for {}", chrom);
     pileup.add_records(records)?;
