@@ -18,5 +18,5 @@ This is the book for `fibertools` (`ft`) which is a CLI tool for **creating and 
 * [Extracting](extracting/extract.md) Fiber-seq results into plain text files.
 * [Centering](extracting/center.md) Fiber-seq results around a given position.
 
-However, a complete list of subcommands and their help pages can be found [here](help.md).
+A complete list of subcommands and their help pages can be found [here](help.md).
 

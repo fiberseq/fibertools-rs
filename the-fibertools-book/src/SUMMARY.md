@@ -5,10 +5,6 @@
 ---
 
 - [Installation](install/install.md)
-    - [From conda](install/conda.md)
-    - [From Cargo](install/cargo.md)
-    - [From GitHub](install/github.md)
-    - [With libtorch](install/libtorch.md)
 
 ---
 
