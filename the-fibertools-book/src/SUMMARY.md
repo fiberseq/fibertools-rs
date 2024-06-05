@@ -12,11 +12,13 @@
 
 ---
 
-- [Creating a fibertools bam](extracting.md)
+- [Creating a Fiber-seq BAM](creating.md)
+    - [`ft predict`](predict.md)
+    - [`ft fire`](fire.md)
 
 ---
 
-- [Extracting from a fibertools bam](extracting.md)
+- [Extracting from a Fiber-seq BAM](extracting.md)
     - [`ft extract`](extract.md)
     - [`ft center`](center.md)
     - [`ft footprint`](footprint.md)
