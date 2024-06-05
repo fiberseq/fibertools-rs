@@ -21,7 +21,11 @@
 - [Installation](install/install.md)
 
 ---
+
 - [Glossary](glossary.md)
+
+---
+
 - [Help pages for all `fibertools` subcommands](help.md)
 - [pyft: Python bindings](pyft.md)
 - [Cite](cite.md)
