@@ -1,7 +1,8 @@
 name: Deploy
 on:
-  [push, pull_request]
-
+  push:
+    branches:
+      - 0.4.3
 jobs:
   deploy:
     runs-on: ubuntu-latest
