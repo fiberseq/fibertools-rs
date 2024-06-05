@@ -1,10 +1,10 @@
 # Summary
 
-[fibertools](README.md)
+[fibertools](HOME.md)
 
 ---
 
-- [Installation](install.md)
+- [Installation](install/install.md)
     - [From conda](install/conda.md)
     - [From Cargo](install/cargo.md)
     - [From GitHub](install/github.md)
@@ -12,16 +12,16 @@
 
 ---
 
-- [Creating a Fiber-seq BAM](creating.md)
-    - [`ft predict`](predict.md)
-    - [`ft fire`](fire.md)
+- [Creating a Fiber-seq BAM](creating/creating.md)
+    - [`ft predict`](creating/predict.md)
+    - [`ft fire`](creating/fire.md)
 
 ---
 
-- [Extracting from a Fiber-seq BAM](extracting.md)
-    - [`ft extract`](extract.md)
-    - [`ft center`](center.md)
-    - [`ft footprint`](footprint.md)
+- [Extracting from a Fiber-seq BAM](extracting/extracting.md)
+    - [`ft extract`](extracting/extract.md)
+    - [`ft center`](extracting/center.md)
+    - [`ft footprint`](extracting/footprint.md)
 
 ---
 
