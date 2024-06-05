@@ -1,4 +1,4 @@
-# `ft-footprint`
+# `ft footprint`
 
 ## Usage
 ```bash

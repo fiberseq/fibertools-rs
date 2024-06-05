@@ -1,4 +1,4 @@
-# `ft-extract`
+# `ft extract`
 
 Extract Fiber-seq data into plain text files
 
