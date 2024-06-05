@@ -2,7 +2,7 @@ use fibertools_rs::bio_io;
 use rust_htslib::bam::Read;
 
 fn get_fiber_data_from_test_bam(bam_file: &str) -> Vec<fibertools_rs::fiber::FiberseqData> {
-    let mut bam = bio_io::bam_reader(bam_file, 1);
+    let mut bam = bio_io::bam_reader(bam_file);
     bam.records()
         .map(|r| {
             let record = r.unwrap();

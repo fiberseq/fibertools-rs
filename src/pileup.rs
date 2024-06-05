@@ -13,6 +13,7 @@ use rust_htslib::bam::{FetchDefinition, IndexedReader};
 
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
+static WINDOW_SIZE: usize = 1_000_000;
 
 #[derive(Debug)]
 pub struct FireRow<'a> {
@@ -55,7 +56,9 @@ impl std::fmt::Display for FireRow<'_> {
 }
 
 pub struct FireTrack<'a> {
-    pub chrom_len: usize,
+    pub chrom_start: usize,
+    pub chrom_end: usize,
+    pub track_len: usize,
     pub raw_scores: Vec<f32>,
     pub scores: Vec<f32>,
     pub coverage: Vec<i32>,
@@ -68,33 +71,40 @@ pub struct FireTrack<'a> {
 }
 
 impl<'a> FireTrack<'a> {
-    pub fn new(chrom_len: usize, pileup_opts: &'a PileupOptions) -> Self {
-        let raw_scores = vec![-1.0; chrom_len];
-        let scores = vec![-1.0; chrom_len];
+    pub fn new(chrom_start: usize, chrom_end: usize, pileup_opts: &'a PileupOptions) -> Self {
+        let track_len = chrom_end - chrom_start;
+        let raw_scores = vec![-1.0; track_len];
+        let scores = vec![-1.0; track_len];
         Self {
-            chrom_len,
+            chrom_start,
+            chrom_end,
+            track_len,
             raw_scores,
             scores,
-            coverage: vec![0; chrom_len],
-            fire_coverage: vec![0; chrom_len],
-            msp_coverage: vec![0; chrom_len],
-            nuc_coverage: vec![0; chrom_len],
-            cpg_coverage: vec![0; chrom_len],
-            m6a_coverage: vec![0; chrom_len],
+            coverage: vec![0; track_len],
+            fire_coverage: vec![0; track_len],
+            msp_coverage: vec![0; track_len],
+            nuc_coverage: vec![0; track_len],
+            cpg_coverage: vec![0; track_len],
+            m6a_coverage: vec![0; track_len],
             pileup_opts,
         }
     }
 
     #[inline]
-    fn add_range_set(array: &mut [i32], ranges: &super::bamranges::Ranges) {
-        let shuffle_offset = 0;
+    fn add_range_set(array: &mut [i32], ranges: &super::bamranges::Ranges, offset: usize) {
+        let offset = offset as i64;
         for (_, _, _, _, r) in ranges {
             match r {
                 Some((rs, re, _)) => {
                     let re = if rs == re { re + 1 } else { re };
                     for i in rs..re {
-                        let i = (i + shuffle_offset) as usize;
-                        array[i] += 1;
+                        let pos = i - offset;
+                        // skip if pos is before the start of the track
+                        if pos < 0 || pos >= array.len() as i64 {
+                            continue;
+                        }
+                        array[pos as usize] += 1;
                     }
                 }
                 _ => continue,
@@ -105,11 +115,13 @@ impl<'a> FireTrack<'a> {
     /// inline this function
     #[inline]
     fn update_with_fiber(&mut self, fiber: &FiberseqData) {
-        let shuffle_offset = 0;
         // calculate the coverage
         for i in fiber.record.reference_start()..fiber.record.reference_end() {
-            let i = (i + shuffle_offset) as usize;
-            self.coverage[i] += 1;
+            let pos = i - self.chrom_start as i64;
+            if pos < 0 || pos >= self.track_len as i64 {
+                continue;
+            }
+            self.coverage[pos as usize] += 1;
         }
 
         // calculate the fire coverage and fire score
@@ -121,27 +133,30 @@ impl<'a> FireTrack<'a> {
                     }
                     let score_update = (1.0 - q as f32 / 255.0).log10() * -50.0;
                     for i in rs..re {
-                        let i = (i + shuffle_offset) as usize;
-                        self.fire_coverage[i] += 1;
-                        self.raw_scores[i] += score_update;
+                        let pos = i - self.chrom_start as i64;
+                        if pos < 0 || pos >= self.track_len as i64 {
+                            continue;
+                        }
+                        self.fire_coverage[pos as usize] += 1;
+                        self.raw_scores[pos as usize] += score_update;
                     }
                 }
                 _ => continue,
             }
         }
 
-        Self::add_range_set(&mut self.nuc_coverage, &fiber.nuc);
-        Self::add_range_set(&mut self.msp_coverage, &fiber.msp);
+        Self::add_range_set(&mut self.nuc_coverage, &fiber.nuc, self.chrom_start);
+        Self::add_range_set(&mut self.msp_coverage, &fiber.msp, self.chrom_start);
         if self.pileup_opts.m6a {
-            Self::add_range_set(&mut self.m6a_coverage, &fiber.m6a);
+            Self::add_range_set(&mut self.m6a_coverage, &fiber.m6a, self.chrom_start);
         }
         if self.pileup_opts.cpg {
-            Self::add_range_set(&mut self.cpg_coverage, &fiber.cpg);
+            Self::add_range_set(&mut self.cpg_coverage, &fiber.cpg, self.chrom_start);
         }
     }
 
     pub fn calculate_scores(&mut self) {
-        for i in 0..self.chrom_len {
+        for i in 0..self.track_len {
             if self.fire_coverage[i] < MIN_FIRE_COVERAGE {
                 self.scores[i] = -1.0;
             } else {
@@ -169,22 +184,32 @@ pub struct FiberseqPileup<'a> {
     pub hap1_data: FireTrack<'a>,
     pub hap2_data: FireTrack<'a>,
     pub chrom: String,
-    pub chrom_len: usize,
+    pub chrom_start: usize,
+    pub chrom_end: usize,
+    pub track_len: usize,
     has_data: bool,
     pileup_opts: &'a PileupOptions,
 }
 
 impl<'a> FiberseqPileup<'a> {
-    pub fn new(chrom: &str, chrom_len: usize, pileup_opts: &'a PileupOptions) -> Self {
-        let all_data = FireTrack::new(chrom_len, pileup_opts);
-        let hap1_data = FireTrack::new(chrom_len, pileup_opts);
-        let hap2_data = FireTrack::new(chrom_len, pileup_opts);
+    pub fn new(
+        chrom: &str,
+        chrom_start: usize,
+        chrom_end: usize,
+        pileup_opts: &'a PileupOptions,
+    ) -> Self {
+        let track_len = chrom_end - chrom_start;
+        let all_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
+        let hap1_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
+        let hap2_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
         Self {
             all_data,
             hap1_data,
             hap2_data,
             chrom: chrom.to_string(),
-            chrom_len,
+            chrom_start,
+            chrom_end,
+            track_len,
             has_data: false,
             pileup_opts,
         }
@@ -196,7 +221,7 @@ impl<'a> FiberseqPileup<'a> {
 
     pub fn add_records(
         &mut self,
-        records: std::iter::Peekable<bam::Records<'a, IndexedReader>>,
+        records: bam::Records<'a, IndexedReader>,
     ) -> Result<(), anyhow::Error> {
         records
             .map(|r| r.unwrap())
@@ -274,7 +299,7 @@ impl<'a> FiberseqPileup<'a> {
         if self.pileup_opts.per_base {
             return false;
         }
-        self.is_same_as_previous(i) && i != self.chrom_len - 1
+        self.is_same_as_previous(i) && i != self.track_len - 1
     }
 
     pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
@@ -283,7 +308,7 @@ impl<'a> FiberseqPileup<'a> {
         }
         let mut write_start_index = 0;
         let mut write_end_index = 0;
-        for i in 0..self.chrom_len {
+        for i in 0..self.track_len {
             // do we have the same data as the previous row?
             if self.wait_to_write(i) {
                 write_end_index = i;
@@ -292,8 +317,8 @@ impl<'a> FiberseqPileup<'a> {
                 let mut line = format!(
                     "{}\t{}\t{}",
                     self.chrom,
-                    write_start_index,
-                    write_end_index + 1
+                    write_start_index + self.chrom_start,
+                    write_end_index + self.chrom_start + 1
                 );
                 // add in the data
                 let hap_data = if self.pileup_opts.haps {
@@ -350,20 +375,29 @@ fn run_rgn(
     let tid = bam.header().tid(chrom.as_bytes()).unwrap();
     let chrom_len = bam.header().target_len(tid).unwrap() as usize;
 
-    log::info!("Fetching records for {}", chrom);
-    bam.fetch(rgn)?;
-    let mut records = bam.records().peekable();
-    // skip if there are no records and keep_zeros is not set
-    if records.peek().is_none() && !pileup_opts.keep_zeros {
-        return Ok(());
+    let windows = split_fetch_definition(&rgn, chrom_len, WINDOW_SIZE);
+    log::debug!("Splitting region into {} windows", windows.len());
+    for (chrom_start, chrom_end) in windows {
+        log::debug!("Fetching {}:{}-{}", chrom, chrom_start, chrom_end);
+        bam.fetch((chrom, chrom_start, chrom_end))?;
+        let records = bam.records();
+        // skip if there are no records and keep_zeros is not set
+        //if records.peek().is_none() && !pileup_opts.keep_zeros {
+        //    continue;
+        //}
+        // make the pileup
+        log::debug!(
+            "Initializing pileup for {}:{}-{}",
+            chrom,
+            chrom_start,
+            chrom_end
+        );
+        let mut pileup =
+            FiberseqPileup::new(chrom, chrom_start as usize, chrom_end as usize, pileup_opts);
+        pileup.add_records(records)?;
+        pileup.write(out)?;
     }
-    // make the pileup
-    log::info!("Initializing pileup for {}", chrom);
-    let mut pileup = FiberseqPileup::new(chrom, chrom_len, pileup_opts);
-    log::info!("Processing records for {}", chrom);
-    pileup.add_records(records)?;
-    log::info!("Writing pileup for {}", chrom);
-    pileup.write(out)?;
+
     Ok(())
 }
 
@@ -371,8 +405,7 @@ fn run_rgn(
 pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error> {
     // read in the bam from stdin or from a file
     let mut bam = pileup_opts.input.indexed_bam_reader();
-    let header = bam.header().clone();
-    bam.set_threads(8).unwrap();
+    let header = pileup_opts.input.header_view();
 
     let mut out = bio_io::writer(&pileup_opts.out)?;
     // add the header

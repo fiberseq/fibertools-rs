@@ -179,7 +179,7 @@ impl BaseMods {
                 rtn.push(mods);
             }
         } else {
-            log::debug!("No MM tag found");
+            log::trace!("No MM tag found");
         }
 
         if ml_tag.len() != num_mods_seen {

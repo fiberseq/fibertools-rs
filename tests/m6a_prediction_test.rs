@@ -34,14 +34,14 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
     }
 
     // read in the output bam and check the sum of the quality scores
-    let mut predicted_bam = bio_io::bam_reader(out_str, 1);
+    let mut predicted_bam = bio_io::bam_reader(out_str);
     sum_qual(&mut predicted_bam)
 }
 
 fn run_comparison(file: &str) {
     let files = vec![file];
     eprintln!("{:?}", files);
-    let results_before_this_predict = sum_qual(&mut bio_io::bam_reader(file, 1));
+    let results_before_this_predict = sum_qual(&mut bio_io::bam_reader(file));
     eprintln!("{:?}", results_before_this_predict);
     let results = run_prediction_and_count_qual(file.to_string());
     eprintln!("{:?}", results);
