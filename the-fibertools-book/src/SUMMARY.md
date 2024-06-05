@@ -1,6 +1,6 @@
 # Summary
 
-[README](../../README.md)
+[fibertools](README.md)
 
 ---
 
@@ -12,6 +12,10 @@
 
 ---
 
+- [Creating a fibertools bam](extracting.md)
+
+---
+
 - [Extracting from a fibertools bam](extracting.md)
     - [`ft extract`](extract.md)
     - [`ft center`](center.md)
@@ -19,6 +23,6 @@
 
 ---
 
-- [`fibertools` subcommands](help.md)
+- [Help pages for all `fibertools` subcommands](help.md)
 - [pyft: Python bindings](pyft.md)
 - [Cite](cite.md)
