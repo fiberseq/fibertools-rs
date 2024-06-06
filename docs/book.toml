@@ -17,7 +17,7 @@ default-theme = "dark"
 preferred-dark-theme = "navy"
 git-repository-url = "https://github.com/fiberseq/fibertools-rs"
 git-repository-icon = "fa-github"
-edit-url-template = "https://github.com/fiberseq/fibertools-rs/edit/main/the-fibertools-book/{path}"
+edit-url-template = "https://github.com/fiberseq/fibertools-rs/edit/main/docs/{path}"
 
 [output.html.fold]
 enable = true    # whether or not to enable section folding
