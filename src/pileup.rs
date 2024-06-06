@@ -378,13 +378,8 @@ fn run_rgn(
     let windows = split_fetch_definition(&rgn, chrom_len, WINDOW_SIZE);
     log::debug!("Splitting region into {} windows", windows.len());
     for (chrom_start, chrom_end) in windows {
-        log::debug!("Fetching {}:{}-{}", chrom, chrom_start, chrom_end);
         bam.fetch((chrom, chrom_start, chrom_end))?;
         let records = bam.records();
-        // skip if there are no records and keep_zeros is not set
-        //if records.peek().is_none() && !pileup_opts.keep_zeros {
-        //    continue;
-        //}
         // make the pileup
         log::debug!(
             "Initializing pileup for {}:{}-{}",
