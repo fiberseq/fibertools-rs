@@ -4,6 +4,10 @@
 
 ---
 
+[Quick start guide for fibertools](quick-start.md)
+
+---
+
 - [Creating a Fiber-seq BAM](creating/creating.md)
     - [`ft predict`](creating/predict.md)
     - [`ft add-nucleosomes`](creating/nucleosome.md)
