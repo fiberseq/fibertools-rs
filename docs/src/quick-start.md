@@ -8,7 +8,7 @@
 HiFi kinetics are required for predicting [m6A](glossary.md#m6a) with `fibertools`. **Check with your sequencing provider prior to sequencing** to ensure that the output file will have kinetics. Additionally, many of `fibertools` commands are compatible with CpG methylation which can be completed on instrument (if requested) or later with [Jasmine](https://github.com/PacificBiosciences/jasmine), e.g. `jasmine --keep-kinetics input.ccs.bam output.ccs.bam`. This command should be run prior to `fibertools` if CpG methylation information is desired as Jasmine will overwrite the m6A predictions in the MM and ML tags.
 
 
-### Predict m6A and infer nuclesomes
+### Predict m6A and infer nucleosomes
 To create useable Fiber-seq data you must first call m6A base-mods on the PacBio CCS bam using `fibertools`. First [install fibertools](install/install.md) and then process your bam file using the prediction command. 
 
 ```bash
