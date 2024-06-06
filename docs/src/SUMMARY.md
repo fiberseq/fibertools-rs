@@ -4,7 +4,7 @@
 
 ---
 
-[Quick start guide for fibertools](quick-start.md)
+[Quick start guide](quick-start.md)
 
 ---
 
