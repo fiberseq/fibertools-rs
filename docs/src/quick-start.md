@@ -49,5 +49,5 @@ We recommend using [WhatsHap](https://whatshap.readthedocs.io/en/latest/) for ph
 
 After this point you will have a Fiber-seq BAM file that is compatible with all the [extraction](extracting/extracting.md) commands in `fibertools`.
 
-### FIRE pipeline
-Some users report reasonable success in applying FIRE to ONT data. However, **please note that FIRE models were not trained or validated for ONT data.** With that said all the instructions for applying FIRE to a PacBio BAM should work for an ONT BAM as well.
+### Fiber-seq peaks and UCSC browser tracks
+Some users report reasonable success in applying the [FIRE pipeline](https://github.com/fiberseq/FIRE) to ONT data. However, **please note that FIRE models were not trained or validated for ONT data.** With that said all the instructions for applying the FIRE pipeline to a PacBio BAM should work for an ONT BAM as well.
