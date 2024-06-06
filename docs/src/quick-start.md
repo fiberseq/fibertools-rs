@@ -1,4 +1,4 @@
-# Quick start guide for fibertools
+# Quick start for `fibertools`
 
 * [Fiber-seq from PacBio](#fiber-seq-starting-with-pacbio)
 * [Fiber-seq from ONT](#fiber-seq-starting-with-oxford-nanopore-technologies-ont)
