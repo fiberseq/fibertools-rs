@@ -17,6 +17,7 @@ This is the book for `fibertools` (`ft`) which is a CLI tool for **creating and 
 * [Identifying FIREs](creating/fire.md) (**<ins>F</ins>iber-seq <ins>I</ins>nferred <ins>R</ins>egulatory <ins>E</ins>lements**)
 * [Extracting](extracting/extract.md) Fiber-seq results into plain text files.
 * [Centering](extracting/center.md) Fiber-seq results around a given position.
+* [pyft](pyft.md): Python bindings for `fibertools`
 
-A complete list of subcommands and their help pages can be found [here](help.md).
+A quick start guide can be found [here](quick-start.md), and a complete list of subcommands and their help pages can be found [here](help.md).
 
