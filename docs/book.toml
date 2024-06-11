@@ -29,6 +29,6 @@ renderer = ["html"]
 max-level = 4
 
 
-[preprocessor.auto-links]
-command = "python auto-links.py"
+#[preprocessor.auto-links]
+#command = "python auto-links.py"
 
