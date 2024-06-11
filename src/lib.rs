@@ -1,6 +1,3 @@
-/// Data structure for fiberseq data
-pub mod fiber;
-
 /// Add and remove base modifications from a bam record
 pub mod basemods;
 /// Center fiberseq information around a reference position
@@ -10,15 +7,18 @@ pub mod center;
 pub mod cli;
 /// Extract fiberseq data into plain text formats
 pub mod extract;
+/// Data structure for fiberseq data
+pub mod fiber;
+/// add fire data
+pub mod fire;
 /// Add nucleosomes to a bam file
 pub mod nucleosomes;
+/// make a fire track from a bam file
+pub mod pileup;
 /// m6A prediction
 pub mod predict_m6a;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
-
-/// add fire data
-pub mod fire;
 
 /// add decorators
 pub mod decorator;
@@ -36,6 +36,7 @@ pub mod m6a_burn;
 use anyhow::Result;
 use bio_io::*;
 use itertools::Itertools;
+use rust_htslib::bam::FetchDefinition;
 use rust_htslib::{bam, bam::Read};
 use std::env;
 use std::io::Write;
@@ -108,7 +109,11 @@ pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: b
 }
 
 /// clear kinetics from a hifi bam
-pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
+pub fn clear_kinetics(opts: &mut cli::ClearKineticsOptions) {
+    let mut bam = opts.input.bam_reader();
+    let mut out = opts.input.bam_writer(&opts.out);
+    //let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
+
     let bar = bio_io::no_length_progress_bar();
     for rec in bam.records() {
         let mut record = rec.unwrap();
@@ -123,17 +128,19 @@ pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
     bar.finish();
 }
 
-/// Write to a bam file.
-pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
-    let program_name = "fibertools-rs";
-    let program_id = "ft";
-    let program_version = VERSION;
-    program_bam_writer(
-        out,
-        template_bam,
-        threads,
-        program_name,
-        program_id,
-        program_version,
-    )
+pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
+    if rgn.contains(':') {
+        let (chrom, rest) = rgn.split(':').collect_tuple().unwrap();
+        let (start, end) = rest.split('-').collect_tuple().unwrap();
+        (
+            FetchDefinition::RegionString(
+                chrom.as_bytes(),
+                start.parse().unwrap(),
+                end.parse().unwrap(),
+            ),
+            chrom.to_string(),
+        )
+    } else {
+        (FetchDefinition::String(rgn.as_bytes()), rgn.to_string())
+    }
 }

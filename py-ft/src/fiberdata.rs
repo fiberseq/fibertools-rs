@@ -4,6 +4,7 @@ use fibertools_rs::fiber::FiberseqData;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
+use std::collections::HashMap;
 use std::time;
 use std::vec::IntoIter;
 #[pyclass]
@@ -217,7 +218,9 @@ impl Fiberwriter {
 /// Open a fiberseq bam file. Must have an index.
 pub struct Fiberbam {
     bam: bam::IndexedReader,
+    reader: bam::Reader,
     header: bam::Header,
+    target_dict: HashMap<i32, String>,
     start: time::Instant,
 }
 
@@ -235,6 +238,7 @@ impl Fiberbam {
         };
 
         let head_view = bam::HeaderView::from_header(&self.header);
+
         self.bam.fetch(fetch_args).expect("unable to fetch region");
         let records: Vec<bam::Record> = self.bam.records().map(|r| r.unwrap()).collect();
 
@@ -261,9 +265,21 @@ impl Fiberbam {
         let mut bam =
             bam::IndexedReader::from_path(bam_file).expect("unable to open indexed bam file");
         bam.set_threads(threads).unwrap();
+
+        let mut reader = bam::Reader::from_path(bam_file).expect("unable to open bam file");
+        reader.set_threads(threads).unwrap();
+
         let header = bam::Header::from_template(bam.header());
+        let head_view = bam::HeaderView::from_header(&header);
+        let target_dict = FiberseqData::dict_from_head_view(&head_view);
         let start = time::Instant::now();
-        Self { bam, header, start }
+        Self {
+            bam,
+            reader,
+            header,
+            target_dict,
+            start,
+        }
     }
 
     /// Returns an iterator over :class:`~pyft.Fiberdata` objects for the selected region.
@@ -307,6 +323,23 @@ impl Fiberbam {
         let elapsed = self.start.elapsed().as_secs_f64();
         self.start = time::Instant::now();
         elapsed
+    }
+
+    fn __next__(&mut self) -> IterNextOutput<Fiberdata, &'static str> {
+        let data = self.reader.records().next();
+        match data {
+            Some(record) => {
+                let record = record.unwrap();
+                let target_name = self.target_dict.get(&record.tid());
+                let fiber = FiberseqData::new(record, target_name, 0);
+                IterNextOutput::Yield(Fiberdata::new(fiber, None))
+            }
+            None => IterNextOutput::Return("Ended"),
+        }
+    }
+
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
     }
 }
 
@@ -382,10 +415,7 @@ impl Basemods {
     pub fn get_reference_ends(&self) -> Vec<Option<i64>> {
         self.reference_starts
             .iter()
-            .map(|x| match x {
-                Some(x) => Some(x + 1),
-                None => None,
-            })
+            .map(|x| x.as_ref().map(|x| x + 1))
             .collect()
     }
 
@@ -393,10 +423,7 @@ impl Basemods {
     pub fn get_ends(&self) -> Vec<Option<i64>> {
         self.starts
             .iter()
-            .map(|x| match x {
-                Some(x) => Some(x + 1),
-                None => None,
-            })
+            .map(|x| x.as_ref().map(|x| x + 1))
             .collect()
     }
 }

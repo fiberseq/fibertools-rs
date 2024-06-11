@@ -125,17 +125,13 @@ pub fn buffer_from<P: AsRef<Path>>(
 BAM IO
 */
 
-/// Write to a bam file.
-pub fn program_bam_writer(
+pub fn program_bam_writer_from_header(
     out: &str,
-    template_bam: &bam::Reader,
-    threads: usize,
+    mut header: bam::Header,
     program_name: &str,
     program_id: &str,
     program_version: &str,
 ) -> bam::Writer {
-    let mut header = bam::Header::from_template(template_bam.header());
-
     // add to the header
     let header_string = String::from_utf8_lossy(&header.to_bytes()).to_string();
     let mut header_rec = bam::header::HeaderRecord::new(b"PG");
@@ -163,24 +159,32 @@ pub fn program_bam_writer(
     log::trace!("{:?}", String::from_utf8_lossy(&header.to_bytes()));
 
     // make the writer
-    let mut out = if out == "-" {
+    if out == "-" {
         bam::Writer::from_stdout(&header, bam::Format::Bam).unwrap()
     } else {
         bam::Writer::from_path(out, &header, bam::Format::Bam).unwrap()
-    };
-    out.set_threads(threads).unwrap();
-    out
+    }
+}
+
+/// Write to a bam file.
+pub fn program_bam_writer(
+    out: &str,
+    template_bam: &bam::Reader,
+    program_name: &str,
+    program_id: &str,
+    program_version: &str,
+) -> bam::Writer {
+    let header = bam::Header::from_template(template_bam.header());
+    program_bam_writer_from_header(out, header, program_name, program_id, program_version)
 }
 
 /// Open bam file
-pub fn bam_reader(bam: &str, threads: usize) -> bam::Reader {
-    let mut bam = if bam == "-" {
+pub fn bam_reader(bam: &str) -> bam::Reader {
+    if bam == "-" {
         bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
     } else {
         bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
-    };
-    bam.set_threads(threads).unwrap();
-    bam
+    }
 }
 // This is a bam chunk reader
 pub struct BamChunk<'a> {
@@ -188,6 +192,7 @@ pub struct BamChunk<'a> {
     pub chunk_size: usize,
     pub pre_chunk_done: u64,
     pub bar: ProgressBar,
+    pub bit_flag_filter: u16,
 }
 
 impl<'a> BamChunk<'a> {
@@ -199,7 +204,12 @@ impl<'a> BamChunk<'a> {
             chunk_size,
             pre_chunk_done: 0,
             bar,
+            bit_flag_filter: 0,
         }
+    }
+
+    pub fn set_bit_flag_filter(&mut self, bit_flag: u16) {
+        self.bit_flag_filter = bit_flag;
     }
 }
 
@@ -226,6 +236,10 @@ impl<'a> Iterator for BamChunk<'a> {
                     "Skipping read ({}) because it has been hard clipped. This read will be excluded from calculations and any output.",
                     String::from_utf8_lossy(r.qname())
                 );
+                continue;
+            }
+            // filter by bit flag
+            if r.flags() & self.bit_flag_filter != 0 {
                 continue;
             }
             cur_vec.push(r);

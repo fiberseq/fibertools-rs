@@ -13,6 +13,7 @@ use serde_yaml;
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FootprintYaml {
     modules: Vec<(usize, usize)>,
+    motif_span: Option<(usize, usize)>,
 }
 
 impl FootprintYaml {
@@ -97,7 +98,11 @@ impl<'a> ReferenceMotif<'a> {
 
     pub fn spans(&self, start: i64, end: i64) -> bool {
         // check if coordinates span the motif
-        self.start > start && self.end < end
+        //self.start > start && self.end < end
+        match self.footprint.motif_span {
+            Some((motif_st, motif_en)) => (motif_st as i64) > start && (motif_en as i64) < end,
+            None => self.start > start && self.end < end,
+        }
     }
 
     pub fn overlaps(&self, start: i64, end: i64) -> bool {
@@ -321,18 +326,15 @@ pub fn define_footprint(fiber: FiberseqData, bed_rec: CenterPosition, _modules: 
     {}
 }
 
-pub fn start_finding_footprints(opts: &FootprintOptions) -> Result<(), anyhow::Error> {
+pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyhow::Error> {
     let yaml_buff = bio_io::buffer_from(&opts.yaml)?;
     let yaml: FootprintYaml = serde_yaml::from_reader(yaml_buff)?;
     yaml.check_for_valid_input()?;
     log::debug!("YAML: {:?}", yaml);
 
-    let bam = bio_io::bam_reader(&opts.bam, 1);
-    let header = bam::Header::from_template(bam.header());
-    let header_view = bam::HeaderView::from_header(&header);
+    let mut bam = opts.input.indexed_bam_reader();
+    let header_view = opts.input.header_view();
     let mut out = bio_io::writer(&opts.out)?;
-    let mut bam = rust_htslib::bam::IndexedReader::from_path(&opts.bam)?;
-    bam.set_threads(8)?;
 
     let reader = bio_io::buffer_from(&opts.bed)?;
     let mut first = true;
