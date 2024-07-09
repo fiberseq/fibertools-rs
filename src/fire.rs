@@ -254,8 +254,11 @@ impl<'a> FireFeats<'a> {
     }
 
     fn feats_in_range(&self, start: i64, end: i64) -> FireFeatsInRange {
-        let m6a_count = get_m6a_count(self.rec, start, end);
+        let mut m6a_count = get_m6a_count(self.rec, start, end);
         let at_count = get_at_count(&self.seq, start, end);
+        if self.fire_opts.ont {
+            m6a_count = std::cmp::min(m6a_count * 2, at_count);
+        }
         let count_5mc = get_5mc_count(self.rec, start, end);
         let frac_m6a = if at_count > 0 {
             m6a_count as f32 / at_count as f32
@@ -296,7 +299,7 @@ impl<'a> FireFeats<'a> {
         if msp_len < self.fire_opts.min_msp_length_for_positive_fire_call {
             return vec![];
         }
-        let ccs_passes = self.rec.ec;
+        let ccs_passes = if self.fire_opts.ont { 4.0 } else { self.rec.ec };
 
         // find the 100bp window within the range with the most m6a
         let mut max_m6a_count = 0;
