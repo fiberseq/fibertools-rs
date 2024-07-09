@@ -43,7 +43,11 @@ pub fn main() -> Result<(), Error> {
         .unwrap();
 
     #[cfg(feature = "tch")]
-    tch::set_num_threads(args.global.threads.try_into().unwrap());
+    {
+        // setting this to 1 since I do paralyzation via processing multiple reads
+        tch::set_num_threads(1);
+        tch::set_num_interop_threads(1);
+    }
 
     log::debug!("Command line options: {:?}", args.command);
 

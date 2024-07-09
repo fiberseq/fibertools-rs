@@ -287,10 +287,14 @@ pub struct FireOptions {
     /// Output file (BAM by default, table of MSP features if `--feats-to-text` is used, and bed9 + if `--extract`` is used)
     #[clap(default_value = "-")]
     pub out: String,
-    /// use a human model for FIRE calling
+    /// Use a ONT heuristic adjustment for FIRE calling.
+    /// This doubles the observed number of m6A counts to adjust for the single strand nature of ONT data.
+    #[clap(long, env)]
+    pub ont: bool,
+    /// Use a human model for FIRE calling
     #[clap(hide = true, long, env)]
     pub human: bool,
-    /// use a yeasr model for FIRE calling
+    /// Use a yeast model for FIRE calling
     #[clap(hide = true, long, env)]
     pub yeast: bool,
     /// Output just FIRE elements in bed9 format
