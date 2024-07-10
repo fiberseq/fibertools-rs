@@ -62,14 +62,6 @@ fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
 }
 
-fn get_at_count(seq: &[u8], start: i64, end: i64) -> usize {
-    let subseq = &seq[start as usize..end as usize];
-    subseq
-        .iter()
-        .filter(|&&bp| bp == b'T' || bp == b'A')
-        .count()
-}
-
 /// ```
 /// use fibertools_rs::fire::get_bins;
 /// let bins = get_bins(50, 5, 20, 200);
@@ -95,24 +87,6 @@ pub fn get_bins(mid_point: i64, bin_num: i64, bin_width: i64, max_end: i64) -> V
         bins.push((bin_start, bin_end));
     }
     bins
-}
-
-fn get_5mc_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
-    rec.cpg
-        .starts
-        .iter()
-        .flatten()
-        .filter(|&&pos| pos >= start && pos < end)
-        .count()
-}
-
-fn get_m6a_count(rec: &FiberseqData, start: i64, end: i64) -> usize {
-    rec.m6a
-        .starts
-        .iter()
-        .flatten()
-        .filter(|&&pos| pos >= start && pos < end)
-        .count()
 }
 
 /// get the maximum and median rle of m6a in a window
@@ -198,47 +172,97 @@ impl<'a> FireFeats<'a> {
     pub fn new(rec: &'a FiberseqData, fire_opts: &'a FireOptions) -> Self {
         let seq_len = rec.record.seq_len();
         let seq = rec.record.seq().as_bytes();
-        log::trace!("new FireFeats {}", seq_len);
-        let at_count = get_at_count(&seq, 0, seq_len as i64);
-        let m6a_count = get_m6a_count(rec, 0, seq_len as i64);
-        log::trace!("new FireFeats");
-        let frac_m6a = if at_count > 0 {
-            m6a_count as f32 / at_count as f32
-        } else {
-            0.0
-        };
-
-        /*
-        // calculate the expected number AT bases covered by m6a within MSPs
-        let (m6a_count_in_msps, at_count_in_msps): (usize, usize) = rec
-            .msp
-            .into_iter()
-            .map(|(start, end, _l, _refs)| {
-                //let bp_count = end - start;
-                let m6a_count = get_m6a_count(rec, start, end);
-                let at_count = get_at_count(&seq, start, end);
-                (m6a_count, at_count)
-            })
-            .fold((0, 0), |acc, x| (acc.0 + x.0, acc.1 + x.1));
-        let frac_m6a_in_msps = if at_count_in_msps > 0 {
-            m6a_count_in_msps as f32 / at_count_in_msps as f32
-        } else {
-            0.0
-        };
-        */
 
         let mut rtn = Self {
             rec,
-            at_count,
-            m6a_count,
-            frac_m6a,
+            at_count: 0,
+            m6a_count: 0,
+            frac_m6a: 0.0,
             //frac_m6a_in_msps,
             fire_opts,
             seq,
             fire_feats: vec![],
         };
+
+        // add in the m6a and AT counts
+        rtn.at_count = rtn.get_at_count(0, seq_len as i64);
+        rtn.m6a_count = rtn.get_m6a_count(0, seq_len as i64);
+        rtn.frac_m6a = if rtn.at_count > 0 {
+            rtn.m6a_count as f32 / rtn.at_count as f32
+        } else {
+            0.0
+        };
+
         rtn.get_fire_features();
+        if rtn.fire_opts.ont {
+            rtn.validate_that_ont_is_single_strand();
+        }
         rtn
+    }
+
+    fn validate_that_ont_is_single_strand(&self) {
+        let sequenced_bp = if self.rec.record.is_reverse() {
+            b'T'
+        } else {
+            b'A'
+        };
+        for m6a_st in self.rec.m6a.starts.iter().flatten() {
+            let m6a_bp = self.seq[*m6a_st as usize];
+            if m6a_bp != sequenced_bp {
+                log::warn!(
+                    "m6A site at {} is not the same as the sequenced base {}",
+                    m6a_st,
+                    sequenced_bp as char
+                );
+            }
+        }
+    }
+
+    fn get_bp_count(&self, start: i64, end: i64, bp: u8) -> usize {
+        let subseq = &self.seq[start as usize..end as usize];
+        subseq.iter().filter(|&&b| b == bp).count()
+    }
+
+    fn get_at_count(&self, start: i64, end: i64) -> usize {
+        self.get_bp_count(start, end, b'A') + self.get_bp_count(start, end, b'T')
+    }
+
+    fn get_5mc_count(&self, start: i64, end: i64) -> usize {
+        self.rec
+            .cpg
+            .starts
+            .iter()
+            .flatten()
+            .filter(|&&pos| pos >= start && pos < end)
+            .count()
+    }
+
+    fn get_m6a_count(&self, start: i64, end: i64) -> usize {
+        let mut m6a_count = self
+            .rec
+            .m6a
+            .starts
+            .iter()
+            .flatten()
+            .filter(|&&pos| pos >= start && pos < end)
+            .count();
+
+        // estimate what the count would be if we sequenced the other strand
+        if self.fire_opts.ont {
+            let mut sequenced_bp = self.get_bp_count(start, end, b'A');
+            let mut un_sequenced_bp = self.get_bp_count(start, end, b'T');
+            if self.rec.record.is_reverse() {
+                // swap the counts
+                std::mem::swap(&mut sequenced_bp, &mut un_sequenced_bp);
+            }
+            let m6a_frac = if sequenced_bp > 0 {
+                m6a_count as f32 / sequenced_bp as f32
+            } else {
+                0.0
+            };
+            m6a_count += (un_sequenced_bp as f32 * m6a_frac).round() as usize;
+        }
+        m6a_count
     }
 
     fn m6a_fc_over_expected(&self, m6a_count: usize, at_count: usize) -> f32 {
@@ -254,12 +278,9 @@ impl<'a> FireFeats<'a> {
     }
 
     fn feats_in_range(&self, start: i64, end: i64) -> FireFeatsInRange {
-        let mut m6a_count = get_m6a_count(self.rec, start, end);
-        let at_count = get_at_count(&self.seq, start, end);
-        if self.fire_opts.ont {
-            m6a_count = std::cmp::min(m6a_count * 2, at_count);
-        }
-        let count_5mc = get_5mc_count(self.rec, start, end);
+        let m6a_count = self.get_m6a_count(start, end);
+        let at_count = self.get_at_count(start, end);
+        let count_5mc = self.get_5mc_count(start, end);
         let frac_m6a = if at_count > 0 {
             m6a_count as f32 / at_count as f32
         } else {
@@ -316,7 +337,7 @@ impl<'a> FireFeats<'a> {
                 log::trace!("MSP window is not large enough for best and worst window analysis");
                 break;
             }
-            let m6a_count = get_m6a_count(self.rec, st_idx, en_idx);
+            let m6a_count = self.get_m6a_count(st_idx, en_idx);
             if m6a_count > max_m6a_count {
                 max_m6a_count = m6a_count;
                 max_m6a_start = st_idx;
