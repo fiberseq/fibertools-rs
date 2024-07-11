@@ -288,7 +288,7 @@ pub struct FireOptions {
     #[clap(default_value = "-")]
     pub out: String,
     /// Use a ONT heuristic adjustment for FIRE calling.
-    /// This doubles the observed number of m6A counts to adjust for the single strand nature of ONT data.
+    /// This adjusts the observed number of m6A counts by adding pseudo counts to account for the single stranded nature of ONT data.
     #[clap(long, env)]
     pub ont: bool,
     /// Use a human model for FIRE calling
