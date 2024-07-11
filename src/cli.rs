@@ -47,7 +47,7 @@ pub struct InputBam {
     )]
     pub bit_flag: u16,
     /// Minium score in the ML tag to use or include in the output
-    #[clap(long="ml", default_value = MIN_ML_SCORE, help_heading = "BAM-Options")]
+    #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
     #[clap(flatten)]
     pub global: GlobalOpts,
