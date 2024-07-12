@@ -65,7 +65,7 @@ def read_footprint_table(f, long=False):
         )
         # drop the module columns
         df.drop(
-            df.columns[df.columns.str.contains("module_|footprint_codes")],
+            df.columns[df.columns.str.contains("module_")],
             axis=1,
             inplace=True,
         )
