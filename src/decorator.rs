@@ -183,12 +183,19 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
     let mut rtn = vec![];
     for (color, values) in map.into_iter() {
         let (starts, lengths): (Vec<Option<i64>>, Vec<Option<i64>>) = values.into_iter().unzip();
+        let el_type = if *color == LINKER_COLOR {
+            "LINKER"
+        } else if *color == NUC_COLOR {
+            "NUC"
+        } else {
+            "FIRE"
+        };
         rtn.push(Decorator::new(
             fiber,
             &starts,
             Some(&lengths),
             color,
-            "FIRE",
+            el_type,
         ));
     }
     rtn
