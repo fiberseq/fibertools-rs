@@ -322,10 +322,10 @@ impl<'a> FiberseqPileup<'a> {
             return Ok(());
         }
         let mut write_start_index = 0;
-        let mut write_end_index = 0;
-        for i in 0..self.track_len {
+        let mut write_end_index = 1;
+        for i in 1..self.track_len {
             // do we have the same data as the previous row?
-            if self.wait_to_write(i) || write_start_index == write_end_index {
+            if self.wait_to_write(i) {
                 write_end_index = i + 1;
             } else {
                 let mut line = format!(
