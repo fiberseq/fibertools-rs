@@ -29,13 +29,24 @@ pub struct FireRow<'a> {
 
 impl PartialEq for FireRow<'_> {
     fn eq(&self, other: &Self) -> bool {
+        let m6a = if self.pileup_opts.m6a {
+            self.m6a_coverage == other.m6a_coverage
+        } else {
+            true
+        };
+        let cpg = if self.pileup_opts.cpg {
+            self.cpg_coverage == other.cpg_coverage
+        } else {
+            true
+        };
+
         self.coverage == other.coverage
             && self.fire_coverage == other.fire_coverage
             && self.score == other.score
             && self.nuc_coverage == other.nuc_coverage
             && self.msp_coverage == other.msp_coverage
-            && self.cpg_coverage == other.cpg_coverage
-            && self.m6a_coverage == other.m6a_coverage
+            && cpg
+            && m6a
     }
 }
 
