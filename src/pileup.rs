@@ -318,7 +318,7 @@ impl<'a> FiberseqPileup<'a> {
                     "{}\t{}\t{}",
                     self.chrom,
                     write_start_index + self.chrom_start,
-                    write_end_index + self.chrom_start + 1
+                    write_end_index + self.chrom_start
                 );
                 // add in the data
                 let hap_data = if self.pileup_opts.haps {
@@ -336,7 +336,7 @@ impl<'a> FiberseqPileup<'a> {
                 }
                 // reset the write indexes
                 write_start_index = i;
-                write_end_index = i;
+                write_end_index = i + 1;
             }
         }
         out.flush()?;

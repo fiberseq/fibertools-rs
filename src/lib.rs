@@ -139,7 +139,7 @@ pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
         (
             FetchDefinition::RegionString(
                 chrom.as_bytes(),
-                st - 1,
+                st,
                 end.replace(',', "")
                     .parse()
                     .unwrap_or_else(|_| panic!("Could not parse end of region: {}", end)),
