@@ -132,13 +132,14 @@ pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
     if rgn.contains(':') {
         let (chrom, rest) = rgn.split(':').collect_tuple().unwrap();
         let (start, end) = rest.split('-').collect_tuple().unwrap();
+        let st: i64 = start
+            .replace(',', "")
+            .parse()
+            .unwrap_or_else(|_| panic!("Could not parse start of region: {}", start));
         (
             FetchDefinition::RegionString(
                 chrom.as_bytes(),
-                start
-                    .replace(',', "")
-                    .parse()
-                    .unwrap_or_else(|_| panic!("Could not parse start of region: {}", start)),
+                st - 1,
                 end.replace(',', "")
                     .parse()
                     .unwrap_or_else(|_| panic!("Could not parse end of region: {}", end)),
