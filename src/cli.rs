@@ -77,6 +77,10 @@ impl InputBam {
     }
 
     pub fn indexed_bam_reader(&mut self) -> bam::IndexedReader {
+        if &self.bam == "-" {
+            panic!("Cannot use stdin (\"-\") for indexed bam reading. Please provide a file path for the bam file.");
+        }
+
         let mut bam =
             bam::IndexedReader::from_path(&self.bam).expect("unable to open indexed bam file");
         self.header = Some(bam::Header::from_template(bam.header()));
@@ -506,7 +510,7 @@ pub struct CompletionOptions {
 pub struct PileupOptions {
     #[clap(flatten)]
     pub input: InputBam,
-    /// Region string to make a pileup of.
+    /// Region string to make a pileup of. e.g. chr1:1-1000 or chr1:1-1,000
     /// If not provided will make a pileup of the whole genome
     #[clap(default_value = None)]
     pub rgn: Option<String>,
