@@ -312,7 +312,6 @@ impl<'a> FiberseqPileup<'a> {
             // do we have the same data as the previous row?
             if self.wait_to_write(i) {
                 write_end_index = i + 1;
-                continue;
             } else {
                 let mut line = format!(
                     "{}\t{}\t{}",
