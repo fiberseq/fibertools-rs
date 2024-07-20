@@ -296,15 +296,15 @@ impl<'a> FiberseqPileup<'a> {
     /// this is used to determine if the data should be written to the output
     pub fn is_same_as_previous(&self, i: usize) -> bool {
         if i == 0 {
-            return true;
+            true
         } else {
             let total_same = self.all_data.row(i) == self.all_data.row(i - 1);
             let hap1_same = self.hap1_data.row(i) == self.hap1_data.row(i - 1);
             let hap2_same = self.hap2_data.row(i) == self.hap2_data.row(i - 1);
             if self.pileup_opts.haps {
-                return total_same && hap1_same && hap2_same;
+                total_same && hap1_same && hap2_same
             } else {
-                return total_same;
+                total_same
             }
         }
     }
