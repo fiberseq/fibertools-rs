@@ -99,6 +99,9 @@ pub fn main() -> Result<(), Error> {
             );
             cli::print_completions(completion_opts.shell, &mut cli::make_cli_app());
         }
+        Some(Commands::DddaToM6a(opts)) => {
+            fibertools_rs::ddda_to_m6a::ddda_to_m6a(opts)?;
+        }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());
             //let mut buffer: Vec<u8> = Default::default();

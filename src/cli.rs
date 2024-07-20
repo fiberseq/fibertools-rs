@@ -223,6 +223,8 @@ pub enum Commands {
     ClearKinetics(ClearKineticsOptions),
     /// Strip out select base modifications
     StripBasemods(StripBasemodsOptions),
+    /// Convert a DddA BAM file to pseudo m6A BAM file
+    DddaToM6a(DddaToM6aOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),
@@ -532,4 +534,13 @@ pub struct PileupOptions {
     /// Write output one base at a time even if the values do not change
     #[clap(short, long)]
     pub per_base: bool,
+}
+
+#[derive(Args, Debug)]
+pub struct DddaToM6aOptions {
+    #[clap(flatten)]
+    pub input: InputBam,
+    /// Output bam file
+    #[clap(default_value = "-")]
+    pub out: String,
 }
