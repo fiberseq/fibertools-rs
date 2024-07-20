@@ -10,28 +10,34 @@ use rayon::prelude::*;
 use rust_htslib::bam::Record;
 
 pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
-    let mut modified_bases_forward = vec![];
-    let mut y_count = 0;
-    let mut r_count = 0;
-
-    let mut new_seq = vec![];
-
+    let was_reverse = record.is_reverse();
+    // clear the flag of any reverse or positive strand, by resetting the 4th bit, aka 16, to zero
+    // let mut flag = record.flags() & !(1 << 4);
+    // save some values we will need to modify
+    let cigar = bam::record::CigarString(record.cigar().to_vec());
+    let q_name = record.qname().to_vec();
+    let qual = record.qual().to_vec();
     let mut forward_seq = record.seq().as_bytes();
-    if record.is_reverse() {
+    if was_reverse {
         forward_seq = revcomp(&forward_seq);
     }
 
+    // get the bases that will be modified
+    let mut modified_bases_forward = vec![];
+    let mut y_count = 0;
+    let mut r_count = 0;
+    let mut new_forward_seq = vec![];
     for (idx, bp) in forward_seq.iter().enumerate() {
         if bp == &b'Y' {
             modified_bases_forward.push(idx as i64);
             y_count += 1;
-            new_seq.push(b'T');
+            new_forward_seq.push(b'T');
         } else if bp == &b'R' {
             modified_bases_forward.push(idx as i64);
             r_count += 1;
-            new_seq.push(b'A');
+            new_forward_seq.push(b'A');
         } else {
-            new_seq.push(*bp);
+            new_forward_seq.push(*bp);
         }
     }
 
@@ -44,24 +50,21 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
 
     // check if we should set the read to the top or bottom strand
     let is_top_strand = y_count > 0;
-    let is_bottom_strand = !is_top_strand;
-
-    // clear the flag of any reverse or positive strand, by resetting the 4th bit, aka 16, to zero
-    let mut flag = record.flags() & !(1 << 4);
 
     // set things up for the bottom strand
-    if is_bottom_strand {
-        flag |= 1 << 4;
-        // must revers complement the new sequence if we are on the bottom strand
-        new_seq = revcomp(&new_seq);
+    // let is_bottom_strand = !is_top_strand;
+    //if is_bottom_strand {
+    //    flag |= 1 << 4;
+    //    record.set_flags(flag);
+    //    record.set_reverse();
+    //}
+    if was_reverse {
+        // must reverse complement the new sequence if we are on the bottom strand
+        new_forward_seq = revcomp(&new_forward_seq);
     }
-    record.set_flags(flag);
 
-    // set the new sequence
-    let q_name = record.qname().to_vec();
-    let cigar = Some(bam::record::CigarString(record.cigar().to_vec()));
-    let qual = record.qual().to_vec();
-    record.set(q_name.as_ref(), cigar.as_ref(), &new_seq, qual.as_ref());
+    // set values for the new modified record
+    record.set(&q_name, Some(&cigar), &new_forward_seq, &qual);
 
     // set up the fake base mods
     let (modified_base, strand) = if is_top_strand {
