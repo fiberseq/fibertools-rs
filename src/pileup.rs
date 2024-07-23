@@ -387,11 +387,17 @@ fn run_rgn(
     pileup_opts: &PileupOptions,
 ) -> Result<(), anyhow::Error> {
     let tid = bam.header().tid(chrom.as_bytes()).unwrap();
-    let chrom_len = bam.header().target_len(tid).unwrap() as usize;
+    let chrom_len = bam.header().target_len(tid).unwrap() as i64;
 
-    let windows = split_fetch_definition(&rgn, chrom_len, WINDOW_SIZE);
+    let windows = split_fetch_definition(&rgn, chrom_len as usize, WINDOW_SIZE);
     log::debug!("Splitting {} into {} windows", chrom, windows.len());
-    for (chrom_start, chrom_end) in windows {
+    for (chrom_start, mut chrom_end) in windows {
+        if chrom_start >= chrom_len {
+            continue;
+        } else if chrom_end > chrom_len {
+            chrom_end = chrom_len;
+        }
+
         // check if region has data
         bam.fetch((chrom, chrom_start, chrom_end))?;
         let mut tmp_records = bam.records();
