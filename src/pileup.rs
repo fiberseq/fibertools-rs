@@ -395,8 +395,7 @@ fn run_rgn(
         // check if region has data
         bam.fetch((chrom, chrom_start, chrom_end))?;
         let mut tmp_records = bam.records();
-        let tmp_rec = tmp_records.next();
-        if tmp_rec.is_none() {
+        if tmp_records.next().is_none() {
             continue;
         }
         // fetch the data
