@@ -83,7 +83,7 @@ pub struct FireTrack<'a> {
 
 impl<'a> FireTrack<'a> {
     pub fn new(chrom_start: usize, chrom_end: usize, pileup_opts: &'a PileupOptions) -> Self {
-        let track_len = chrom_end - chrom_start;
+        let track_len = chrom_end - chrom_start + 1;
         let raw_scores = vec![-1.0; track_len];
         let scores = vec![-1.0; track_len];
         Self {
@@ -209,7 +209,7 @@ impl<'a> FiberseqPileup<'a> {
         chrom_end: usize,
         pileup_opts: &'a PileupOptions,
     ) -> Self {
-        let track_len = chrom_end - chrom_start;
+        let track_len = chrom_end - chrom_start + 1;
         let all_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
         let hap1_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
         let hap2_data = FireTrack::new(chrom_start, chrom_end, pileup_opts);
