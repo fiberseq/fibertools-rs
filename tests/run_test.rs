@@ -99,3 +99,17 @@ fn test_footprint() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(predicate::str::contains("done! Time elapsed:"));
     Ok(())
 }
+
+#[test]
+fn test_pileup() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ft")?;
+    cmd.arg("pileup")
+        .arg("-v")
+        .arg("tests/data/all.bam")
+        .arg("-o")
+        .arg("/dev/null");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("done! Time elapsed:"));
+    Ok(())
+}

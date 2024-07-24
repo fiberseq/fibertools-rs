@@ -346,8 +346,13 @@ pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyho
         }
         let motif = ReferenceMotif::new(&line, &yaml)?;
         bam.fetch((&motif.chrom, motif.start, motif.end))?;
-        let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
-        let fibers = FiberseqData::from_records(records, &header_view, 0);
+        let records: Vec<bam::Record> = opts
+            .input
+            .filters
+            .filter_on_bit_flags(bam.records())
+            .collect();
+
+        let fibers = FiberseqData::from_records(records, &header_view, &opts.input.filters);
 
         let footprint = Footprint::new(&motif, &fibers);
         if first {

@@ -35,6 +35,8 @@ pub mod m6a_burn;
 
 pub mod ddda_to_m6a;
 
+pub mod utils;
+
 use anyhow::Result;
 use bio_io::*;
 use itertools::Itertools;
