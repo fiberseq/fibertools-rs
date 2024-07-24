@@ -243,7 +243,9 @@ impl<'a> FiberseqPileup<'a> {
             .for_each(|r| {
                 let fibers: Vec<FiberseqData> = r
                     .par_iter()
-                    .map(|r| FiberseqData::new(r.clone(), None, 0))
+                    .map(|r| {
+                        FiberseqData::new(r.clone(), None, self.pileup_opts.input.min_ml_score)
+                    })
                     .collect();
                 if !fibers.is_empty() {
                     self.has_data = true;
