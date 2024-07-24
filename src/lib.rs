@@ -1,41 +1,18 @@
+pub mod bamlift;
+pub mod bamranges;
 /// Add and remove base modifications from a bam record
 pub mod basemods;
-/// Center fiberseq information around a reference position
-pub mod center;
+pub mod bio_io;
+/// Data structure for fiberseq data
+pub mod fiber;
+pub mod m6a_burn;
+/// subcommands of fibertools-rs
+pub mod subcommands;
+pub mod utils;
+
 #[cfg(feature = "cli")]
 /// Command line interface for fibertools-rs.
 pub mod cli;
-/// Extract fiberseq data into plain text formats
-pub mod extract;
-/// Data structure for fiberseq data
-pub mod fiber;
-/// add fire data
-pub mod fire;
-/// Add nucleosomes to a bam file
-pub mod nucleosomes;
-/// make a fire track from a bam file
-pub mod pileup;
-/// m6A prediction
-pub mod predict_m6a;
-/// Remove base modifications from a bam record
-pub mod strip_basemods;
-
-/// add decorators
-pub mod decorator;
-
-pub mod footprint;
-
-pub mod bamlift;
-
-pub mod bio_io;
-
-pub mod bamranges;
-
-pub mod m6a_burn;
-
-pub mod ddda_to_m6a;
-
-pub mod utils;
 
 use anyhow::Result;
 use bio_io::*;

@@ -31,7 +31,7 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
 
     {
         // run prediction
-        fibertools_rs::predict_m6a::read_bam_into_fiberdata(&mut predict_options);
+        fibertools_rs::subcommands::predict_m6a::read_bam_into_fiberdata(&mut predict_options);
     }
 
     // read in the output bam and check the sum of the quality scores

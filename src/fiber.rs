@@ -1,8 +1,8 @@
 use super::bamranges::*;
 use super::basemods::BaseMods;
 use super::bio_io::*;
-use super::center::CenterPosition;
-use super::center::CenteredFiberData;
+use super::subcommands::center::CenterPosition;
+use super::subcommands::center::CenteredFiberData;
 use super::utils::FiberFilters;
 use super::*;
 use rayon::prelude::*;

@@ -2,7 +2,8 @@ use anyhow::{Error, Ok, Result};
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::*;
-use fibertools_rs::nucleosomes::add_nucleosomes_to_bam;
+use fibertools_rs::subcommands;
+use fibertools_rs::subcommands::nucleosomes::add_nucleosomes_to_bam;
 use fibertools_rs::*;
 use log::LevelFilter;
 use std::time::Instant;
@@ -53,11 +54,11 @@ pub fn main() -> Result<(), Error> {
 
     match &mut args.command {
         Some(Commands::Extract(extract_opts)) => {
-            extract::extract_contained(extract_opts);
+            subcommands::extract::extract_contained(extract_opts);
         }
         Some(Commands::Center(center_opts)) => {
             // read in the bam from stdin or from a file
-            center::center_fiberdata(center_opts)?;
+            subcommands::center::center_fiberdata(center_opts)?;
         }
         #[allow(unused)]
         Some(Commands::PredictM6A(predict_m6a_opts)) => {
@@ -69,28 +70,28 @@ pub fn main() -> Result<(), Error> {
                 "For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
             );
 
-            predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
+            subcommands::predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
         }
         Some(Commands::ClearKinetics(clear_kinetics_opts)) => {
-            fibertools_rs::clear_kinetics(clear_kinetics_opts);
+            clear_kinetics(clear_kinetics_opts);
         }
         Some(Commands::StripBasemods(strip_basemods_opts)) => {
-            fibertools_rs::strip_basemods::strip_base_mods(strip_basemods_opts);
+            subcommands::strip_basemods::strip_base_mods(strip_basemods_opts);
         }
         Some(Commands::AddNucleosomes(nuc_opts)) => {
             add_nucleosomes_to_bam(nuc_opts);
         }
         Some(Commands::Fire(fire_opts)) => {
-            fibertools_rs::fire::add_fire_to_bam(fire_opts)?;
+            subcommands::fire::add_fire_to_bam(fire_opts)?;
         }
         Some(Commands::Footprint(footprint_opts)) => {
-            fibertools_rs::footprint::start_finding_footprints(footprint_opts)?;
+            subcommands::footprint::start_finding_footprints(footprint_opts)?;
         }
         Some(Commands::Pileup(pileup_opts)) => {
-            fibertools_rs::pileup::pileup_track(pileup_opts)?;
+            fibertools_rs::subcommands::pileup::pileup_track(pileup_opts)?;
         }
         Some(Commands::TrackDecorators(decorator_opts)) => {
-            fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
+            fibertools_rs::subcommands::decorator::get_decorators_from_bam(decorator_opts)?;
         }
         Some(Commands::Completions(completion_opts)) => {
             log::info!(
@@ -100,7 +101,7 @@ pub fn main() -> Result<(), Error> {
             cli::print_completions(completion_opts.shell, &mut cli::make_cli_app());
         }
         Some(Commands::DddaToM6a(opts)) => {
-            fibertools_rs::ddda_to_m6a::ddda_to_m6a(opts)?;
+            fibertools_rs::subcommands::ddda_to_m6a::ddda_to_m6a(opts)?;
         }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());
