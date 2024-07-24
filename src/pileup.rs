@@ -236,7 +236,10 @@ impl<'a> FiberseqPileup<'a> {
     ) -> Result<(), anyhow::Error> {
         records
             .map(|r| r.unwrap())
-            .filter(|r| !(r.is_secondary() || r.is_supplementary() || r.is_unmapped()))
+            .filter(|r| {
+                // filter by bit flag
+                (r.flags() & self.pileup_opts.input.bit_flag) == 0
+            })
             .chunks(1000)
             .into_iter()
             .map(|r| r.collect::<Vec<_>>())
