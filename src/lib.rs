@@ -1,7 +1,3 @@
-pub mod bamlift;
-pub mod bamranges;
-/// Add and remove base modifications from a bam record
-pub mod basemods;
 /// Data structure for fiberseq data
 pub mod fiber;
 pub mod m6a_burn;

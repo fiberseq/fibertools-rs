@@ -1,6 +1,6 @@
-use crate::basemods;
-use crate::basemods::BaseMods;
 use crate::cli::DddaToM6aOptions;
+use crate::utils::basemods;
+use crate::utils::basemods::BaseMods;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;

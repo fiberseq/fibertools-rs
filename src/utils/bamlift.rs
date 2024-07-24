@@ -19,7 +19,7 @@ where
 /// Normal sort is supposed to be very fast on two sorted lists
 /// <https://doc.rust-lang.org/std/vec/struct.Vec.html#current-implementation-6>
 /// ```
-/// use fibertools_rs::bamlift::*;
+/// use fibertools_rs::utils::bamlift::*;
 /// let x = vec![1,3];
 /// let x_q = vec!["a","b"];
 /// let y = vec![2,4];

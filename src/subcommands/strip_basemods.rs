@@ -1,5 +1,5 @@
-use crate::basemods;
 use crate::cli::StripBasemodsOptions;
+use crate::utils::basemods;
 use crate::utils::bio_io::BamChunk;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
