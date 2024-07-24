@@ -1,6 +1,7 @@
-use fibertools_rs::bamlift;
+use fibertools_rs::utils::bamlift;
 //use fibertools_rs::bio_io;
 use fibertools_rs::fiber::FiberseqData;
+use fibertools_rs::utils::input_bam::FiberFilters;
 use pyo3::iter::IterNextOutput;
 use pyo3::prelude::*;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Read};
@@ -247,7 +248,7 @@ impl Fiberbam {
             records.len(),
             self._time_from_last()
         );
-        let fiberdata = FiberseqData::from_records(records, &head_view, 0);
+        let fiberdata = FiberseqData::from_records(records, &head_view, &FiberFilters::default());
         log::info!(
             "Fiberdata made for {} records in {:.2}s",
             fiberdata.len(),
@@ -301,7 +302,7 @@ impl Fiberbam {
     #[pyo3(signature = (chrom, start, end, strand = '+'))]
     pub fn center(&mut self, chrom: &str, start: i64, end: i64, strand: char) -> Fiberiter {
         let position = if strand == '-' { end - 1 } else { start };
-        let center_position = fibertools_rs::center::CenterPosition {
+        let center_position = fibertools_rs::subcommands::center::CenterPosition {
             chrom: chrom.to_string(),
             position,
             strand,
@@ -331,7 +332,7 @@ impl Fiberbam {
             Some(record) => {
                 let record = record.unwrap();
                 let target_name = self.target_dict.get(&record.tid());
-                let fiber = FiberseqData::new(record, target_name, 0);
+                let fiber = FiberseqData::new(record, target_name, &FiberFilters::default());
                 IterNextOutput::Yield(Fiberdata::new(fiber, None))
             }
             None => IterNextOutput::Return("Ended"),
