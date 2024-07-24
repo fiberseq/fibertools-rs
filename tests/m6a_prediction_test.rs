@@ -1,6 +1,6 @@
 use fibertools_rs;
 use fibertools_rs::utils::bio_io;
-use fibertools_rs::utils::FiberFilters;
+use fibertools_rs::utils::input_bam::FiberFilters;
 use rust_htslib::bam::Reader;
 use tempfile::NamedTempFile;
 
