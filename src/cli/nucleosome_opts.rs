@@ -1,5 +1,5 @@
 use super::super::utils::InputBam;
-use crate::subcommands::nucleosomes::*;
+use crate::utils::nucleosome::*;
 use clap::Args;
 use std::fmt::Debug;
 

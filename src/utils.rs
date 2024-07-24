@@ -1,10 +1,13 @@
-use super::bio_io;
 use super::cli;
 use crate::fiber::FiberseqRecords;
 use clap::{Args, ValueHint};
 use rust_htslib::bam;
 use rust_htslib::bam::Read;
 use std::fmt::Debug;
+
+pub mod bio_io;
+pub mod fire;
+pub mod nucleosome;
 
 pub static MIN_ML_SCORE: &str = "125";
 

@@ -1,7 +1,7 @@
 use crate::bamlift::*;
-use crate::bio_io;
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bio_io;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ProgressBar};
