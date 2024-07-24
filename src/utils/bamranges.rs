@@ -1,4 +1,4 @@
-use super::bamlift::*;
+use crate::utils::bamlift::*;
 use itertools::{izip, multiunzip};
 use rust_htslib::bam;
 
@@ -156,13 +156,13 @@ impl Ranges {
             (&self.starts, &self.ends, &self.lengths, &self.qual)
         };
 
-        let s = super::join_by_str_option_can_skip(s, ",", skip_none);
-        let e = super::join_by_str_option_can_skip(e, ",", skip_none);
-        let l = super::join_by_str_option_can_skip(l, ",", skip_none);
+        let s = crate::join_by_str_option_can_skip(s, ",", skip_none);
+        let e = crate::join_by_str_option_can_skip(e, ",", skip_none);
+        let l = crate::join_by_str_option_can_skip(l, ",", skip_none);
         if reference {
             vec![s, e, l]
         } else {
-            let q = super::join_by_str(q, ",");
+            let q = crate::join_by_str(q, ",");
             vec![s, e, l, q]
         }
     }

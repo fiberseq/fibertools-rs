@@ -1,6 +1,6 @@
-use crate::bamlift::*;
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bamlift::*;
 use crate::utils::bio_io;
 use crate::*;
 use bio::alphabets::dna::revcomp;

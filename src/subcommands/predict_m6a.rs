@@ -1,4 +1,5 @@
 use crate::cli::PredictM6AOptions;
+use crate::utils::basemods;
 use crate::utils::bio_io;
 use crate::utils::nucleosome;
 use crate::*;

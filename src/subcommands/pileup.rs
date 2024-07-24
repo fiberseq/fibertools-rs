@@ -1,6 +1,6 @@
-use crate::bamranges;
 use crate::cli::PileupOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bamranges;
 use crate::utils::bio_io;
 use crate::*;
 use anyhow::{self, Ok};
