@@ -1,6 +1,6 @@
 use super::subcommands::center::CenterPosition;
 use super::subcommands::center::CenteredFiberData;
-use super::utils::FiberFilters;
+use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamranges::*;
 use crate::utils::basemods::BaseMods;

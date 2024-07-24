@@ -1,4 +1,4 @@
-use super::super::utils::InputBam;
+use crate::utils::input_bam::InputBam;
 use crate::utils::nucleosome::*;
 use clap::Args;
 use std::fmt::Debug;
