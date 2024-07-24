@@ -1,6 +1,6 @@
-use crate::bio_io;
 use crate::cli::PredictM6AOptions;
-use crate::subcommands::nucleosomes;
+use crate::utils::bio_io;
+use crate::utils::nucleosome;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use burn::tensor::backend::Backend;
@@ -234,7 +234,7 @@ where
             let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
 
             // adding the nucleosomes
-            nucleosomes::add_nucleosomes_to_record(record, &modified_bases_forward, &self.nuc_opts);
+            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &self.nuc_opts);
 
             // clear the existing data
             if !self.keep {

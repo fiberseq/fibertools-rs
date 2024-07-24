@@ -1,5 +1,6 @@
 use crate::cli::DecoratorOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bio_io;
 use crate::*;
 use anyhow;
 use rust_htslib::bam::ext::BamRecordExtensions;

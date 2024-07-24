@@ -1,6 +1,6 @@
-use super::bio_io::PbChem;
 use super::subcommands::predict_m6a::PredictOptions;
 use super::subcommands::predict_m6a::{LAYERS, WINDOW};
+use crate::utils::bio_io::PbChem;
 use burn::module::Module;
 use burn::tensor::backend::Backend;
 use burn::tensor::{Shape, Tensor};

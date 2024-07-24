@@ -1,10 +1,10 @@
 use super::bamranges::*;
 use super::basemods::BaseMods;
-use super::bio_io::*;
 use super::subcommands::center::CenterPosition;
 use super::subcommands::center::CenteredFiberData;
 use super::utils::FiberFilters;
 use super::*;
+use crate::utils::bio_io::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};

@@ -1,13 +1,7 @@
-use crate::cli::AddNucleosomeOptions;
 use crate::cli::NucleosomeParameters;
-use crate::fiber::FiberseqData;
-use crate::*;
-use rayon::iter::ParallelIterator;
-use rayon::prelude::*;
 use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
-    bam::Record,
 };
 pub static NUC_LEN: &str = "75";
 pub static COMBO_NUC_LEN: &str = "100";
@@ -229,33 +223,6 @@ pub fn add_nucleosomes_to_record(
     }
 }
 
-pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
-    let mut bam = nuc_opts.input.bam_reader();
-    let mut out = nuc_opts.input.bam_writer(&nuc_opts.out);
-
-    // read in bam data
-    let bam_chunk_iter = BamChunk::new(bam.records(), None);
-
-    // iterate over chunks
-    for mut chunk in bam_chunk_iter {
-        // add nuc calls
-        let records: Vec<&mut Record> = chunk
-            .par_iter_mut()
-            .map(|record| {
-                let fd = FiberseqData::new(record.clone(), None, &nuc_opts.input.filters);
-                //let m6a = fd.base_mods.forward_m6a();
-                let m6a = fd.m6a.get_forward_starts();
-                add_nucleosomes_to_record(record, &m6a, &nuc_opts.nuc);
-                record
-            })
-            .collect();
-
-        records
-            .into_iter()
-            .for_each(|record| out.write(record).unwrap());
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,7 +230,7 @@ mod tests {
     #[test]
     fn test_nucleosomes() {
         let m6a = vec![];
-        let o = NucleosomeParameters::default();
+        let o = crate::cli::NucleosomeParameters::default();
         assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
         // simple case
         let m6a = vec![100];

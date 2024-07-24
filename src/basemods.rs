@@ -1,5 +1,5 @@
 use super::bamranges::*;
-use super::bio_io::*;
+use crate::utils::bio_io::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
 use regex::Regex;

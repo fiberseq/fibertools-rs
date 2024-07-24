@@ -1,7 +1,6 @@
 use crate::basemods;
-//use crate::*;
-use crate::bio_io::BamChunk;
 use crate::cli::StripBasemodsOptions;
+use crate::utils::bio_io::BamChunk;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::bam::Read;

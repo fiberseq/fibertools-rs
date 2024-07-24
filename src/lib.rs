@@ -2,7 +2,6 @@ pub mod bamlift;
 pub mod bamranges;
 /// Add and remove base modifications from a bam record
 pub mod basemods;
-pub mod bio_io;
 /// Data structure for fiberseq data
 pub mod fiber;
 pub mod m6a_burn;
@@ -14,8 +13,8 @@ pub mod utils;
 /// Command line interface for fibertools-rs.
 pub mod cli;
 
+use crate::utils::bio_io::*;
 use anyhow::Result;
-use bio_io::*;
 use itertools::Itertools;
 use rust_htslib::bam::FetchDefinition;
 use rust_htslib::{bam, bam::Read};
@@ -87,26 +86,6 @@ pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: b
         .filter(|v| !v.is_empty())
         .map(|v| v + sep)
         .collect()
-}
-
-/// clear kinetics from a hifi bam
-pub fn clear_kinetics(opts: &mut cli::ClearKineticsOptions) {
-    let mut bam = opts.input.bam_reader();
-    let mut out = opts.input.bam_writer(&opts.out);
-    //let mut out = bam_writer(&opts.out, &bam, opts.input.global.threads);
-
-    let bar = bio_io::no_length_progress_bar();
-    for rec in bam.records() {
-        let mut record = rec.unwrap();
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
-        out.write(&record).unwrap();
-        bar.inc_length(1);
-        bar.inc(1);
-    }
-    bar.finish();
 }
 
 pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {

@@ -1,7 +1,7 @@
-use crate::bio_io;
 use crate::cli::FootprintOptions;
 use crate::fiber::*;
 use crate::subcommands::center::CenterPosition;
+use crate::utils::bio_io;
 use anyhow;
 use std::io::BufRead;
 //use rayon::prelude::*;
@@ -9,6 +9,7 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::{bam, bam::*};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FootprintYaml {
     modules: Vec<(usize, usize)>,
