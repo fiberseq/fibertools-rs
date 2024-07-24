@@ -1,5 +1,5 @@
 use fibertools_rs::utils::bio_io;
-use fibertools_rs::utils::FiberFilters;
+use fibertools_rs::utils::input_bam::FiberFilters;
 use rust_htslib::bam::Read;
 
 fn get_fiber_data_from_test_bam(bam_file: &str) -> Vec<fibertools_rs::fiber::FiberseqData> {
