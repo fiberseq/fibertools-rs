@@ -12,7 +12,6 @@ pub struct FiberOut {
     pub reference: bool,
     pub simplify: bool,
     pub quality: bool,
-    pub min_ml_score: u8,
 }
 
 impl FiberOut {
@@ -26,7 +25,6 @@ impl FiberOut {
         reference: bool,
         simplify: bool,
         quality: bool,
-        min_ml_score: u8,
     ) -> Result<Self> {
         let m6a = match m6a {
             Some(m6a) => Some(writer(m6a)?),
@@ -58,7 +56,6 @@ impl FiberOut {
             reference,
             simplify,
             quality,
-            min_ml_score,
         })
     }
 }
@@ -137,7 +134,6 @@ pub fn extract_contained(extract_opts: &mut ExtractOptions) {
         extract_opts.reference,
         extract_opts.simplify,
         extract_opts.quality,
-        extract_opts.input.min_ml_score,
     )
     .unwrap();
 

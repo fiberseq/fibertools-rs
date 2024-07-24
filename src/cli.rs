@@ -1,140 +1,13 @@
-use crate::fiber::FiberseqRecords;
-
-use super::bio_io;
 use super::nucleosomes::*;
+use super::utils::InputBam;
 use anstyle;
-use clap::{Args, Command, CommandFactory, Parser, Subcommand, ValueHint};
+use clap::{Args, Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
-use rust_htslib::bam;
-use rust_htslib::bam::Read;
 use std::{fmt::Debug, io};
 
-pub static MIN_ML_SCORE: &str = "125";
-
-pub fn get_styles() -> clap::builder::Styles {
-    let cmd_color = anstyle::AnsiColor::Magenta;
-    let header_color = anstyle::AnsiColor::BrightGreen;
-    let placeholder_color = anstyle::AnsiColor::Cyan;
-    let header_style = anstyle::Style::new()
-        .bold()
-        .underline()
-        .fg_color(Some(anstyle::Color::Ansi(header_color)));
-    let cmd_style = anstyle::Style::new()
-        .bold()
-        .fg_color(Some(anstyle::Color::Ansi(cmd_color)));
-    let placeholder_style = anstyle::Style::new()
-        //.bold()
-        .fg_color(Some(anstyle::Color::Ansi(placeholder_color)));
-    clap::builder::Styles::styled()
-        .header(header_style)
-        .literal(cmd_style)
-        .usage(header_style)
-        .placeholder(placeholder_style)
-}
-
-#[derive(Debug, Args)]
-pub struct InputBam {
-    /// Input BAM file. If no path is provided stdin is used. For m6A prediction, this should be a HiFi bam file with kinetics data. For other commands, this should be a bam file with m6A calls.
-    #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
-    pub bam: String,
-    /// BAM bit flags to filter on, equivalent to `-F` in samtools view
-    #[clap(
-        global = true,
-        short = 'F',
-        long = "filter",
-        default_value = "0",
-        help_heading = "BAM-Options"
-    )]
-    pub bit_flag: u16,
-    /// Minium score in the ML tag to use or include in the output
-    #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
-    pub min_ml_score: u8,
-    #[clap(flatten)]
-    pub global: GlobalOpts,
-    #[clap(skip)]
-    pub header: Option<bam::Header>,
-}
-
-impl InputBam {
-    pub fn skip_unaligned(&mut self) {
-        self.bit_flag |= 4;
-    }
-
-    pub fn skip_secondary(&mut self) {
-        self.bit_flag |= 256;
-    }
-
-    pub fn skip_supplementary(&mut self) {
-        self.bit_flag |= 2048;
-    }
-
-    pub fn bam_reader(&mut self) -> bam::Reader {
-        let mut bam = bio_io::bam_reader(&self.bam);
-        bam.set_threads(self.global.threads)
-            .expect("unable to set threads for bam reader");
-        self.header = Some(bam::Header::from_template(bam.header()));
-        bam
-    }
-
-    pub fn indexed_bam_reader(&mut self) -> bam::IndexedReader {
-        if &self.bam == "-" {
-            panic!("Cannot use stdin (\"-\") for indexed bam reading. Please provide a file path for the bam file.");
-        }
-
-        let mut bam =
-            bam::IndexedReader::from_path(&self.bam).expect("unable to open indexed bam file");
-        self.header = Some(bam::Header::from_template(bam.header()));
-        bam.set_threads(self.global.threads).unwrap();
-        bam
-    }
-
-    pub fn fibers<'a>(&self, bam: &'a mut bam::Reader) -> FiberseqRecords<'a> {
-        let mut fr = FiberseqRecords::new(bam);
-        fr.set_min_ml_score(self.min_ml_score);
-        fr.set_bit_flag_filter(self.bit_flag);
-        fr
-    }
-
-    pub fn header_view(&self) -> bam::HeaderView {
-        bam::HeaderView::from_header(self.header.as_ref().expect(
-            "Input bam must be opened before opening the header or creating a writer with the input bam as a template.",
-        ))
-    }
-
-    pub fn header(&self) -> bam::Header {
-        bam::Header::from_template(&self.header_view())
-    }
-
-    pub fn bam_writer(&self, out: &str) -> bam::Writer {
-        let header = self.header();
-        let program_name = "fibertools-rs";
-        let program_id = "ft";
-        let program_version = super::VERSION;
-        let mut out = bio_io::program_bam_writer_from_header(
-            out,
-            header,
-            program_name,
-            program_id,
-            program_version,
-        );
-        out.set_threads(self.global.threads)
-            .expect("unable to set threads for bam writer");
-        out
-    }
-}
-
-impl std::default::Default for InputBam {
-    fn default() -> Self {
-        Self {
-            bam: "-".to_string(),
-            bit_flag: 0,
-            min_ml_score: MIN_ML_SCORE.parse().unwrap(),
-            global: GlobalOpts::default(),
-            header: None,
-        }
-    }
-}
-
+//
+// Global options available to all subcommands
+//
 #[derive(Debug, Args, PartialEq, Eq)]
 pub struct GlobalOpts {
     /// Threads
@@ -171,6 +44,9 @@ impl std::default::Default for GlobalOpts {
     }
 }
 
+//
+// The main CLI structure
+//
 #[derive(Parser)]
 #[clap(
     author,
@@ -191,9 +67,9 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-///
-/// This structure contains all the subcommands for fiberseq-rs and their help descriptions.
-///
+//
+// This structure contains all the subcommands and their help descriptions.
+//
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. Also adds nucleosome (nl, ns) and MTase sensitive patches (al, as).
@@ -235,18 +111,9 @@ pub enum Commands {
     Man {},
 }
 
-pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
-}
-
-pub fn make_cli_parse() -> Cli {
-    Cli::parse()
-}
-
-pub fn make_cli_app() -> Command {
-    Cli::command()
-}
-
+//
+// Options for each subcommand
+//
 #[derive(Args, Debug)]
 pub struct PredictM6AOptions {
     #[clap(flatten)]
@@ -543,4 +410,42 @@ pub struct DddaToM6aOptions {
     /// Output bam file
     #[clap(default_value = "-")]
     pub out: String,
+}
+
+//
+// CLI utility functions
+//
+
+/// This function is used to generate the styles for the CLI help messages.
+fn get_styles() -> clap::builder::Styles {
+    let cmd_color = anstyle::AnsiColor::Magenta;
+    let header_color = anstyle::AnsiColor::BrightGreen;
+    let placeholder_color = anstyle::AnsiColor::Cyan;
+    let header_style = anstyle::Style::new()
+        .bold()
+        .underline()
+        .fg_color(Some(anstyle::Color::Ansi(header_color)));
+    let cmd_style = anstyle::Style::new()
+        .bold()
+        .fg_color(Some(anstyle::Color::Ansi(cmd_color)));
+    let placeholder_style = anstyle::Style::new()
+        //.bold()
+        .fg_color(Some(anstyle::Color::Ansi(placeholder_color)));
+    clap::builder::Styles::styled()
+        .header(header_style)
+        .literal(cmd_style)
+        .usage(header_style)
+        .placeholder(placeholder_style)
+}
+
+pub fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+    generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
+
+pub fn make_cli_parse() -> Cli {
+    Cli::parse()
+}
+
+pub fn make_cli_app() -> Command {
+    Cli::command()
 }

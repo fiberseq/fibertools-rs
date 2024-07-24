@@ -305,24 +305,25 @@ pub fn center(
     records: Vec<bam::Record>,
     header_view: &rust_htslib::bam::HeaderView,
     center_position: CenterPosition,
-    min_ml_score: u8,
-    wide: bool,
-    dist: Option<i64>,
-    reference: bool,
-    simplify: bool,
+    opts: &CenterOptions,
     buffer: &mut Box<dyn std::io::Write>,
 ) {
-    let fiber_data = FiberseqData::from_records(records, header_view, min_ml_score);
+    let fiber_data = FiberseqData::from_records(records, header_view, &opts.input.filters);
     let total = fiber_data.len();
     let mut seen = 0;
 
     fiber_data
         .into_par_iter()
         .map(|fiber| {
-            match CenteredFiberData::new(fiber, center_position.clone(), dist, reference, simplify)
-            {
+            match CenteredFiberData::new(
+                fiber,
+                center_position.clone(),
+                opts.dist,
+                opts.reference,
+                opts.simplify,
+            ) {
                 Some(centered_fiber) => {
-                    if wide {
+                    if opts.wide {
                         centered_fiber.write()
                     } else {
                         centered_fiber.write_long()
@@ -386,16 +387,18 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
                 center_position.position + 1
             )
         });
-        let records: Vec<bam::Record> = bam.records().map(|r| r.unwrap()).collect();
+
+        let records: Vec<bam::Record> = center_opts
+            .input
+            .filters
+            .filter_on_bit_flags(bam.records())
+            .collect();
+
         center(
             records,
             &header_view,
             center_position,
-            center_opts.input.min_ml_score,
-            center_opts.wide,
-            center_opts.dist,
-            center_opts.reference,
-            center_opts.simplify,
+            center_opts,
             &mut buffer,
         );
         pb.inc(1);

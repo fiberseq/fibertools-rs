@@ -1,10 +1,11 @@
 use fibertools_rs;
 use fibertools_rs::bio_io;
+use fibertools_rs::utils::FiberFilters;
 use rust_htslib::bam::Reader;
 use tempfile::NamedTempFile;
 
 fn sum_qual(bam: &mut Reader) -> usize {
-    let fibers = fibertools_rs::fiber::FiberseqRecords::new(bam);
+    let fibers = fibertools_rs::fiber::FiberseqRecords::new(bam, FiberFilters::default());
     // sum up all quality scores across all fibers
     let mut sum = 0;
     for fiber in fibers {

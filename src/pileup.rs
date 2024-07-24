@@ -234,21 +234,17 @@ impl<'a> FiberseqPileup<'a> {
         &mut self,
         records: bam::Records<'a, IndexedReader>,
     ) -> Result<(), anyhow::Error> {
-        records
-            .map(|r| r.unwrap())
-            .filter(|r| {
-                // filter by bit flag
-                (r.flags() & self.pileup_opts.input.bit_flag) == 0
-            })
+        self.pileup_opts
+            .input
+            .filters
+            .filter_on_bit_flags(records)
             .chunks(1000)
             .into_iter()
             .map(|r| r.collect::<Vec<_>>())
             .for_each(|r| {
                 let fibers: Vec<FiberseqData> = r
                     .par_iter()
-                    .map(|r| {
-                        FiberseqData::new(r.clone(), None, self.pileup_opts.input.min_ml_score)
-                    })
+                    .map(|r| FiberseqData::new(r.clone(), None, &self.pileup_opts.input.filters))
                     .collect();
                 if !fibers.is_empty() {
                     self.has_data = true;

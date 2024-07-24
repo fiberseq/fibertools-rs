@@ -3,6 +3,7 @@ use super::basemods::BaseMods;
 use super::bio_io::*;
 use super::center::CenterPosition;
 use super::center::CenteredFiberData;
+use super::utils::FiberFilters;
 use super::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
@@ -25,7 +26,7 @@ pub struct FiberseqData {
 }
 
 impl FiberseqData {
-    pub fn new(record: bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
+    pub fn new(record: bam::Record, target_name: Option<&String>, filters: &FiberFilters) -> Self {
         // read group
         let rg = if let Ok(Aux::String(f)) = record.aux(b"RG") {
             log::trace!("{f}");
@@ -60,7 +61,7 @@ impl FiberseqData {
         };
 
         // get fiberseq basemods
-        let base_mods = BaseMods::new(&record, min_ml_score);
+        let base_mods = BaseMods::new(&record, filters.min_ml_score);
         //let (m6a, cpg) = FiberMods::new(&base_mods);
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();
@@ -103,7 +104,7 @@ impl FiberseqData {
     pub fn from_records(
         records: Vec<bam::Record>,
         head_view: &HeaderView,
-        min_ml_score: u8,
+        filters: &FiberFilters,
     ) -> Vec<Self> {
         let target_dict = Self::dict_from_head_view(head_view);
         records
@@ -112,7 +113,7 @@ impl FiberseqData {
                 let tid = r.tid();
                 (r, Self::target_name_from_tid(tid, &target_dict))
             })
-            .map(|(r, target_name)| Self::new(r, target_name, min_ml_score))
+            .map(|(r, target_name)| Self::new(r, target_name, filters))
             .collect::<Vec<_>>()
     }
 
@@ -532,12 +533,12 @@ impl FiberseqData {
 pub struct FiberseqRecords<'a> {
     bam_chunk: BamChunk<'a>,
     header: HeaderView,
-    min_ml_score: u8,
+    filters: FiberFilters,
     cur_chunk: Vec<FiberseqData>,
 }
 
 impl<'a> FiberseqRecords<'a> {
-    pub fn new(bam: &'a mut bam::Reader) -> Self {
+    pub fn new(bam: &'a mut bam::Reader, filters: FiberFilters) -> Self {
         let header = bam.header().clone();
         let bam_recs = bam.records();
         let bam_chunk = BamChunk::new(bam_recs, None);
@@ -545,17 +546,9 @@ impl<'a> FiberseqRecords<'a> {
         FiberseqRecords {
             bam_chunk,
             header,
-            min_ml_score: 0,
+            filters,
             cur_chunk,
         }
-    }
-
-    pub fn set_min_ml_score(&mut self, min_ml_score: u8) {
-        self.min_ml_score = min_ml_score;
-    }
-
-    pub fn set_bit_flag_filter(&mut self, filter_bit_flag: u16) {
-        self.bam_chunk.set_bit_flag_filter(filter_bit_flag);
     }
 }
 
@@ -567,8 +560,7 @@ impl<'a> Iterator for FiberseqRecords<'a> {
         if self.cur_chunk.is_empty() {
             match self.bam_chunk.next() {
                 Some(recs) => {
-                    self.cur_chunk =
-                        FiberseqData::from_records(recs, &self.header, self.min_ml_score);
+                    self.cur_chunk = FiberseqData::from_records(recs, &self.header, &self.filters);
                     // we will be popping from this list so we want to remove the first element first, not the last
                     self.cur_chunk.reverse();
                 }
