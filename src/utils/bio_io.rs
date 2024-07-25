@@ -339,20 +339,6 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     chemistry.clone()
 }
 
-///```
-/// use rust_htslib::{bam, bam::Read};
-/// use fibertools_rs::utils::bio_io;
-/// use log;
-/// let mut bam = bam::Reader::from_path(&"tests/data/all.bam").unwrap();
-/// for record in bam.records() {
-///     let record = record.unwrap();
-///     let n_s = bio_io::get_u32_tag(&record, b"ns");
-///     let n_l = bio_io::get_u32_tag(&record, b"nl");
-///     let a_s = bio_io::get_u32_tag(&record, b"as");
-///     let a_l = bio_io::get_u32_tag(&record, b"al");
-///     log::debug!("{:?}", a_s);
-/// }
-///```
 pub fn get_u32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<i64> {
     if let Ok(Aux::ArrayU32(array)) = record.aux(tag) {
         let read_array = array.iter().map(|x| x as i64).collect::<Vec<_>>();
