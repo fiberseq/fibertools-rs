@@ -24,6 +24,9 @@ pub struct FiberFilters {
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
+    // @SHANE this is where we would add more filtering options
+    #[clap(short, long)]
+    pub filter_expression: Option<String>,
 }
 
 impl std::default::Default for FiberFilters {
@@ -31,6 +34,7 @@ impl std::default::Default for FiberFilters {
         Self {
             bit_flag: 0,
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
+            filter_expression: None,
         }
     }
 }
