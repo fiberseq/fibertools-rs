@@ -1,3 +1,6 @@
+use crate::fiber;
+use crate::utils::input_bam;
+
 #[derive(Debug, PartialEq, Clone)]
 enum Comparison {
     LessThan,
@@ -212,6 +215,17 @@ impl Parser {
         self.pos += ch.map_or(0, |c| c.len_utf8());
         ch
     }
+}
+
+pub fn filter_fiber(fiber: &mut fiber::FiberseqData, input_bam_filter: &input_bam::FiberFilters) {
+    let expression = match input_bam_filter.filter_expression {
+        Some(ref expression) => expression,
+        None => return,
+    };
+    let mut parser = Parser::new(&expression);
+    // ideally I think parser should be filtering one of "fiber"s ranges, msp, nuc, cpg, m6a.
+    // parser my need a "name" for this
+    todo!()
 }
 
 /// @SHANE you can run these tests with
