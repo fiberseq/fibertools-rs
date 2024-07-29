@@ -215,7 +215,7 @@ impl Parser {
 }
 
 /// @SHANE you can run these tests with
-///  cargo test --lib -- utils::ftexpression::tests --show-output
+/// cargo test --lib -- utils::ftexpression::tests --show-output
 #[cfg(test)]
 mod tests {
     use super::*;
