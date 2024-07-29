@@ -38,11 +38,16 @@ impl Expression {
                 println!("FunctionCall result: {}", arg_len);
                 true
             }
-            Expression::Comparison { left, operator, right } => {
+            Expression::Comparison {
+                left,
+                operator,
+                right,
+            } => {
                 let left_value = match &**left {
                     Expression::FunctionCall { name, argument } => match name.as_str() {
                         "len" | "qual" => match argument {
-                            FunctionArgument::LenArgument(arg) | FunctionArgument::QualArgument(arg) => arg.len() as f64,
+                            FunctionArgument::LenArgument(arg)
+                            | FunctionArgument::QualArgument(arg) => arg.len() as f64,
                         },
                         _ => panic!("Unknown function name"),
                     },
@@ -108,8 +113,12 @@ impl Parser {
             "len" | "qual" => {
                 let arg = self.parse_identifier()?;
                 match name.as_str() {
-                    "len" if matches!(arg.as_str(), "msp" | "fire" | "nuc" | "lnk") => FunctionArgument::LenArgument(arg),
-                    "qual" if matches!(arg.as_str(), "m6a" | "5mC") => FunctionArgument::QualArgument(arg),
+                    "len" if matches!(arg.as_str(), "msp" | "fire" | "nuc" | "lnk") => {
+                        FunctionArgument::LenArgument(arg)
+                    }
+                    "qual" if matches!(arg.as_str(), "m6a" | "5mC") => {
+                        FunctionArgument::QualArgument(arg)
+                    }
                     _ => return Err(format!("Invalid argument for {} function: {}", name, arg)),
                 }
             }
@@ -148,14 +157,22 @@ impl Parser {
                 _ => Comparison::GreaterThan,
             },
             Some('=') => Comparison::Equal,
-            _ => return Err(format!("Expected comparison operator at position {}", self.pos)),
+            _ => {
+                return Err(format!(
+                    "Expected comparison operator at position {}",
+                    self.pos
+                ))
+            }
         };
         Ok(operator)
     }
 
     fn parse_number(&mut self) -> Result<f64, String> {
         let start = self.pos;
-        while self.peek_char().map_or(false, |c| c.is_digit(10) || c == '.') {
+        while self
+            .peek_char()
+            .map_or(false, |c| c.is_digit(10) || c == '.')
+        {
             self.pos += 1;
         }
         self.input[start..self.pos]
@@ -197,23 +214,31 @@ impl Parser {
     }
 }
 
-fn main() {
-    let expressions = vec![
-        "len(msp)>1000",
-        "len(fire)>=500",
-        "qual(m6a)=0.7",
-        "qual(5mC)<1.0",
-        "len(msp)=30:40",
-    ];
+/// @SHANE you can run these tests with
+///  cargo test --lib -- utils::ftexpression::tests --show-output
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for expression in expressions {
-        let mut parser = Parser::new(expression);
-        match parser.parse() {
-            Ok(expr) => {
-                println!("Expression: {}", expression);
-                println!("Evaluates to: {}", expr.evaluate());
+    #[test]
+    fn test_parser() {
+        let expressions = vec![
+            "len(msp)>1000",
+            "len(fire)>=500",
+            "qual(m6a)=0.7",
+            "qual(5mC)<1.0",
+            "len(msp)=30:40",
+        ];
+
+        for expression in expressions {
+            let mut parser = Parser::new(expression);
+            match parser.parse() {
+                Ok(expr) => {
+                    println!("Expression: {}", expression);
+                    println!("Evaluates to: {}", expr.evaluate());
+                }
+                Err(e) => println!("Failed to parse expression: {}. Error: {}", expression, e),
             }
-            Err(e) => println!("Failed to parse expression: {}. Error: {}", expression, e),
         }
     }
 }
