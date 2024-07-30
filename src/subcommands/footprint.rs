@@ -18,9 +18,9 @@ pub struct FootprintYaml {
 
 impl FootprintYaml {
     pub fn check_for_valid_input(&self) -> Result<(), anyhow::Error> {
-        if self.modules.is_empty() || self.modules.len() > 8 {
+        if self.modules.is_empty() || self.modules.len() >= u16::MAX as usize {
             return Err(anyhow::anyhow!(
-                "YAML SPECIFICATION ERROR: Number of modules must be between 1 and 8: {self:?}"
+                "YAML SPECIFICATION ERROR: Number of modules must be between 1 and 15: {self:?}"
             ));
         }
         let mut last_end = 0;
