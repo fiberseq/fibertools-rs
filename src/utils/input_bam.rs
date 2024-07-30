@@ -24,8 +24,8 @@ pub struct FiberFilters {
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
-    // @SHANE this is where we would add more filtering options
-    #[clap(short, long, help_heading = "BAM-Options", hide = true)]
+    /// Filtering expression to use for filtering records
+    #[clap(short = 'x', long, help_heading = "BAM-Options", hide = true)]
     pub filter_expression: Option<String>,
 }
 
