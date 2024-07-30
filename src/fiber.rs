@@ -68,7 +68,7 @@ impl FiberseqData {
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();
 
-        let mut fiber = FiberseqData {
+        FiberseqData {
             record,
             msp,
             nuc,
@@ -79,9 +79,7 @@ impl FiberseqData {
             target_name,
             rg,
             center_position: None,
-        };
-        // @SHANE apply the filters here
-        fiber
+        }
     }
 
     pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
