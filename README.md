@@ -60,7 +60,7 @@ The python API is still in development and not stable; however, you can find the
 
 # Cite
 
-**Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Finkbeiner, C., Li, T., Whittington, D., Stergachis, A. B., & **Vollger, M. R.** (2023). DNA-m6A calling and integrated long-read epigenetic and genetic analysis with **fibertools**. _bioRxiv_. https://doi.org/10.1101/2023.04.20.537673
+**Jha, A.**, **Bohaczuk, S. C.**, Mao, Y., Ranchalis, J., Mallory, B. J., Min, A. T., Hamm, M. O., Swanson, E., Dubocanin, D., Finkbeiner, C., Li, T., Whittington, D., Noble, W. S., Stergachis, A. B., & **Vollger, M. R**. (2024). DNA-m6A calling and integrated long-read epigenetic and genetic analysis with fibertools. Genome Research. https://doi.org/10.1101/gr.279095.124
 
 # Contributing
 If you would like to contribute to `fibertools-rs`, please see the [CONTRIBUTING.md](/CONTRIBUTING.md) file for more information.
