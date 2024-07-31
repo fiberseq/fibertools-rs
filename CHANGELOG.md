@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog with release
 - Update changelog with release
 - Update changelog with release
+- Update changelog with release
 
 ## [0.5.2] - 2024-07-31
 
