@@ -18,12 +18,12 @@ echo ""
 rg FIRE -z tmp.dec.bed12.gz | cut -f 9,10 | sort | datamash -g 1 sum 2
 echo ""
 
-as="../fiberseq-fire/workflow/templates/bed12_filter.as"
+as="../FIRE/workflow/templates/bed12_filter.as"
 bedToBigBed -allow1bpOverlap -type=bed12+ -as=$as tmp.bed12.gz tests/data/hg38.analysisSet.fa.fai tmp.bed12.bb
 
 echo "done bed12"
 
-as="../fiberseq-fire/workflow/templates/decoration.as"
+as="../FIRE/workflow/templates/decoration.as"
 bedToBigBed -allow1bpOverlap -type=bed12+ -as=$as tmp.dec.bed12.gz tests/data/hg38.analysisSet.fa.fai tmp.dec.bed12.bb
 
 aws s3 sync --profile Mitchell_Vollger --exclude "*" --include "tmp.*bb" $@ . s3://stergachis-public1/Mitchell/temp/FIREv2/

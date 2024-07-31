@@ -1,12 +1,14 @@
-use fibertools_rs::bio_io;
+use fibertools_rs::utils::bio_io;
+use fibertools_rs::utils::input_bam::FiberFilters;
 use rust_htslib::bam::Read;
 
 fn get_fiber_data_from_test_bam(bam_file: &str) -> Vec<fibertools_rs::fiber::FiberseqData> {
-    let mut bam = bio_io::bam_reader(bam_file, 1);
+    let mut bam = bio_io::bam_reader(bam_file);
     bam.records()
         .map(|r| {
             let record = r.unwrap();
-            let fiber_data = fibertools_rs::fiber::FiberseqData::new(record, None, 0);
+            let fiber_data =
+                fibertools_rs::fiber::FiberseqData::new(record, None, &FiberFilters::default());
             fiber_data
         })
         .collect::<Vec<_>>()

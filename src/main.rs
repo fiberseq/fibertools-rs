@@ -1,19 +1,17 @@
-use anyhow::{bail, Error, Ok, Result};
-use bio_io::*;
+use anyhow::{Error, Ok, Result};
 use colored::Colorize;
 use env_logger::{Builder, Target};
 use fibertools_rs::cli::*;
-use fibertools_rs::nucleosomes::add_nucleosomes_to_bam;
+use fibertools_rs::subcommands;
 use fibertools_rs::*;
 use log::LevelFilter;
-use rust_htslib::{bam, bam::Read};
 use std::time::Instant;
 
 pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
     console::set_colors_enabled(true);
     let pg_start = Instant::now();
-    let args = cli::make_cli_parse();
+    let mut args = cli::make_cli_parse();
     let matches = cli::make_cli_app().get_matches();
     let subcommand = matches.subcommand_name().unwrap();
 
@@ -24,7 +22,7 @@ pub fn main() -> Result<(), Error> {
         2 => LevelFilter::Debug,
         _ => LevelFilter::Trace,
     };
-    if args.quiet {
+    if args.global.quiet {
         min_log_level = LevelFilter::Error;
     }
 
@@ -35,29 +33,31 @@ pub fn main() -> Result<(), Error> {
 
     log::debug!("DEBUG logging enabled");
     log::trace!("TRACE logging enabled");
-    log::debug!("Using {} threads.", args.threads);
+    log::debug!("Using {} threads.", args.global.threads);
     log::info!("Starting ft-{}", subcommand.bright_green().bold());
 
     // set up number of threads to use globally
     rayon::ThreadPoolBuilder::new()
-        .num_threads(args.threads)
+        .num_threads(args.global.threads)
         .build_global()
         .unwrap();
 
     #[cfg(feature = "tch")]
-    tch::set_num_threads(args.threads.try_into().unwrap());
+    {
+        // setting this to 1 since I do paralyzation via processing multiple reads
+        tch::set_num_threads(1);
+        tch::set_num_interop_threads(1);
+    }
 
-    match &args.command {
+    log::debug!("Command line options: {:?}", args.command);
+
+    match &mut args.command {
         Some(Commands::Extract(extract_opts)) => {
-            // read in the bam from stdin or from a file
-            let mut bam = bam_reader(&extract_opts.bam, args.threads);
-            extract::extract_contained(&mut bam, extract_opts);
+            subcommands::extract::extract_contained(extract_opts);
         }
         Some(Commands::Center(center_opts)) => {
             // read in the bam from stdin or from a file
-            let mut bam = bam::IndexedReader::from_path(center_opts.bam.clone())?;
-            bam.set_threads(args.threads).unwrap();
-            center::center_fiberdata(center_opts, &mut bam)?;
+            subcommands::center::center_fiberdata(center_opts)?;
         }
         #[allow(unused)]
         Some(Commands::PredictM6A(predict_m6a_opts)) => {
@@ -68,36 +68,28 @@ pub fn main() -> Result<(), Error> {
                 "Consider recompiling via cargo with: `--all-features`.",
                 "For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
             );
-
-            let mut bam = bam_reader(&predict_m6a_opts.bam, args.threads);
-            let mut out = bam_writer(&predict_m6a_opts.out, &bam, args.threads);
-            predict_m6a::read_bam_into_fiberdata(&mut bam, &mut out, predict_m6a_opts);
+            subcommands::predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
         }
         Some(Commands::ClearKinetics(clear_kinetics_opts)) => {
-            let mut bam = bam_reader(&clear_kinetics_opts.bam, args.threads);
-            let mut out = bam_writer(&clear_kinetics_opts.out, &bam, args.threads);
-            fibertools_rs::clear_kinetics(&mut bam, &mut out);
+            subcommands::clear_kinetics::clear_kinetics(clear_kinetics_opts);
         }
         Some(Commands::StripBasemods(strip_basemods_opts)) => {
-            let mut bam = bam_reader(&strip_basemods_opts.bam, args.threads);
-            let mut out = bam_writer(&strip_basemods_opts.out, &bam, args.threads);
-            fibertools_rs::strip_basemods::strip_base_mods(
-                &mut bam,
-                &mut out,
-                &strip_basemods_opts.basemod,
-            );
+            subcommands::strip_basemods::strip_base_mods(strip_basemods_opts);
         }
         Some(Commands::AddNucleosomes(nuc_opts)) => {
-            add_nucleosomes_to_bam(nuc_opts, args.threads);
+            subcommands::add_nucleosomes::add_nucleosomes_to_bam(nuc_opts);
         }
         Some(Commands::Fire(fire_opts)) => {
-            fibertools_rs::fire::add_fire_to_bam(fire_opts)?;
+            subcommands::fire::add_fire_to_bam(fire_opts)?;
         }
         Some(Commands::Footprint(footprint_opts)) => {
-            fibertools_rs::footprint::start_finding_footprints(footprint_opts)?;
+            subcommands::footprint::start_finding_footprints(footprint_opts)?;
+        }
+        Some(Commands::Pileup(pileup_opts)) => {
+            subcommands::pileup::pileup_track(pileup_opts)?;
         }
         Some(Commands::TrackDecorators(decorator_opts)) => {
-            fibertools_rs::decorator::get_decorators_from_bam(decorator_opts)?;
+            subcommands::decorator::get_decorators_from_bam(decorator_opts)?;
         }
         Some(Commands::Completions(completion_opts)) => {
             log::info!(
@@ -105,6 +97,9 @@ pub fn main() -> Result<(), Error> {
                 completion_opts.shell
             );
             cli::print_completions(completion_opts.shell, &mut cli::make_cli_app());
+        }
+        Some(Commands::DddaToM6a(opts)) => {
+            subcommands::ddda_to_m6a::ddda_to_m6a(opts)?;
         }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());
@@ -123,47 +118,5 @@ pub fn main() -> Result<(), Error> {
         subcommand.bright_green().bold(),
         format!("{:.2?}", duration).bright_yellow().bold()
     );
-    Ok(())
-}
-
-fn _help_check_torch_env_vars() -> Result<()> {
-    //std::env::set_var("LIBTORCH", "");
-    //std::env::remove_var("LIBTORCH");
-    //std::env::set_var("LD_LIBRARY_PATH", "aa");
-    let lib = std::env::var("LIBTORCH")?;
-    let ld_path = std::env::var("LD_LIBRARY_PATH")?;
-    let dy_path = std::env::var("DYLD_LIBRARY_PATH")?;
-    // make sure vars are not empty
-    for v in [&lib, &ld_path, &dy_path] {
-        if v.is_empty() {
-            bail!("\t{}\n\t{}\n\t{}", lib, ld_path, dy_path)
-        }
-    }
-    // make sure paths contain libtorch
-    for path in [&ld_path, &dy_path] {
-        if !path.contains(&lib) {
-            bail!("\t{}\n\t{}\n\t{}", lib, ld_path, dy_path)
-        }
-    }
-    Ok(())
-}
-
-fn _check_torch_env_vars() -> Result<()> {
-    if let Err(e) = _help_check_torch_env_vars() {
-        let msg = "\nEnvironment variable LIBTORCH is missing or is missing from LD_LIBRARY_PATH or DYLD_LIBRARY_PATH.".red().bold();
-        let download_msg = "
-Please download libtorch v1.13.0 from https://pytorch.org/get-started/ and extract the content of the zip file.
-
-On a linux system you can download:
-    wget https://download.pytorch.org/libtorch/cu116/libtorch-cxx11-abi-shared-with-deps-1.13.0%2Bcu116.zip
-    
-Then add the following to your .bashrc or equivalent:
-    export LIBTORCH=/path/to/libtorch
-    export LD_LIBRARY_PATH=${{LIBTORCH}}/lib:$LD_LIBRARY_PATH
-    export DYLD_LIBRARY_PATH=${{LIBTORCH}}/lib:$LD_LIBRARY_PATH
-            ".bold();
-        let env_vars = format!("\nYour library variables:\n{}", e).yellow();
-        bail!("{}\n{}\n{}", msg, env_vars, download_msg)
-    };
     Ok(())
 }
