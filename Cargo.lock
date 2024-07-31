@@ -1387,7 +1387,7 @@ checksum = "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da"
 
 [[package]]
 name = "fibertools-rs"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anstyle",
  "anyhow",
