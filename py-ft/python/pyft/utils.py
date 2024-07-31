@@ -41,6 +41,9 @@ def read_footprint_table(f, long=False):
     """
     wide_cols = ["footprint_codes", "fire_quals", "fiber_names"]
     df = pd.read_csv(f, sep="\t")
+    # filter out columns that do not contain spanning fibers
+    df = df[df["n_spanning_fibers"] > 0]
+    # split the wide columns
     for col in wide_cols:
         df[col] = df[col].str.split(",")
         if col != "fiber_names":
@@ -62,7 +65,7 @@ def read_footprint_table(f, long=False):
         )
         # drop the module columns
         df.drop(
-            df.columns[df.columns.str.contains("module_|footprint_codes")],
+            df.columns[df.columns.str.contains("module_")],
             axis=1,
             inplace=True,
         )

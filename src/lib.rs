@@ -1,41 +1,18 @@
 /// Data structure for fiberseq data
 pub mod fiber;
+pub mod m6a_burn;
+/// subcommands of fibertools-rs
+pub mod subcommands;
+pub mod utils;
 
-/// Add and remove base modifications from a bam record
-pub mod basemods;
-/// Center fiberseq information around a reference position
-pub mod center;
 #[cfg(feature = "cli")]
 /// Command line interface for fibertools-rs.
 pub mod cli;
-/// Extract fiberseq data into plain text formats
-pub mod extract;
-/// Add nucleosomes to a bam file
-pub mod nucleosomes;
-/// m6A prediction
-pub mod predict_m6a;
-/// Remove base modifications from a bam record
-pub mod strip_basemods;
 
-/// add fire data
-pub mod fire;
-
-/// add decorators
-pub mod decorator;
-
-pub mod footprint;
-
-pub mod bamlift;
-
-pub mod bio_io;
-
-pub mod bamranges;
-
-pub mod m6a_burn;
-
+use crate::utils::bio_io::*;
 use anyhow::Result;
-use bio_io::*;
 use itertools::Itertools;
+use rust_htslib::bam::FetchDefinition;
 use rust_htslib::{bam, bam::Read};
 use std::env;
 use std::io::Write;
@@ -107,33 +84,25 @@ pub fn join_by_str_option_can_skip(vals: &[Option<i64>], sep: &str, skip_none: b
         .collect()
 }
 
-/// clear kinetics from a hifi bam
-pub fn clear_kinetics(bam: &mut bam::Reader, out: &mut bam::Writer) {
-    let bar = bio_io::no_length_progress_bar();
-    for rec in bam.records() {
-        let mut record = rec.unwrap();
-        record.remove_aux(b"fp").unwrap_or(());
-        record.remove_aux(b"fi").unwrap_or(());
-        record.remove_aux(b"rp").unwrap_or(());
-        record.remove_aux(b"ri").unwrap_or(());
-        out.write(&record).unwrap();
-        bar.inc_length(1);
-        bar.inc(1);
+pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
+    if rgn.contains(':') {
+        let (chrom, rest) = rgn.split(':').collect_tuple().unwrap();
+        let (start, end) = rest.split('-').collect_tuple().unwrap();
+        let st: i64 = start
+            .replace(',', "")
+            .parse()
+            .unwrap_or_else(|_| panic!("Could not parse start of region: {}", start));
+        (
+            FetchDefinition::RegionString(
+                chrom.as_bytes(),
+                st,
+                end.replace(',', "")
+                    .parse()
+                    .unwrap_or_else(|_| panic!("Could not parse end of region: {}", end)),
+            ),
+            chrom.to_string(),
+        )
+    } else {
+        (FetchDefinition::String(rgn.as_bytes()), rgn.to_string())
     }
-    bar.finish();
-}
-
-/// Write to a bam file.
-pub fn bam_writer(out: &str, template_bam: &bam::Reader, threads: usize) -> bam::Writer {
-    let program_name = "fibertools-rs";
-    let program_id = "ft";
-    let program_version = VERSION;
-    program_bam_writer(
-        out,
-        template_bam,
-        threads,
-        program_name,
-        program_id,
-        program_version,
-    )
 }

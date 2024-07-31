@@ -1,15 +1,18 @@
-use super::bamranges::*;
-use super::basemods::BaseMods;
-use super::bio_io::*;
-use super::center::CenterPosition;
-use super::center::CenteredFiberData;
+use super::subcommands::center::CenterPosition;
+use super::subcommands::center::CenteredFiberData;
+use super::utils::input_bam::FiberFilters;
 use super::*;
+use crate::utils::bamranges::*;
+use crate::utils::basemods::BaseMods;
+use crate::utils::bio_io::*;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
 use std::collections::HashMap;
 use std::fmt::Write;
 
+// @SHANE this is the core data structure for Fiber-seq data that you will be working with
+// it represents a single Fiber-seq read
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
@@ -25,7 +28,7 @@ pub struct FiberseqData {
 }
 
 impl FiberseqData {
-    pub fn new(record: bam::Record, target_name: Option<&String>, min_ml_score: u8) -> Self {
+    pub fn new(record: bam::Record, target_name: Option<&String>, filters: &FiberFilters) -> Self {
         // read group
         let rg = if let Ok(Aux::String(f)) = record.aux(b"RG") {
             log::trace!("{f}");
@@ -60,7 +63,7 @@ impl FiberseqData {
         };
 
         // get fiberseq basemods
-        let base_mods = BaseMods::new(&record, min_ml_score);
+        let base_mods = BaseMods::new(&record, filters.min_ml_score);
         //let (m6a, cpg) = FiberMods::new(&base_mods);
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();
@@ -80,6 +83,9 @@ impl FiberseqData {
     }
 
     pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
+        if head_view.target_count() == 0 {
+            return HashMap::new();
+        }
         let target_u8s = head_view.target_names();
         let tids = target_u8s
             .iter()
@@ -100,7 +106,7 @@ impl FiberseqData {
     pub fn from_records(
         records: Vec<bam::Record>,
         head_view: &HeaderView,
-        min_ml_score: u8,
+        filters: &FiberFilters,
     ) -> Vec<Self> {
         let target_dict = Self::dict_from_head_view(head_view);
         records
@@ -109,7 +115,7 @@ impl FiberseqData {
                 let tid = r.tid();
                 (r, Self::target_name_from_tid(tid, &target_dict))
             })
-            .map(|(r, target_name)| Self::new(r, target_name, min_ml_score))
+            .map(|(r, target_name)| Self::new(r, target_name, filters))
             .collect::<Vec<_>>()
     }
 
@@ -529,21 +535,20 @@ impl FiberseqData {
 pub struct FiberseqRecords<'a> {
     bam_chunk: BamChunk<'a>,
     header: HeaderView,
-    min_ml_score: u8,
+    filters: FiberFilters,
     cur_chunk: Vec<FiberseqData>,
 }
 
 impl<'a> FiberseqRecords<'a> {
-    pub fn new(bam: &'a mut bam::Reader, min_ml_score: u8) -> Self {
+    pub fn new(bam: &'a mut bam::Reader, filters: FiberFilters) -> Self {
         let header = bam.header().clone();
         let bam_recs = bam.records();
         let bam_chunk = BamChunk::new(bam_recs, None);
         let cur_chunk: Vec<FiberseqData> = vec![];
-
         FiberseqRecords {
             bam_chunk,
             header,
-            min_ml_score,
+            filters,
             cur_chunk,
         }
     }
@@ -557,8 +562,7 @@ impl<'a> Iterator for FiberseqRecords<'a> {
         if self.cur_chunk.is_empty() {
             match self.bam_chunk.next() {
                 Some(recs) => {
-                    self.cur_chunk =
-                        FiberseqData::from_records(recs, &self.header, self.min_ml_score);
+                    self.cur_chunk = FiberseqData::from_records(recs, &self.header, &self.filters);
                     // we will be popping from this list so we want to remove the first element first, not the last
                     self.cur_chunk.reverse();
                 }

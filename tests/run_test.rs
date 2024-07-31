@@ -21,6 +21,7 @@ fn test_center() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg("center")
         .arg("-v")
         .arg("tests/data/center.bam")
+        .arg("--bed")
         .arg("tests/data/center.bed");
     cmd.assert()
         .success()
@@ -87,8 +88,24 @@ fn test_footprint() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg("footprint")
         .arg("-v")
         .arg("tests/data/ctcf.bam")
+        .arg("--bed")
         .arg("tests/data/ctcf.bed.gz")
+        .arg("--yaml")
         .arg("tests/data/ctcf.yaml")
+        .arg("-o")
+        .arg("/dev/null");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("done! Time elapsed:"));
+    Ok(())
+}
+
+#[test]
+fn test_pileup() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ft")?;
+    cmd.arg("pileup")
+        .arg("-v")
+        .arg("tests/data/all.bam")
         .arg("-o")
         .arg("/dev/null");
     cmd.assert()
