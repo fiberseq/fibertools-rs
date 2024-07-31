@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and the project tries but probably doesn't to adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.1 (2024-07-31)
+
+### Bug Fixes
+
+ - <csr-id-1be7c1690a4a79853ff3a901949fffdb7d8298f5/> citation
+ - <csr-id-0e4aa6fd22391cb92f2dc5abf631516ca196b02a/> remove windows target
+
+### Other
+
+ - <csr-id-b5b9cfb74c03cae1a37e5671ea30e0deb45c1483/> remove windows target
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' were seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Citation ([`1be7c16`](https://github.com/fiberseq/fibertools-rs/commit/1be7c1690a4a79853ff3a901949fffdb7d8298f5))
+    - Remove windows target ([`b5b9cfb`](https://github.com/fiberseq/fibertools-rs/commit/b5b9cfb74c03cae1a37e5671ea30e0deb45c1483))
+    - Remove windows target ([`0e4aa6f`](https://github.com/fiberseq/fibertools-rs/commit/0e4aa6fd22391cb92f2dc5abf631516ca196b02a))
+</details>
+
 ## 0.5.0 (2024-07-31)
 
 <csr-id-bebf51d0cb33b31c3bc984f385d0a5e4205119c9/>
@@ -170,7 +201,7 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
  - 131 days passed between releases.
  - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
  - 1 unique issue was worked on: [#50](https://github.com/fiberseq/fibertools-rs/issues/50)
@@ -183,6 +214,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
  * **[#50](https://github.com/fiberseq/fibertools-rs/issues/50)**
     - Working on v0.5.0 ([`198cebe`](https://github.com/fiberseq/fibertools-rs/commit/198cebe3369155bdaa07e8ea17aa8b9bc147b9a9))
+ * **Uncategorized**
+    - Release fibertools-rs v0.5.0 ([`9d8bb2f`](https://github.com/fiberseq/fibertools-rs/commit/9d8bb2fc786890b33d37e3576a98a1b37ff88e39))
 </details>
 
 ## 0.4.2 (2024-03-21)
