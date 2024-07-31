@@ -11,14 +11,7 @@ cargo clippy --workspace
 
 ## Cutting a release
 
-First preview changes to the changelog:
-```bash
-git cliff --bump | less -S
-```
-Then if you agree with them bump the version:
-```
-git cliff --bump | less -S
-```
+The changelog is managed by git-cliff which will run with the release action.
 
 ```bash
 cargo release {release type} 
