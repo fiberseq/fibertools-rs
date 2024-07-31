@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
+- Update changelog with release
+- Update changelog with release
+- Update changelog with release
+
+## [0.5.2] - 2024-07-31
+
+### ⚙️ Miscellaneous Tasks
+
 - Release fibertools-rs version 0.5.2
 
 ## [0.5.1] - 2024-07-31

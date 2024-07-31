@@ -14,7 +14,7 @@ cargo clippy --workspace
 The changelog is managed by git-cliff which will run with the release action.
 
 You can preview the changelog with:
-```
+```bash
 git cliff | less
 ```
 
