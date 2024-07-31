@@ -11,11 +11,6 @@ cargo clippy --workspace
 
 ## Cutting a release
 ```bash
-cargo release --workspace {release type} -x
+cargo release {release type} 
 ```
 Where release type is one of: major, minor, patch.
-
-I have also started trying cargo smart-release and it seems to work well:
-```bash
-cargo smart-release --update-crates-index --execute
-```
