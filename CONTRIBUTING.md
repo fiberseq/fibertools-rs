@@ -18,7 +18,13 @@ You can preview the changelog with:
 git cliff | less
 ```
 
+To cut a release, run:
 ```bash
 cargo release {release type} 
 ```
 Where release type is one of: major, minor, patch.
+
+The release page on GitHub will then be updated using `cargo dist`. You can preview this with:
+```bash
+cargo dist plan
+```
