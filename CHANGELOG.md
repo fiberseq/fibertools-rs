@@ -7,6 +7,35 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 ## 0.5.0 (2024-07-31)
 
+<csr-id-bebf51d0cb33b31c3bc984f385d0a5e4205119c9/>
+<csr-id-3eb0bf4ed4fc45e843f747b8277168777b982e02/>
+<csr-id-5195a1d3c5370bd80f5eddb84b3d684a931e7b26/>
+<csr-id-7c7abcb4fe8785627d5e9f0b8acb1db2e16013c1/>
+<csr-id-73422195b4bc90e6d5e437dcddfdb168e53a796f/>
+<csr-id-1a4df897164582ba127bea7d497e5095696b02ba/>
+<csr-id-23f7c70a27369ecfa085efde174ce1779c27cb06/>
+<csr-id-b0bdc443a3e13f82bfa1196a4c349a6de4459516/>
+<csr-id-95d5ddbdaa1c783fa681dd5160b86dfee42099f6/>
+<csr-id-49b5e83676fe51c3f074d08443cab391fb0cc828/>
+<csr-id-956474d2844ef192fbbe8c05aec30a5c1c311d8b/>
+<csr-id-b5dfd1e40baf8f095890c11af01a20983bedea1b/>
+<csr-id-6260d3976ff4e69745d91284a7631b84e2ede7f3/>
+<csr-id-3ca62604114dc830e5918d8285e81b42ef985767/>
+<csr-id-9a92b675d1523b0bc252cf2a5ca9990e8a54abd6/>
+<csr-id-8d9a1b4e8c3f2a126f0a54adf2086b1c5072932d/>
+<csr-id-c887abcb5168ae4fbbe9accd09a9a57e300d193f/>
+<csr-id-571d4a391926d53526b65cf23dabc5253c2fbc0b/>
+<csr-id-2fa25184e18c93a13352e2b96635c158568e0f7a/>
+<csr-id-4796b8b108aa18aafbb39d3310c64620c6043893/>
+<csr-id-9d545913fd3f6b5c1d44b5679929fb98cef74ff5/>
+<csr-id-6d590e32f50b9ba6087d30f1d8c941157fe1e209/>
+<csr-id-10c42109e155d72cf5c75c4060b8a34efe749e66/>
+<csr-id-d4e397748b248c7f03a7e8b35af454aea38b899e/>
+<csr-id-b3bcece9a99a4fdb2874b2896c67323d1f0e12eb/>
+<csr-id-c8384100bb65f90dea23094c776297d9c8aaf234/>
+<csr-id-1751215a136061d394d4248a1ed35f658d7de017/>
+<csr-id-f8f2f43d04a0507d40ce60599530a202f0608c39/>
+
 ### Chore
 
  - <csr-id-bebf51d0cb33b31c3bc984f385d0a5e4205119c9/> clippy
@@ -141,10 +170,10 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <csr-read-only-do-not-edit/>
 
- - 137 commits contributed to the release over the course of 112 calendar days.
+ - 1 commit contributed to the release.
  - 131 days passed between releases.
- - 115 commits were understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' were seen in commit messages
+ - 0 commits were understood as [conventional](https://www.conventionalcommits.org).
+ - 1 unique issue was worked on: [#50](https://github.com/fiberseq/fibertools-rs/issues/50)
 
 ### Commit Details
 
@@ -152,144 +181,8 @@ and the project tries but probably doesn't to adhere to [Semantic Versioning](ht
 
 <details><summary>view details</summary>
 
- * **Uncategorized**
-    - Make footprint u16 number of modules consistent ([`489f343`](https://github.com/fiberseq/fibertools-rs/commit/489f3430b50831e54d1879db7024a76c5cd814be))
-    - Clippy ([`bebf51d`](https://github.com/fiberseq/fibertools-rs/commit/bebf51d0cb33b31c3bc984f385d0a5e4205119c9))
-    - Clippy ([`3eb0bf4`](https://github.com/fiberseq/fibertools-rs/commit/3eb0bf4ed4fc45e843f747b8277168777b982e02))
-    - Clippy ([`5195a1d`](https://github.com/fiberseq/fibertools-rs/commit/5195a1d3c5370bd80f5eddb84b3d684a931e7b26))
-    - Outline where Shane may want to add things for our new filter expression ideas ([`a60ee3e`](https://github.com/fiberseq/fibertools-rs/commit/a60ee3efa8f5d5ce576cc576405b3f5bd7f97cc3))
-    - Move some tests ([`571d4a3`](https://github.com/fiberseq/fibertools-rs/commit/571d4a391926d53526b65cf23dabc5253c2fbc0b))
-    - Update for fibertools refactor ([`2fa2518`](https://github.com/fiberseq/fibertools-rs/commit/2fa25184e18c93a13352e2b96635c158568e0f7a))
-    - Move some complexity into utils ([`4796b8b`](https://github.com/fiberseq/fibertools-rs/commit/4796b8b108aa18aafbb39d3310c64620c6043893))
-    - Move some complexity into utils ([`9d54591`](https://github.com/fiberseq/fibertools-rs/commit/9d545913fd3f6b5c1d44b5679929fb98cef74ff5))
-    - Move some complexity into utils ([`6d590e3`](https://github.com/fiberseq/fibertools-rs/commit/6d590e32f50b9ba6087d30f1d8c941157fe1e209))
-    - Move some complexity into utils ([`10c4210`](https://github.com/fiberseq/fibertools-rs/commit/10c42109e155d72cf5c75c4060b8a34efe749e66))
-    - Move some complexity into utils ([`d4e3977`](https://github.com/fiberseq/fibertools-rs/commit/d4e397748b248c7f03a7e8b35af454aea38b899e))
-    - Removing unneeded nesting ([`9a92b67`](https://github.com/fiberseq/fibertools-rs/commit/9a92b675d1523b0bc252cf2a5ca9990e8a54abd6))
-    - Move the running of subcommands into a submodule called subcommands ([`b3bcece`](https://github.com/fiberseq/fibertools-rs/commit/b3bcece9a99a4fdb2874b2896c67323d1f0e12eb))
-    - Move the running of subcommands into a submodule called subcommands ([`c838410`](https://github.com/fiberseq/fibertools-rs/commit/c8384100bb65f90dea23094c776297d9c8aaf234))
-    - Breakout subcommands opts into different files ([`1751215`](https://github.com/fiberseq/fibertools-rs/commit/1751215a136061d394d4248a1ed35f658d7de017))
-    - Make the inputbam function a utility and add a FiberFilter structure that can be used to filter the input bam and therefore the output ([`f8f2f43`](https://github.com/fiberseq/fibertools-rs/commit/f8f2f43d04a0507d40ce60599530a202f0608c39))
-    - Use bit flag filter ([`a959126`](https://github.com/fiberseq/fibertools-rs/commit/a95912615eb886f1be37d9bec7652e4bf0c9e0d5))
-    - Use min ml score in pileup ([`0d035ce`](https://github.com/fiberseq/fibertools-rs/commit/0d035cedc778489165bdef397dce2c82bec47f59))
-    - Check for end of chrom ([`69942fe`](https://github.com/fiberseq/fibertools-rs/commit/69942fecae5a5bcc2cd055e022f9b487ea65b35b))
-    - Skip empty regions ([`e088980`](https://github.com/fiberseq/fibertools-rs/commit/e088980b9d5bf9cfd961746687744ebd3f48d379))
-    - Skip empty regions ([`1e75fb4`](https://github.com/fiberseq/fibertools-rs/commit/1e75fb4e2c3d2d443bc542d6d0f17d7496dcc184))
-    - Missing final base in pileup region ([`bff5459`](https://github.com/fiberseq/fibertools-rs/commit/bff5459a063d1815ee797d84f44fe1777cd85c9d))
-    - Get ucsc tools into conda ([`2b9d282`](https://github.com/fiberseq/fibertools-rs/commit/2b9d282d9199fa8a1e35016231cf498210ceb6fb))
-    - Add a ddda to m6a converter ([`506ba76`](https://github.com/fiberseq/fibertools-rs/commit/506ba76e8e90fde53206df612157fe26306d2638))
-    - Clean up cli interactions with pileup ([`43941c3`](https://github.com/fiberseq/fibertools-rs/commit/43941c33980e9b771c7d2a45899fd4dfe7a08e56))
-    - Clean up cli interactions with pileup ([`d7f35ae`](https://github.com/fiberseq/fibertools-rs/commit/d7f35aea6d3ee4f54ef2dca5e71a2bdcf252e472))
-    - Clean up cli interactions with pileup ([`cfb6feb`](https://github.com/fiberseq/fibertools-rs/commit/cfb6febe162a09c4b9520fc253c8292244e668eb))
-    - Clean up cli interactions with pileup ([`7e4decf`](https://github.com/fiberseq/fibertools-rs/commit/7e4decfd25b92e0716d3b61d49736b67f78aa0e9))
-    - Clean up cli interactions with pileup ([`bf5d6dc`](https://github.com/fiberseq/fibertools-rs/commit/bf5d6dc27ad4dce1f569fab8be9157baee5c178d))
-    - Clean up cli interactions with pileup ([`e8da753`](https://github.com/fiberseq/fibertools-rs/commit/e8da753cda30712d18b1bb3fff1b99dd2ba8d94e))
-    - Clean up cli interactions with pileup ([`f2adf3c`](https://github.com/fiberseq/fibertools-rs/commit/f2adf3c13f9f2f155cb6da243e726d4ed49f6c05))
-    - Clean up cli interactions with pileup ([`c5004b9`](https://github.com/fiberseq/fibertools-rs/commit/c5004b9b12c3e1f2ff61c0e7ec6fff5318c02aee))
-    - Clean up cli interactions with pileup ([`e574b06`](https://github.com/fiberseq/fibertools-rs/commit/e574b067003f77940480b79b55b379eb5e916fd6))
-    - Fix label on FIRE vs LINKER for decorator tracks ([`c92a4d4`](https://github.com/fiberseq/fibertools-rs/commit/c92a4d46be1a0bf0fe18fe8331e4b6873775a6f1))
-    - Keep footprint code ([`7546c09`](https://github.com/fiberseq/fibertools-rs/commit/7546c09f854046f54eca6f0f9b83179ce4446730))
-    - Skip sites with zero spanning reads ([`c87e12e`](https://github.com/fiberseq/fibertools-rs/commit/c87e12e13bce48c902c5e0ba2892392390ef41e1))
-    - Skip sites with zero spanning reads ([`92284b3`](https://github.com/fiberseq/fibertools-rs/commit/92284b3d89f240782f1875489346996533fc43cf))
-    - Switch to generic cpu ([`f732064`](https://github.com/fiberseq/fibertools-rs/commit/f73206496f9c8c8ed60f4981a450833239ac87a7))
-    - Switch to generic cpu ([`86087ec`](https://github.com/fiberseq/fibertools-rs/commit/86087ec797b7f763364fc8b3b0d560948865c370))
-    - Add ont fire heuristic test data and cli improments ([`274ce9e`](https://github.com/fiberseq/fibertools-rs/commit/274ce9e4530df307385f25da4820982306a2fc67))
-    - Add ont fire heuristic ([`5d42c01`](https://github.com/fiberseq/fibertools-rs/commit/5d42c01c4c3fcaf53647ad7abac694cfe4fce095))
-    - Add ont fire heuristic ([`6ab1edb`](https://github.com/fiberseq/fibertools-rs/commit/6ab1edb150bccb647bb7a1de0fd884bb7fff79ac))
-    - Move the book to its own repo ([`f298692`](https://github.com/fiberseq/fibertools-rs/commit/f298692d74edbedb53ddfddc9dc2049579d70951))
-    - Move the book to its own repo ([`7c2f224`](https://github.com/fiberseq/fibertools-rs/commit/7c2f22420c041bd951eb416f7ebe893e533eb985))
-    - Starting the book ([`be05cbe`](https://github.com/fiberseq/fibertools-rs/commit/be05cbe25fa90ec871f3951daea2e790b9172ae0))
-    - Starting the book ([`55208f7`](https://github.com/fiberseq/fibertools-rs/commit/55208f7bdc1fec286d73425623ebeb7f974f282f))
-    - Starting the book ([`e92de35`](https://github.com/fiberseq/fibertools-rs/commit/e92de35abb4839a0891d17fda788ab2f9806c10b))
-    - Starting the book ([`cf03b1d`](https://github.com/fiberseq/fibertools-rs/commit/cf03b1d2e1b3915d37c3e8411f81845355043e0c))
-    - Starting the book ([`46b418a`](https://github.com/fiberseq/fibertools-rs/commit/46b418a0ef7a0faebcc8ceb9058390d4812c5423))
-    - Starting the book ([`9525257`](https://github.com/fiberseq/fibertools-rs/commit/9525257580bb02e1a80341ee52afa017f5e2aad4))
-    - Starting the book ([`8e609ee`](https://github.com/fiberseq/fibertools-rs/commit/8e609ee71981d3af1648d5e98243855ec36d7a2e))
-    - Starting the book ([`b9c7a3b`](https://github.com/fiberseq/fibertools-rs/commit/b9c7a3b328667a5fd1e55ead353493701e541c28))
-    - Starting the book ([`8ab2992`](https://github.com/fiberseq/fibertools-rs/commit/8ab299248a2be8211c0dd58380e2b99ee021f7e3))
-    - Starting the book ([`3cfd780`](https://github.com/fiberseq/fibertools-rs/commit/3cfd78085822124f0d42382ff84c32bdb755192c))
-    - Starting the book ([`752d225`](https://github.com/fiberseq/fibertools-rs/commit/752d225da1d40b13212292af5aa78030f4254938))
-    - Starting the book ([`1a3e75b`](https://github.com/fiberseq/fibertools-rs/commit/1a3e75be6e6a78568cd6de3c56de9a5ca4d16abd))
-    - Starting the book ([`ab75af5`](https://github.com/fiberseq/fibertools-rs/commit/ab75af54ac53d969541a8c9bb190ab2f9d0d2324))
-    - Pileup thread error ([`570d3f6`](https://github.com/fiberseq/fibertools-rs/commit/570d3f62b2355740b20351e119db37f925cf4510))
-    - Pileup thread error ([`7bebe18`](https://github.com/fiberseq/fibertools-rs/commit/7bebe1886113cbc2841016a1f2b3abe4144271fa))
-    - Starting the book ([`e7800cf`](https://github.com/fiberseq/fibertools-rs/commit/e7800cf45a443a77c6079b418edb0a2ac4d9590b))
-    - Starting the book ([`9120ab7`](https://github.com/fiberseq/fibertools-rs/commit/9120ab7ddf34c2269d1f228f741f51081a8fbbd3))
-    - Starting the book ([`c37dec5`](https://github.com/fiberseq/fibertools-rs/commit/c37dec527485bb45e5f0af2a32d140eaac8c9241))
-    - Starting the book ([`c1b2af0`](https://github.com/fiberseq/fibertools-rs/commit/c1b2af0daad2dd96fcfdb6e2f14d524c7f7eded7))
-    - Starting the book ([`2d02305`](https://github.com/fiberseq/fibertools-rs/commit/2d0230561fab2aa0574c602dd0de92cad0c46d88))
-    - Starting the book ([`b576fca`](https://github.com/fiberseq/fibertools-rs/commit/b576fca4681562d2d3ea512951a134d7a12d31e0))
-    - Starting the book ([`d09fd87`](https://github.com/fiberseq/fibertools-rs/commit/d09fd87d70b75ef153324fdb200297e3e2a085ef))
-    - Starting the book ([`99056a4`](https://github.com/fiberseq/fibertools-rs/commit/99056a49ba3360c8cda679977c58e75d18016454))
-    - Starting the book ([`a72b390`](https://github.com/fiberseq/fibertools-rs/commit/a72b390739bda0f75510e62495b9b152192c0145))
-    - Starting the book ([`70323b0`](https://github.com/fiberseq/fibertools-rs/commit/70323b0db24156654e12e93582091dda8aec9578))
-    - Starting the book ([`04dd93d`](https://github.com/fiberseq/fibertools-rs/commit/04dd93d3a555ba8af9d26e6a632a4dad6cd13665))
-    - Starting the book ([`0471806`](https://github.com/fiberseq/fibertools-rs/commit/0471806c29e5ea2c0a390fdefef1b39317ddb54c))
-    - Starting the book ([`4b6006b`](https://github.com/fiberseq/fibertools-rs/commit/4b6006baea8439e2ee28c3d62f0fe584ccf67f4e))
-    - Starting the book ([`7fe6971`](https://github.com/fiberseq/fibertools-rs/commit/7fe69711f7c4fc761b40e8b2a92ffa0f35a760d9))
-    - Starting the book ([`4fb0e40`](https://github.com/fiberseq/fibertools-rs/commit/4fb0e40c134900b7f58a908a0dab182b679f780b))
-    - Starting the book ([`bc8558a`](https://github.com/fiberseq/fibertools-rs/commit/bc8558aaa862256379aa83993482660d753274c8))
-    - Starting the book ([`eb7f370`](https://github.com/fiberseq/fibertools-rs/commit/eb7f3701e7a6d41a0c739818fda1b10f8945deb3))
-    - Starting the book ([`f8a7592`](https://github.com/fiberseq/fibertools-rs/commit/f8a7592a7a7c8583063d91c16fb3b25646dab192))
-    - Starting the book ([`01a3e8a`](https://github.com/fiberseq/fibertools-rs/commit/01a3e8a5c6bdcc7ab540de4ee97d0f61120b9bed))
-    - Starting the book ([`3b4f9c9`](https://github.com/fiberseq/fibertools-rs/commit/3b4f9c9a52cb98755e035c960a43870f4581823f))
-    - Starting the book ([`9be4ca0`](https://github.com/fiberseq/fibertools-rs/commit/9be4ca06eef185b5bfe0144c1b85afb159dee202))
-    - Starting the book ([`c5d30a9`](https://github.com/fiberseq/fibertools-rs/commit/c5d30a9da7d4f80f29d47a15aebd2486837395a2))
-    - Starting the book ([`27e5dc2`](https://github.com/fiberseq/fibertools-rs/commit/27e5dc2da6ac80e0d80ba71aa46a88766432c2e2))
-    - Starting the book ([`3379e16`](https://github.com/fiberseq/fibertools-rs/commit/3379e16be868c446a33476214d307d664ad0c616))
-    - Starting the book ([`3e98f2d`](https://github.com/fiberseq/fibertools-rs/commit/3e98f2dcdd058064ab7e7b4aec0a28d8283de751))
-    - Starting the book ([`b8ffdd8`](https://github.com/fiberseq/fibertools-rs/commit/b8ffdd830f9edf1bb292aca8da562e157a10ef36))
-    - Unused ([`7c7abcb`](https://github.com/fiberseq/fibertools-rs/commit/7c7abcb4fe8785627d5e9f0b8acb1db2e16013c1))
-    - Cli ([`7342219`](https://github.com/fiberseq/fibertools-rs/commit/73422195b4bc90e6d5e437dcddfdb168e53a796f))
-    - Cli ([`1a4df89`](https://github.com/fiberseq/fibertools-rs/commit/1a4df897164582ba127bea7d497e5095696b02ba))
-    - Cli ([`23f7c70`](https://github.com/fiberseq/fibertools-rs/commit/23f7c70a27369ecfa085efde174ce1779c27cb06))
-    - Add options motif_span ([`34138f6`](https://github.com/fiberseq/fibertools-rs/commit/34138f613fb483da826d9f165faf5dea42acfeb3))
-    - Update ctcf definition ([`b0bdc44`](https://github.com/fiberseq/fibertools-rs/commit/b0bdc443a3e13f82bfa1196a4c349a6de4459516))
-    - More input bam functions ([`1caf278`](https://github.com/fiberseq/fibertools-rs/commit/1caf2781d035d11a109f9221f18b670840357be9))
-    - More input bam functions ([`5fa8f29`](https://github.com/fiberseq/fibertools-rs/commit/5fa8f29de029299a3cde976992bda324b12e0464))
-    - InputBam now can make a template for an output bam ([`2465fe7`](https://github.com/fiberseq/fibertools-rs/commit/2465fe719d4505712ffa21486d86de0e37e5e262))
-    - InputBam now can make a template for an output bam ([`01bd5f7`](https://github.com/fiberseq/fibertools-rs/commit/01bd5f7147b9680282c2d513c4431ebc75e34713))
-    - Test a fix for doc build error ([`0a2b7ee`](https://github.com/fiberseq/fibertools-rs/commit/0a2b7ee3688c4ff5e8450f44edc577a7050c67a1))
-    - Small ([`5ad6b6b`](https://github.com/fiberseq/fibertools-rs/commit/5ad6b6baeca86c2be6a5b8fe5a89c201a399b8ed))
-    - Small ([`6fff5e9`](https://github.com/fiberseq/fibertools-rs/commit/6fff5e986f6cb1f41c64ec9253acf5ad78ae958a))
-    - Small ([`ec0c5b6`](https://github.com/fiberseq/fibertools-rs/commit/ec0c5b6e149ec34f3d3b3f259fa334faed4b6d0c))
-    - Small ([`f5bffa1`](https://github.com/fiberseq/fibertools-rs/commit/f5bffa18289438bbb82b12c876530206a14b43dc))
-    - Small ([`0113df4`](https://github.com/fiberseq/fibertools-rs/commit/0113df4baadbb58d801412398e90f50fff72d41b))
-    - Small ([`d583bdb`](https://github.com/fiberseq/fibertools-rs/commit/d583bdb6445610ba253671e5147e399dc6295e01))
-    - Small ([`ac32395`](https://github.com/fiberseq/fibertools-rs/commit/ac32395d1717a8b32f4fcd4295b3e6785e356896))
-    - Test a fix for doc build error ([`024f24f`](https://github.com/fiberseq/fibertools-rs/commit/024f24f13b5261e4b8a10225ed458dbf574615e7))
-    - Major change to the cli and adding a filtering tools that works like samtools view \-F ([`8d9a1b4`](https://github.com/fiberseq/fibertools-rs/commit/8d9a1b4e8c3f2a126f0a54adf2086b1c5072932d))
-    - Test a fix for doc build error ([`1aa875c`](https://github.com/fiberseq/fibertools-rs/commit/1aa875cc2af5fcf1453712e92d595ad84d7333ce))
-    - Test a fix for doc build error ([`15274ea`](https://github.com/fiberseq/fibertools-rs/commit/15274ea5fa49a2bc49d07e4ec658143bc0d70c44))
-    - Test a fix for doc build error ([`7a190a1`](https://github.com/fiberseq/fibertools-rs/commit/7a190a1c4aea9b73394e6757b2adc4e7fc49d99b))
-    - Add target names to pyft ([`fbc50c5`](https://github.com/fiberseq/fibertools-rs/commit/fbc50c5403e62d7f0583c8d979e1f9c03ec2256a))
-    - Add target names to pyft ([`370ea24`](https://github.com/fiberseq/fibertools-rs/commit/370ea24616d418192aa16553a2d91e33d5b20620))
-    - Add target names to pyft ([`7357ab0`](https://github.com/fiberseq/fibertools-rs/commit/7357ab05bbd7ce22d8ae11d56884f250d06c25f9))
-    - Test a fix for doc build error ([`112c581`](https://github.com/fiberseq/fibertools-rs/commit/112c58192983e7c9caeea631a6701bd8e02caf14))
-    - Test a fix for doc build error ([`5714739`](https://github.com/fiberseq/fibertools-rs/commit/5714739a5133306b004b8e77d14899e14ed19f2d))
-    - Test a fix for doc build error ([`4389dc5`](https://github.com/fiberseq/fibertools-rs/commit/4389dc5762864090a6064285a521c7fd8f34d64d))
-    - Test a fix for doc build error ([`20a16d2`](https://github.com/fiberseq/fibertools-rs/commit/20a16d2819c22a831402ebb1c7b80bff6949b81f))
-    - Add new check to avoid a new failure on unaligned bams ([`7ec0651`](https://github.com/fiberseq/fibertools-rs/commit/7ec065146264796f56ec122303da920c383ae79b))
-    - Why are the revio tests failing? ([`c887abc`](https://github.com/fiberseq/fibertools-rs/commit/c887abcb5168ae4fbbe9accd09a9a57e300d193f))
-    - Allow the complexity of the pipeup to be adjusted ([`16c18ee`](https://github.com/fiberseq/fibertools-rs/commit/16c18eefc3c161d29def9e0c6f1636284132d55e))
-    - Prep for bump ([`95d5ddb`](https://github.com/fiberseq/fibertools-rs/commit/95d5ddbdaa1c783fa681dd5160b86dfee42099f6))
-    - Pileup is now useable ([`844f2a2`](https://github.com/fiberseq/fibertools-rs/commit/844f2a2e45b43bd56e072115e26fa36e39611074))
-    - Pileup is now useable ([`f709630`](https://github.com/fiberseq/fibertools-rs/commit/f709630cfc1b0a58975b75177ae4374ccc4b530b))
-    - Pileup is now useable ([`9a2530a`](https://github.com/fiberseq/fibertools-rs/commit/9a2530ae345b9123a6540c124ee209182a81547a))
-    - Pyft bump ([`49b5e83`](https://github.com/fiberseq/fibertools-rs/commit/49b5e83676fe51c3f074d08443cab391fb0cc828))
-    - Add a pyft way to iterate over a bam file one read at a time. ([`831e5a0`](https://github.com/fiberseq/fibertools-rs/commit/831e5a047665a791abd4bfa090413c7b6f77b30f))
-    - Hide m5c #54 ([`956474d`](https://github.com/fiberseq/fibertools-rs/commit/956474d2844ef192fbbe8c05aec30a5c1c311d8b))
-    - Hide m5c #54 ([`b5dfd1e`](https://github.com/fiberseq/fibertools-rs/commit/b5dfd1e40baf8f095890c11af01a20983bedea1b))
-    - Extend docs #54 ([`6260d39`](https://github.com/fiberseq/fibertools-rs/commit/6260d3976ff4e69745d91284a7631b84e2ede7f3))
-    - Allow fire opts to be read from env vars. ([`3fea667`](https://github.com/fiberseq/fibertools-rs/commit/3fea6676da4ee58bb9aa0f6c7989176c7f6201ca))
-    - Clean ([`8b6a1ac`](https://github.com/fiberseq/fibertools-rs/commit/8b6a1ac71ffe5f0e24d5679ba6f337502093b971))
-    - Inital fibertools pileup is complete ([`b4ac782`](https://github.com/fiberseq/fibertools-rs/commit/b4ac7829b8e7f6ae233e6b61f2097377eeaadb3f))
-    - Inital fibertools pileup is complete ([`20e4ef6`](https://github.com/fiberseq/fibertools-rs/commit/20e4ef6e5dd373810ce949fb3735526395f0f66d))
-    - Inital fibertools pileup is complete ([`f512b19`](https://github.com/fiberseq/fibertools-rs/commit/f512b19969b0edd47b31cec1d2642ad59bfbe70c))
-    - Py-ft build ([`9c4dea1`](https://github.com/fiberseq/fibertools-rs/commit/9c4dea13d87b7820feb9f83f1fafa8bd0c6744d9))
-    - Py-ft build ([`714a8dc`](https://github.com/fiberseq/fibertools-rs/commit/714a8dcd1917d99db9e0a63e6d1ef2f3aba085b8))
-    - Cargo dist ([`3ca6260`](https://github.com/fiberseq/fibertools-rs/commit/3ca62604114dc830e5918d8285e81b42ef985767))
-    - Start work on making a fire track ([`351cb91`](https://github.com/fiberseq/fibertools-rs/commit/351cb91ccb9617a9f020b2d685fb4e0eba1ad5d7))
+ * **[#50](https://github.com/fiberseq/fibertools-rs/issues/50)**
+    - Working on v0.5.0 ([`198cebe`](https://github.com/fiberseq/fibertools-rs/commit/198cebe3369155bdaa07e8ea17aa8b9bc147b9a9))
 </details>
 
 ## 0.4.2 (2024-03-21)
