@@ -37,22 +37,22 @@ ft --help
 
 ### `ft predict-m6a`
 
-Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. [Help page for predict-m6a](https://fiberseq.github.io/fibertools/help.html#ft-predict-m6a).
+Predict m6A positions using HiFi kinetics data and encode the results in the MM and ML bam tags. [Docs for predict-m6a](https://fiberseq.github.io/fibertools/creating/predict.html).
 
 ### `ft add-nucleosomes`
 
-Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling. [Help page for add-nucleosomes](https://fiberseq.github.io/fibertools/help.html#ft-add-nucleosomes).
+Add nucleosomes to a bam that file already contains m6a predictions. Note, this process is also run in the background during `predict-m6a`, so it is unnecessary to run independently unless you want to try new parameters for nucleosome calling. [Docs for add-nucleosomes](https://fiberseq.github.io/fibertools/creating/nucleosome.html).
 
 ### `ft extract`
 
-Extracts Fiber-seq data from a bam file into plain text. [Docs for extract](https://fiberseq.github.io/fibertools/help.html#ft-extract).
+Extracts Fiber-seq data from a bam file into plain text. [Docs for extract](https://fiberseq.github.io/fibertools/extracting/extract.html).
 
 ### `ft center`
 
-Center Fiber-seq reads (bam) around reference position(s). [Docs for center](https://fiberseq.github.io/fibertools/help.html#ft-center).
+Center Fiber-seq reads (bam) around reference position(s). [Docs for center](https://fiberseq.github.io/fibertools/extracting/center.html).
 
 ### `ft footprint`
-Footprint Fiber-seq reads (bam) around reference motifs(s). [Docs for footprint](https://fiberseq.github.io/fibertools/help.html#ft-footprint).
+Footprint Fiber-seq reads (bam) around reference motifs(s). [Docs for footprint](https://fiberseq.github.io/fibertools/extracting/footprint.html).
 
 # Python API (`pyft`)
 
