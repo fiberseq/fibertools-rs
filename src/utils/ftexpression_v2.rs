@@ -8,11 +8,6 @@ enum Threshold {
 
 fn len(name: &str, value: i64, operator: &str, threshold: &Threshold) -> bool {
     let value = value as f64;
-    if !["msp", "fire", "nuc"].contains(&name) {
-        eprintln!("Invalid argument for len function: {}", name);
-        std::process::exit(1);
-    }
-
     match threshold {
         Threshold::Single(thr) => match operator {
             ">" => value > *thr,
@@ -38,11 +33,6 @@ fn len(name: &str, value: i64, operator: &str, threshold: &Threshold) -> bool {
 
 fn qual(name: &str, value: u8, operator: &str, threshold: &Threshold) -> bool {
     let value = value as f64;
-    if !["m6a", "5mC"].contains(&name) {
-        eprintln!("Invalid argument for qual function: {}", name);
-        std::process::exit(1);
-    }
-
     match threshold {
         Threshold::Single(thr) => match operator {
             ">" => value > *thr,
@@ -69,13 +59,20 @@ fn qual(name: &str, value: u8, operator: &str, threshold: &Threshold) -> bool {
     }
 }
 
-fn parse_filter(filter: &str) -> (String, String, String, Threshold) {
+fn parse_filter(filter_orig: &str) -> (String, String, String, Threshold) {
+    let mut filter = filter_orig.to_string();
+    filter.retain(|c| !c.is_whitespace());
+
     let func_name_end = filter.find('(').unwrap_or(filter.len());
     let func_name = filter[..func_name_end].trim().to_string();
 
     let gnm_feat_start = filter.find('(').unwrap_or(filter.len()) + 1;
     let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
-    let gnm_feat = filter[gnm_feat_start..gnm_feat_end].trim().to_string();
+    let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
+    if !["msp", "fire", "nuc", "cpg", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
+        eprintln!("Invalid argument for len function: {}", gnm_feat);
+        std::process::exit(1);
+    }
 
     let rest = &filter[gnm_feat_end + 1..].trim();
 
@@ -120,7 +117,6 @@ fn parse_filter(filter: &str) -> (String, String, String, Threshold) {
 
 pub fn apply_filter_to_range(
     filter: &str,
-    range_type: &str,
     range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.starts.len();
@@ -130,13 +126,13 @@ pub fn apply_filter_to_range(
         range
             .lengths
             .iter()
-            .map(|l| len(&range_type, l.unwrap(), &operator, &threshold))
+            .map(|l| len(&_gnm_feat, l.unwrap(), &operator, &threshold))
             .collect()
     } else if func_name == "qual" {
         range
             .qual
             .iter()
-            .map(|q| qual(&range_type, *q, &operator, &threshold))
+            .map(|q| qual(&_gnm_feat, *q, &operator, &threshold))
             .collect()
     } else {
         anyhow::bail!("Invalid function name: {}", func_name);
@@ -180,13 +176,13 @@ mod test {
 
     fn make_fake_range() -> bamranges::Ranges {
         bamranges::Ranges {
-            starts: vec![Some(0), Some(10)],
-            ends: vec![Some(5), Some(15)],
-            lengths: vec![Some(5), Some(5)],
-            qual: vec![0, 255],
-            reference_starts: vec![Some(0), Some(10)],
-            reference_ends: vec![Some(5), Some(15)],
-            reference_lengths: vec![Some(5), Some(5)],
+            starts: vec![Some(0), Some(10), Some(17)],
+            ends: vec![Some(5), Some(15), Some(20)],
+            lengths: vec![Some(5), Some(5), Some(3)],
+            qual: vec![0, 255, 181],
+            reference_starts: vec![Some(0), Some(10), Some(17)],
+            reference_ends: vec![Some(5), Some(15), Some(20)],
+            reference_lengths: vec![Some(5), Some(5), Some(3)],
             seq_len: 100,
             reverse: false,
         }
@@ -196,9 +192,8 @@ mod test {
     fn test_this_one() {
         let filter = "len(msp)=50:100";
         let mut range = make_fake_range();
-        let range_type = "msp";
         eprintln!("{:?}", range.starts.len());
-        apply_filter_to_range(filter, range_type, &mut range).unwrap();
+        apply_filter_to_range(&filter, &mut range).unwrap();
         eprintln!("{:?}", range.starts.len());
     }
 }
