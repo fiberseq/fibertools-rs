@@ -9,7 +9,7 @@ rustflags = [
 rustflags = [
     "-C", "link-arg=-Wl,--allow-shlib-undefined", 
     "-C", "link-arg=-fno-lto",
-    #"-C", "target-cpu=generic",
+    #"-C", "target-cpu=generic", # including this broke tch builds on hyak
 ]
 
 # this breaks my build on my mac. I don't know why
