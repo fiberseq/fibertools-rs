@@ -12,7 +12,7 @@ pub struct Ranges {
     pub reference_ends: Vec<Option<i64>>,
     pub reference_lengths: Vec<Option<i64>>,
     pub seq_len: i64,
-    reverse: bool,
+    pub reverse: bool,
 }
 
 impl Ranges {
