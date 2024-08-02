@@ -1,0 +1,204 @@
+use crate::utils::bamranges;
+
+#[derive(Debug)]
+enum Threshold {
+    Single(f64),
+    Range(f64, f64),
+}
+
+fn len(name: &str, value: i64, operator: &str, threshold: &Threshold) -> bool {
+    let value = value as f64;
+    if !["msp", "fire", "nuc"].contains(&name) {
+        eprintln!("Invalid argument for len function: {}", name);
+        std::process::exit(1);
+    }
+
+    match threshold {
+        Threshold::Single(thr) => match operator {
+            ">" => value > *thr,
+            "<" => value < *thr,
+            ">=" => value >= *thr,
+            "<=" => value <= *thr,
+            "=" => value == *thr,
+            "!=" => value != *thr,
+            _ => {
+                eprintln!("Invalid operator for len function: {}", operator);
+                std::process::exit(1);
+            }
+        },
+        Threshold::Range(min, max) => match operator {
+            "=" => (value as f64) >= *min && (value as f64) < *max,
+            _ => {
+                eprintln!("Invalid operator for len function with range: {}", operator);
+                std::process::exit(1);
+            }
+        },
+    }
+}
+
+fn qual(name: &str, value: u8, operator: &str, threshold: &Threshold) -> bool {
+    let value = value as f64;
+    if !["m6a", "5mC"].contains(&name) {
+        eprintln!("Invalid argument for qual function: {}", name);
+        std::process::exit(1);
+    }
+
+    match threshold {
+        Threshold::Single(thr) => match operator {
+            ">" => value > *thr,
+            "<" => value < *thr,
+            ">=" => value >= *thr,
+            "<=" => value <= *thr,
+            "=" => value == *thr,
+            "!=" => value != *thr,
+            _ => {
+                eprintln!("Invalid operator for qual function: {}", operator);
+                std::process::exit(1);
+            }
+        },
+        Threshold::Range(min, max) => match operator {
+            "=" => value >= *min && value < *max,
+            _ => {
+                eprintln!(
+                    "Invalid operator for qual function with range: {}",
+                    operator
+                );
+                std::process::exit(1);
+            }
+        },
+    }
+}
+
+fn parse_filter(filter: &str) -> (String, String, String, Threshold) {
+    let func_name_end = filter.find('(').unwrap_or(filter.len());
+    let func_name = filter[..func_name_end].trim().to_string();
+
+    let gnm_feat_start = filter.find('(').unwrap_or(filter.len()) + 1;
+    let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
+    let gnm_feat = filter[gnm_feat_start..gnm_feat_end].trim().to_string();
+
+    let rest = &filter[gnm_feat_end + 1..].trim();
+
+    let operators = ["!=", ">=", "<=", ">", "<", "="];
+    let mut operator = "".to_string();
+    let mut threshold = None;
+    let mut range = None;
+
+    for &op in operators.iter() {
+        if let Some(pos) = rest.find(op) {
+            operator = op.to_string();
+            let threshold_str = rest[pos + op.len()..].trim();
+            if threshold_str.contains(':') {
+                let range_parts: Vec<&str> = threshold_str.split(':').collect();
+                if range_parts.len() == 2 {
+                    range = Some((
+                        range_parts[0].trim().parse::<f64>().unwrap(),
+                        range_parts[1].trim().parse::<f64>().unwrap(),
+                    ));
+                }
+            } else {
+                threshold = Some(threshold_str.parse::<f64>().unwrap());
+            }
+            break;
+        }
+    }
+
+    if let Some((_, _)) = range {
+        if operator != "=" {
+            eprintln!("Range thresholds can only be used with the '=' operator.");
+            std::process::exit(1);
+        }
+    }
+
+    let threshold_value = match range {
+        Some((min, max)) => Threshold::Range(min, max),
+        None => Threshold::Single(threshold.unwrap()),
+    };
+
+    (func_name, gnm_feat, operator, threshold_value)
+}
+
+pub fn apply_filter_to_range(
+    filter: &str,
+    range_type: &str,
+    range: &mut bamranges::Ranges,
+) -> Result<(), anyhow::Error> {
+    let starting_len = range.starts.len();
+    let (func_name, _gnm_feat, operator, threshold) = parse_filter(filter);
+
+    let to_keep: Vec<bool> = if func_name == "len" {
+        range
+            .lengths
+            .iter()
+            .map(|l| len(&range_type, l.unwrap(), &operator, &threshold))
+            .collect()
+    } else if func_name == "qual" {
+        range
+            .qual
+            .iter()
+            .map(|q| qual(&range_type, *q, &operator, &threshold))
+            .collect()
+    } else {
+        anyhow::bail!("Invalid function name: {}", func_name);
+    };
+
+    // drop i64 values from the range
+    for vec in vec![
+        &mut range.starts,
+        &mut range.ends,
+        &mut range.lengths,
+        &mut range.reference_starts,
+        &mut range.reference_ends,
+        &mut range.reference_lengths,
+    ] {
+        *vec = vec
+            .iter()
+            .zip(to_keep.iter())
+            .filter_map(|(v, d)| if *d { Some(*v) } else { None })
+            .collect();
+    }
+    // drop u8 values from the range
+    range.qual = range
+        .qual
+        .iter()
+        .zip(to_keep.iter())
+        .filter_map(|(v, d)| if *d { Some(*v) } else { None })
+        .collect();
+
+    // check we dropped the right number of values
+    let n_dropped = to_keep.iter().filter(|&&x| !x).count();
+    assert_eq!(starting_len, range.starts.len() + n_dropped);
+
+    Ok(())
+}
+
+/// tests
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::utils::bamranges;
+
+    fn make_fake_range() -> bamranges::Ranges {
+        bamranges::Ranges {
+            starts: vec![Some(0), Some(10)],
+            ends: vec![Some(5), Some(15)],
+            lengths: vec![Some(5), Some(5)],
+            qual: vec![0, 255],
+            reference_starts: vec![Some(0), Some(10)],
+            reference_ends: vec![Some(5), Some(15)],
+            reference_lengths: vec![Some(5), Some(5)],
+            seq_len: 100,
+            reverse: false,
+        }
+    }
+
+    #[test]
+    fn test_this_one() {
+        let filter = "len(msp)=50:100";
+        let mut range = make_fake_range();
+        let range_type = "msp";
+        eprintln!("{:?}", range.starts.len());
+        apply_filter_to_range(filter, range_type, &mut range).unwrap();
+        eprintln!("{:?}", range.starts.len());
+    }
+}
