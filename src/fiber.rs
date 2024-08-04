@@ -11,8 +11,6 @@ use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::Hea
 use std::collections::HashMap;
 use std::fmt::Write;
 
-// @SHANE this is the core data structure for Fiber-seq data that you will be working with
-// it represents a single Fiber-seq read
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
