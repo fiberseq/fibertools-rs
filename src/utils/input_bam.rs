@@ -21,12 +21,19 @@ pub struct FiberFilters {
         help_heading = "BAM-Options"
     )]
     pub bit_flag: u16,
+    /// Filtering expression to use for filtering records
+    #[clap(
+        global = true,
+        short = 'x',
+        long = "expression",
+        default_value = "",
+        help_heading = "BAM-Options",
+        hide = true,
+    )]
+    pub filter_expression: Option<String>,
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
-    /// Filtering expression to use for filtering records
-    #[clap(short = 'x', long, help_heading = "BAM-Options", hide = true)]
-    pub filter_expression: Option<String>,
 }
 
 impl std::default::Default for FiberFilters {
