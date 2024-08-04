@@ -6,8 +6,7 @@ enum Threshold {
     Range(f64, f64),
 }
 
-fn len(name: &str, value: i64, operator: &str, threshold: &Threshold) -> bool {
-    let value = value as f64;
+fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
     match threshold {
         Threshold::Single(thr) => match operator {
             ">" => value > *thr,
@@ -17,49 +16,36 @@ fn len(name: &str, value: i64, operator: &str, threshold: &Threshold) -> bool {
             "=" => value == *thr,
             "!=" => value != *thr,
             _ => {
-                eprintln!("Invalid operator for len function: {}", operator);
+                eprintln!("Invalid operator for {} function: {}", name, operator);
                 std::process::exit(1);
             }
         },
         Threshold::Range(min, max) => match operator {
             "=" => (value as f64) >= *min && (value as f64) < *max,
             _ => {
-                eprintln!("Invalid operator for len function with range: {}", operator);
+                eprintln!("Invalid operator for {} function with range: {}", name, operator);
                 std::process::exit(1);
             }
         },
     }
 }
 
-fn qual(name: &str, value: u8, operator: &str, threshold: &Threshold) -> bool {
-    let value = value as f64;
-    match threshold {
-        Threshold::Single(thr) => match operator {
-            ">" => value > *thr,
-            "<" => value < *thr,
-            ">=" => value >= *thr,
-            "<=" => value <= *thr,
-            "=" => value == *thr,
-            "!=" => value != *thr,
-            _ => {
-                eprintln!("Invalid operator for qual function: {}", operator);
-                std::process::exit(1);
-            }
-        },
-        Threshold::Range(min, max) => match operator {
-            "=" => value >= *min && value < *max,
-            _ => {
-                eprintln!(
-                    "Invalid operator for qual function with range: {}",
-                    operator
-                );
-                std::process::exit(1);
-            }
-        },
-    }
+fn len(value: i64, operator: &str, threshold: &Threshold) -> bool {
+    cmp("len", value as f64, operator, threshold)
 }
 
-fn parse_filter(filter_orig: &str) -> (String, String, String, Threshold) {
+fn qual(value: u8, operator: &str, threshold: &Threshold) -> bool {
+    cmp("qual", value as f64, operator, threshold)
+}
+
+struct Parsed {
+    fn_name: String,
+    rng_name: String,
+    op: String, // <, <=, >, >=, etc
+    threshold: Threshold,
+}
+
+fn parse_filter(filter_orig: &str) -> Parsed {
     let mut filter = filter_orig.to_string();
     filter.retain(|c| !c.is_whitespace());
 
@@ -112,30 +98,34 @@ fn parse_filter(filter_orig: &str) -> (String, String, String, Threshold) {
         None => Threshold::Single(threshold.unwrap()),
     };
 
-    (func_name, gnm_feat, operator, threshold_value)
+    Parsed {
+        fn_name: func_name,
+        rng_name: gnm_feat,
+        op: operator,
+        threshold: threshold_value,
+    }
 }
 
-pub fn apply_filter_to_range(
-    filter: &str,
+fn apply_filter_to_range(
+    parsed: &Parsed,
     range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.starts.len();
-    let (func_name, _gnm_feat, operator, threshold) = parse_filter(filter);
 
-    let to_keep: Vec<bool> = if func_name == "len" {
+    let to_keep: Vec<bool> = if parsed.fn_name == "len" {
         range
             .lengths
             .iter()
-            .map(|l| len(&_gnm_feat, l.unwrap(), &operator, &threshold))
+            .map(|l| len(l.unwrap(), &parsed.op, &parsed.threshold))
             .collect()
-    } else if func_name == "qual" {
+    } else if parsed.fn_name == "qual" {
         range
             .qual
             .iter()
-            .map(|q| qual(&_gnm_feat, *q, &operator, &threshold))
+            .map(|q| qual(*q, &parsed.op, &parsed.threshold))
             .collect()
     } else {
-        anyhow::bail!("Invalid function name: {}", func_name);
+        anyhow::bail!("Invalid function name: {}", &parsed.fn_name);
     };
 
     // drop i64 values from the range
@@ -192,8 +182,9 @@ mod test {
     fn test_this_one() {
         let filter = "len(msp)=50:100";
         let mut range = make_fake_range();
+        let parser = parse_filter(&filter);
         eprintln!("{:?}", range.starts.len());
-        apply_filter_to_range(&filter, &mut range).unwrap();
+        apply_filter_to_range(&parser, &mut range).unwrap();
         eprintln!("{:?}", range.starts.len());
     }
 }
