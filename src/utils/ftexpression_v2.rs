@@ -38,14 +38,14 @@ fn qual(value: u8, operator: &str, threshold: &Threshold) -> bool {
     cmp("qual", value as f64, operator, threshold)
 }
 
-struct Parsed {
+pub struct ParsedExpr {
     fn_name: String,
-    rng_name: String,
+    pub rng_name: String,
     op: String, // <, <=, >, >=, etc
     threshold: Threshold,
 }
 
-fn parse_filter(filter_orig: &str) -> Parsed {
+pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let mut filter = filter_orig.to_string();
     filter.retain(|c| !c.is_whitespace());
 
@@ -55,7 +55,7 @@ fn parse_filter(filter_orig: &str) -> Parsed {
     let gnm_feat_start = filter.find('(').unwrap_or(filter.len()) + 1;
     let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
     let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
-    if !["msp", "fire", "nuc", "cpg", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
+    if !["msp", "nuc", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
         eprintln!("Invalid argument for len function: {}", gnm_feat);
         std::process::exit(1);
     }
@@ -98,7 +98,7 @@ fn parse_filter(filter_orig: &str) -> Parsed {
         None => Threshold::Single(threshold.unwrap()),
     };
 
-    Parsed {
+    ParsedExpr {
         fn_name: func_name,
         rng_name: gnm_feat,
         op: operator,
@@ -106,8 +106,8 @@ fn parse_filter(filter_orig: &str) -> Parsed {
     }
 }
 
-fn apply_filter_to_range(
-    parsed: &Parsed,
+pub fn apply_filter_to_range(
+    parsed: &ParsedExpr,
     range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.starts.len();
@@ -143,6 +143,7 @@ fn apply_filter_to_range(
             .filter_map(|(v, d)| if *d { Some(*v) } else { None })
             .collect();
     }
+
     // drop u8 values from the range
     range.qual = range
         .qual
