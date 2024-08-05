@@ -35,7 +35,7 @@ pub struct ExtractOptions {
     /// Include per base quality scores in "fiber_qual"
     #[clap(short, long, help_heading = "All-Format-Options")]
     pub quality: bool,
-    /// Simplify output by remove fiber sequence
+    /// Simplify output by removing fiber sequence
     #[clap(short, long, help_heading = "All-Format-Options")]
     pub simplify: bool,
 }
