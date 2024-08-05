@@ -5,6 +5,8 @@ use super::*;
 use crate::utils::bamranges::*;
 use crate::utils::basemods::BaseMods;
 use crate::utils::bio_io::*;
+use crate::utils::ftexpression_v2::parse_filter;
+use crate::utils::ftexpression_v2::apply_filter_to_range;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
@@ -66,7 +68,7 @@ impl FiberseqData {
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();
 
-        FiberseqData {
+        let fsd = &mut FiberseqData {
             record,
             msp,
             nuc,
@@ -77,7 +79,24 @@ impl FiberseqData {
             target_name,
             rg,
             center_position: None,
+        };
+
+        if let Some(s) = filters.filter_expression.as_ref() {
+            if !s.is_empty() {
+                let parser = parse_filter(s.as_str());
+                let rng = if parser.rng_name == "msp" {
+                    &mut fsd.msp
+                } else if parser.rng_name == "nuc" {
+                    &mut fsd.nuc
+                } else if parser.rng_name == "m6a" {
+                    &mut fsd.m6a
+                } else { // 5mC
+                    &mut fsd.cpg
+                };
+                apply_filter_to_range(&parser, rng).unwrap();
+            }
         }
+        fsd.clone()
     }
 
     pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {

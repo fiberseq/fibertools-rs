@@ -25,10 +25,10 @@ pub struct FiberFilters {
     #[clap(
         global = true,
         short = 'x',
-        long = "expression",
+        long = "ftx",
+        alias = "ft-expression",
         default_value = "",
         help_heading = "BAM-Options",
-        hide = true,
     )]
     pub filter_expression: Option<String>,
     /// Minium score in the ML tag to use or include in the output
