@@ -108,8 +108,8 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
-    range: &mut bamranges::Ranges,
-) -> Result<(), anyhow::Error> {
+    mut range: bamranges::Ranges,
+) -> Result<bamranges::Ranges, anyhow::Error> {
     let starting_len = range.starts.len();
 
     let to_keep: Vec<bool> = if parsed.fn_name == "len" {
@@ -156,7 +156,7 @@ pub fn apply_filter_to_range(
     let n_dropped = to_keep.iter().filter(|&&x| !x).count();
     assert_eq!(starting_len, range.starts.len() + n_dropped);
 
-    Ok(())
+    Ok(range)
 }
 
 /// tests
