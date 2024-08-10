@@ -68,7 +68,7 @@ impl FiberseqData {
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();
 
-        let fsd = &mut FiberseqData {
+        let mut fsd = FiberseqData {
             record,
             msp,
             nuc,
@@ -84,19 +84,18 @@ impl FiberseqData {
         if let Some(s) = filters.filter_expression.as_ref() {
             if !s.is_empty() {
                 let parser = parse_filter(s.as_str());
-                let rng = if parser.rng_name == "msp" {
-                    &mut fsd.msp
+                if parser.rng_name == "msp" {
+                    fsd.msp = apply_filter_to_range(&parser, fsd.msp).unwrap();
                 } else if parser.rng_name == "nuc" {
-                    &mut fsd.nuc
+                    fsd.nuc = apply_filter_to_range(&parser, fsd.nuc).unwrap();
                 } else if parser.rng_name == "m6a" {
-                    &mut fsd.m6a
+                    fsd.m6a = apply_filter_to_range(&parser, fsd.m6a).unwrap();
                 } else { // 5mC
-                    &mut fsd.cpg
+                    fsd.cpg = apply_filter_to_range(&parser, fsd.cpg).unwrap();
                 };
-                apply_filter_to_range(&parser, rng).unwrap();
             }
         }
-        fsd.clone()
+        fsd
     }
 
     pub fn dict_from_head_view(head_view: &HeaderView) -> HashMap<i32, String> {
