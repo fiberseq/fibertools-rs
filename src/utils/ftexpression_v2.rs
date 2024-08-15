@@ -23,7 +23,10 @@ fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
         Threshold::Range(min, max) => match operator {
             "=" => (value as f64) >= *min && (value as f64) < *max,
             _ => {
-                eprintln!("Invalid operator for {} function with range: {}", name, operator);
+                eprintln!(
+                    "Invalid operator for {} function with range: {}",
+                    name, operator
+                );
                 std::process::exit(1);
             }
         },
