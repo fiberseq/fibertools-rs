@@ -21,7 +21,7 @@ fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
             }
         },
         Threshold::Range(min, max) => match operator {
-            "=" => (value as f64) >= *min && (value as f64) < *max,
+            "=" => value >= *min && value < *max,
             _ => {
                 eprintln!(
                     "Invalid operator for {} function with range: {}",
@@ -132,7 +132,7 @@ pub fn apply_filter_to_range(
     };
 
     // drop i64 values from the range
-    for vec in vec![
+    for vec in [
         &mut range.starts,
         &mut range.ends,
         &mut range.lengths,
