@@ -28,7 +28,7 @@ pub struct FiberFilters {
         long = "ftx",
         alias = "ft-expression",
         default_value = "",
-        help_heading = "BAM-Options",
+        help_heading = "BAM-Options"
     )]
     pub filter_expression: Option<String>,
     /// Minium score in the ML tag to use or include in the output
