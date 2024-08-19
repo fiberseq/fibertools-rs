@@ -1,4 +1,3 @@
-use fibertools_rs;
 use fibertools_rs::utils::bio_io;
 use fibertools_rs::utils::input_bam::FiberFilters;
 use rust_htslib::bam::Reader;
@@ -25,7 +24,7 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
     let named_tmp_bam_out = NamedTempFile::new().unwrap();
     let out_str = named_tmp_bam_out.path().to_str().unwrap();
     let mut predict_options = fibertools_rs::cli::PredictM6AOptions::default();
-    predict_options.input.bam = inbam.clone();
+    predict_options.input.bam.clone_from(&inbam);
     predict_options.input.global.threads = 1;
     predict_options.out = out_str.to_string();
 

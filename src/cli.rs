@@ -14,6 +14,7 @@ mod footprint_opts;
 mod nucleosome_opts;
 mod pileup_opts;
 mod predict_opts;
+mod qc_opts;
 mod strip_basemods_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
@@ -27,6 +28,7 @@ pub use footprint_opts::*;
 pub use nucleosome_opts::*;
 pub use pileup_opts::*;
 pub use predict_opts::*;
+pub use qc_opts::*;
 pub use strip_basemods_opts::*;
 
 //
