@@ -16,8 +16,12 @@ pub struct QcStats {
     pub fiber_count: i64,
     // hashmap that stores lengths of fibers
     pub fiber_lengths: HashMap<i64, i64>,
+    //
+    pub msp_count: HashMap<i64, i64>,
     // length of msps
     pub msp_lengths: HashMap<i64, i64>,
+    //
+    pub nuc_count: HashMap<i64, i64>,
     // lengths of nucleosomes
     pub nuc_lengths: HashMap<i64, i64>,
     // number of ccs passes per read
@@ -37,7 +41,9 @@ impl QcStats {
         Self {
             fiber_count: 0,
             fiber_lengths: HashMap::new(),
+            msp_count: HashMap::new(),
             msp_lengths: HashMap::new(),
+            nuc_count: HashMap::new(),
             nuc_lengths: HashMap::new(),
             ccs_passes: HashMap::new(),
             m6a_count: HashMap::new(),
@@ -50,8 +56,20 @@ impl QcStats {
     pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData) {
         self.full_read_stats(fiber);
         self.add_basemod_stats(fiber);
+        self.add_ranges(fiber);
+    }
+
+    fn add_ranges(&mut self, fiber: &fiber::FiberseqData) {
         Self::add_range_lengths(&mut self.msp_lengths, &fiber.msp);
         Self::add_range_lengths(&mut self.nuc_lengths, &fiber.nuc);
+        self.nuc_count
+            .entry(fiber.nuc.starts.len() as i64)
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+        self.msp_count
+            .entry(fiber.msp.starts.len() as i64)
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
     }
 
     fn full_read_stats(&mut self, fiber: &fiber::FiberseqData) {
@@ -113,7 +131,9 @@ impl QcStats {
         // write the integers
         for x in &[
             (&self.fiber_lengths, "fiber_lengths"),
+            (&self.msp_count, "msp_count"),
             (&self.msp_lengths, "msp_lengths"),
+            (&self.nuc_count, "nuc_count"),
             (&self.nuc_lengths, "nuc_lengths"),
             (&self.m6a_count, "m6a_count"),
             (&self.cpg_count, "cpg_count"),
