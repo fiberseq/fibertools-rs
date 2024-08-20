@@ -139,11 +139,11 @@ impl QcStats {
         out.write_all(b"statistic\tvalue\tcount\n")?;
         // write the integers
         for x in &[
-            (&self.fiber_lengths, "fiber_lengths"),
+            (&self.fiber_lengths, "fiber_length"),
             (&self.msp_count, "msp_count"),
-            (&self.msp_lengths, "msp_lengths"),
+            (&self.msp_lengths, "msp_length"),
             (&self.nuc_count, "nuc_count"),
-            (&self.nuc_lengths, "nuc_lengths"),
+            (&self.nuc_lengths, "nuc_length"),
             (&self.m6a_count, "m6a_count"),
             (&self.cpg_count, "cpg_count"),
         ] {
