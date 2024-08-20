@@ -12,6 +12,20 @@ fn my_ordered_float(f: f32) -> OrderedFloat<f32> {
     OrderedFloat((f * 100_000.0).round() / 100_000.0)
 }
 
+#[derive(Eq, Hash, PartialEq, PartialOrd, Ord)]
+pub struct M6aPerMsp {
+    pub m6a_count: i64,
+    pub msp_size: i64,
+    pub is_fire: bool,
+}
+
+impl core::fmt::Display for M6aPerMsp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{},{}", self.m6a_count, self.msp_size, self.is_fire)
+    }
+}
+
+/// Main QC stat object
 pub struct QcStats {
     pub fiber_count: i64,
     // hashmap that stores lengths of fibers
@@ -36,6 +50,8 @@ pub struct QcStats {
     pub cpg_count: HashMap<i64, i64>,
     // add rq to stats
     pub rq: HashMap<OrderedFloat<f32>, i64>,
+    // m6a per msp size: (msp size, m6a count, is a FIRE element), number of times seen
+    pub m6a_per_msp_size: HashMap<M6aPerMsp, i64>,
 }
 
 impl QcStats {
@@ -52,14 +68,18 @@ impl QcStats {
             m6a_count: HashMap::new(),
             m6a_ratio: HashMap::new(),
             cpg_count: HashMap::new(),
+            m6a_per_msp_size: HashMap::new(),
             rq: HashMap::new(),
         }
     }
 
-    pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData) {
+    pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData, opts: &QcOpts) {
         self.full_read_stats(fiber);
         self.add_basemod_stats(fiber);
         self.add_ranges(fiber);
+        if opts.m6a_per_msp {
+            self.m6a_per_msp(fiber);
+        }
     }
 
     fn add_ranges(&mut self, fiber: &fiber::FiberseqData) {
@@ -133,6 +153,29 @@ impl QcStats {
         }
     }
 
+    /// calculate the m6a per MSP/FIRE element
+    fn m6a_per_msp(&mut self, fiber: &fiber::FiberseqData) {
+        for (st, en, _, qual, _) in fiber.msp.into_iter() {
+            let is_fire = qual >= 230;
+            let msp_size = en - st;
+            let m6a_count = fiber
+                .m6a
+                .starts
+                .iter()
+                .flatten()
+                .filter(|&&m6a_st| st <= m6a_st && m6a_st < en)
+                .count() as i64;
+            self.m6a_per_msp_size
+                .entry(M6aPerMsp {
+                    m6a_count,
+                    msp_size,
+                    is_fire,
+                })
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
+        }
+    }
+
     /// write the output to stdout
     pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         // write the header
@@ -158,6 +201,10 @@ impl QcStats {
         ] {
             out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
         }
+        // write the m6a per msp size
+        out.write_all(
+            Self::hashmap_to_string(&self.m6a_per_msp_size, "m6a_per_msp_size").as_bytes(),
+        )?;
 
         Ok(())
     }
@@ -184,7 +231,7 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     let mut bam = opts.input.bam_reader();
     let mut stats = QcStats::default();
     for fiber in opts.input.fibers(&mut bam) {
-        stats.add_read_to_stats(&fiber);
+        stats.add_read_to_stats(&fiber, opts);
     }
     let mut out = bio_io::writer(&opts.out)?;
     stats.write(&mut out)?;

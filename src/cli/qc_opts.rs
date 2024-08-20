@@ -8,4 +8,6 @@ pub struct QcOpts {
     pub input: InputBam,
     #[clap(default_value = "-")]
     pub out: String,
+    #[clap(short, long)]
+    pub m6a_per_msp: bool,
 }
