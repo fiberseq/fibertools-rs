@@ -82,6 +82,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Fire(fire_opts)) => {
             subcommands::fire::add_fire_to_bam(fire_opts)?;
         }
+        Some(Commands::Qc(qc_opts)) => {
+            subcommands::qc::run_qc(qc_opts)?;
+        }
         Some(Commands::Footprint(footprint_opts)) => {
             subcommands::footprint::start_finding_footprints(footprint_opts)?;
         }

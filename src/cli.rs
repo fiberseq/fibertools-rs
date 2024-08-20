@@ -117,6 +117,8 @@ pub enum Commands {
     Center(CenterOptions),
     /// Infer footprints from fiberseq data
     Footprint(FootprintOptions),
+    /// Collect QC metrics from a fiberseq bam file
+    Qc(QcOpts),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
     /// Make a pileup track of Fiber-seq features from a FIRE bam
