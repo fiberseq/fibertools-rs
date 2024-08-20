@@ -118,7 +118,7 @@ impl QcStats {
         // write the floats
         for f in &[
             (&self.ccs_passes, "ccs_passes"),
-            (&self.rq, "rq"),
+            (&self.rq, "read_quality"),
             (&self.m6a_ratio, "m6a_ratio"),
         ] {
             out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
