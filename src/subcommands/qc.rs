@@ -7,6 +7,7 @@ use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 use std::io::Write;
 
+// set the precision of the floats to be saved and printed
 fn my_ordered_float(f: f32) -> OrderedFloat<f32> {
     OrderedFloat((f * 100_000.0).round() / 100_000.0)
 }
