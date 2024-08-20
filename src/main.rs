@@ -66,7 +66,7 @@ pub fn main() -> Result<(), Error> {
                 "\n{}\n\t{}\n\t{}\n", 
                 "WARNING: m6A predictions are slower without the pytorch backend.".bright_yellow().bold(),
                 "Consider recompiling via cargo with: `--all-features`.",
-                "For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
+                "For detailed instructions see: https://fiberseq.github.io/fibertools/install.html."
             );
             subcommands::predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
         }

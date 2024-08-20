@@ -107,12 +107,12 @@ pub enum Commands {
     Fire(FireOptions),
     /// Extract fiberseq data into plain text files.
     ///
-    /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
+    /// See https://fiberseq.github.io/fibertools/extracting/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
     Extract(ExtractOptions),
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs.
     ///
-    ///  See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output.
+    ///  See https://fiberseq.github.io/fibertools/extracting/center.html for a description of the output.
     #[clap(visible_aliases = &["c", "ct"])]
     Center(CenterOptions),
     /// Infer footprints from fiberseq data
