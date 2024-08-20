@@ -6,6 +6,6 @@ use std::fmt::Debug;
 pub struct QcOpts {
     #[clap(flatten)]
     pub input: InputBam,
-    #[clap(short, long, default_value = "-")]
+    #[clap(default_value = "-")]
     pub out: String,
 }

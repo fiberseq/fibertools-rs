@@ -7,6 +7,10 @@ use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 use std::io::Write;
 
+fn my_ordered_float(f: f32) -> OrderedFloat<f32> {
+    OrderedFloat((f * 100_000.0).round() / 100_000.0)
+}
+
 pub struct QcStats {
     pub fiber_count: i64,
     // hashmap that stores lengths of fibers
@@ -56,12 +60,12 @@ impl QcStats {
             .and_modify(|e| *e += 1)
             .or_insert(1);
         self.ccs_passes
-            .entry(OrderedFloat(fiber.ec))
+            .entry(my_ordered_float(fiber.ec))
             .and_modify(|e| *e += 1)
             .or_insert(1);
         if let Some(rq) = fiber.get_rq() {
             self.rq
-                .entry(OrderedFloat(rq))
+                .entry(my_ordered_float(rq))
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
         }
@@ -84,8 +88,8 @@ impl QcStats {
             .count();
         let ratio = m6a_count as f32 / total_at as f32;
         self.m6a_ratio
-            .entry(OrderedFloat(ratio))
-            .and_modify(|e| *e += 1)
+            .entry(my_ordered_float(ratio))
+            .and_modify(|e: &mut i64| *e += 1)
             .or_insert(1);
 
         // cpg count
