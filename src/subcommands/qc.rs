@@ -24,6 +24,8 @@ pub struct QcStats {
     pub nuc_count: HashMap<i64, i64>,
     // lengths of nucleosomes
     pub nuc_lengths: HashMap<i64, i64>,
+    // read_length per nucleosome
+    pub read_length_per_nuc: HashMap<OrderedFloat<f32>, i64>,
     // number of ccs passes per read
     pub ccs_passes: HashMap<OrderedFloat<f32>, i64>,
     /// m6as per read   
@@ -45,6 +47,7 @@ impl QcStats {
             msp_lengths: HashMap::new(),
             nuc_count: HashMap::new(),
             nuc_lengths: HashMap::new(),
+            read_length_per_nuc: HashMap::new(),
             ccs_passes: HashMap::new(),
             m6a_count: HashMap::new(),
             m6a_ratio: HashMap::new(),
@@ -68,6 +71,12 @@ impl QcStats {
             .or_insert(1);
         self.msp_count
             .entry(fiber.msp.starts.len() as i64)
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+        // read length per nucleosome
+        let read_length = fiber.record.seq_len() as f32 / fiber.nuc.starts.len() as f32;
+        self.read_length_per_nuc
+            .entry(my_ordered_float(read_length))
             .and_modify(|e| *e += 1)
             .or_insert(1);
     }
@@ -142,6 +151,7 @@ impl QcStats {
         }
         // write the floats
         for f in &[
+            (&self.read_length_per_nuc, "read_length_per_nuc"),
             (&self.ccs_passes, "ccs_passes"),
             (&self.rq, "read_quality"),
             (&self.m6a_ratio, "m6a_ratio"),
