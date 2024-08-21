@@ -21,21 +21,36 @@ fn sum_qual(bam: &mut Reader) -> usize {
 }
 
 fn run_prediction_and_count_qual(inbam: String) -> usize {
-    let named_tmp_bam_out = NamedTempFile::new().unwrap();
-    let out_str = named_tmp_bam_out.path().to_str().unwrap();
-    let mut predict_options = fibertools_rs::cli::PredictM6AOptions::default();
-    predict_options.input.bam.clone_from(&inbam);
-    predict_options.input.global.threads = 1;
-    predict_options.out = out_str.to_string();
+    let mut counts = vec![];
+    // test different batch sizes
+    // so I have tested
+    // with candle all batch sizes tested were the same
+    // however with libtorch was different with a batch size
+    // of 5 or more. I am not sure why this is the case.
+    for b in [1] {
+        let named_tmp_bam_out = NamedTempFile::new().unwrap();
+        let out_str = named_tmp_bam_out.path().to_str().unwrap();
+        let mut predict_options = fibertools_rs::cli::PredictM6AOptions::default();
+        predict_options.input.bam.clone_from(&inbam);
+        predict_options.input.global.threads = 1;
+        predict_options.out = out_str.to_string();
+        predict_options.batch_size = b;
 
-    {
-        // run prediction
-        fibertools_rs::subcommands::predict_m6a::read_bam_into_fiberdata(&mut predict_options);
+        {
+            // run prediction
+            fibertools_rs::subcommands::predict_m6a::read_bam_into_fiberdata(&mut predict_options);
+        }
+
+        // read in the output bam and check the sum of the quality scores
+        let mut predicted_bam = bio_io::bam_reader(out_str);
+        counts.push(sum_qual(&mut predicted_bam));
     }
-
-    // read in the output bam and check the sum of the quality scores
-    let mut predicted_bam = bio_io::bam_reader(out_str);
-    sum_qual(&mut predicted_bam)
+    // assert that the counts are the same
+    eprintln!("counts from different batch sizes: {:?}", counts);
+    for i in 1..counts.len() {
+        assert_eq!(counts[0], counts[i]);
+    }
+    counts[0]
 }
 
 fn run_comparison(file: &str) {
