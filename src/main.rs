@@ -71,7 +71,7 @@ pub fn main() -> Result<(), Error> {
                 if args.global.threads >= 16 {
                     tch_threads = args.global.threads / 16 + 1;
                     set_rayon_threads(args.global.threads / tch_threads + 1)?;
-                    log::debug!(
+                    log::info!(
                         "Setting tch threads to: {} and rayon threads to: {}",
                         tch_threads,
                         args.global.threads / tch_threads + 1
