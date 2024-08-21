@@ -82,10 +82,6 @@ where
         if count == 0 {
             return vec![];
         }
-        // allow fake predictions for testing speed of other parts of the code
-        if opts.fake {
-            return vec![0.0; count];
-        }
 
         let shape = Shape::new([count, LAYERS, WINDOW]);
         let input =
@@ -97,7 +93,10 @@ where
             PbChem::ThreePointTwo => self.three_two.forward(input),
             PbChem::Revio => self.revio.forward(input),
         };
-
+        // allow fake predictions for testing speed of other parts of the code
+        if opts.fake {
+            return vec![0.0; count];
+        }
         forward
             .into_data()
             .convert()
