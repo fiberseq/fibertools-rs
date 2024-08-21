@@ -87,16 +87,17 @@ where
         let input =
             Tensor::<B, 1, burn::tensor::Float>::from_floats(windows, &self.device).reshape(shape);
 
+        // allow fake predictions for testing speed of other parts of the code
+        if opts.fake {
+            return vec![0.0; count];
+        }
+
         let forward: Tensor<B, 2, burn::tensor::Float> = match opts.polymerase {
             PbChem::Two => self.two_zero.forward(input),
             PbChem::TwoPointTwo => self.two_two.forward(input),
             PbChem::ThreePointTwo => self.three_two.forward(input),
             PbChem::Revio => self.revio.forward(input),
         };
-        // allow fake predictions for testing speed of other parts of the code
-        if opts.fake {
-            return vec![0.0; count];
-        }
         forward
             .into_data()
             .convert()
