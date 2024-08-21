@@ -69,13 +69,13 @@ where
             keep,
             min_ml_score,
             all_calls,
-            polymerase,
+            polymerase: polymerase.clone(),
             batch_size,
             map,
             model: vec![],
             min_ml: 0,
             nuc_opts,
-            burn_models: m6a_burn::BurnModels::new(),
+            burn_models: m6a_burn::BurnModels::new(&polymerase),
             fake,
         };
         options.add_model().expect("Error loading model");
