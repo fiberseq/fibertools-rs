@@ -67,19 +67,10 @@ pub fn main() -> Result<(), Error> {
             );
             #[cfg(feature = "tch")]
             {
-                let mut tch_threads = 1;
-                if args.global.threads >= 16 {
-                    tch_threads = 1;
-                    //set_rayon_threads(args.global.threads / tch_threads + 1)?;
-                    log::info!(
-                        "Setting tch threads to: {} and rayon threads to: {}",
-                        tch_threads,
-                        args.global.threads / tch_threads + 1
-                    );
-                }
-                // setting this to 1 since I do paralyzation via processing multiple reads
-                tch::set_num_threads(tch_threads as i32);
-                tch::set_num_interop_threads(tch_threads as i32);
+                // one threads works best for CPU inference performance
+                // with rayon handling the parallelism using multiple reads
+                tch::set_num_threads(1);
+                tch::set_num_interop_threads(1);
             }
             subcommands::predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
         }
