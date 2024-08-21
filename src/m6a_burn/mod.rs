@@ -23,18 +23,6 @@ pub type BurnDevice = burn::backend::libtorch::LibTorchDevice;
 #[cfg(not(feature = "tch"))]
 pub type BurnDevice = burn::backend::candle::CandleDevice;
 
-/// enum that can hold the different models for the different polymerases
-#[derive(Debug)]
-pub enum BurnModel<B>
-where
-    B: Backend<Device = BurnDevice>,
-{
-    TwoZero(two_zero::Model<B>),
-    TwoTwo(two_two::Model<B>),
-    ThreeTwo(three_two::Model<B>),
-    Revio(revio::Model<B>),
-}
-
 /// B is for the burn backend and D is for the device
 #[derive(Debug)]
 pub struct BurnModels<B>
