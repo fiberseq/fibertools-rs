@@ -497,19 +497,15 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
     log::info!("Using Candle for ML backend.");
 
     // switch to the internal predict options
-    let mut predict_options_vec = vec![];
-    for _ in 0..predict_options.batch_size {
-        let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
-            predict_options.keep,
-            predict_options.force_min_ml_score,
-            predict_options.all_calls,
-            find_pb_polymerase(&header),
-            predict_options.batch_size,
-            predict_options.nuc.clone(),
-            predict_options.fake,
-        );
-        predict_options_vec.push(predict_options);
-    }
+    let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
+        predict_options.keep,
+        predict_options.force_min_ml_score,
+        predict_options.all_calls,
+        find_pb_polymerase(&header),
+        predict_options.batch_size,
+        predict_options.nuc.clone(),
+        predict_options.fake,
+    );
 
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
@@ -519,13 +515,7 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
-            .map(|recs| {
-                let mut sum = 0;
-                for (rec, predict_options) in recs.into_iter().zip(predict_options_vec.iter()) {
-                    sum += predict_options.predict_m6a_on_records(vec![rec]);
-                }
-                sum
-            })
+            .map(|recs| predict_options.predict_m6a_on_records(recs))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
