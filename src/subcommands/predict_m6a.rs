@@ -5,7 +5,9 @@ use crate::utils::nucleosome;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use burn::tensor::backend::Backend;
+use fiber::FiberseqData;
 use ordered_float::OrderedFloat;
+use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
@@ -476,14 +478,14 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     Some((a_data, t_data))
 }
 
-pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
-    let mut bam = predict_options.input.bam_reader();
-    let mut out = predict_options.input.bam_writer(&predict_options.out);
+pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
+    let mut bam = opts.input.bam_reader();
+    let mut out = opts.input.bam_writer(&opts.out);
     let header = bam::Header::from_template(bam.header());
     // log the options
     log::info!(
         "{} reads included at once in batch prediction.",
-        predict_options.batch_size
+        opts.batch_size
     );
 
     #[cfg(feature = "tch")]
@@ -498,14 +500,17 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
 
     // switch to the internal predict options
     let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
-        predict_options.keep,
-        predict_options.force_min_ml_score,
-        predict_options.all_calls,
+        opts.keep,
+        opts.force_min_ml_score,
+        opts.all_calls,
         find_pb_polymerase(&header),
-        predict_options.batch_size,
-        predict_options.nuc.clone(),
-        predict_options.fake,
+        opts.batch_size,
+        opts.nuc.clone(),
+        opts.fake,
     );
+    // get default fire options
+    let fire_opts = crate::cli::FireOptions::default();
+    let (model, precision_table) = crate::utils::fire::get_model(&fire_opts);
 
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
@@ -523,8 +528,15 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
             log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0-100.0*frac_called);
         }
 
+        // covert to FiberData and do FIRE predictions
+        let mut fd_recs =
+            FiberseqData::from_records(chunk, &opts.input.header_view(), &opts.input.filters);
+        fd_recs.par_iter_mut().for_each(|fd| {
+            crate::subcommands::fire::add_fire_to_rec(fd, &fire_opts, &model, &precision_table);
+        });
+
         // write to output
-        chunk.iter().for_each(|r| out.write(r).unwrap());
+        fd_recs.iter().for_each(|fd| out.write(&fd.record).unwrap());
     }
 }
 
