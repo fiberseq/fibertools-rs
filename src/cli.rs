@@ -14,6 +14,7 @@ mod footprint_opts;
 mod nucleosome_opts;
 mod pileup_opts;
 mod predict_opts;
+mod qc_opts;
 mod strip_basemods_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
@@ -27,6 +28,7 @@ pub use footprint_opts::*;
 pub use nucleosome_opts::*;
 pub use pileup_opts::*;
 pub use predict_opts::*;
+pub use qc_opts::*;
 pub use strip_basemods_opts::*;
 
 //
@@ -105,16 +107,18 @@ pub enum Commands {
     Fire(FireOptions),
     /// Extract fiberseq data into plain text files.
     ///
-    /// See https://fiberseq.github.io/fibertools-rs/docs/extract.html for a description of the outputs.
+    /// See https://fiberseq.github.io/fibertools/extracting/extract.html for a description of the outputs.
     #[clap(visible_aliases = &["ex", "e"])]
     Extract(ExtractOptions),
     /// This command centers fiberseq data around given reference positions. This is useful for making aggregate m6A and CpG observations, as well as visualization of SVs.
     ///
-    ///  See https://fiberseq.github.io/fibertools-rs/docs/center.html for a description of the output.
+    ///  See https://fiberseq.github.io/fibertools/extracting/center.html for a description of the output.
     #[clap(visible_aliases = &["c", "ct"])]
     Center(CenterOptions),
     /// Infer footprints from fiberseq data
     Footprint(FootprintOptions),
+    /// Collect QC metrics from a fiberseq bam file
+    Qc(QcOpts),
     /// Make decorated bed files for fiberseq data
     TrackDecorators(DecoratorOptions),
     /// Make a pileup track of Fiber-seq features from a FIRE bam

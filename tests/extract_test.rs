@@ -7,9 +7,8 @@ fn get_fiber_data_from_test_bam(bam_file: &str) -> Vec<fibertools_rs::fiber::Fib
     bam.records()
         .map(|r| {
             let record = r.unwrap();
-            let fiber_data =
-                fibertools_rs::fiber::FiberseqData::new(record, None, &FiberFilters::default());
-            fiber_data
+
+            fibertools_rs::fiber::FiberseqData::new(record, None, &FiberFilters::default())
         })
         .collect::<Vec<_>>()
 }
@@ -45,7 +44,7 @@ fn test_many_msps() {
             .starts
             .iter()
             .flatten()
-            .map(|&x| x)
+            .copied()
             .chain(fiber_data.msp.ends.iter().flatten().map(|&x| x - 1))
             .collect::<Vec<_>>();
         eprintln!("m6a: {:?}", m6a);

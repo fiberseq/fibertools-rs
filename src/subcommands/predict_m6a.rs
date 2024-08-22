@@ -43,6 +43,7 @@ where
     pub min_ml: u8,
     pub nuc_opts: cli::NucleosomeParameters,
     pub burn_models: m6a_burn::BurnModels<B>,
+    pub fake: bool,
 }
 
 impl<B> PredictOptions<B>
@@ -57,6 +58,7 @@ where
         polymerase: PbChem,
         batch_size: usize,
         nuc_opts: cli::NucleosomeParameters,
+        fake: bool,
     ) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();
@@ -67,13 +69,14 @@ where
             keep,
             min_ml_score,
             all_calls,
-            polymerase,
+            polymerase: polymerase.clone(),
             batch_size,
             map,
             model: vec![],
             min_ml: 0,
             nuc_opts,
-            burn_models: m6a_burn::BurnModels::new(),
+            burn_models: m6a_burn::BurnModels::new(&polymerase),
+            fake,
         };
         options.add_model().expect("Error loading model");
         options
@@ -501,6 +504,7 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
         find_pb_polymerase(&header),
         predict_options.batch_size,
         predict_options.nuc.clone(),
+        predict_options.fake,
     );
 
     // read in bam data

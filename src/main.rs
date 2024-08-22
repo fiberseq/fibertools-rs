@@ -7,6 +7,13 @@ use fibertools_rs::*;
 use log::LevelFilter;
 use std::time::Instant;
 
+fn set_rayon_threads(threads: usize) -> anyhow::Result<()> {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build_global()?;
+    Ok(())
+}
+
 pub fn main() -> Result<(), Error> {
     colored::control::set_override(true);
     console::set_colors_enabled(true);
@@ -37,17 +44,7 @@ pub fn main() -> Result<(), Error> {
     log::info!("Starting ft-{}", subcommand.bright_green().bold());
 
     // set up number of threads to use globally
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(args.global.threads)
-        .build_global()
-        .unwrap();
-
-    #[cfg(feature = "tch")]
-    {
-        // setting this to 1 since I do paralyzation via processing multiple reads
-        tch::set_num_threads(1);
-        tch::set_num_interop_threads(1);
-    }
+    set_rayon_threads(args.global.threads)?;
 
     log::debug!("Command line options: {:?}", args.command);
 
@@ -66,8 +63,15 @@ pub fn main() -> Result<(), Error> {
                 "\n{}\n\t{}\n\t{}\n", 
                 "WARNING: m6A predictions are slower without the pytorch backend.".bright_yellow().bold(),
                 "Consider recompiling via cargo with: `--all-features`.",
-                "For detailed instructions see: https://fiberseq.github.io/fibertools-rs/INSTALL.html."
+                "For detailed instructions see: https://fiberseq.github.io/fibertools/install.html."
             );
+            #[cfg(feature = "tch")]
+            {
+                // one threads works best for CPU inference performance
+                // with rayon handling the parallelism using multiple reads
+                tch::set_num_threads(1);
+                tch::set_num_interop_threads(1);
+            }
             subcommands::predict_m6a::read_bam_into_fiberdata(predict_m6a_opts);
         }
         Some(Commands::ClearKinetics(clear_kinetics_opts)) => {
@@ -81,6 +85,9 @@ pub fn main() -> Result<(), Error> {
         }
         Some(Commands::Fire(fire_opts)) => {
             subcommands::fire::add_fire_to_bam(fire_opts)?;
+        }
+        Some(Commands::Qc(qc_opts)) => {
+            subcommands::qc::run_qc(qc_opts)?;
         }
         Some(Commands::Footprint(footprint_opts)) => {
             subcommands::footprint::start_finding_footprints(footprint_opts)?;
