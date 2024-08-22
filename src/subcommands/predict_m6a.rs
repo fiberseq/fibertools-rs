@@ -7,7 +7,6 @@ use bio::alphabets::dna::revcomp;
 use burn::tensor::backend::Backend;
 use fiber::FiberseqData;
 use ordered_float::OrderedFloat;
-use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
