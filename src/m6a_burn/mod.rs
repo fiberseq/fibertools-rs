@@ -29,10 +29,10 @@ pub struct BurnModels<B>
 where
     B: Backend<Device = BurnDevice>,
 {
-    pub two_zero: two_zero::Model<B>,
-    pub two_two: two_two::Model<B>,
-    pub three_two: three_two::Model<B>,
-    pub revio: revio::Model<B>,
+    pub two_zero: Option<two_zero::Model<B>>,
+    pub two_two: Option<two_two::Model<B>>,
+    pub three_two: Option<three_two::Model<B>>,
+    pub revio: Option<revio::Model<B>>,
     pub device: BurnDevice,
 }
 
@@ -40,26 +40,56 @@ impl<B> BurnModels<B>
 where
     B: Backend<Device = BurnDevice>,
 {
-    pub fn new() -> Self {
+    pub fn new(polymerase: &PbChem) -> Self {
         #[cfg(not(feature = "tch"))]
         let device = B::Device::default();
         #[cfg(feature = "tch")]
         let device = Self::get_libtorch_device();
 
-        let two_zero = two_zero::Model::default().to_device(&device);
-        let two_two = two_two::Model::default().to_device(&device);
-        let three_two = three_two::Model::default().to_device(&device);
-        let revio = revio::Model::default().to_device(&device);
-
         // log info about the device used
         log::info!("Using {:?} for Burn device.", device);
 
-        Self {
-            two_zero,
-            two_two,
-            three_two,
-            revio,
-            device,
+        match polymerase {
+            PbChem::Two => {
+                let two_zero = two_zero::Model::default().to_device(&device);
+                Self {
+                    two_zero: Some(two_zero),
+                    two_two: None,
+                    three_two: None,
+                    revio: None,
+                    device,
+                }
+            }
+            PbChem::TwoPointTwo => {
+                let two_two = two_two::Model::default().to_device(&device);
+                Self {
+                    two_zero: None,
+                    two_two: Some(two_two),
+                    three_two: None,
+                    revio: None,
+                    device,
+                }
+            }
+            PbChem::ThreePointTwo => {
+                let three_two = three_two::Model::default().to_device(&device);
+                Self {
+                    two_zero: None,
+                    two_two: None,
+                    three_two: Some(three_two),
+                    revio: None,
+                    device,
+                }
+            }
+            PbChem::Revio => {
+                let revio = revio::Model::default().to_device(&device);
+                Self {
+                    two_zero: None,
+                    two_two: None,
+                    three_two: None,
+                    revio: Some(revio),
+                    device,
+                }
+            }
         }
     }
 
@@ -87,13 +117,18 @@ where
         let input =
             Tensor::<B, 1, burn::tensor::Float>::from_floats(windows, &self.device).reshape(shape);
 
+        // allow fake predictions for testing speed of other parts of the code
+        // I have moved this chunk around and it is indeed just the model.forward
+        // step that is slow
+        if opts.fake {
+            return vec![0.0; count];
+        }
         let forward: Tensor<B, 2, burn::tensor::Float> = match opts.polymerase {
-            PbChem::Two => self.two_zero.forward(input),
-            PbChem::TwoPointTwo => self.two_two.forward(input),
-            PbChem::ThreePointTwo => self.three_two.forward(input),
-            PbChem::Revio => self.revio.forward(input),
+            PbChem::Two => self.two_zero.as_ref().unwrap().forward(input),
+            PbChem::TwoPointTwo => self.two_two.as_ref().unwrap().forward(input),
+            PbChem::ThreePointTwo => self.three_two.as_ref().unwrap().forward(input),
+            PbChem::Revio => self.revio.as_ref().unwrap().forward(input),
         };
-
         forward
             .into_data()
             .convert()
@@ -101,15 +136,6 @@ where
             .chunks(2)
             .map(|c| c[0])
             .collect()
-    }
-}
-
-impl<B> Default for BurnModels<B>
-where
-    B: Backend<Device = BurnDevice>,
-{
-    fn default() -> Self {
-        Self::new()
     }
 }
 

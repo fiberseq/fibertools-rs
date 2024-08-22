@@ -199,6 +199,7 @@ pub fn add_nucleosomes_to_record(
     record.remove_aux(b"nl").unwrap_or(());
     record.remove_aux(b"as").unwrap_or(());
     record.remove_aux(b"al").unwrap_or(());
+    record.remove_aux(b"aq").unwrap_or(());
 
     let nucs = if options.allowed_m6a_skips < 0 {
         find_nucleosomes(m6a, options)

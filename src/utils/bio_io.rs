@@ -197,7 +197,10 @@ pub struct BamChunk<'a> {
 
 impl<'a> BamChunk<'a> {
     pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: Option<usize>) -> Self {
-        let chunk_size = chunk_size.unwrap_or_else(|| current_num_threads() * 100);
+        let chunk_size = std::cmp::min(
+            chunk_size.unwrap_or_else(|| current_num_threads() * 100),
+            1_000,
+        );
         let bar = no_length_progress_bar();
         Self {
             bam,

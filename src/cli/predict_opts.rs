@@ -26,6 +26,9 @@ pub struct PredictM6AOptions {
     /// Increasing improves GPU performance at the cost of memory.
     #[clap(short, long, default_value = "1", help_heading = "Developer-Options")]
     pub batch_size: usize,
+    /// Skip the actual prediction step to allow for testing the speed of other parts of the code
+    #[clap(long, help_heading = "Developer-Options", hide = true)]
+    pub fake: bool,
 }
 
 impl std::default::Default for PredictM6AOptions {
@@ -38,6 +41,7 @@ impl std::default::Default for PredictM6AOptions {
             force_min_ml_score: None,
             all_calls: false,
             batch_size: 1,
+            fake: false,
         }
     }
 }

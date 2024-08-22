@@ -16,5 +16,7 @@ pub mod footprint;
 pub mod pileup;
 /// m6A prediction
 pub mod predict_m6a;
+/// Collect QC metrics
+pub mod qc;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
