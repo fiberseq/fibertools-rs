@@ -56,6 +56,10 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
     let func_name_end = filter.find('(').unwrap_or(filter.len());
     let func_name = filter[..func_name_end].trim().to_string();
+    if !["len", "cmp"].contains(&func_name.as_str()) {
+        eprintln!("Invalid function: {}", func_name);
+        std::process::exit(1);
+    }
 
     let gnm_feat_start = filter.find('(').unwrap_or(filter.len()) + 1;
     let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
