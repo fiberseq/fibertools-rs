@@ -1,4 +1,6 @@
 use crate::utils::bamranges;
+use crate::fiber::FiberseqData;
+use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
 enum Threshold {
@@ -111,8 +113,8 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
-    mut range: bamranges::Ranges,
-) -> Result<bamranges::Ranges, anyhow::Error> {
+    range: &mut bamranges::Ranges
+) -> Result<(), anyhow::Error> {
     let starting_len = range.starts.len();
 
     let to_keep: Vec<bool> = if parsed.fn_name == "len" {
@@ -159,7 +161,28 @@ pub fn apply_filter_to_range(
     let n_dropped = to_keep.iter().filter(|&&x| !x).count();
     assert_eq!(starting_len, range.starts.len() + n_dropped);
 
-    Ok(range)
+    Ok(())
+}
+
+pub fn apply_filter_fsd(
+    fsd: &mut FiberseqData,
+    filt: &FiberFilters
+) -> Result<(), anyhow::Error> {
+    if let Some(s) = filt.filter_expression.as_ref() {
+        if !s.is_empty() {
+            let parser = parse_filter(s.as_str());
+            match parser.rng_name.as_str() {
+                "msp" => apply_filter_to_range(&parser, &mut fsd.msp)?,
+                "nuc" => apply_filter_to_range(&parser, &mut fsd.nuc)?,
+                "m6a" => apply_filter_to_range(&parser, &mut fsd.m6a)?,
+                "cpg" => apply_filter_to_range(&parser, &mut fsd.cpg)?,
+                _ => {
+                    return Err(anyhow::anyhow!("Unknown range name: {}", parser.rng_name));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// tests

@@ -27,7 +27,6 @@ pub struct FiberFilters {
         short = 'x',
         long = "ftx",
         alias = "ft-expression",
-        default_value = "",
         help_heading = "BAM-Options"
     )]
     pub filter_expression: Option<String>,

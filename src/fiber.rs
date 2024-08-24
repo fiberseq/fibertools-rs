@@ -5,8 +5,7 @@ use super::*;
 use crate::utils::bamranges::*;
 use crate::utils::basemods::BaseMods;
 use crate::utils::bio_io::*;
-use crate::utils::ftexpression::apply_filter_to_range;
-use crate::utils::ftexpression::parse_filter;
+use crate::utils::ftexpression::apply_filter_fsd;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
@@ -81,21 +80,7 @@ impl FiberseqData {
             center_position: None,
         };
 
-        if let Some(s) = filters.filter_expression.as_ref() {
-            if !s.is_empty() {
-                let parser = parse_filter(s.as_str());
-                if parser.rng_name == "msp" {
-                    fsd.msp = apply_filter_to_range(&parser, fsd.msp).unwrap();
-                } else if parser.rng_name == "nuc" {
-                    fsd.nuc = apply_filter_to_range(&parser, fsd.nuc).unwrap();
-                } else if parser.rng_name == "m6a" {
-                    fsd.m6a = apply_filter_to_range(&parser, fsd.m6a).unwrap();
-                } else {
-                    // 5mC
-                    fsd.cpg = apply_filter_to_range(&parser, fsd.cpg).unwrap();
-                };
-            }
-        }
+        apply_filter_fsd(&mut fsd, filters).expect("Failed to apply filter to FiberseqData");
         fsd
     }
 
