@@ -1,5 +1,5 @@
-use crate::utils::bamranges;
 use crate::fiber::FiberseqData;
+use crate::utils::bamranges;
 use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
@@ -113,7 +113,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
-    range: &mut bamranges::Ranges
+    range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.starts.len();
 
@@ -164,10 +164,7 @@ pub fn apply_filter_to_range(
     Ok(())
 }
 
-pub fn apply_filter_fsd(
-    fsd: &mut FiberseqData,
-    filt: &FiberFilters
-) -> Result<(), anyhow::Error> {
+pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(), anyhow::Error> {
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
             let parser = parse_filter(s.as_str());
