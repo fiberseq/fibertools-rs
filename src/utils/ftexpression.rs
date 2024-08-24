@@ -25,10 +25,7 @@ fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
         Threshold::Range(min, max) => match operator {
             "=" => value >= *min && value < *max,
             _ => {
-                eprintln!(
-                    "Require = operator for {} when using ranged args",
-                    name
-                );
+                eprintln!("Require = operator for {} when using ranged args", name);
                 std::process::exit(1);
             }
         },
@@ -50,6 +47,87 @@ pub struct ParsedExpr {
     threshold: Threshold,
 }
 
+pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
+    let mut filter = filter_orig.to_string();
+    filter.retain(|c| !c.is_whitespace());
+    let func_name_end = filter.find('(').unwrap_or(filter.len());
+    let func_name = filter[..func_name_end].trim().to_string();
+    if !["len", "cmp"].contains(&func_name.as_str()) {
+        eprintln!("Invalid function: {}", func_name);
+        std::process::exit(1);
+    }
+    let gnm_feat_start = filter.find('(').unwrap_or(filter.len()) + 1;
+    let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
+    let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
+    if !["msp", "nuc", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
+        eprintln!("Invalid argument for {} function: {}", func_name, gnm_feat);
+        std::process::exit(1);
+    }
+    let rest = &filter[gnm_feat_end + 1..].trim();
+    let operators = ["!=", ">=", "<=", ">", "<", "="];
+    let mut operator = "".to_string();
+    let mut threshold = None;
+    let mut range = None;
+    for &op in operators.iter() {
+        if let Some(pos) = rest.find(op) {
+            operator = op.to_string();
+            let threshold_str = rest[pos + op.len()..].trim();
+            if threshold_str.contains(':') {
+                let range_parts: Vec<&str> = threshold_str.split(':').collect();
+                if range_parts.len() == 2 {
+                    let start = range_parts[0].trim();
+                    let end = range_parts[1].trim();
+                    let start_value = start.parse::<f64>();
+                    let end_value = end.parse::<f64>();
+                    if start_value.is_err() || end_value.is_err() {
+                        eprintln!("Range thresholds must be numeric values, ex: 'len(msp)=30:100'");
+                        std::process::exit(1);
+                    }
+                    let start_value = start_value.unwrap();
+                    let end_value = end_value.unwrap();
+                    if start_value >= end_value {
+                        eprintln!("In a range, the start value must be less than the end value.");
+                        std::process::exit(1);
+                    }
+                    range = Some((start_value, end_value));
+                } else {
+                    eprintln!("Range thresholds require 2 numerical values, ex: 'len(msp)=50:100'");
+                    std::process::exit(1);
+                }
+            } else {
+                let threshold_value = threshold_str.parse::<f64>();
+                if threshold_value.is_err() {
+                    eprintln!("Threshold value must be numeric.");
+                    std::process::exit(1);
+                }
+                threshold = Some(threshold_value.unwrap());
+            }
+            break;
+        }
+    }
+    if operator.is_empty() {
+        eprintln!("No valid operator found.");
+        std::process::exit(1);
+    }
+    if let Some((_, _)) = range {
+        if operator != "=" {
+            eprintln!("Range thresholds can only be used with the '=' operator.");
+            std::process::exit(1);
+        }
+    }
+    let threshold_value = match range {
+        Some((min, max)) => Threshold::Range(min, max),
+        None => Threshold::Single(threshold.unwrap()),
+    };
+    ParsedExpr {
+        fn_name: func_name,
+        feat_name: gnm_feat,
+        op: operator,
+        threshold: threshold_value,
+    }
+}
+
+/*
 pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let mut filter = filter_orig.to_string();
     filter.retain(|c| !c.is_whitespace());
@@ -87,6 +165,9 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
                         range_parts[0].trim().parse::<f64>().unwrap(),
                         range_parts[1].trim().parse::<f64>().unwrap(),
                     ));
+                } else {
+                    eprintln!("Range thresholds require 2 numerical values, ex: 'len(msp)=50:100'");
+                    std::process::exit(1);
                 }
             } else {
                 threshold = Some(threshold_str.parse::<f64>().unwrap());
@@ -114,6 +195,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
         threshold: threshold_value,
     }
 }
+*/
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
@@ -162,7 +244,7 @@ pub fn apply_filter_to_range(
         .collect();
 
     // check we dropped the right number of values
-    let n_dropped = to_keep.iter().filter(|&&x| !x).count();
+    let n_dropped = to_keep.iter().filter(|&x| !x).count();
     assert_eq!(starting_len, range.starts.len() + n_dropped);
 
     Ok(())
@@ -178,7 +260,10 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                 "m6a" => apply_filter_to_range(&parser, &mut fsd.m6a)?,
                 "cpg" => apply_filter_to_range(&parser, &mut fsd.cpg)?,
                 _ => {
-                    return Err(anyhow::anyhow!("Unknown feature name: {}", parser.feat_name));
+                    return Err(anyhow::anyhow!(
+                        "Unknown feature name: {}",
+                        parser.feat_name
+                    ));
                 }
             }
         }
