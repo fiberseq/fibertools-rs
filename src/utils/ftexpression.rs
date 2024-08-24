@@ -26,8 +26,8 @@ fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
             "=" => value >= *min && value < *max,
             _ => {
                 eprintln!(
-                    "Invalid operator for {} function with range: {}",
-                    name, operator
+                    "Require = operator for {} when using ranged args",
+                    name
                 );
                 std::process::exit(1);
             }
@@ -45,7 +45,7 @@ fn qual(value: u8, operator: &str, threshold: &Threshold) -> bool {
 
 pub struct ParsedExpr {
     fn_name: String,
-    pub rng_name: String,
+    feat_name: String,
     op: String, // <, <=, >, >=, etc
     threshold: Threshold,
 }
@@ -61,7 +61,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
     let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
     if !["msp", "nuc", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
-        eprintln!("Invalid argument for len function: {}", gnm_feat);
+        eprintln!("Invalid argument for {} function: {}", func_name, gnm_feat);
         std::process::exit(1);
     }
 
@@ -105,7 +105,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
     ParsedExpr {
         fn_name: func_name,
-        rng_name: gnm_feat,
+        feat_name: gnm_feat,
         op: operator,
         threshold: threshold_value,
     }
@@ -168,13 +168,13 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
             let parser = parse_filter(s.as_str());
-            match parser.rng_name.as_str() {
+            match parser.feat_name.as_str() {
                 "msp" => apply_filter_to_range(&parser, &mut fsd.msp)?,
                 "nuc" => apply_filter_to_range(&parser, &mut fsd.nuc)?,
                 "m6a" => apply_filter_to_range(&parser, &mut fsd.m6a)?,
                 "cpg" => apply_filter_to_range(&parser, &mut fsd.cpg)?,
                 _ => {
-                    return Err(anyhow::anyhow!("Unknown range name: {}", parser.rng_name));
+                    return Err(anyhow::anyhow!("Unknown feature name: {}", parser.feat_name));
                 }
             }
         }
