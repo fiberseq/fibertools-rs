@@ -47,6 +47,15 @@ pub struct ParsedExpr {
     threshold: Threshold,
 }
 
+pub fn parse_filter_all(full_expr: &str) -> Vec<ParsedExpr> {
+    let mut v = Vec::new();
+    let expressions: Vec<String> = full_expr.split(',').map(|s| s.to_string()).collect();
+    for expr in expressions.iter() {
+        v.push(parse_filter(expr.as_str()));
+    }
+    v
+}
+
 pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let mut filter = filter_orig.to_string();
     filter.retain(|c| !c.is_whitespace());
@@ -183,17 +192,19 @@ pub fn apply_filter_to_range(
 pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(), anyhow::Error> {
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
-            let parser = parse_filter(s.as_str());
-            match parser.feat_name.as_str() {
-                "msp" => apply_filter_to_range(&parser, &mut fsd.msp)?,
-                "nuc" => apply_filter_to_range(&parser, &mut fsd.nuc)?,
-                "m6a" => apply_filter_to_range(&parser, &mut fsd.m6a)?,
-                "cpg" => apply_filter_to_range(&parser, &mut fsd.cpg)?,
-                _ => {
-                    return Err(anyhow::anyhow!(
-                        "Unknown feature name: {}",
-                        parser.feat_name
-                    ));
+            let parsers = parse_filter_all(s.as_str());
+            for parser in parsers.iter() {
+                match parser.feat_name.as_str() {
+                    "msp" => apply_filter_to_range(parser, &mut fsd.msp)?,
+                    "nuc" => apply_filter_to_range(parser, &mut fsd.nuc)?,
+                    "m6a" => apply_filter_to_range(parser, &mut fsd.m6a)?,
+                    "cpg" => apply_filter_to_range(parser, &mut fsd.cpg)?,
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Unknown feature name: {}",
+                            parser.feat_name
+                        ));
+                    }
                 }
             }
         }
