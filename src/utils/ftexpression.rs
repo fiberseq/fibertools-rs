@@ -87,7 +87,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     for &op in operators.iter() {
         if let Some(pos) = rest.find(op) {
             operator = Some(op);
-            value_str = &rest[pos + op.len()..].trim();
+            value_str = rest[pos + op.len()..].trim();
             break;
         }
     }
@@ -137,7 +137,6 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
         threshold: value,
     }
 }
-
 
 /*
 pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
