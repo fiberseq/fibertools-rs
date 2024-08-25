@@ -57,6 +57,90 @@ pub fn parse_filter_all(full_expr: &str) -> Vec<ParsedExpr> {
 }
 
 pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
+    // Remove all whitespace characters
+    let mut filter = filter_orig.to_string();
+    filter.retain(|c| !c.is_whitespace());
+
+    // Extract and validate function name
+    let func_name_end = filter.find('(').unwrap_or(filter.len());
+    let func_name = filter[..func_name_end].trim().to_string();
+    if !["len", "qual"].contains(&func_name.as_str()) {
+        eprintln!("Invalid function: {}", func_name);
+        std::process::exit(1);
+    }
+
+    // Extract and validate function argument
+    let gnm_feat_start = func_name_end + 1;
+    let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
+    let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
+    if !["msp", "nuc", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
+        eprintln!("Invalid argument for {} function: {}", func_name, gnm_feat);
+        std::process::exit(1);
+    }
+
+    // Extract and validate the operator and value
+    let rest = &filter[gnm_feat_end + 1..].trim();
+    let operators = ["!=", ">=", "<=", ">", "<", "="];
+    let mut operator = None;
+    let mut value_str = "";
+
+    for &op in operators.iter() {
+        if let Some(pos) = rest.find(op) {
+            operator = Some(op);
+            value_str = &rest[pos + op.len()..].trim();
+            break;
+        }
+    }
+
+    if operator.is_none() {
+        eprintln!("No valid operator found.");
+        std::process::exit(1);
+    }
+
+    let operator = operator.unwrap().to_string();
+
+    // Validate and parse the value
+    let value = if value_str.contains(':') {
+        let range_parts: Vec<&str> = value_str.split(':').collect();
+        if range_parts.len() != 2 {
+            eprintln!("Range format requires exactly 2 values separated by ':', ex: '50:100'");
+            std::process::exit(1);
+        }
+        let start = range_parts[0].trim();
+        let end = range_parts[1].trim();
+        let start_value = start.parse::<f64>();
+        let end_value = end.parse::<f64>();
+        if start_value.is_err() || end_value.is_err() {
+            eprintln!("Range thresholds must be numeric values, ex: '30:100'");
+            std::process::exit(1);
+        }
+        let start_value = start_value.unwrap();
+        let end_value = end_value.unwrap();
+        if start_value >= end_value {
+            eprintln!("In a range, the start value must be less than the end value.");
+            std::process::exit(1);
+        }
+        Threshold::Range(start_value, end_value)
+    } else {
+        let value_num = value_str.parse::<f64>();
+        if value_num.is_err() {
+            eprintln!("Value is not numeric: {}.", value_str);
+            std::process::exit(1);
+        }
+        Threshold::Single(value_num.unwrap())
+    };
+
+    ParsedExpr {
+        fn_name: func_name,
+        feat_name: gnm_feat,
+        op: operator,
+        threshold: value,
+    }
+}
+
+
+/*
+pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let mut filter = filter_orig.to_string();
     filter.retain(|c| !c.is_whitespace());
     let func_name_end = filter.find('(').unwrap_or(filter.len());
@@ -135,6 +219,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
         threshold: threshold_value,
     }
 }
+*/
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
