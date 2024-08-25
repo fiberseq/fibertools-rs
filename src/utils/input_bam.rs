@@ -22,6 +22,13 @@ pub struct FiberFilters {
     )]
     pub bit_flag: u16,
     /// Filtering expression to use for filtering records
+    /// Example: filter to nucleosomes with lengths greater than 150 bp
+    ///   -x "len(nuc)>150"
+    /// Example: filter to msps with lengths between 30 and 49 bp
+    ///   -x "len(nuc)=30:50"
+    /// Example: combine 2+ filter expressions
+    ///   -x "len(nuc)<150,len(msp)=30:50"
+    /// Filtering expressions support len() and qual() functions over msp, nuc, m6a, cpg
     #[clap(
         global = true,
         short = 'x',

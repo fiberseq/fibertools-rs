@@ -198,7 +198,7 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                     "msp" => apply_filter_to_range(parser, &mut fsd.msp)?,
                     "nuc" => apply_filter_to_range(parser, &mut fsd.nuc)?,
                     "m6a" => apply_filter_to_range(parser, &mut fsd.m6a)?,
-                    "cpg" => apply_filter_to_range(parser, &mut fsd.cpg)?,
+                    "5mC" => apply_filter_to_range(parser, &mut fsd.cpg)?,
                     _ => {
                         return Err(anyhow::anyhow!(
                             "Unknown feature name: {}",
