@@ -21,12 +21,25 @@ pub struct FiberFilters {
         help_heading = "BAM-Options"
     )]
     pub bit_flag: u16,
+    /// Filtering expression to use for filtering records
+    /// Example: filter to nucleosomes with lengths greater than 150 bp
+    ///   -x "len(nuc)>150"
+    /// Example: filter to msps with lengths between 30 and 49 bp
+    ///   -x "len(msp)=30:50"
+    /// Example: combine 2+ filter expressions
+    ///   -x "len(nuc)<150,len(msp)=30:50"
+    /// Filtering expressions support len() and qual() functions over msp, nuc, m6a, cpg
+    #[clap(
+        global = true,
+        short = 'x',
+        long = "ftx",
+        alias = "ft-expression",
+        help_heading = "BAM-Options"
+    )]
+    pub filter_expression: Option<String>,
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
-    /// Filtering expression to use for filtering records
-    #[clap(short = 'x', long, help_heading = "BAM-Options", hide = true)]
-    pub filter_expression: Option<String>,
 }
 
 impl std::default::Default for FiberFilters {
