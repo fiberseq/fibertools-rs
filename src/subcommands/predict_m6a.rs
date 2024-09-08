@@ -7,8 +7,8 @@ use bio::alphabets::dna::revcomp;
 use burn::tensor::backend::Backend;
 use fiber::FiberseqData;
 use ordered_float::OrderedFloat;
+use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
-use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
@@ -189,7 +189,11 @@ where
     }
 
     /// group reads together for predictions so we have to move data to the GPU less often
-    pub fn predict_m6a_on_records(opts: &Self, records: &mut [bam::Record]) -> usize {
+    pub fn predict_m6a_on_records(
+        opts: &Self,
+        records: Vec<&mut rust_htslib::bam::Record>,
+        //records: &mut [rust_htslib::bam::Record],
+    ) -> usize {
         // data windows for all the records in this chunk
         let data: Vec<Option<(DataWidows, DataWidows)>> = records
             .iter()
@@ -517,10 +521,9 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
     for mut chunk in bam_chunk_iter {
         // add m6a calls
         let number_of_reads_with_predictions = chunk
-            //.par_iter_mut()
-            //.chunks(predict_options.batch_size)
-            .chunks_mut(predict_options.batch_size)
-            .map(|recs| PredictOptions::predict_m6a_on_records(&predict_options, recs))
+            .par_iter_mut()
+            .chunks(predict_options.batch_size)
+            .map(|records| PredictOptions::predict_m6a_on_records(&predict_options, records))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;

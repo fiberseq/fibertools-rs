@@ -37,7 +37,7 @@ itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4"
 ordered-float = "3.4.0"
-rayon = "1.8"
+rayon = "1.10"
 regex = "1.9.1"
 rust-htslib = "0.43.0"
 
