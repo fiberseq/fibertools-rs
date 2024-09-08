@@ -29,7 +29,7 @@ pub struct PrecisionTable {
     pub data: Vec<(f32, u8)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PredictOptions<B>
 where
     B: Backend<Device = m6a_burn::BurnDevice>,
@@ -189,7 +189,7 @@ where
     }
 
     /// group reads together for predictions so we have to move data to the GPU less often
-    pub fn predict_m6a_on_records(&self, records: &mut [bam::Record]) -> usize {
+    pub fn predict_m6a_on_records(opts: &Self, records: &mut [bam::Record]) -> usize {
         // data windows for all the records in this chunk
         let data: Vec<Option<(DataWidows, DataWidows)>> = records
             .iter()
@@ -204,7 +204,7 @@ where
             all_ml_data.extend(t.windows.clone());
             all_count += t.count;
         });
-        let predictions = self.apply_model(&all_ml_data, all_count);
+        let predictions = opts.apply_model(&all_ml_data, all_count);
         assert_eq!(predictions.len(), all_count);
         // split ml results back to all the records and modify the MM ML tags
         assert_eq!(data.len(), records.len());
@@ -225,7 +225,7 @@ where
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
 
                 cur_predict_st += data.count;
-                cur_basemods.base_mods.push(self.basemod_from_ml(
+                cur_basemods.base_mods.push(opts.basemod_from_ml(
                     record,
                     cur_predictions,
                     &data.positions,
@@ -239,10 +239,10 @@ where
             let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
 
             // adding the nucleosomes
-            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &self.nuc_opts);
+            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &opts.nuc_opts);
 
             // clear the existing data
-            if !self.keep {
+            if !opts.keep {
                 record.remove_aux(b"fp").unwrap_or(());
                 record.remove_aux(b"fi").unwrap_or(());
                 record.remove_aux(b"rp").unwrap_or(());
@@ -520,7 +520,7 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
             //.par_iter_mut()
             //.chunks(predict_options.batch_size)
             .chunks_mut(predict_options.batch_size)
-            .map(|recs| predict_options.predict_m6a_on_records(recs))
+            .map(|recs| PredictOptions::predict_m6a_on_records(&predict_options, recs))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
