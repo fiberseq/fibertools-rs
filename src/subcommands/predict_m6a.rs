@@ -189,7 +189,7 @@ where
     }
 
     /// group reads together for predictions so we have to move data to the GPU less often
-    pub fn predict_m6a_on_records(&self, records: Vec<&mut bam::Record>) -> usize {
+    pub fn predict_m6a_on_records(&self, records: &mut [bam::Record]) -> usize {
         // data windows for all the records in this chunk
         let data: Vec<Option<(DataWidows, DataWidows)>> = records
             .iter()
@@ -517,8 +517,9 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
     for mut chunk in bam_chunk_iter {
         // add m6a calls
         let number_of_reads_with_predictions = chunk
-            .par_iter_mut()
-            .chunks(predict_options.batch_size)
+            //.par_iter_mut()
+            //.chunks(predict_options.batch_size)
+            .chunks_mut(predict_options.batch_size)
             .map(|recs| predict_options.predict_m6a_on_records(recs))
             .sum::<usize>() as f32;
 
