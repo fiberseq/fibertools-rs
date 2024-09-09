@@ -8,7 +8,11 @@ use std::collections::HashMap;
 use std::io::Write;
 
 // set the precision of the floats to be saved and printed
-fn my_ordered_float(f: f32) -> OrderedFloat<f32> {
+fn ordered_float_100k_round(f: f32) -> OrderedFloat<f32> {
+    OrderedFloat((f * 100_000.0).round() / 100_000.0)
+}
+
+fn ordered_float_10k_round(f: f32) -> OrderedFloat<f32> {
     OrderedFloat((f * 10_000.0).round() / 10_000.0)
 }
 
@@ -131,7 +135,7 @@ impl<'a> QcStats<'a> {
         // read length per nucleosome
         let read_length = fiber.record.seq_len() as f32 / fiber.nuc.starts.len() as f32;
         self.read_length_per_nuc
-            .entry(my_ordered_float(read_length))
+            .entry(ordered_float_10k_round(read_length))
             .and_modify(|e| *e += 1)
             .or_insert(1);
     }
@@ -155,12 +159,12 @@ impl<'a> QcStats<'a> {
             .and_modify(|e| *e += 1)
             .or_insert(1);
         self.ccs_passes
-            .entry(my_ordered_float(fiber.ec))
+            .entry(ordered_float_10k_round(fiber.ec))
             .and_modify(|e| *e += 1)
             .or_insert(1);
         if let Some(rq) = fiber.get_rq() {
             self.rq
-                .entry(my_ordered_float(rq))
+                .entry(ordered_float_100k_round(rq))
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
         }
@@ -183,7 +187,7 @@ impl<'a> QcStats<'a> {
             .count();
         let ratio = m6a_count as f32 / total_at as f32;
         self.m6a_ratio
-            .entry(my_ordered_float(ratio))
+            .entry(ordered_float_100k_round(ratio))
             .and_modify(|e: &mut i64| *e += 1)
             .or_insert(1);
 
@@ -239,7 +243,12 @@ impl<'a> QcStats<'a> {
         log::info!("Done calculating m6A auto-correlation!");
         for (i, val) in acf.iter().enumerate() {
             out.write_all(
-                format!("m6a_acf\t{}\t{}\n", i, my_ordered_float(*val as f32)).as_bytes(),
+                format!(
+                    "m6a_acf\t{}\t{}\n",
+                    i,
+                    ordered_float_100k_round(*val as f32)
+                )
+                .as_bytes(),
             )?;
         }
         Ok(())
