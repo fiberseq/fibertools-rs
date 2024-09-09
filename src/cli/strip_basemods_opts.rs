@@ -9,7 +9,13 @@ pub struct StripBasemodsOptions {
     /// Output bam file
     #[clap(default_value = "-")]
     pub out: String,
-    #[clap(short, long, default_value = "m6A",  value_parser(["m6A","6mA", "5mC","CpG"]))]
+    #[clap(short, long, value_parser(["m6A","6mA", "5mC","CpG"]))]
     /// base modification to strip out of the bam file
     pub basemod: String,
+    /// Drop forward strand of base modifications
+    #[clap(long)]
+    pub drop_forward: bool,
+    /// Drop reverse strand of base modifications
+    #[clap(long)]
+    pub drop_reverse: bool,
 }

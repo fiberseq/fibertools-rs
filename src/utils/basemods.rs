@@ -231,6 +231,16 @@ impl BaseMods {
         self.base_mods.retain(|bm| !bm.is_cpg());
     }
 
+    /// drop the forward stand of basemod calls
+    pub fn drop_forward(&mut self) {
+        self.base_mods.retain(|bm| bm.strand == '-');
+    }
+
+    /// drop the reverse strand of basemod calls   
+    pub fn drop_reverse(&mut self) {
+        self.base_mods.retain(|bm| bm.strand == '+');
+    }
+
     /// combine the forward and reverse m6a data
     pub fn m6a(&self) -> Ranges {
         let ranges = self

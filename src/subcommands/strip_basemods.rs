@@ -24,6 +24,13 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
                 } else if (opts.basemod == "6mA") || (opts.basemod == "m6A") {
                     data.drop_m6a();
                 }
+                if opts.drop_forward {
+                    data.drop_forward();
+                }
+                if opts.drop_reverse {
+                    data.drop_reverse();
+                }
+
                 data.add_mm_and_ml_tags(record);
                 record
             })
