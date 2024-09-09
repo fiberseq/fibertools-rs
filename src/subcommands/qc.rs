@@ -135,7 +135,7 @@ impl<'a> QcStats<'a> {
         if sample && self.sampled > self.qc_opts.acf_max_reads {
             let idx = thread_rng().gen_range(0..self.m6a_acf_starts.len());
             self.m6a_acf_starts[idx] = m6a_vec;
-            log::trace!(
+            log::debug!(
                 "Replaced read at index {} after the {}th sample",
                 idx,
                 self.sampled
@@ -268,7 +268,7 @@ impl<'a> QcStats<'a> {
                 .m6a_acf_starts
                 .iter()
                 .flatten()
-                .map(|f| *f)
+                .copied()
                 .collect::<Vec<f64>>(),
             Some(self.qc_opts.acf_max_lag),
             false,
