@@ -60,6 +60,9 @@ pub struct QcStats<'a> {
     m6a_acf_starts: Vec<f64>,
     //
     qc_opts: &'a QcOpts,
+    // phasing information
+    phased_reads: HashMap<String, i64>,
+    phased_bp: HashMap<String, i64>,
 }
 
 impl<'a> QcStats<'a> {
@@ -82,10 +85,13 @@ impl<'a> QcStats<'a> {
             acf_read_count: 0,
             m6a_acf_starts: Vec::new(),
             qc_opts,
+            phased_reads: HashMap::new(),
+            phased_bp: HashMap::new(),
         }
     }
 
     pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData) {
+        // add auto-correlation of m6a
         if self.qc_opts.acf
             && self.acf_read_count < self.qc_opts.acf_max_reads
             && fiber.m6a.starts.len() >= self.qc_opts.acf_min_m6a
@@ -131,6 +137,18 @@ impl<'a> QcStats<'a> {
     }
 
     fn full_read_stats(&mut self, fiber: &fiber::FiberseqData) {
+        let hp = fiber.get_hp();
+        // phase
+        self.phased_reads
+            .entry(hp.clone())
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+        // phased reads
+        self.phased_bp
+            .entry(hp)
+            .and_modify(|e| *e += fiber.record.seq_len() as i64)
+            .or_insert(fiber.record.seq_len() as i64);
+
         self.fiber_count += 1;
         self.fiber_lengths
             .entry(fiber.record.seq_len() as i64)
@@ -252,6 +270,13 @@ impl<'a> QcStats<'a> {
         ] {
             out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
         }
+        // write the phasing information
+        for f in &[
+            (&self.phased_reads, "phased_reads"),
+            (&self.phased_bp, "phased_bp"),
+        ] {
+            out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
+        }
         // write the m6a per msp size
         out.write_all(
             Self::hashmap_to_string(&self.m6a_per_msp_size, "m6a_per_msp_size").as_bytes(),
@@ -274,6 +299,7 @@ impl<'a> QcStats<'a> {
 pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     let mut bam = opts.input.bam_reader();
     let mut stats = QcStats::new(opts);
+
     for fiber in opts.input.fibers(&mut bam) {
         stats.add_read_to_stats(&fiber);
     }
