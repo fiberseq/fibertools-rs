@@ -55,7 +55,6 @@ pub fn acf<T: Float + From<u32> + From<f64> + Copy + Add + AddAssign + Div>(
     let sum_x: T = x.iter().fold(sum, |sum, &xi| sum + xi);
     let mean_x: T = sum_x / len_x;
 
-    //let mut y: Vec<T> = Vec::with_capacity(max_lag);
     let mut y: Vec<T> = vec![From::from(0.0); m];
 
     for t in 0..m {
