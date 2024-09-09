@@ -213,11 +213,16 @@ impl<'a> QcStats<'a> {
         }
 
         log::info!("Calculating m6A auto-correlation.");
-        let acf =
-            crate::utils::acf::acf(&self.m6a_acf_starts, Some(self.qc_opts.acf_max_lag), false)?;
+        let acf = crate::utils::acf::acf_par(
+            &self.m6a_acf_starts,
+            Some(self.qc_opts.acf_max_lag),
+            false,
+        )?;
         log::info!("Done calculating m6A auto-correlation!");
         for (i, val) in acf.iter().enumerate() {
-            out.write_all(format!("m6a_acf\t{}\t{}\n", i, val).as_bytes())?;
+            out.write_all(
+                format!("m6a_acf\t{}\t{}\n", i, my_ordered_float(*val as f32)).as_bytes(),
+            )?;
         }
         Ok(())
     }
