@@ -11,7 +11,7 @@ pub struct StripBasemodsOptions {
     pub out: String,
     #[clap(short, long, value_parser(["m6A","6mA", "5mC","CpG"]))]
     /// base modification to strip out of the bam file
-    pub basemod: String,
+    pub basemod: Option<String>,
     /// Drop forward strand of base modifications
     #[clap(long)]
     pub drop_forward: bool,
