@@ -21,6 +21,9 @@ pub struct QcOpts {
     /// maximum number of reads to use in the ACF calculation
     #[clap(long, default_value = "10000")]
     pub acf_max_reads: usize,
+    /// After sampling the first "acf-max-reads" randomly sample one of every "acf-sample-rate" reads and replace one of the previous reads at random.
+    #[clap(long, default_value = "100")]
+    pub acf_sample_rate: f32,
     /// In the output include a measure of the number of m6A events per MSPs of a given size.
     /// The output format is: "m6a_per_msp_size\t{m6A count},{MSP size},{is a FIRE}\t{count}"
     /// e.g. "m6a_per_msp_size\t35,100,false\t100"

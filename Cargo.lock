@@ -1426,6 +1426,7 @@ dependencies = [
  "num",
  "ordered-float",
  "predicates",
+ "rand",
  "rayon",
  "regex",
  "rust-htslib",
