@@ -29,4 +29,7 @@ pub struct QcOpts {
     /// e.g. "m6a_per_msp_size\t35,100,false\t100"
     #[clap(short, long)]
     pub m6a_per_msp: bool,
+    /// Only process the first "n" reads in the input bam file.
+    #[clap(long)]
+    pub n_reads: Option<usize>,
 }

@@ -346,7 +346,12 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     let mut bam = opts.input.bam_reader();
     let mut stats = QcStats::new(opts);
 
-    for fiber in opts.input.fibers(&mut bam) {
+    for (idx, fiber) in opts.input.fibers(&mut bam).enumerate() {
+        // break if we have reached the maximum number of reads
+        if idx >= opts.n_reads.unwrap_or(usize::MAX) {
+            break;
+        }
+        // add the read to the stats
         stats.add_read_to_stats(&fiber);
     }
     let mut out = bio_io::writer(&opts.out)?;
