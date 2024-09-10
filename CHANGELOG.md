@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [0.5.4] - 2024-09-10
 
-- Added filtering expressions to `ft` https://github.com/fiberseq/fibertools-rs/pull/57
-- ADD `ft qc` https://github.com/fiberseq/fibertools-rs/pull/59
-- Extended QC commands and added FIRE to prediction https://github.com/fiberseq/fibertools-rs/pull/60
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog with release
+- Readme
+- Readme
+- Readme
 
 ## [0.5.3] - 2024-07-31
 
