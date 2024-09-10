@@ -349,7 +349,7 @@ impl<'a> FiberseqPileup<'a> {
                 // don't write empty lines unless keep_zeros is set
                 if self.pileup_opts.keep_zeros || self.all_data.coverage[write_start_index] > 0 {
                     line += "\n";
-                    out.write_all(line.as_bytes())?;
+                    bio_io::write_to_file(&line, out);
                 }
                 // reset the write indexes
                 write_start_index = i;

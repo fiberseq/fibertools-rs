@@ -82,7 +82,7 @@ impl CenteredFiberData {
         if self.simplify {
             return "N".to_string();
         }
-        let dist = if let Some(dist) = self.dist { dist } else { 0 };
+        let dist = self.dist.unwrap_or(0);
         let seq = self.fiber.record.seq().as_bytes();
 
         let mut out_seq: Vec<u8> = vec![];
