@@ -67,10 +67,13 @@ pub struct QcStats<'a> {
     // phasing information
     phased_reads: HashMap<String, i64>,
     phased_bp: HashMap<String, i64>,
+    //
+    thread_rng: ThreadRng,
 }
 
 impl<'a> QcStats<'a> {
     pub fn new(qc_opts: &'a QcOpts) -> Self {
+        let thread_rng = rand::thread_rng();
         Self {
             fiber_count: 0,
             fiber_lengths: HashMap::new(),
@@ -90,6 +93,7 @@ impl<'a> QcStats<'a> {
             qc_opts,
             phased_reads: HashMap::new(),
             phased_bp: HashMap::new(),
+            thread_rng,
         }
     }
 
@@ -113,9 +117,9 @@ impl<'a> QcStats<'a> {
         }
 
         // test if we should skip or not based on length and random sampling
-        let rand_float: f32 = random();
+        let rand_float: f32 = self.thread_rng.gen_range(0.0..1.0);
         let sample = rand_float < 1.0 / self.qc_opts.acf_sample_rate;
-        if !(self.m6a_acf_starts.len() <= self.qc_opts.acf_max_reads || sample) {
+        if !(self.m6a_acf_starts.len() < self.qc_opts.acf_max_reads || sample) {
             return;
         };
 
@@ -133,7 +137,7 @@ impl<'a> QcStats<'a> {
         // if we have sampled enough that all reads are random replace
         // a random previous read with the current read
         if sample && self.sampled > self.qc_opts.acf_max_reads {
-            let idx = thread_rng().gen_range(0..self.m6a_acf_starts.len());
+            let idx = self.thread_rng.gen_range(0..self.m6a_acf_starts.len());
             self.m6a_acf_starts[idx] = m6a_vec;
             log::debug!(
                 "Replaced read at index {} after the {}th sample",
