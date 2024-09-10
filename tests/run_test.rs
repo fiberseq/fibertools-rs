@@ -113,3 +113,18 @@ fn test_pileup() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(predicate::str::contains("done! Time elapsed:"));
     Ok(())
 }
+
+#[test]
+fn test_qc() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = Command::cargo_bin("ft")?;
+    cmd.arg("qc")
+        .arg("-v")
+        .arg("--acf")
+        .arg("--m6a-per-msp")
+        .arg("tests/data/all.bam")
+        .arg("/dev/null");
+    cmd.assert()
+        .success()
+        .stderr(predicate::str::contains("done! Time elapsed:"));
+    Ok(())
+}

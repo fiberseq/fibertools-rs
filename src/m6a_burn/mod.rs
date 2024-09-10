@@ -24,7 +24,7 @@ pub type BurnDevice = burn::backend::libtorch::LibTorchDevice;
 pub type BurnDevice = burn::backend::candle::CandleDevice;
 
 /// B is for the burn backend and D is for the device
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BurnModels<B>
 where
     B: Backend<Device = BurnDevice>,

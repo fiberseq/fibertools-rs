@@ -4,12 +4,18 @@ use crate::utils::bio_io;
 use anyhow::Result;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use rand::prelude::*;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::io::Write;
 
 // set the precision of the floats to be saved and printed
-fn my_ordered_float(f: f32) -> OrderedFloat<f32> {
+fn ordered_float_100k_round(f: f32) -> OrderedFloat<f32> {
     OrderedFloat((f * 100_000.0).round() / 100_000.0)
+}
+
+fn ordered_float_10k_round(f: f32) -> OrderedFloat<f32> {
+    OrderedFloat((f * 10_000.0).round() / 10_000.0)
 }
 
 #[derive(Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -26,7 +32,7 @@ impl core::fmt::Display for M6aPerMsp {
 }
 
 /// Main QC stat object
-pub struct QcStats {
+pub struct QcStats<'a> {
     pub fiber_count: i64,
     // hashmap that stores lengths of fibers
     pub fiber_lengths: HashMap<i64, i64>,
@@ -52,10 +58,22 @@ pub struct QcStats {
     pub rq: HashMap<OrderedFloat<f32>, i64>,
     // m6a per msp size: (msp size, m6a count, is a FIRE element), number of times seen
     pub m6a_per_msp_size: HashMap<M6aPerMsp, i64>,
+    // m6a starts for acf
+    m6a_acf_starts: VecDeque<Vec<f64>>,
+    // times m6as have been sampled at random for acf
+    sampled: usize,
+    // the qc options for printing
+    qc_opts: &'a QcOpts,
+    // phasing information
+    phased_reads: HashMap<String, i64>,
+    phased_bp: HashMap<String, i64>,
+    //
+    thread_rng: ThreadRng,
 }
 
-impl QcStats {
-    pub fn new() -> Self {
+impl<'a> QcStats<'a> {
+    pub fn new(qc_opts: &'a QcOpts) -> Self {
+        let thread_rng = rand::thread_rng();
         Self {
             fiber_count: 0,
             fiber_lengths: HashMap::new(),
@@ -70,15 +88,69 @@ impl QcStats {
             cpg_count: HashMap::new(),
             m6a_per_msp_size: HashMap::new(),
             rq: HashMap::new(),
+            m6a_acf_starts: VecDeque::new(),
+            sampled: 0,
+            qc_opts,
+            phased_reads: HashMap::new(),
+            phased_bp: HashMap::new(),
+            thread_rng,
         }
     }
 
-    pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData, opts: &QcOpts) {
+    pub fn add_read_to_stats(&mut self, fiber: &fiber::FiberseqData) {
+        // add auto-correlation of m6a
+        self.add_m6a_starts_for_acf(fiber);
+
         self.full_read_stats(fiber);
         self.add_basemod_stats(fiber);
         self.add_ranges(fiber);
-        if opts.m6a_per_msp {
+        if self.qc_opts.m6a_per_msp {
             self.m6a_per_msp(fiber);
+        }
+    }
+
+    /// converts the m6A calls into a boolean vector for the ACF calculation
+    fn add_m6a_starts_for_acf(&mut self, fiber: &fiber::FiberseqData) {
+        // skip conditions
+        if !self.qc_opts.acf || fiber.m6a.starts.len() < self.qc_opts.acf_min_m6a {
+            return;
+        }
+
+        // test if we should skip or not based on length and random sampling
+        let rand_float: f32 = self.thread_rng.gen_range(0.0..1.0);
+        let sample = rand_float < 1.0 / self.qc_opts.acf_sample_rate;
+        if !(self.m6a_acf_starts.len() < self.qc_opts.acf_max_reads || sample) {
+            return;
+        };
+
+        // note how many times we have sampled
+        if sample {
+            self.sampled += 1;
+        }
+
+        // add the m6a to the working queue
+        let mut m6a_vec: Vec<f64> = vec![0.0; fiber.record.seq_len()];
+        for m6a in fiber.m6a.starts.iter().flatten() {
+            m6a_vec[*m6a as usize] = 1.0;
+        }
+
+        // if we have sampled enough that all reads are random replace
+        // a random previous read with the current read
+        if sample && self.sampled > self.qc_opts.acf_max_reads {
+            let idx = self.thread_rng.gen_range(0..self.m6a_acf_starts.len());
+            self.m6a_acf_starts[idx] = m6a_vec;
+            log::debug!(
+                "Replaced read at index {} after the {}th sample",
+                idx,
+                self.sampled
+            );
+            return;
+        }
+
+        // otherwise add to the end while constraining the size of the queue
+        self.m6a_acf_starts.push_back(m6a_vec);
+        if self.m6a_acf_starts.len() > self.qc_opts.acf_max_reads {
+            self.m6a_acf_starts.pop_front();
         }
     }
 
@@ -96,24 +168,36 @@ impl QcStats {
         // read length per nucleosome
         let read_length = fiber.record.seq_len() as f32 / fiber.nuc.starts.len() as f32;
         self.read_length_per_nuc
-            .entry(my_ordered_float(read_length))
+            .entry(ordered_float_10k_round(read_length))
             .and_modify(|e| *e += 1)
             .or_insert(1);
     }
 
     fn full_read_stats(&mut self, fiber: &fiber::FiberseqData) {
+        let hp = fiber.get_hp();
+        // phase
+        self.phased_reads
+            .entry(hp.clone())
+            .and_modify(|e| *e += 1)
+            .or_insert(1);
+        // phased reads
+        self.phased_bp
+            .entry(hp)
+            .and_modify(|e| *e += fiber.record.seq_len() as i64)
+            .or_insert(fiber.record.seq_len() as i64);
+
         self.fiber_count += 1;
         self.fiber_lengths
             .entry(fiber.record.seq_len() as i64)
             .and_modify(|e| *e += 1)
             .or_insert(1);
         self.ccs_passes
-            .entry(my_ordered_float(fiber.ec))
+            .entry(ordered_float_10k_round(fiber.ec))
             .and_modify(|e| *e += 1)
             .or_insert(1);
         if let Some(rq) = fiber.get_rq() {
             self.rq
-                .entry(my_ordered_float(rq))
+                .entry(ordered_float_100k_round(rq))
                 .and_modify(|e| *e += 1)
                 .or_insert(1);
         }
@@ -136,7 +220,7 @@ impl QcStats {
             .count();
         let ratio = m6a_count as f32 / total_at as f32;
         self.m6a_ratio
-            .entry(my_ordered_float(ratio))
+            .entry(ordered_float_100k_round(ratio))
             .and_modify(|e: &mut i64| *e += 1)
             .or_insert(1);
 
@@ -176,6 +260,37 @@ impl QcStats {
         }
     }
 
+    /// Write auto correlation of m6A in fiber-seq data.
+    pub fn write_m6a_acf(&mut self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
+        // if we don't want to calculate the acf, then return
+        if !self.qc_opts.acf {
+            return Ok(());
+        }
+        log::info!("Calculating m6A auto-correlation.");
+        let acf = crate::utils::acf::acf_par(
+            &self
+                .m6a_acf_starts
+                .iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<f64>>(),
+            Some(self.qc_opts.acf_max_lag),
+            false,
+        )?;
+        log::info!("Done calculating m6A auto-correlation!");
+        for (i, val) in acf.iter().enumerate() {
+            out.write_all(
+                format!(
+                    "m6a_acf\t{}\t{}\n",
+                    i,
+                    ordered_float_100k_round(*val as f32)
+                )
+                .as_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
     /// write the output to stdout
     pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         // write the header
@@ -201,11 +316,17 @@ impl QcStats {
         ] {
             out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
         }
+        // write the phasing information
+        for f in &[
+            (&self.phased_reads, "phased_reads"),
+            (&self.phased_bp, "phased_bp"),
+        ] {
+            out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
+        }
         // write the m6a per msp size
         out.write_all(
             Self::hashmap_to_string(&self.m6a_per_msp_size, "m6a_per_msp_size").as_bytes(),
         )?;
-
         Ok(())
     }
 
@@ -221,19 +342,20 @@ impl QcStats {
     }
 }
 
-impl Default for QcStats {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     let mut bam = opts.input.bam_reader();
-    let mut stats = QcStats::default();
-    for fiber in opts.input.fibers(&mut bam) {
-        stats.add_read_to_stats(&fiber, opts);
+    let mut stats = QcStats::new(opts);
+
+    for (idx, fiber) in opts.input.fibers(&mut bam).enumerate() {
+        // break if we have reached the maximum number of reads
+        if idx >= opts.n_reads.unwrap_or(usize::MAX) {
+            break;
+        }
+        // add the read to the stats
+        stats.add_read_to_stats(&fiber);
     }
     let mut out = bio_io::writer(&opts.out)?;
     stats.write(&mut out)?;
+    stats.write_m6a_acf(&mut out)?;
     Ok(())
 }

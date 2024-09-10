@@ -5,9 +5,10 @@ use crate::utils::nucleosome;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use burn::tensor::backend::Backend;
+use fiber::FiberseqData;
 use ordered_float::OrderedFloat;
+use rayon::iter::IndexedParallelIterator;
 use rayon::iter::ParallelIterator;
-use rayon::prelude::IndexedParallelIterator;
 use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
@@ -28,7 +29,7 @@ pub struct PrecisionTable {
     pub data: Vec<(f32, u8)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PredictOptions<B>
 where
     B: Backend<Device = m6a_burn::BurnDevice>,
@@ -188,7 +189,11 @@ where
     }
 
     /// group reads together for predictions so we have to move data to the GPU less often
-    pub fn predict_m6a_on_records(&self, records: Vec<&mut bam::Record>) -> usize {
+    pub fn predict_m6a_on_records(
+        opts: &Self,
+        records: Vec<&mut rust_htslib::bam::Record>,
+        //records: &mut [rust_htslib::bam::Record],
+    ) -> usize {
         // data windows for all the records in this chunk
         let data: Vec<Option<(DataWidows, DataWidows)>> = records
             .iter()
@@ -203,7 +208,7 @@ where
             all_ml_data.extend(t.windows.clone());
             all_count += t.count;
         });
-        let predictions = self.apply_model(&all_ml_data, all_count);
+        let predictions = opts.apply_model(&all_ml_data, all_count);
         assert_eq!(predictions.len(), all_count);
         // split ml results back to all the records and modify the MM ML tags
         assert_eq!(data.len(), records.len());
@@ -224,7 +229,7 @@ where
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
 
                 cur_predict_st += data.count;
-                cur_basemods.base_mods.push(self.basemod_from_ml(
+                cur_basemods.base_mods.push(opts.basemod_from_ml(
                     record,
                     cur_predictions,
                     &data.positions,
@@ -238,10 +243,10 @@ where
             let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
 
             // adding the nucleosomes
-            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &self.nuc_opts);
+            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &opts.nuc_opts);
 
             // clear the existing data
-            if !self.keep {
+            if !opts.keep {
                 record.remove_aux(b"fp").unwrap_or(());
                 record.remove_aux(b"fi").unwrap_or(());
                 record.remove_aux(b"rp").unwrap_or(());
@@ -476,14 +481,14 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
     Some((a_data, t_data))
 }
 
-pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
-    let mut bam = predict_options.input.bam_reader();
-    let mut out = predict_options.input.bam_writer(&predict_options.out);
+pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
+    let mut bam = opts.input.bam_reader();
+    let mut out = opts.input.bam_writer(&opts.out);
     let header = bam::Header::from_template(bam.header());
     // log the options
     log::info!(
         "{} reads included at once in batch prediction.",
-        predict_options.batch_size
+        opts.batch_size
     );
 
     #[cfg(feature = "tch")]
@@ -498,14 +503,17 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
 
     // switch to the internal predict options
     let predict_options: PredictOptions<MlBackend> = PredictOptions::new(
-        predict_options.keep,
-        predict_options.force_min_ml_score,
-        predict_options.all_calls,
+        opts.keep,
+        opts.force_min_ml_score,
+        opts.all_calls,
         find_pb_polymerase(&header),
-        predict_options.batch_size,
-        predict_options.nuc.clone(),
-        predict_options.fake,
+        opts.batch_size,
+        opts.nuc.clone(),
+        opts.fake,
     );
+    // get default fire options
+    let fire_opts = crate::cli::FireOptions::default();
+    let (model, precision_table) = crate::utils::fire::get_model(&fire_opts);
 
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
@@ -515,7 +523,7 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
-            .map(|recs| predict_options.predict_m6a_on_records(recs))
+            .map(|records| PredictOptions::predict_m6a_on_records(&predict_options, records))
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
@@ -523,8 +531,15 @@ pub fn read_bam_into_fiberdata(predict_options: &mut PredictM6AOptions) {
             log::warn!("More than 5% ({:.2}%) of reads were not predicted on. Are HiFi kinetics missing from this file? Enable Debug logging level to show which reads lack kinetics.", 100.0-100.0*frac_called);
         }
 
+        // covert to FiberData and do FIRE predictions
+        let mut fd_recs =
+            FiberseqData::from_records(chunk, &opts.input.header_view(), &opts.input.filters);
+        fd_recs.par_iter_mut().for_each(|fd| {
+            crate::subcommands::fire::add_fire_to_rec(fd, &fire_opts, &model, &precision_table);
+        });
+
         // write to output
-        chunk.iter().for_each(|r| out.write(r).unwrap());
+        fd_recs.iter().for_each(|fd| out.write(&fd.record).unwrap());
     }
 }
 

@@ -66,3 +66,28 @@ pub struct FireOptions {
     #[clap(long, env)]
     pub fdr_table: Option<String>,
 }
+
+impl Default for FireOptions {
+    fn default() -> Self {
+        Self {
+            input: Default::default(),
+            out: "-".to_string(),
+            ont: false,
+            human: false,
+            yeast: false,
+            extract: false,
+            all: false,
+            feats_to_text: false,
+            skip_no_m6a: false,
+            min_msp: 0,
+            min_ave_msp_size: 0,
+            width_bin: 40,
+            bin_num: 9,
+            best_window_size: 100,
+            use_5mc: false,
+            min_msp_length_for_positive_fire_call: 85,
+            model: None,
+            fdr_table: None,
+        }
+    }
+}

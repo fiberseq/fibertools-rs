@@ -12,6 +12,11 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
     // read in bam data
     let bam_chunk_iter = BamChunk::new(bam.records(), None);
 
+    let filter_mod = match &opts.basemod {
+        Some(mod_name) => mod_name,
+        None => "",
+    };
+
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
         // strip
@@ -19,11 +24,18 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
             .par_iter_mut()
             .map(|record| {
                 let mut data = basemods::BaseMods::new(record, 0);
-                if (opts.basemod == "5mC") || (opts.basemod == "CpG") {
+                if (filter_mod == "5mC") || (filter_mod == "CpG") {
                     data.drop_cpg();
-                } else if (opts.basemod == "6mA") || (opts.basemod == "m6A") {
+                } else if (filter_mod == "6mA") || (filter_mod == "m6A") {
                     data.drop_m6a();
                 }
+                if opts.drop_forward {
+                    data.drop_forward();
+                }
+                if opts.drop_reverse {
+                    data.drop_reverse();
+                }
+
                 data.add_mm_and_ml_tags(record);
                 record
             })
