@@ -393,6 +393,14 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
             .filter_on_bit_flags(bam.records())
             .collect();
 
+        log::debug!(
+            "{} records centering on {}:{}:{}",
+            records.len(),
+            center_position.chrom,
+            center_position.position,
+            center_position.strand
+        );
+
         center(
             records,
             &header_view,
