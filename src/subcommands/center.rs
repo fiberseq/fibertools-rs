@@ -311,7 +311,7 @@ pub fn center(
     let total = fiber_data.len();
     let mut seen = 0;
 
-    fiber_data
+    let to_write: Vec<String> = fiber_data
         .into_par_iter()
         .map(|fiber| {
             match CenteredFiberData::new(
@@ -331,13 +331,13 @@ pub fn center(
                 None => "".to_string(),
             }
         })
-        .collect::<Vec<_>>()
-        .iter()
         .filter(|x| !x.is_empty())
-        .for_each(|x| {
-            seen += 1;
-            write_to_file(x, buffer);
-        });
+        .collect::<Vec<_>>();
+
+    for line in to_write {
+        seen += 1;
+        write_to_file(&line, buffer);
+    }
 
     log::debug!(
         "centering {} records of {} on {}:{}:{}",
