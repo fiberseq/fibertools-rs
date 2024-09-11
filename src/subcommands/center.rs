@@ -258,6 +258,7 @@ impl CenteredFiberData {
             ("msp", (msp_st, Some(msp_en), Some(fire))),
         ] {
             let starts = vals.0.iter().collect::<Vec<_>>();
+            log::debug!("{}: {}", t, starts.len());
             let ends: Vec<Option<i64>> = match vals.1 {
                 Some(ends) => ends.to_vec(),
                 None => vec![None; starts.len()],
