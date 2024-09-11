@@ -339,6 +339,15 @@ pub fn center(
             write_to_file(x, buffer);
         });
 
+    log::debug!(
+        "centering {} records of {} on {}:{}:{}",
+        seen,
+        total,
+        center_position.chrom,
+        center_position.position,
+        center_position.strand
+    );
+
     if total - seen > 1 {
         log::warn!(
             "Unable to exactly map {}/{} reads at position {}:{}",
@@ -392,14 +401,6 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
             .filters
             .filter_on_bit_flags(bam.records())
             .collect();
-
-        log::debug!(
-            "{} records centering on {}:{}:{}",
-            records.len(),
-            center_position.chrom,
-            center_position.position,
-            center_position.strand
-        );
 
         center(
             records,
