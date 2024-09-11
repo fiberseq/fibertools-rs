@@ -258,7 +258,6 @@ impl CenteredFiberData {
             ("msp", (msp_st, Some(msp_en), Some(fire))),
         ] {
             let starts = vals.0.iter().collect::<Vec<_>>();
-            log::debug!("{}: {}", t, starts.len());
             let ends: Vec<Option<i64>> = match vals.1 {
                 Some(ends) => ends.to_vec(),
                 None => vec![None; starts.len()],
@@ -267,7 +266,7 @@ impl CenteredFiberData {
                 Some(quals) => quals.to_vec(),
                 None => vec![0; starts.len()],
             };
-
+            let mut write_count = 0;
             for ((&st, &en), &qual) in starts.iter().zip(ends.iter()).zip(quals.iter()) {
                 let Some(st) = st else {
                     continue;
@@ -292,8 +291,10 @@ impl CenteredFiberData {
                         format_args!("{}\t{}\t{}\t{}\n", t, st, en, qual)
                     )
                     .unwrap();
+                    write_count += 1;
                 }
             }
+            log::debug!("{}: {}", t, write_count);
         }
 
         rtn
