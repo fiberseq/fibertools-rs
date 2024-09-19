@@ -28,4 +28,15 @@ pub struct PileupOptions {
     /// Write output one base at a time even if the values do not change
     #[clap(short, long)]
     pub per_base: bool,
+    /// Calculate coverage starting from the first MSP/NUC to the last MSP/NUC
+    /// position instead of the complete span of the read alignment.
+    #[clap(long)]
+    pub fiber_coverage: bool,
+    /// Shuffle the fiber-seq data according to a bed file of
+    /// the shuffled positions of the fiber-seq data
+    ///
+    /// The bed file should have the following format:
+    /// #chrom shuffled_start shuffled_end read_name original_start
+    #[clap(long)]
+    pub shuffle: Option<String>,
 }
