@@ -39,4 +39,13 @@ pub struct PileupOptions {
     /// #chrom shuffled_start shuffled_end read_name original_start
     #[clap(long)]
     pub shuffle: Option<String>,
+    /// Output a rolling max of the score column over X bases
+    #[clap(long)]
+    pub rolling_max: Option<usize>,
+    /// No MSP columns
+    #[clap(long)]
+    pub no_msp: bool,
+    /// No NUC columns
+    #[clap(long)]
+    pub no_nuc: bool,
 }

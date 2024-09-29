@@ -7,6 +7,7 @@ use anyhow::{anyhow, Ok};
 use std::collections::HashMap;
 use std::io::BufRead;
 //use polars::prelude::*;
+use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};
 
@@ -56,9 +57,15 @@ impl PartialEq for FireRow<'_> {
 impl std::fmt::Display for FireRow<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut rtn = format!(
-            "\t{}\t{}\t{}\t{}\t{}",
-            self.coverage, self.fire_coverage, self.score, self.nuc_coverage, self.msp_coverage
+            "\t{}\t{}\t{}",
+            self.coverage, self.fire_coverage, self.score
         );
+        if !self.pileup_opts.no_nuc {
+            rtn += &format!("\t{}", self.nuc_coverage);
+        }
+        if !self.pileup_opts.no_msp {
+            rtn += &format!("\t{}", self.msp_coverage);
+        }
         if self.pileup_opts.m6a {
             rtn += &format!("\t{}", self.m6a_coverage);
         }
@@ -299,10 +306,13 @@ impl<'a> FireTrack<'a> {
         }
 
         // add other sets of data to the FireTrack depending on CLI opts
-        let mut pairs = vec![
-            (&mut self.nuc_coverage, &fiber.nuc),
-            (&mut self.msp_coverage, &fiber.msp),
-        ];
+        let mut pairs = vec![];
+        if !self.pileup_opts.no_nuc {
+            pairs.push((&mut self.nuc_coverage, &fiber.nuc));
+        }
+        if !self.pileup_opts.no_msp {
+            pairs.push((&mut self.msp_coverage, &fiber.msp));
+        }
         if self.pileup_opts.m6a {
             pairs.push((&mut self.m6a_coverage, &fiber.m6a));
         }
@@ -323,6 +333,25 @@ impl<'a> FireTrack<'a> {
                 self.scores[i] = self.raw_scores[i] / self.coverage[i] as f32;
             }
         }
+    }
+
+    pub fn calculate_rolling_max_score(&mut self) -> Vec<f32> {
+        let mut rolling_max = vec![-1.0; self.track_len];
+        let window_size = self.pileup_opts.rolling_max.unwrap();
+        let look_back = window_size / 2;
+        for i in 0..self.track_len {
+            let start = if i < look_back { 0 } else { i - look_back };
+            let mut end = i + look_back;
+            if end > self.track_len {
+                end = self.track_len;
+            }
+            let relevant_scores = &self.scores[start..end];
+            rolling_max[i] = *relevant_scores
+                .iter()
+                .max_by_key(|x| NotNan::new(**x).unwrap())
+                .unwrap_or(&-1.0);
+        }
+        rolling_max
     }
 
     pub fn row(&self, i: usize) -> FireRow {
@@ -351,6 +380,7 @@ pub struct FiberseqPileup<'a> {
     has_data: bool,
     pileup_opts: &'a PileupOptions,
     shuffled_fibers: &'a Option<ShuffledFibers>,
+    rolling_max: Option<Vec<f32>>,
 }
 
 impl<'a> FiberseqPileup<'a> {
@@ -395,6 +425,7 @@ impl<'a> FiberseqPileup<'a> {
             has_data: false,
             pileup_opts,
             shuffled_fibers,
+            rolling_max: None,
         }
     }
 
@@ -467,9 +498,15 @@ impl<'a> FiberseqPileup<'a> {
 
         for suffix in suffixes {
             header += &format!(
-                "\t{}{suffix}\t{}{suffix}\t{}{suffix}\t{}{suffix}\t{}{suffix}",
-                "coverage", "fire_coverage", "score", "nuc_coverage", "msp_coverage",
+                "\t{}{suffix}\t{}{suffix}\t{}{suffix}",
+                "coverage", "fire_coverage", "score",
             );
+            if !pileup_opts.no_nuc {
+                header += &format!("\t{}{suffix}", "nuc_coverage");
+            }
+            if !pileup_opts.no_msp {
+                header += &format!("\t{}{suffix}", "msp_coverage");
+            }
             if pileup_opts.m6a {
                 header += &format!("\t{}{suffix}", "m6a_coverage");
             }
@@ -477,12 +514,20 @@ impl<'a> FiberseqPileup<'a> {
                 header += &format!("\t{}{suffix}", "cpg_coverage");
             }
         }
+        if pileup_opts.rolling_max.is_some() {
+            header += "\trolling_max";
+        }
         header += "\n";
         header
     }
 
     fn calculate_scores(&mut self) {
         self.all_data.calculate_scores();
+        // calculate rolling max
+        if self.pileup_opts.rolling_max.is_some() {
+            self.rolling_max = Some(self.all_data.calculate_rolling_max_score());
+        }
+        // scores for other tracks
         if let Some(hap1_data) = &mut self.hap1_data {
             hap1_data.calculate_scores();
         }
@@ -583,6 +628,12 @@ impl<'a> FiberseqPileup<'a> {
 
                 for data in data_tracks {
                     line += data.row(write_start_index).to_string().as_str();
+                }
+                if self.pileup_opts.rolling_max.is_some() {
+                    line += &format!(
+                        "\t{}",
+                        self.rolling_max.as_ref().unwrap()[write_start_index]
+                    );
                 }
                 // don't write empty lines unless keep_zeros is set
                 let mut cov = self.all_data.coverage[write_start_index];
