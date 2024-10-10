@@ -327,7 +327,7 @@ impl<'a> FireTrack<'a> {
 
     pub fn calculate_scores(&mut self) {
         for i in 0..self.track_len {
-            if self.fire_coverage[i] == 0 {
+            if self.fire_coverage[i] <= 0 {
                 self.scores[i] = -1.0;
             } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE
                 && self.pileup_opts.shuffle.is_none()
