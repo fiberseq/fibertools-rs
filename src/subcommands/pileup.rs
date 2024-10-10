@@ -327,8 +327,12 @@ impl<'a> FireTrack<'a> {
 
     pub fn calculate_scores(&mut self) {
         for i in 0..self.track_len {
-            // there is no minimum fire coverage if we are shuffling
-            if self.fire_coverage[i] < MIN_FIRE_COVERAGE && self.pileup_opts.shuffle.is_none() {
+            if self.fire_coverage[i] == 0 {
+                self.scores[i] = -1.0;
+            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE
+                && self.pileup_opts.shuffle.is_none()
+            {
+                // there is no minimum fire coverage if we are shuffling
                 self.scores[i] = -1.0;
             } else {
                 self.scores[i] = self.raw_scores[i] / self.coverage[i] as f32;
