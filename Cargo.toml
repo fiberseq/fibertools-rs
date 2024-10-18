@@ -57,6 +57,8 @@ rand = "0.8.5"
 
 [build-dependencies]
 burn-import = {version = "0.12"}
+vergen-git2 = { version = "1.0.1", features = ["build"] }
+
 
 [dev-dependencies]
 assert_cmd = "2.0.11"

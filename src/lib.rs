@@ -12,14 +12,16 @@ pub mod cli;
 use crate::utils::bio_io::*;
 use anyhow::Result;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use rust_htslib::bam::FetchDefinition;
 use rust_htslib::{bam, bam::Read};
 use std::env;
 use std::io::Write;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const GIT_HASH: &str = env!("CARGO_GIT_HASH");
-pub const LONG_VERSION: &str = env!("CARGO_LONG_VERSION");
+lazy_static! {
+    pub static ref FULL_VERSION: String = format!("{}", env!("VERGEN_GIT_DESCRIBE"));
+}
 // if this string (bar)gets too long it displays weird when writing to stdout
 const PROGRESS_STYLE: &str =
     "[{elapsed_precise:.yellow}] {bar:>35.cyan/blue} {human_pos:>5.cyan}/{human_len:.blue} {percent:>3.green}% {per_sec:<10.cyan}";
