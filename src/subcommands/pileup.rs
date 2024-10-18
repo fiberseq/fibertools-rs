@@ -344,14 +344,14 @@ impl<'a> FireTrack<'a> {
         let mut rolling_max = vec![-1.0; self.track_len];
         let window_size = self.pileup_opts.rolling_max.unwrap();
         let look_back = window_size / 2;
-        for i in 0..self.track_len {
+        for (i, cur_roll_max) in rolling_max.iter_mut().enumerate().take(self.track_len) {
             let start = if i < look_back { 0 } else { i - look_back };
             let mut end = i + look_back;
             if end > self.track_len {
                 end = self.track_len;
             }
             let relevant_scores = &self.scores[start..end];
-            rolling_max[i] = *relevant_scores
+            *cur_roll_max = *relevant_scores
                 .iter()
                 .max_by_key(|x| NotNan::new(**x).unwrap())
                 .unwrap_or(&-1.0);
