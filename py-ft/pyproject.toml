@@ -18,3 +18,4 @@ python-source = "python"
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+

@@ -2,6 +2,7 @@
 edition = "2021"
 name = "pyft"
 version = "0.2.4"
+readme = "./README.md"
 
 [lib]
 crate-type = ["cdylib"]
