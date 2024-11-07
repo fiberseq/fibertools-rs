@@ -1,4 +1,5 @@
 import altair as alt
+import pandas as pd
 
 alt.data_transformers.enable("vegafusion")
 
@@ -213,3 +214,104 @@ def _add_footprint_lines_to_centered_chart(dfm):
         )
     )
     return footprint_lines
+
+
+
+def extract_chart(
+    in_df,
+    height=600,
+    width=800,
+    m6a_color=M6A_COLOR,
+    m5c_color=M5C_COLOR,
+    nuc_color=NUC_COLOR,
+    msp_color=MSP_COLOR,
+    max_fibers=None,
+):
+    """Make an altair chart from a dataframe of centered positions
+    Args:
+        in_df (_type_): _description_
+        m6a_color (_type_, optional): _description_. Defaults to M6A_COLOR.
+        m5c_color (_type_, optional): _description_. Defaults to M5C_COLOR.
+        nuc_color (_type_, optional): _description_. Defaults to NUC_COLOR.
+        msp_color (_type_, optional): _description_. Defaults to MSP_COLOR.
+        auto_sort (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        altair.Chart
+    """
+    dfm = (
+        in_df.copy()[
+            [
+                "long_start",
+                "long_end",
+                "type",
+                "fiber",
+            ]
+        ]
+        .dropna()
+        .reset_index(drop=True)
+        .infer_objects()
+    )  # .query("centered_position_type != '5mC'") 
+
+    # set the colors
+    color_m6a = alt.param(value=m6a_color, bind=alt.binding(input="color", name="m6a"))
+    color_5mc = alt.param(value=m5c_color, bind=alt.binding(input="color", name="5mC"))
+    color_nuc = alt.param(value=nuc_color, bind=alt.binding(input="color", name="nuc"))
+    color_msp = alt.param(value=msp_color, bind=alt.binding(input="color", name="msp"))
+
+    domain = ["5mC", "m6a", "nuc", "msp"]
+    range_ = [color_5mc, color_m6a, color_nuc, color_msp]
+    opacity = dict(zip(domain, [1.0, 1.0, 0.5, 0.20]))
+
+    # add opacity column to the dataframe
+    dfm = dfm.assign(opacity=dfm["type"].map(opacity))
+
+    dfm["long_end"] = dfm["long_end"]
+
+    # convert fiber column to integer
+    dfm["height"] = 0.4
+    dfm.loc[dfm.type=="nuc", "height"] = 0.2
+    dfm.loc[dfm.type=="msp", "height"] = 0.3
+    dfm["y"] = pd.factorize(dfm["fiber"])[0] - dfm["height"]
+    dfm["y2"] = pd.factorize(dfm["fiber"])[0] + dfm["height"]
+    if max_fibers is not None:
+        dfm = dfm.query("y < @max_fibers")
+    
+    
+    bind_range_w = alt.binding_range(min=200, max=1600, name="Chart width: ")
+    param_width = alt.param("width", bind=bind_range_w)
+    bind_range_h = alt.binding_range(min=200, max=1600, name="Chart height: ")
+    param_height = alt.param("height", bind=bind_range_h)
+
+    base = (
+        alt.Chart(dfm)
+        .encode(
+            x=alt.X("long_start:Q", scale=alt.Scale(domain=(500, 2500))),
+            x2="long_end:Q",
+            color=alt.Color("type:O").scale(domain=domain, range=range_),
+            y="y:Q",
+            y2="y2:Q",
+            opacity=alt.Opacity("opacity"),
+            # opacity=alt.condition(type_selection, "opacity", alt.value(0))
+        )
+    )
+
+  
+    chart = base.mark_rect()
+    chart = (
+        chart.properties(width=width, height=height)
+        .add_params(
+            param_width,
+            param_height,
+            color_m6a,
+            color_5mc,
+            color_nuc,
+            color_msp,
+        )
+        .interactive(
+            bind_y = False
+        ) 
+    )
+
+    return chart
+

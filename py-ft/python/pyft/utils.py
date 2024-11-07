@@ -1,5 +1,8 @@
 import pandas as pd
 import altair as alt
+import polars as pl
+import numpy as np
+import polars.selectors as cs
 
 alt.data_transformers.enable("vegafusion")
 
@@ -22,6 +25,123 @@ def empty_data_dict():
         "end": [],
         "qual": [],
     }
+    
+
+def split_to_ints(df, col, sep=",", trim=True):
+    """Split a columns with list of ints separated by
+    "sep" into a numpy array quickly.
+
+    Args:
+        df (dataframe): dataframe that is like a bed12 file.
+        col (str): column name within the dataframe to split up.
+        sep (str, optional): Defaults to ",".
+        trim (bool, optional): Remove the first and last call from the bed12 (removes bookendings). Defaults to True.
+
+    Returns:
+        column: New column that is a list of numpy array of ints.
+    """
+    if trim:
+        return df[col].map_elements(
+            lambda x: np.fromstring(x, sep=sep, dtype=np.int32)[1:-1],
+            return_dtype=pl.datatypes.List(pl.datatypes.Int32),
+        )
+    return df[col].map_elements(
+        lambda x: np.fromstring(x, sep=sep, dtype=np.int32),
+        return_dtype=pl.datatypes.List(pl.datatypes.Int32),
+    )
+
+
+
+def read_extract_all(f: str, pandas=False, n_rows=None, long=False):
+    """Read a table made with fibertools-rs. Specifically `ft extract --all`.
+    Args:
+        f (str): File path to the table. Can be compressed.
+    Returns:
+        pl.DataFrame: Dataframe of the table.
+    """
+    cols_with_lists = [
+        "nuc_starts",
+        "nuc_lengths",
+        "ref_nuc_starts",
+        "ref_nuc_lengths",
+        "msp_starts",
+        "msp_lengths",
+        "fire",
+        "ref_msp_starts",
+        "ref_msp_lengths",
+        "m6a",
+        "ref_m6a",
+        "m6a_qual",
+        "5mC",
+        "ref_5mC",
+        "5mC_qual",
+    ]
+    df = pl.read_csv(
+        f,
+        separator="\t",
+        n_rows=n_rows,
+        null_values=["."],
+        comment_prefix=None,
+    )
+    # clean up comment char
+    df.columns = list(map(lambda x: x.strip("#"), df.columns))
+    if df.shape[0] > 0:
+        for col in cols_with_lists:
+            col_index = df.columns.index(col)
+            df.replace_column(col_index, split_to_ints(df, col, trim=False))
+    
+    if long:
+        explode_sets = {
+            "m6a":["m6a", "ref_m6a", "m6a_qual"],
+            "5mC": ["5mC", "ref_5mC", "5mC_qual"],
+            "msp": ["msp_starts", "msp_lengths", "ref_msp_starts", "ref_msp_lengths", "fire"],
+            "nuc": ["nuc_starts", "nuc_lengths", "ref_nuc_starts", "ref_nuc_lengths"],
+        }
+        def my_rename(col):
+            if col == "m6a" or col == "5mC" or col == "msp_starts" or col == "nuc_starts":
+                return "long_start"
+            if col == "ref_m6a" or col == "ref_5mC" or col == "ref_msp_starts" or col == "ref_nuc_starts":
+                return "long_ref_start"
+            if col == "m6a_qual" or col == "5mC_qual" or col == "fire":
+                return "long_qual"
+            if col == "msp_lengths" or col == "nuc_lengths":
+                return "zlength"
+            if col == "ref_msp_lengths" or col == "ref_nuc_lengths":
+                return "ref_zlength"
+            else:
+                return col
+            
+        
+        all_explode_cols = [s for _t, sublist in explode_sets.items() for s in sublist] 
+        dfs = []
+        for cur_type, s in explode_sets.items():
+            not_in_s = [x for x in all_explode_cols if x not in s]
+            tdf = df.drop(not_in_s).explode(s).with_columns(
+                pl.lit(cur_type).alias("type")
+            ).rename(my_rename)
+            if cur_type == "m6a" or cur_type == "5mC":
+                tdf = tdf.with_columns(
+                    zlength=1,
+                    ref_zlength=1,
+                )
+            if cur_type == "nuc":
+                tdf = tdf.with_columns(
+                    long_qual=0,
+                )
+            tdf = tdf.with_columns(
+                long_end=pl.col("long_start") + pl.col("zlength"),
+                long_ref_end=pl.col("long_ref_start") + pl.col("ref_zlength"),
+            ).drop(
+                cs.contains("zlength")
+            )
+            tdf=tdf.select(sorted(tdf.columns))
+            dfs.append(tdf)
+        # concat all of the dataframes
+        df = pl.concat(dfs)
+    if pandas:
+        df = pd.DataFrame(df.to_dicts())
+    return df
+
 
 
 def footprint_code_to_vec(footprint_code, n_modules):
