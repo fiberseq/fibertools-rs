@@ -230,13 +230,13 @@ def extract_chart(
 ):
     """Make an altair chart from a dataframe of centered positions
     Args:
-        in_df (_type_): _description_
+        in_df (_type_): Pandas DataFrame from utils.read_extract_all with long=True.
         m6a_color (_type_, optional): _description_. Defaults to M6A_COLOR.
         m5c_color (_type_, optional): _description_. Defaults to M5C_COLOR.
         nuc_color (_type_, optional): _description_. Defaults to NUC_COLOR.
         msp_color (_type_, optional): _description_. Defaults to MSP_COLOR.
-        auto_sort (bool, optional): _description_. Defaults to True.
-
+        max_fibers (_type_, optional): maximum number of fibers to plot. Defaults to None.
+        ref (_type_, optional): Whether to use reference (ref) coordinates. Defaults to True.
     Returns:
         altair.Chart
     """
