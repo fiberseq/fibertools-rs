@@ -226,6 +226,7 @@ def extract_chart(
     nuc_color=NUC_COLOR,
     msp_color=MSP_COLOR,
     max_fibers=None,
+    ref=True,
 ):
     """Make an altair chart from a dataframe of centered positions
     Args:
@@ -239,11 +240,17 @@ def extract_chart(
     Returns:
         altair.Chart
     """
+    if ref:
+        start = "long_ref_start"
+        end = "long_ref_end"
+    else:
+        start = "long_start"
+        end = "long_end"
     dfm = (
         in_df.copy()[
             [
-                "long_start",
-                "long_end",
+                start,
+                end,
                 "type",
                 "fiber",
             ]
@@ -286,8 +293,8 @@ def extract_chart(
     base = (
         alt.Chart(dfm)
         .encode(
-            x=alt.X("long_start:Q", scale=alt.Scale(domain=(500, 2500))),
-            x2="long_end:Q",
+            x=alt.X(f"{start}:Q", scale=alt.Scale(domain=(500, 2500))),
+            x2=f"{end}:Q",
             color=alt.Color("type:O").scale(domain=domain, range=range_),
             y="y:Q",
             y2="y2:Q",
