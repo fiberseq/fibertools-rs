@@ -3,11 +3,6 @@ use rust_htslib::{
     bam,
     bam::record::{Aux, AuxArray},
 };
-pub static NUC_LEN: &str = "75";
-pub static COMBO_NUC_LEN: &str = "100";
-pub static MIN_DIST_ADDED: &str = "25";
-pub static DIST_FROM_END: &str = "45";
-pub static ALLOWED_SKIPS: &str = "-1";
 
 pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeParameters) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
@@ -107,7 +102,7 @@ pub fn d_segment_nucleosomes(m6a: &[i64], options: &NucleosomeParameters) -> Vec
     let mut pre_m6a = -1;
     let mut scores = vec![];
     for &cur_m6a in m6a {
-        let m6a_clear_stretch = cur_m6a - pre_m6a - 1;
+        let m6a_clear_stretch: i64 = cur_m6a - pre_m6a - 1;
         scores.push((m6a_clear_stretch, pre_m6a + 1, cur_m6a));
         scores.push((-1, cur_m6a, cur_m6a + 1));
         pre_m6a = cur_m6a;

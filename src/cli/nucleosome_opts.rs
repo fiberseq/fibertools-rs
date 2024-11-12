@@ -1,7 +1,12 @@
 use crate::utils::input_bam::InputBam;
-use crate::utils::nucleosome::*;
 use clap::Args;
 use std::fmt::Debug;
+
+pub static NUC_LEN: &str = "75";
+pub static COMBO_NUC_LEN: &str = "100";
+pub static MIN_DIST_ADDED: &str = "25";
+pub static DIST_FROM_END: &str = "45";
+pub static ALLOWED_SKIPS: &str = "-1";
 
 #[derive(Args, Debug, Clone)]
 pub struct NucleosomeParameters {
