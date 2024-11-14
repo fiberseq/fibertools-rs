@@ -10,7 +10,7 @@ classifiers = [
 ]
 name = "pyft"
 requires-python = ">=3.7"
-dependencies = ["pandas>=2.0", "altair>=5.0", "vegafusion[embed]", "tqdm"]
+dependencies = ["pandas>=2.0", "altair==5.1", "vegafusion[embed]", "tqdm", "typing-extensions", "polars"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
@@ -18,3 +18,4 @@ python-source = "python"
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+

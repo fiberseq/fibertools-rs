@@ -6,7 +6,7 @@ use std::fmt::Debug;
 pub struct ExtractOptions {
     #[clap(flatten)]
     pub input: InputBam,
-    /// Report in reference sequence coordinates
+    /// Report positions in reference sequence coordinates
     #[clap(short, long, default_value = "true",
           default_value_ifs([
               ("molecular", "true", "false"),

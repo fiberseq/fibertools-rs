@@ -265,6 +265,9 @@ where
         positions: &[usize],
         base_mod: &str,
     ) -> basemods::BaseMod {
+        // do not report predictions for the first and last 7 bases
+        let min_pos = (WINDOW / 2) as i64;
+        let max_pos = (record.seq_len() - WINDOW / 2) as i64;
         let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
             Vec<u8>,
             Vec<f32>,
@@ -273,7 +276,7 @@ where
             .iter()
             .zip(positions.iter())
             .map(|(&x, &pos)| (self.float_to_u8(x), x, pos as i64))
-            .filter(|(ml, _, _)| *ml >= self.min_ml_value())
+            .filter(|(ml, _, pos)| *ml >= self.min_ml_value() && *pos >= min_pos && *pos < max_pos)
             .multiunzip();
 
         log::debug!(

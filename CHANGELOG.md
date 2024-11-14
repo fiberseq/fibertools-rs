@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2024-11-14
+
+### 🚀 Features
+
+- Add ability to drop mods below an ML score
+- Add shuffle option to pileup that produces a shuffled track in addition to the real one
+- Nuc and msp optional
+
+### 🐛 Bug Fixes
+
+- Report footprint codes even if there is no spanning msp, will fix #63
+- Do not report m6A predictions that happen within the first 7 or last 7 bp of a read. This is so the ML model only operates on real data. No changes to other calls.
+
 ## [0.5.4] - 2024-09-10
 
 ### ⚙️ Miscellaneous Tasks
@@ -10,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Readme
 - Readme
 - Readme
+- Release fibertools-rs version 0.5.4
 
 ## [0.5.3] - 2024-07-31
 

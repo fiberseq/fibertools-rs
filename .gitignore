@@ -18,3 +18,7 @@ tests/data/chr20*bam*
 hub.txt
 *test.bam*
 py-ft/Cargo.lock
+py-ft/test.html
+py-ft/test.py
+py-ft/test.tbl
+tests/data/shuffle.chr20.hifi.bed.gz

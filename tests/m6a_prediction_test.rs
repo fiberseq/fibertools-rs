@@ -1,3 +1,4 @@
+use fibertools_rs::subcommands::predict_m6a::WINDOW;
 use fibertools_rs::utils::bio_io;
 use fibertools_rs::utils::input_bam::FiberFilters;
 use rust_htslib::bam::Reader;
@@ -7,15 +8,24 @@ fn sum_qual(bam: &mut Reader) -> usize {
     let fibers = fibertools_rs::fiber::FiberseqRecords::new(bam, FiberFilters::default());
     // sum up all quality scores across all fibers
     let mut sum = 0;
+    let mut count = 0;
     for fiber in fibers {
-        sum += fiber
+        let min_pos = (WINDOW / 2) as i64;
+        let max_pos = (fiber.record.seq_len() - WINDOW / 2) as i64;
+        let mut this_count = 0;
+        let this_qual_sum = fiber
             .m6a
-            .qual
             .into_iter()
-            .map(|x| x as usize)
+            .filter(|(st, en, _, _, _)| *st >= min_pos && *en < max_pos)
+            .map(|(_, _, _, qual, _)| {
+                this_count += 1;
+                qual as usize
+            })
             .sum::<usize>();
+        sum += this_qual_sum;
+        count += this_count;
     }
-    eprintln!("sum {:?}", sum);
+    eprintln!("sum {:?}; count {:?}", sum, count);
     // now count for the input bam file as well
     sum
 }

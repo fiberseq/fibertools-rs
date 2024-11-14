@@ -266,7 +266,7 @@ impl CenteredFiberData {
                 Some(quals) => quals.to_vec(),
                 None => vec![0; starts.len()],
             };
-
+            let mut write_count = 0;
             for ((&st, &en), &qual) in starts.iter().zip(ends.iter()).zip(quals.iter()) {
                 let Some(st) = st else {
                     continue;
@@ -291,8 +291,10 @@ impl CenteredFiberData {
                         format_args!("{}\t{}\t{}\t{}\n", t, st, en, qual)
                     )
                     .unwrap();
+                    write_count += 1;
                 }
             }
+            log::debug!("{}: {}", t, write_count);
         }
 
         rtn
@@ -311,7 +313,7 @@ pub fn center(
     let total = fiber_data.len();
     let mut seen = 0;
 
-    fiber_data
+    let to_write: Vec<String> = fiber_data
         .into_par_iter()
         .map(|fiber| {
             match CenteredFiberData::new(
@@ -331,13 +333,22 @@ pub fn center(
                 None => "".to_string(),
             }
         })
-        .collect::<Vec<_>>()
-        .iter()
         .filter(|x| !x.is_empty())
-        .for_each(|x| {
-            seen += 1;
-            write_to_file(x, buffer);
-        });
+        .collect::<Vec<_>>();
+
+    for line in to_write {
+        seen += 1;
+        write_to_file(&line, buffer);
+    }
+
+    log::debug!(
+        "centering {} records of {} on {}:{}:{}",
+        seen,
+        total,
+        center_position.chrom,
+        center_position.position,
+        center_position.strand
+    );
 
     if total - seen > 1 {
         log::warn!(

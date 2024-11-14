@@ -241,6 +241,22 @@ impl BaseMods {
         self.base_mods.retain(|bm| bm.strand == '+');
     }
 
+    /// drop m6A modifications with a qual less than the min_ml_score
+    pub fn filter_m6a(&mut self, min_ml_score: u8) {
+        self.base_mods
+            .iter_mut()
+            .filter(|bm| bm.is_m6a())
+            .for_each(|bm| bm.ranges.filter_by_qual(min_ml_score));
+    }
+
+    /// drop 5mC modifications with a qual less than the min_ml_score
+    pub fn filter_5mc(&mut self, min_ml_score: u8) {
+        self.base_mods
+            .iter_mut()
+            .filter(|bm| bm.is_cpg())
+            .for_each(|bm| bm.ranges.filter_by_qual(min_ml_score));
+    }
+
     /// combine the forward and reverse m6a data
     pub fn m6a(&self) -> Ranges {
         let ranges = self
