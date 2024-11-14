@@ -4,16 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [0.6.0] - 2024-11-14
 
-### 🚀 Features
-
-- Add ability to drop mods below an ML score
-- Add shuffle option to pileup that produces a shuffled track in addition to the real one
-- Nuc and msp optional
-
-### 🐛 Bug Fixes
-
-- Report footprint codes even if there is no spanning msp, will fix #63
-- Do not report m6A predictions that happen within the first 7 or last 7 bp of a read. This is so the ML model only operates on real data. No changes to other calls.
+- fix: do not report m6A predictions that happen within the first 7 or last 7 bp of a read. This is so the ML model only operates on real data. No changes to other calls. Will fix #65
+- fix: report footprint codes even if there is no spanning msp, fixes #63
+- feat: add a pyft utility that can take extract --all data and make it long format for plotting.
+- feat: Add a shuffle option to pileup to help with the FDR calculations in FIRE
+- feat: make nucleosomes and MSPs optional in pileup
+- chore: use vergen for cli version
+- feat: add phasing stats to QC
+- feat: allow strip-base mods to filter on base mod quality.
 
 ## [0.5.4] - 2024-09-10
 
