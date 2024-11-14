@@ -1,6 +1,22 @@
-use std::process::Command;
+use std::error::Error;
+use vergen_git2::*;
+
+fn vergen() -> Result<(), Box<dyn Error>> {
+    // NOTE: This will output everything, and requires all features enabled.
+    // NOTE: See the specific builder documentation for configuration options.
+    let build = BuildBuilder::all_build()?;
+    let git2 = Git2Builder::all_git()?;
+
+    Emitter::default()
+        .add_instructions(&build)?
+        .add_instructions(&git2)?
+        .emit()?;
+    Ok(())
+}
 
 fn main() {
+    /*
+    use std::process::Command;
     let output = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
@@ -12,6 +28,8 @@ fn main() {
         cargo:rustc-env=CARGO_LONG_VERSION={} commit:{}",
         git_hash, version, git_hash
     );
+    */
+    vergen().expect("Unable to set version and git hash");
 
     // Generate the model code and state file from the ONNX file.
     use burn_import::onnx::ModelGen;

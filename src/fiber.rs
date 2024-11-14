@@ -125,6 +125,10 @@ impl FiberseqData {
     // GET FUNCTIONS
     //
 
+    pub fn get_qname(&self) -> String {
+        String::from_utf8_lossy(self.record.qname()).to_string()
+    }
+
     pub fn get_rq(&self) -> Option<f32> {
         if let Ok(Aux::Float(f)) = self.record.aux(b"rq") {
             Some(f)

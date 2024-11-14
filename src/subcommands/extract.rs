@@ -61,65 +61,50 @@ impl FiberOut {
 }
 
 pub fn process_bam_chunk(fiber_data: Vec<FiberseqData>, out_files: &mut FiberOut) {
-    match &mut out_files.m6a {
-        Some(m6a) => {
-            let out: Vec<String> = fiber_data
-                .par_iter()
-                .map(|r| r.write_m6a(out_files.reference))
-                .collect();
-            for line in out {
-                write_to_file(&line, m6a);
-            }
+    if let Some(m6a) = &mut out_files.m6a {
+        let out: Vec<String> = fiber_data
+            .par_iter()
+            .map(|r| r.write_m6a(out_files.reference))
+            .collect();
+        for line in out {
+            write_to_file(&line, m6a);
         }
-        None => {}
     }
-    match &mut out_files.cpg {
-        Some(cpg) => {
-            let out: Vec<String> = fiber_data
-                .par_iter()
-                .map(|r| r.write_cpg(out_files.reference))
-                .collect();
-            for line in out {
-                write_to_file(&line, cpg);
-            }
+    if let Some(cpg) = &mut out_files.cpg {
+        let out: Vec<String> = fiber_data
+            .par_iter()
+            .map(|r| r.write_cpg(out_files.reference))
+            .collect();
+        for line in out {
+            write_to_file(&line, cpg);
         }
-        None => {}
     }
-    match &mut out_files.msp {
-        Some(msp) => {
-            let out: Vec<String> = fiber_data
-                .par_iter()
-                .map(|r| r.write_msp(out_files.reference))
-                .collect();
-            for line in out {
-                write_to_file(&line, msp);
-            }
+    if let Some(msp) = &mut out_files.msp {
+        let out: Vec<String> = fiber_data
+            .par_iter()
+            .map(|r| r.write_msp(out_files.reference))
+            .collect();
+        for line in out {
+            write_to_file(&line, msp);
         }
-        None => {}
     }
-    match &mut out_files.nuc {
-        Some(nuc) => {
-            let out: Vec<String> = fiber_data
-                .par_iter()
-                .map(|r| r.write_nuc(out_files.reference))
-                .collect();
-            for line in out {
-                write_to_file(&line, nuc);
-            }
+    if let Some(nuc) = &mut out_files.nuc {
+        let out: Vec<String> = fiber_data
+            .par_iter()
+            .map(|r| r.write_nuc(out_files.reference))
+            .collect();
+        for line in out {
+            write_to_file(&line, nuc);
         }
-        None => {}
     }
-    match &mut out_files.all {
-        Some(all) => {
-            let out: Vec<String> = fiber_data
-                .par_iter()
-                .map(|r| r.write_all(out_files.simplify, out_files.quality))
-                .collect();
-            for line in out {
-                write_to_file(&line, all);
-            }
+    if let Some(all) = &mut out_files.all {
+        let out: Vec<String> = fiber_data
+            .par_iter()
+            .map(|r| r.write_all(out_files.simplify, out_files.quality))
+            .collect();
+        for line in out {
+            write_to_file(&line, all);
         }
-        None => {}
     }
 }
 
@@ -138,16 +123,13 @@ pub fn extract_contained(extract_opts: &mut ExtractOptions) {
     .unwrap();
 
     // print the header if in all mode
-    match &mut out_files.all {
-        Some(all) => {
-            write!(
-                all,
-                "{}",
-                FiberseqData::all_header(out_files.simplify, out_files.quality)
-            )
-            .unwrap();
-        }
-        None => {}
+    if let Some(all) = &mut out_files.all {
+        write!(
+            all,
+            "{}",
+            FiberseqData::all_header(out_files.simplify, out_files.quality)
+        )
+        .unwrap();
     }
 
     // process bam in chunks

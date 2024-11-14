@@ -1,7 +1,8 @@
 [package]
 edition = "2021"
 name = "pyft"
-version = "0.2.3"
+version = "0.2.6"
+readme = "./README.md"
 
 [lib]
 crate-type = ["cdylib"]

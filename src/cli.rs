@@ -44,7 +44,7 @@ pub use strip_basemods_opts::*;
     infer_subcommands = true,
     arg_required_else_help = true
 )]
-#[command(version = super::LONG_VERSION)]
+#[command(version = &**crate::FULL_VERSION)]
 #[command(styles=get_styles())]
 pub struct Cli {
     #[clap(flatten)]

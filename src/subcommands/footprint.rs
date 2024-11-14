@@ -197,17 +197,14 @@ impl<'a> Footprint<'a> {
 
     fn establish_footprints(&mut self) {
         for (fiber, has_msp) in self.fibers.iter().zip(self.has_spanning_msp.iter()) {
-            let mut footprint_code = 0;
-            if *has_msp {
-                footprint_code = self.footprint_code(fiber);
-            }
+            let footprint_code = self.footprint_code(fiber, has_msp);
             self.footprint_codes.push(footprint_code);
         }
     }
 
-    fn footprint_code(&self, fiber: &FiberseqData) -> u16 {
+    fn footprint_code(&self, fiber: &FiberseqData, has_spanning_msp: &bool) -> u16 {
+        let mut footprint_code = if *has_spanning_msp { 1 << 0 } else { 0 };
         // denote that we have a spanning msp
-        let mut footprint_code = 1 << 0;
         let motif_end = self.motif.footprint.max_pos();
         // make a binary vector over the motif indicating the presence of an m6a
         let mut m6a_vec = vec![false; motif_end];

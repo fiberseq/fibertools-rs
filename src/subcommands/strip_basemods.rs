@@ -35,6 +35,12 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
                 if opts.drop_reverse {
                     data.drop_reverse();
                 }
+                if opts.ml_m6a > 0 {
+                    data.filter_m6a(opts.ml_m6a);
+                }
+                if opts.ml_5mc > 0 {
+                    data.filter_5mc(opts.ml_5mc);
+                }
 
                 data.add_mm_and_ml_tags(record);
                 record

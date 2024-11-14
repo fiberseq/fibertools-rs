@@ -295,6 +295,13 @@ impl<'a> QcStats<'a> {
     pub fn write(&self, out: &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
         // write the header
         out.write_all(b"statistic\tvalue\tcount\n")?;
+        // write the phasing information
+        for f in &[
+            (&self.phased_reads, "phased_reads"),
+            (&self.phased_bp, "phased_bp"),
+        ] {
+            out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
+        }
         // write the integers
         for x in &[
             (&self.fiber_lengths, "fiber_length"),
@@ -313,13 +320,6 @@ impl<'a> QcStats<'a> {
             (&self.ccs_passes, "ccs_passes"),
             (&self.rq, "read_quality"),
             (&self.m6a_ratio, "m6a_ratio"),
-        ] {
-            out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
-        }
-        // write the phasing information
-        for f in &[
-            (&self.phased_reads, "phased_reads"),
-            (&self.phased_bp, "phased_bp"),
         ] {
             out.write_all(Self::hashmap_to_string(f.0, f.1).as_bytes())?;
         }

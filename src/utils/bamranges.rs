@@ -144,6 +144,24 @@ impl Ranges {
         forward
     }
 
+    // filter out ranges that are less than the passed quality score
+    pub fn filter_by_qual(&mut self, min_qual: u8) {
+        let to_keep = self
+            .qual
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &q)| if q >= min_qual { Some(i) } else { None })
+            .collect::<Vec<_>>();
+
+        self.starts = to_keep.iter().map(|&i| self.starts[i]).collect();
+        self.ends = to_keep.iter().map(|&i| self.ends[i]).collect();
+        self.lengths = to_keep.iter().map(|&i| self.lengths[i]).collect();
+        self.qual = to_keep.iter().map(|&i| self.qual[i]).collect();
+        self.reference_starts = to_keep.iter().map(|&i| self.reference_starts[i]).collect();
+        self.reference_ends = to_keep.iter().map(|&i| self.reference_ends[i]).collect();
+        self.reference_lengths = to_keep.iter().map(|&i| self.reference_lengths[i]).collect();
+    }
+
     pub fn to_strings(&self, reference: bool, skip_none: bool) -> Vec<String> {
         let (s, e, l, q) = if reference {
             (
