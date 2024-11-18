@@ -40,6 +40,15 @@ pub struct FiberFilters {
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
+    /// strip basemods in the first or last X bp of the read
+    #[clap(
+        global = true,
+        long,
+        default_value = "0",
+        help_heading = "BAM-Options",
+        hide = true
+    )]
+    pub strip_starting_basemods: i64,
 }
 
 impl std::default::Default for FiberFilters {
@@ -48,6 +57,7 @@ impl std::default::Default for FiberFilters {
             bit_flag: 0,
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
             filter_expression: None,
+            strip_starting_basemods: 0,
         }
     }
 }
