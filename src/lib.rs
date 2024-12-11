@@ -20,7 +20,11 @@ use std::io::Write;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 lazy_static! {
-    pub static ref FULL_VERSION: String = format!("{}", env!("VERGEN_GIT_DESCRIBE"));
+    pub static ref FULL_VERSION: String = format!(
+        "{:?} git:{}",
+        std::env::var("VERGEN_GIT_SEMVER"),
+        env!("VERGEN_GIT_DESCRIBE")
+    );
 }
 // if this string (bar)gets too long it displays weird when writing to stdout
 const PROGRESS_STYLE: &str =

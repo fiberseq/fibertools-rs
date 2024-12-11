@@ -10,7 +10,7 @@ license = "MIT"
 name = "fibertools-rs"
 readme = "README.md"
 repository = "https://github.com/fiberseq/fibertools-rs"
-version = "0.6.0"
+version = "0.6.1"
 # exclude py-ft and test data from cargo publish since they are too large
 exclude = ["py-ft/", "tests/data/"]
 
@@ -57,7 +57,7 @@ rand = "0.8.5"
 
 [build-dependencies]
 burn-import = {version = "0.12"}
-vergen-git2 = { version = "1.0.1", features = ["build"] }
+vergen-git2 = { version = "1.0.2", features = ["build", "cargo", "rustc", "si"] }
 
 
 [dev-dependencies]
