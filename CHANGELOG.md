@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2024-12-11
+
+- Fix: the cli version string.
+
 ## [0.6.0] - 2024-11-14
 
 - fix: do not report m6A predictions that happen within the first 7 or last 7 bp of a read. This is so the ML model only operates on real data. No changes to other calls. Will fix #65
