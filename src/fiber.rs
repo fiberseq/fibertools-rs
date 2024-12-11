@@ -62,7 +62,9 @@ impl FiberseqData {
         };
 
         // get fiberseq basemods
-        let base_mods = BaseMods::new(&record, filters.min_ml_score);
+        let mut base_mods = BaseMods::new(&record, filters.min_ml_score);
+        base_mods.filter_at_read_ends(filters.strip_starting_basemods);
+
         //let (m6a, cpg) = FiberMods::new(&base_mods);
         let m6a = base_mods.m6a();
         let cpg = base_mods.cpg();

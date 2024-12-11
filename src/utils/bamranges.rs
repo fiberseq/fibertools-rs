@@ -162,6 +162,44 @@ impl Ranges {
         self.reference_lengths = to_keep.iter().map(|&i| self.reference_lengths[i]).collect();
     }
 
+    /// filter out ranges that are within the first or last X bp of the read
+    pub fn filter_starts_at_read_ends(&mut self, strip: i64) {
+        if strip == 0 {
+            return;
+        }
+        let to_keep = self
+            .starts
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &s)| {
+                if let Some(s) = s {
+                    if s < strip || s > self.seq_len - strip {
+                        None
+                    } else {
+                        Some(i)
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if to_keep.len() != self.starts.len() {
+            log::trace!(
+                "basemods stripped, {} basemods removed",
+                self.starts.len() - to_keep.len()
+            );
+        }
+
+        self.starts = to_keep.iter().map(|&i| self.starts[i]).collect();
+        self.ends = to_keep.iter().map(|&i| self.ends[i]).collect();
+        self.lengths = to_keep.iter().map(|&i| self.lengths[i]).collect();
+        self.qual = to_keep.iter().map(|&i| self.qual[i]).collect();
+        self.reference_starts = to_keep.iter().map(|&i| self.reference_starts[i]).collect();
+        self.reference_ends = to_keep.iter().map(|&i| self.reference_ends[i]).collect();
+        self.reference_lengths = to_keep.iter().map(|&i| self.reference_lengths[i]).collect();
+    }
+
     pub fn to_strings(&self, reference: bool, skip_none: bool) -> Vec<String> {
         let (s, e, l, q) = if reference {
             (
