@@ -7,10 +7,21 @@ fn vergen() -> Result<(), Box<dyn Error>> {
     let build = BuildBuilder::all_build()?;
     let git2 = Git2Builder::all_git()?;
 
-    Emitter::default()
+    let status = Emitter::default()
         .add_instructions(&build)?
         .add_instructions(&git2)?
-        .emit()?;
+        .fail_on_error()
+        .emit();
+    // if the status is an error set the version in a custom way
+    if let Err(e) = status {
+        let version = env!("CARGO_PKG_VERSION");
+        eprintln!("Using CARGO version instead of git version: {}", version);
+        eprintln!("Vergen error: {}", e);
+        // set the env variable VERGEN_GIT_DESCRIBE using the CARO_PKG_VERSION
+        std::env::set_var("VERGEN_GIT_DESCRIBE", version);
+    }
+
+    //.emit()?;
     Ok(())
 }
 
