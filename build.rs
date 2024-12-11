@@ -8,13 +8,12 @@ fn vergen() -> Result<(), Box<dyn Error>> {
     let git2 = Git2Builder::all_git()?;
     let cargo = CargoBuilder::all_cargo()?;
 
-    let status = Emitter::default()
+    Emitter::default()
         .add_instructions(&build)?
         .add_instructions(&git2)?
         .add_instructions(&cargo)?
         .emit()?;
 
-    //.emit()?;
     Ok(())
 }
 

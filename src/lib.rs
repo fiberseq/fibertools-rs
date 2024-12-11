@@ -21,8 +21,8 @@ use std::io::Write;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 lazy_static! {
     pub static ref FULL_VERSION: String = format!(
-        "{:?} git:{}",
-        std::env::var("VERGEN_GIT_SEMVER"),
+        "{} git details:{}",
+        env!("CARGO_PKG_VERSION"),
         env!("VERGEN_GIT_DESCRIBE")
     );
 }
