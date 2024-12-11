@@ -6,11 +6,22 @@ fn vergen() -> Result<(), Box<dyn Error>> {
     // NOTE: See the specific builder documentation for configuration options.
     let build = BuildBuilder::all_build()?;
     let git2 = Git2Builder::all_git()?;
+    let cargo = CargoBuilder::all_cargo()?;
 
-    Emitter::default()
+    let status = Emitter::default()
         .add_instructions(&build)?
         .add_instructions(&git2)?
-        .emit()?;
+        .add_instructions(&cargo)?
+        .fail_on_error()
+        .emit();
+
+    // set the env variable myself if the status failed
+    if status.is_err() {
+        eprintln!("Failed to get version information from git");
+        eprintln!("Likely building a published version from cargo or bioconda.");
+        std::env::set_var("VERGEN_GIT_DESCRIBE", "unknown");
+    }
+
     Ok(())
 }
 

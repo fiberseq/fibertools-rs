@@ -51,6 +51,13 @@ impl BaseMod {
     pub fn is_cpg(&self) -> bool {
         self.modification_type == 'm'
     }
+
+    pub fn filter_at_read_ends(&mut self, n_strip: i64) {
+        if n_strip <= 0 {
+            return;
+        }
+        self.ranges.filter_starts_at_read_ends(n_strip);
+    }
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]
@@ -255,6 +262,16 @@ impl BaseMods {
             .iter_mut()
             .filter(|bm| bm.is_cpg())
             .for_each(|bm| bm.ranges.filter_by_qual(min_ml_score));
+    }
+
+    /// filter the basemods at the read ends
+    pub fn filter_at_read_ends(&mut self, n_strip: i64) {
+        if n_strip <= 0 {
+            return;
+        }
+        self.base_mods
+            .iter_mut()
+            .for_each(|bm| bm.filter_at_read_ends(n_strip));
     }
 
     /// combine the forward and reverse m6a data
