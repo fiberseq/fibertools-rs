@@ -320,11 +320,11 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     assert_eq!(read_type, "CCS");
     // grab chemistry
     let chemistry = CHEMISTRY_MAP.get(binding_kit).unwrap_or_else(|| {
-        log::warn!(
-            "Polymerase for BINDINGKIT={} not found. Defaulting to ML model made for REVIO.",
+        log::error!(
+            "Model for BINDINGKIT={} not available. Unable to run predictions.",
             binding_kit
         );
-        &PbChem::Revio
+        std::process::exit(1);
     });
 
     // log the chem being used
