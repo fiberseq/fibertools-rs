@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2025-01-31
+
+- Fix: bit flag filtering #70.
+
 ## [0.6.1] - 2024-12-11
 
 - Fix: the cli version string.
