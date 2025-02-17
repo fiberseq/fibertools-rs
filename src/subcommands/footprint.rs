@@ -268,7 +268,7 @@ impl<'a> Footprint<'a> {
             .map(|(st, en)| format!("module:{}-{}", st, en))
             .collect::<Vec<_>>()
             .join("\t");
-        out += "\tfootprint_codes\tfire_quals\tfiber_names";
+        out += "\tfootprint_codes\tfire_quals\tfiber_names\thaplotype";
         out
     }
 }
@@ -293,8 +293,15 @@ impl std::fmt::Display for Footprint<'_> {
             .collect::<Vec<_>>()
             .join("\t"));
 
+        let haplotypes = self
+            .fibers
+            .iter()
+            .map(|rec| rec.get_hp())
+            .collect::<Vec<_>>()
+            .join(",");
+
         out += &format!(
-            "\t{}\t{}\t{}",
+            "\t{}\t{}\t{}\t{}",
             self.footprint_codes
                 .iter()
                 .map(|x| x.to_string())
@@ -310,6 +317,7 @@ impl std::fmt::Display for Footprint<'_> {
                 .map(|x| String::from_utf8_lossy(x.record.qname()))
                 .collect::<Vec<_>>()
                 .join(","),
+            haplotypes
         );
         writeln!(f, "{}", out)
     }
