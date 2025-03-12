@@ -291,7 +291,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
             // regular 3.2
             ("102-194-100".to_string(), PbChem::ThreePointTwo),
             // Revio has kinetics most similar to 2.2
-            ("102-739-100".to_string(), PbChem::Revio)
+            ("102-739-100".to_string(), PbChem::Revio),
             // Vega currently using Revio chemistry
             ("103-426-500".to_string(), PbChem::Revio)
         ]);
