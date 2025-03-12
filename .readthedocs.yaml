@@ -11,8 +11,8 @@ build:
   apt_packages:
     - cmake
   tools:
-    python: "3.9"
-    rust: "1.82"
+    python: "3.10"
+    rust: "1.85"
 
 python:
   install:
