@@ -4,6 +4,7 @@ version: 2
 
 sphinx:
   builder: html
+  configuration: py-ft/docs/conf.py
 
 build:
   os: "ubuntu-20.04"
