@@ -12,7 +12,7 @@ build:
     - cmake
   tools:
     python: "3.9"
-    rust: "1.75"
+    rust: "1.85"
 
 python:
   install:
