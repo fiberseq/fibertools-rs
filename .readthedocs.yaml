@@ -11,10 +11,11 @@ build:
   apt_packages:
     - cmake
   tools:
-    python: "3.12"
+    python: "3.10"
     #rust: "1.85"
   jobs:
     create_environment:
+      - asdf plugin add python
       - asdf install rust 1.85
       - asdf global rust 1.85
 
