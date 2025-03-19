@@ -15,7 +15,8 @@ build:
     #rust: "1.85"
   jobs:
     create_environment:
-      - asdf plugin add python
+      - asdf install python 3.10
+      - asdf global python 3.10
       - asdf install rust 1.85
       - asdf global rust 1.85
 
