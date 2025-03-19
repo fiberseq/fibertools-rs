@@ -13,13 +13,13 @@ build:
   tools:
     python: "3.12"
     #rust: "1.85"
-  jobs:
-    create_environment:
-      - asdf install rust 1.85
-      #- asdf global rust 1.85
-      #- asdf plugin-add python
-      #- asdf install python 3.12
-      #- asdf global python 3.12.7
+  #jobs:
+  #create_environment:
+  #- asdf install rust 1.85
+  #- asdf global rust 1.85
+  #- asdf plugin-add python
+  #- asdf install python 3.12
+  #- asdf global python 3.12.7
 
 python:
   install:
