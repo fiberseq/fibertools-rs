@@ -19,7 +19,7 @@ build:
       - asdf global rust 1.85
       #- asdf plugin-add python
       #- asdf install python 3.12
-      - asdf global python 3.12
+      - asdf global python 3.12.7
 
 python:
   install:
