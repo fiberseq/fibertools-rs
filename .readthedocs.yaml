@@ -11,7 +11,7 @@ build:
   apt_packages:
     - cmake
   tools:
-    python: "3.12"
+    python: "3.10"
     #rust: "1.85"
   jobs:
     install:
