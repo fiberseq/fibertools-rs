@@ -12,7 +12,7 @@ build:
     - cmake
   tools:
     python: "3.10"
-    rust: "1.81"
+    rust: "1.82"
   #jobs:
   #  install:
   #    - asdf install rust 1.85
