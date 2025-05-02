@@ -20,3 +20,5 @@ pub mod predict_m6a;
 pub mod qc;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
+
+pub mod fiber_hmm;

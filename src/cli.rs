@@ -9,6 +9,7 @@ mod clear_kinetics_opts;
 mod ddda_to_m6a_opts;
 mod decorator_opts;
 mod extract_opts;
+mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
 mod nucleosome_opts;
@@ -23,6 +24,7 @@ pub use clear_kinetics_opts::*;
 pub use ddda_to_m6a_opts::*;
 pub use decorator_opts::*;
 pub use extract_opts::*;
+pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
 pub use nucleosome_opts::*;
@@ -129,6 +131,8 @@ pub enum Commands {
     StripBasemods(StripBasemodsOptions),
     /// Convert a DddA BAM file to pseudo m6A BAM file
     DddaToM6a(DddaToM6aOptions),
+    /// Apply FiberHMM to a bam file
+    FiberHmm(FiberHmmOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),

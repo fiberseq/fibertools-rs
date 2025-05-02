@@ -108,6 +108,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::DddaToM6a(opts)) => {
             subcommands::ddda_to_m6a::ddda_to_m6a(opts)?;
         }
+        Some(Commands::FiberHmm(opts)) => {
+            subcommands::fiber_hmm::run_fiber_hmm(opts)?;
+        }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());
             //let mut buffer: Vec<u8> = Default::default();
