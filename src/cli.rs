@@ -17,6 +17,7 @@ mod pileup_opts;
 mod predict_opts;
 mod qc_opts;
 mod strip_basemods_opts;
+mod validate_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
 pub use center_opts::*;
@@ -32,6 +33,7 @@ pub use pileup_opts::*;
 pub use predict_opts::*;
 pub use qc_opts::*;
 pub use strip_basemods_opts::*;
+pub use validate_opts::ValidateOptions;
 
 //
 // The main CLI structure
@@ -133,6 +135,8 @@ pub enum Commands {
     DddaToM6a(DddaToM6aOptions),
     /// Apply FiberHMM to a bam file
     FiberHmm(FiberHmmOptions),
+    /// Validate a fiber-seq BAM file
+    Validate(ValidateOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),
