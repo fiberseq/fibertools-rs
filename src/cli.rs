@@ -135,7 +135,7 @@ pub enum Commands {
     DddaToM6a(DddaToM6aOptions),
     /// Apply FiberHMM to a bam file
     FiberHmm(FiberHmmOptions),
-    /// Validate a fiber-seq BAM file
+    /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
     Validate(ValidateOptions),
     /// Make command line completions
     #[clap(hide = true)]

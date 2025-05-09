@@ -8,7 +8,7 @@ pub struct ValidateOptions {
     pub bam: InputBam,
 
     /// Number of reads to validate
-    #[clap(short, long, default_value = "1000")]
+    #[clap(short, long, default_value = "5000")]
     pub num_reads: usize,
 
     /// Check for FIRE calls in the reads
