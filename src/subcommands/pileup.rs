@@ -1,3 +1,6 @@
+/// This module is used to extract the fire calls as well as nucs and msps from a bam file
+/// for every position in the bam file and output the results to a bed file.
+/// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 use crate::cli::PileupOptions;
 use crate::fiber::FiberseqData;
 use crate::utils::bamranges;
@@ -10,10 +13,6 @@ use std::io::BufRead;
 use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};
-
-/// This module is used to extract the fire calls as well as nucs and msps from a bam file
-/// for every position in the bam file and output the results to a bed file.
-/// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
@@ -345,7 +344,7 @@ impl<'a> FireTrack<'a> {
         let window_size = self.pileup_opts.rolling_max.unwrap();
         let look_back = window_size / 2;
         for (i, cur_roll_max) in rolling_max.iter_mut().enumerate().take(self.track_len) {
-            let start = if i < look_back { 0 } else { i - look_back };
+            let start = i.saturating_sub(look_back);
             let mut end = i + look_back;
             if end > self.track_len {
                 end = self.track_len;

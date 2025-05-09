@@ -108,6 +108,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::DddaToM6a(opts)) => {
             subcommands::ddda_to_m6a::ddda_to_m6a(opts)?;
         }
+        Some(Commands::FiberHmm(opts)) => {
+            subcommands::fiber_hmm::run_fiber_hmm(opts)?;
+        }
         Some(Commands::Man {}) => {
             let man = clap_mangen::Man::new(cli::make_cli_app());
             //let mut buffer: Vec<u8> = Default::default();
@@ -116,6 +119,9 @@ pub fn main() -> Result<(), Error> {
             //man.render_subcommands_section(&mut buffer)?;
             //man.render_description_section(&mut buffer)?;
             //std::fs::write("ft.1", buffer)?;
+        }
+        Some(Commands::Validate(validate_opts)) => {
+            subcommands::validate::validate_fiberseq_bam(validate_opts)?;
         }
         None => {}
     };
