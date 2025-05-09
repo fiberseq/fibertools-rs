@@ -563,7 +563,7 @@ impl<'a> FiberseqRecords<'a> {
     }
 }
 
-impl<'a> Iterator for FiberseqRecords<'a> {
+impl Iterator for FiberseqRecords<'_> {
     type Item = FiberseqData;
 
     fn next(&mut self) -> Option<Self::Item> {
