@@ -27,6 +27,8 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     let mut n_m6a = 0;
     let mut n_fire_calls = 0;
     let mut n_nucleosomes = 0;
+    let mut n_aligned = 0;
+    let mut n_phased = 0;
 
     let mut bam = opts.bam.bam_reader();
 
@@ -34,6 +36,9 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
         let m6a_okay = !fiber.m6a.starts.is_empty();
         let nuc_okay = !fiber.nuc.starts.is_empty();
         n_fire_calls += fiber.msp.qual.iter().filter(|q| **q > 0).count();
+
+        n_aligned += !fiber.record.is_unmapped() as usize;
+        n_phased += fiber.record.aux(b"HP").is_ok() as usize;
 
         if m6a_okay {
             n_m6a += 1;
@@ -48,10 +53,17 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     }
     // frac with m6a, frac with nucleosomes, and frac with fire
     eprintln!(
-        "Fraction with m6A: {:.2}%\nFraction with nucleosomes: {:.2}%\nNumer of FIRE calls: {}\n",
+        "Fraction with m6A: {:.2}%\nFraction with nucleosomes: {:.2}%\nNumer of FIRE calls: {}",
         n_m6a as f64 / n_reads as f64 * 100.0,
         n_nucleosomes as f64 / n_reads as f64 * 100.0,
         n_fire_calls,
+    );
+
+    // alignment and phasing
+    eprintln!(
+        "Fraction aligned: {:.2}%\nFraction phased: {:.2}%",
+        n_aligned as f64 / n_reads as f64 * 100.0,
+        n_phased as f64 / n_reads as f64 * 100.0,
     );
 
     // total reads, total valid reads, and percent valid reads
@@ -60,9 +72,16 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
         "Total reads tested: {}\nValid reads: {}\nFraction valid: {:.2}%\nMinimum validation rate to pass {:.2}%\n",
         n_reads, n_valid, frac_valid, 100.0*opts.min_valid_fraction,
     );
-    let passes_fire = n_fire_calls > 0 || !opts.check_fire;
 
-    if frac_valid >= opts.min_valid_fraction * 100.0 && passes_fire {
+    let passes_fire = n_fire_calls > 0 || !opts.check_fire;
+    let passes_phased = n_phased as f64 / n_reads as f64 * 100.0 >= opts.phased;
+    let passes_aligned = n_aligned as f64 / n_reads as f64 * 100.0 >= opts.aligned;
+
+    if frac_valid >= opts.min_valid_fraction * 100.0
+        && passes_fire
+        && passes_phased
+        && passes_aligned
+    {
         eprintln_green("Fiber-seq BAM file is valid");
     } else {
         eprintln_red("Fiber-seq BAM file is invalid");
@@ -77,6 +96,18 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
         }
         if n_fire_calls == 0 && opts.check_fire {
             eprintln!("\t- No FIRE calls found, please check FIRE calling was performed. FIRE calls can be added with `ft fire`");
+        }
+        if !passes_aligned {
+            eprintln!(
+                "\t- Less than {}% of reads are aligned, please check the alignment was performed correctly",
+                opts.aligned * 100.0
+            );
+        }
+        if !passes_phased {
+            eprintln!(
+                "\t- Less than {}% of reads are phased, please check the phasing was performed correctly",
+                opts.phased * 100.0
+            );
         }
         eprintln!();
         return Err(Error::msg("Fiber-seq BAM file is invalid"));

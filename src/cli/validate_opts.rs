@@ -18,4 +18,12 @@ pub struct ValidateOptions {
     /// The fraction of reads that must be valid for the BAM to be considered valid
     #[clap(short, long, default_value = "0.5")]
     pub min_valid_fraction: f64,
+
+    /// Check for the fraction of reads with alignment to a reference genome
+    #[clap(short, long, default_value = "0.0")]
+    pub aligned: f64,
+
+    /// Check for the fraction of reads with phasing information
+    #[clap(short, long, default_value = "0.0")]
+    pub phased: f64,
 }
