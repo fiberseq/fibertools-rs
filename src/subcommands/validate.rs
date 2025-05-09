@@ -23,12 +23,12 @@ pub fn eprintln_green(message: &str) {
 
 pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     let mut n_reads = 0;
-    let mut n_valid = 0;
     let mut n_m6a = 0;
     let mut n_fire_calls = 0;
     let mut n_nucleosomes = 0;
     let mut n_aligned = 0;
     let mut n_phased = 0;
+    let mut n_kinetics = 0;
 
     let mut bam = opts.bam.bam_reader();
 
@@ -40,17 +40,25 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
         n_aligned += !fiber.record.is_unmapped() as usize;
         n_phased += fiber.record.aux(b"HP").is_ok() as usize;
 
+        let mut seen_kinetics = 0;
+        seen_kinetics += fiber.record.aux(b"fp").is_ok() as usize;
+        seen_kinetics += fiber.record.aux(b"fi").is_ok() as usize;
+        seen_kinetics += fiber.record.aux(b"rp").is_ok() as usize;
+        seen_kinetics += fiber.record.aux(b"ri").is_ok() as usize;
+        n_kinetics += (seen_kinetics == 4) as usize;
+
         if m6a_okay {
             n_m6a += 1;
         }
         if nuc_okay {
             n_nucleosomes += 1;
         }
-        if m6a_okay && nuc_okay {
-            n_valid += 1;
-        }
         n_reads += 1;
     }
+
+    // total reads
+    eprintln!("Total reads tested: {}", n_reads);
+
     // frac with m6a, frac with nucleosomes, and frac with fire
     eprintln!(
         "Fraction with m6A: {:.2}%\nFraction with nucleosomes: {:.2}%\nNumer of FIRE calls: {}",
@@ -61,40 +69,39 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
 
     // alignment and phasing
     eprintln!(
-        "Fraction aligned: {:.2}%\nFraction phased: {:.2}%",
+        "Fraction aligned: {:.2}%\nFraction phased: {:.2}%\nFraction with kinetics: {:.2}%\n",
         n_aligned as f64 / n_reads as f64 * 100.0,
         n_phased as f64 / n_reads as f64 * 100.0,
+        n_kinetics as f64 / n_reads as f64 * 100.0,
     );
 
-    // total reads, total valid reads, and percent valid reads
-    let frac_valid = n_valid as f64 / n_reads as f64 * 100.0;
-    eprintln!(
-        "Total reads tested: {}\nValid reads: {}\nFraction valid: {:.2}%\nMinimum validation rate to pass {:.2}%\n",
-        n_reads, n_valid, frac_valid, 100.0*opts.min_valid_fraction,
-    );
+    let passes_m6a = n_m6a as f64 / n_reads as f64 >= opts.m6a;
+    let passes_nucleosomes = n_nucleosomes as f64 / n_reads as f64 >= opts.nuc;
+    let passes_fire = n_fire_calls > 0 || !opts.fire;
+    let passes_phased = n_phased as f64 / n_reads as f64 >= opts.phased;
+    let passes_aligned = n_aligned as f64 / n_reads as f64 >= opts.aligned;
+    let passes_kinetics = n_kinetics as f64 / n_reads as f64 >= opts.kinetics;
 
-    let passes_fire = n_fire_calls > 0 || !opts.check_fire;
-    let passes_phased = n_phased as f64 / n_reads as f64 * 100.0 >= opts.phased;
-    let passes_aligned = n_aligned as f64 / n_reads as f64 * 100.0 >= opts.aligned;
-
-    if frac_valid >= opts.min_valid_fraction * 100.0
+    if passes_m6a
+        && passes_nucleosomes
         && passes_fire
         && passes_phased
         && passes_aligned
+        && passes_kinetics
     {
         eprintln_green("Fiber-seq BAM file is valid");
     } else {
         eprintln_red("Fiber-seq BAM file is invalid");
 
-        if n_m6a == 0 {
+        if !passes_m6a {
             eprintln!(
                 "\t- No m6A calls found, please check the m6A calling was performed correctly",
             );
         }
-        if n_nucleosomes == 0 {
+        if !passes_nucleosomes {
             eprintln!("\t- No nucleosome calls found, please check the nucleosome calling was performed correctly. Nucleosome calls can be added with `ft add-nucleosomes`");
         }
-        if n_fire_calls == 0 && opts.check_fire {
+        if !passes_fire {
             eprintln!("\t- No FIRE calls found, please check FIRE calling was performed. FIRE calls can be added with `ft fire`");
         }
         if !passes_aligned {
@@ -107,6 +114,12 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
             eprintln!(
                 "\t- Less than {}% of reads are phased, please check the phasing was performed correctly",
                 opts.phased * 100.0
+            );
+        }
+        if !passes_kinetics {
+            eprintln!(
+                "\t- Less than {}% of reads have kinetics information, please check the kinetics calling was performed correctly",
+                opts.kinetics * 100.0
             );
         }
         eprintln!();
