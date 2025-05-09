@@ -120,6 +120,9 @@ pub fn main() -> Result<(), Error> {
             //man.render_description_section(&mut buffer)?;
             //std::fs::write("ft.1", buffer)?;
         }
+        Some(Commands::Validate(validate_opts)) => {
+            subcommands::validate::validate_fiberseq_bam(validate_opts)?;
+        }
         None => {}
     };
     let duration = pg_start.elapsed();

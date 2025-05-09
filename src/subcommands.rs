@@ -22,3 +22,5 @@ pub mod qc;
 pub mod strip_basemods;
 
 pub mod fiber_hmm;
+
+pub mod validate;

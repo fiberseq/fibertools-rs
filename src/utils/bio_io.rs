@@ -217,7 +217,7 @@ impl<'a> BamChunk<'a> {
 }
 
 // The `Iterator` trait only requires a method to be defined for the `next` element.
-impl<'a> Iterator for BamChunk<'a> {
+impl Iterator for BamChunk<'_> {
     // We can refer to this type using Self::Item
     type Item = Vec<bam::Record>;
 
