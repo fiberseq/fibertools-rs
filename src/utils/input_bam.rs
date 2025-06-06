@@ -40,6 +40,9 @@ pub struct FiberFilters {
     /// Minium score in the ML tag to use or include in the output
     #[clap(long="ml", alias="min-ml-score", default_value = MIN_ML_SCORE, help_heading = "BAM-Options", env="FT_MIN_ML_SCORE")]
     pub min_ml_score: u8,
+    /// Output uncompressed BAM files
+    #[clap(help_heading = "BAM-Options", short, long)]
+    pub uncompressed: bool,
     /// strip basemods in the first or last X bp of the read
     #[clap(
         global = true,
@@ -57,6 +60,7 @@ impl std::default::Default for FiberFilters {
             bit_flag: 0,
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
             filter_expression: None,
+            uncompressed: false,
             strip_starting_basemods: 0,
         }
     }
@@ -146,6 +150,10 @@ impl InputBam {
         );
         out.set_threads(self.global.threads)
             .expect("unable to set threads for bam writer");
+        if self.filters.uncompressed {
+            out.set_compression_level(bam::CompressionLevel::Uncompressed)
+                .expect("Unable to set compression level to uncompressed");
+        }
         out
     }
 }
