@@ -63,7 +63,7 @@ pub struct Cli {
 //
 // Global options available to all subcommands
 //
-#[derive(Debug, Args, PartialEq, Eq)]
+#[derive(Debug, Args, PartialEq, Eq, Clone)]
 pub struct GlobalOpts {
     /// Threads
     #[clap(
