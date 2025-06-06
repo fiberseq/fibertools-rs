@@ -123,6 +123,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Validate(validate_opts)) => {
             subcommands::validate::validate_fiberseq_bam(validate_opts)?;
         }
+        Some(Commands::FiberFold(fiber_fold_opts)) => {
+            subcommands::fiber_fold::fiber_fold(fiber_fold_opts)?;
+        }
         None => {}
     };
     let duration = pg_start.elapsed();
