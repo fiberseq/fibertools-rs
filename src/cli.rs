@@ -9,6 +9,7 @@ mod clear_kinetics_opts;
 mod ddda_to_m6a_opts;
 mod decorator_opts;
 mod extract_opts;
+mod fiber_fold_opts;
 mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
@@ -18,7 +19,6 @@ mod predict_opts;
 mod qc_opts;
 mod strip_basemods_opts;
 mod validate_opts;
-mod fiber_fold_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
 pub use center_opts::*;
@@ -26,6 +26,7 @@ pub use clear_kinetics_opts::*;
 pub use ddda_to_m6a_opts::*;
 pub use decorator_opts::*;
 pub use extract_opts::*;
+pub use fiber_fold_opts::*;
 pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
@@ -35,7 +36,6 @@ pub use predict_opts::*;
 pub use qc_opts::*;
 pub use strip_basemods_opts::*;
 pub use validate_opts::ValidateOptions;
-pub use fiber_fold_opts::*;
 
 //
 // The main CLI structure
@@ -139,7 +139,7 @@ pub enum Commands {
     FiberHmm(FiberHmmOptions),
     /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
     Validate(ValidateOptions),
-    /// FiberFold subcommand for analyzing fiberseq data
+    /// Predict 3D chromatin structure using only fiberseq data
     FiberFold(FiberFoldOptions),
     /// Make command line completions
     #[clap(hide = true)]
