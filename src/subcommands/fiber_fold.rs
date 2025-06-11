@@ -60,6 +60,7 @@ pub fn fiber_fold(opts: &mut FiberFoldOptions) -> Result<()> {
         header: None,
     };
     
+    // define the options used for creating pileup(s)
     let mut pileup_opts = crate::cli::PileupOptions {
         input: input_bam,
         rgn: None,
@@ -78,6 +79,9 @@ pub fn fiber_fold(opts: &mut FiberFoldOptions) -> Result<()> {
     
     // Now create the bam reader using the input from pileup_opts
     let mut bam = pileup_opts.input.indexed_bam_reader();
+
+
+    // TODO in a loop over the genome call fold_pileup and process the results
 
     todo!("FiberFold functionality not yet implemented")
 }
