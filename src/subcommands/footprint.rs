@@ -209,7 +209,7 @@ impl<'a> Footprint<'a> {
         // make a binary vector over the motif indicating the presence of an m6a
         let mut m6a_vec = vec![false; motif_end];
 
-        for m6a in fiber.m6a.reference_starts.iter().flatten() {
+        for m6a in fiber.m6a.reference_starts().iter().flatten() {
             if m6a < &self.motif.start {
                 continue;
             }

@@ -194,52 +194,64 @@ impl FiberseqData {
             CenteredFiberData::find_offsets(&self.record, center_position);
 
         // move basemods
-        FiberseqData::apply_offset(&mut new.m6a.starts, mol_offset, center_position.strand);
+        FiberseqData::apply_offset(new.m6a.starts_mut(), mol_offset, center_position.strand);
         FiberseqData::apply_offset(
-            &mut new.m6a.reference_starts,
+            new.m6a.reference_starts_mut(),
             ref_offset,
             center_position.strand,
         );
-        FiberseqData::apply_offset(&mut new.cpg.starts, mol_offset, center_position.strand);
+        FiberseqData::apply_offset(new.cpg.starts_mut(), mol_offset, center_position.strand);
         FiberseqData::apply_offset(
-            &mut new.cpg.reference_starts,
+            new.cpg.reference_starts_mut(),
             ref_offset,
             center_position.strand,
         );
         // move ranges
-        FiberseqData::offset_range(
-            &mut new.msp.starts,
-            &mut new.msp.ends,
-            mol_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.msp.reference_starts,
-            &mut new.msp.reference_ends,
-            ref_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.nuc.starts,
-            &mut new.nuc.ends,
-            mol_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.nuc.reference_starts,
-            &mut new.nuc.reference_ends,
-            ref_offset,
-            center_position.strand,
-        );
+        {
+            let (msp_starts, msp_ends) = new.msp.starts_ends_mut();
+            FiberseqData::offset_range(
+                msp_starts,
+                msp_ends,
+                mol_offset,
+                center_position.strand,
+            );
+        }
+        {
+            let (msp_ref_starts, msp_ref_ends) = new.msp.reference_starts_ends_mut();
+            FiberseqData::offset_range(
+                msp_ref_starts,
+                msp_ref_ends,
+                ref_offset,
+                center_position.strand,
+            );
+        }
+        {
+            let (nuc_starts, nuc_ends) = new.nuc.starts_ends_mut();
+            FiberseqData::offset_range(
+                nuc_starts,
+                nuc_ends,
+                mol_offset,
+                center_position.strand,
+            );
+        }
+        {
+            let (nuc_ref_starts, nuc_ref_ends) = new.nuc.reference_starts_ends_mut();
+            FiberseqData::offset_range(
+                nuc_ref_starts,
+                nuc_ref_ends,
+                ref_offset,
+                center_position.strand,
+            );
+        }
         // correct orientations
         if center_position.strand == '-' {
-            new.m6a.qual.reverse();
-            new.cpg.qual.reverse();
-            new.msp.lengths.reverse();
-            new.msp.reference_lengths.reverse();
-            new.msp.qual.reverse();
-            new.nuc.lengths.reverse();
-            new.nuc.reference_lengths.reverse();
+            new.m6a.qual_mut().reverse();
+            new.cpg.qual_mut().reverse();
+            new.msp.lengths_mut().reverse();
+            new.msp.reference_lengths_mut().reverse();
+            new.msp.qual_mut().reverse();
+            new.nuc.lengths_mut().reverse();
+            new.nuc.reference_lengths_mut().reverse();
         }
         // TODO update start and end
         // TODO update aligned block pairs
@@ -252,12 +264,12 @@ impl FiberseqData {
     pub fn write_msp(&self, reference: bool) -> String {
         let (starts, _ends, lengths) = if reference {
             (
-                &self.msp.reference_starts,
-                &self.msp.reference_ends,
-                &self.msp.reference_lengths,
+                self.msp.reference_starts(),
+                self.msp.reference_ends(),
+                self.msp.reference_lengths(),
             )
         } else {
-            (&self.msp.starts, &self.msp.ends, &self.msp.lengths)
+            (self.msp.starts(), self.msp.ends(), self.msp.lengths())
         };
         self.to_bed12(reference, starts, lengths, LINKER_COLOR)
     }
@@ -265,21 +277,21 @@ impl FiberseqData {
     pub fn write_nuc(&self, reference: bool) -> String {
         let (starts, _ends, lengths) = if reference {
             (
-                &self.nuc.reference_starts,
-                &self.nuc.reference_ends,
-                &self.nuc.reference_lengths,
+                self.nuc.reference_starts(),
+                self.nuc.reference_ends(),
+                self.nuc.reference_lengths(),
             )
         } else {
-            (&self.nuc.starts, &self.nuc.ends, &self.nuc.lengths)
+            (self.nuc.starts(), self.nuc.ends(), self.nuc.lengths())
         };
         self.to_bed12(reference, starts, lengths, NUC_COLOR)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
         let starts = if reference {
-            &self.m6a.reference_starts
+            self.m6a.reference_starts()
         } else {
-            &self.m6a.starts
+            self.m6a.starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, starts, &lengths, M6A_COLOR)
@@ -287,9 +299,9 @@ impl FiberseqData {
 
     pub fn write_cpg(&self, reference: bool) -> String {
         let starts = if reference {
-            &self.cpg.reference_starts
+            self.cpg.reference_starts()
         } else {
-            &self.cpg.starts
+            self.cpg.starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, starts, &lengths, CPG_COLOR)
@@ -454,11 +466,11 @@ impl FiberseqData {
             .count() as i64;
 
         // get the info
-        let m6a_count = self.m6a.starts.len();
-        let m6a_qual = self.m6a.qual.iter().map(|a| Some(*a as i64)).collect();
-        let cpg_count = self.cpg.starts.len();
-        let cpg_qual = self.cpg.qual.iter().map(|a| Some(*a as i64)).collect();
-        let fire = self.msp.qual.iter().map(|a| Some(*a as i64)).collect();
+        let m6a_count = self.m6a.starts().len();
+        let m6a_qual = self.m6a.qual().iter().map(|a| Some(*a as i64)).collect();
+        let cpg_count = self.cpg.starts().len();
+        let cpg_qual = self.cpg.qual().iter().map(|a| Some(*a as i64)).collect();
+        let fire = self.msp.qual().iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -492,8 +504,8 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = self.nuc.lengths.iter().flatten().sum::<i64>();
-        let total_msp_bp = self.msp.lengths.iter().flatten().sum::<i64>();
+        let total_nuc_bp = self.nuc.lengths().iter().flatten().sum::<i64>();
+        let total_msp_bp = self.msp.lengths().iter().flatten().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
@@ -501,20 +513,20 @@ impl FiberseqData {
         .unwrap();
         // add fiber features
         for vec in &[
-            &self.nuc.starts,
-            &self.nuc.lengths,
-            &self.nuc.reference_starts,
-            &self.nuc.reference_lengths,
-            &self.msp.starts,
-            &self.msp.lengths,
+            self.nuc.starts(),
+            self.nuc.lengths(),
+            self.nuc.reference_starts(),
+            self.nuc.reference_lengths(),
+            self.msp.starts(),
+            self.msp.lengths(),
             &fire,
-            &self.msp.reference_starts,
-            &self.msp.reference_lengths,
-            &self.m6a.starts,
-            &self.m6a.reference_starts,
+            self.msp.reference_starts(),
+            self.msp.reference_lengths(),
+            self.m6a.starts(),
+            self.m6a.reference_starts(),
             &m6a_qual,
-            &self.cpg.starts,
-            &self.cpg.reference_starts,
+            self.cpg.starts(),
+            self.cpg.reference_starts(),
             &cpg_qual,
         ] {
             if vec.is_empty() {

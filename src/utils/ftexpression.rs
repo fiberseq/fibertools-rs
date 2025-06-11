@@ -142,17 +142,17 @@ pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
     range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
-    let starting_len = range.starts.len();
+    let starting_len = range.starts().len();
 
     let to_keep: Vec<bool> = if parsed.fn_name == "len" {
         range
-            .lengths
+            .lengths()
             .iter()
             .map(|l| len(l.unwrap(), &parsed.op, &parsed.threshold))
             .collect()
     } else if parsed.fn_name == "qual" {
         range
-            .qual
+            .qual()
             .iter()
             .map(|q| qual(*q, &parsed.op, &parsed.threshold))
             .collect()
@@ -161,24 +161,23 @@ pub fn apply_filter_to_range(
     };
 
     // drop i64 values from the range
-    for vec in [
-        &mut range.starts,
-        &mut range.ends,
-        &mut range.lengths,
-        &mut range.reference_starts,
-        &mut range.reference_ends,
-        &mut range.reference_lengths,
-    ] {
+    let filter_fn = |vec: &mut Vec<Option<i64>>| {
         *vec = vec
             .iter()
             .zip(to_keep.iter())
             .filter_map(|(v, d)| if *d { Some(*v) } else { None })
             .collect();
-    }
+    };
+    filter_fn(range.starts_mut());
+    filter_fn(range.ends_mut());
+    filter_fn(range.lengths_mut());
+    filter_fn(range.reference_starts_mut());
+    filter_fn(range.reference_ends_mut());
+    filter_fn(range.reference_lengths_mut());
 
     // drop u8 values from the range
-    range.qual = range
-        .qual
+    *range.qual_mut() = range
+        .qual()
         .iter()
         .zip(to_keep.iter())
         .filter_map(|(v, d)| if *d { Some(*v) } else { None })
@@ -186,7 +185,7 @@ pub fn apply_filter_to_range(
 
     // check we dropped the right number of values
     let n_dropped = to_keep.iter().filter(|&x| !x).count();
-    assert_eq!(starting_len, range.starts.len() + n_dropped);
+    assert_eq!(starting_len, range.starts().len() + n_dropped);
 
     Ok(())
 }
@@ -221,17 +220,17 @@ mod test {
     use crate::utils::bamranges;
 
     fn make_fake_range() -> bamranges::Ranges {
-        bamranges::Ranges {
-            starts: vec![Some(0), Some(10), Some(17)],
-            ends: vec![Some(5), Some(15), Some(20)],
-            lengths: vec![Some(5), Some(5), Some(3)],
-            qual: vec![0, 255, 181],
-            reference_starts: vec![Some(0), Some(10), Some(17)],
-            reference_ends: vec![Some(5), Some(15), Some(20)],
-            reference_lengths: vec![Some(5), Some(5), Some(3)],
-            seq_len: 100,
-            reverse: false,
-        }
+        bamranges::Ranges::new_test(
+            vec![Some(0), Some(10), Some(17)],
+            vec![Some(5), Some(15), Some(20)],
+            vec![Some(5), Some(5), Some(3)],
+            vec![0, 255, 181],
+            vec![Some(0), Some(10), Some(17)],
+            vec![Some(5), Some(15), Some(20)],
+            vec![Some(5), Some(5), Some(3)],
+            100,
+            false,
+        )
     }
 
     #[test]
@@ -239,8 +238,8 @@ mod test {
         let filter = "len(msp)=50:100";
         let mut range = make_fake_range();
         let parser = parse_filter(&filter);
-        eprintln!("{:?}", range.starts.len());
+        eprintln!("{:?}", range.starts().len());
         apply_filter_to_range(&parser, &mut range).unwrap();
-        eprintln!("{:?}", range.starts.len());
+        eprintln!("{:?}", range.starts().len());
     }
 }

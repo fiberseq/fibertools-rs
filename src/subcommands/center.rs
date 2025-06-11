@@ -161,27 +161,27 @@ impl CenteredFiberData {
     ) {
         if self.reference {
             (
-                &self.fiber.m6a.reference_starts,
-                &self.fiber.m6a.qual,
-                &self.fiber.cpg.reference_starts,
-                &self.fiber.cpg.qual,
-                &self.fiber.nuc.reference_starts,
-                &self.fiber.nuc.reference_ends,
-                &self.fiber.msp.reference_starts,
-                &self.fiber.msp.reference_ends,
-                &self.fiber.msp.qual,
+                self.fiber.m6a.reference_starts(),
+                self.fiber.m6a.qual(),
+                self.fiber.cpg.reference_starts(),
+                self.fiber.cpg.qual(),
+                self.fiber.nuc.reference_starts(),
+                self.fiber.nuc.reference_ends(),
+                self.fiber.msp.reference_starts(),
+                self.fiber.msp.reference_ends(),
+                self.fiber.msp.qual(),
             )
         } else {
             (
-                &self.fiber.m6a.starts,
-                &self.fiber.m6a.qual,
-                &self.fiber.cpg.starts,
-                &self.fiber.cpg.qual,
-                &self.fiber.nuc.starts,
-                &self.fiber.nuc.ends,
-                &self.fiber.msp.starts,
-                &self.fiber.msp.ends,
-                &self.fiber.msp.qual,
+                self.fiber.m6a.starts(),
+                self.fiber.m6a.qual(),
+                self.fiber.cpg.starts(),
+                self.fiber.cpg.qual(),
+                self.fiber.nuc.starts(),
+                self.fiber.nuc.ends(),
+                self.fiber.msp.starts(),
+                self.fiber.msp.ends(),
+                self.fiber.msp.qual(),
             )
         }
     }

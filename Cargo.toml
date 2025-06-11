@@ -21,6 +21,10 @@ exclude = ["py-ft"]
 name = "ft"
 path = "src/main.rs"
 
+[[bench]]
+name = "ranges_bench"
+harness = false
+
 [dependencies]
 anstyle = "1.0.0"
 anyhow = "1.0.58"
@@ -76,6 +80,7 @@ vergen-git2 = { version = "1.0.2", features = [
 [dev-dependencies]
 assert_cmd = "2.0.11"
 predicates = "3.0.3"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [features]
 cli = ["dep:clap", "dep:clap_complete", "dep:clap_mangen", "dep:console"]
