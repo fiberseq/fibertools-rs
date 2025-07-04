@@ -74,9 +74,9 @@ impl BaseMods {
     pub fn my_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
-            // MM:Z:([ACGTUN][-+]([a-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
+            // MM:Z:([ACGTUN][-+]([A-Za-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
             static ref MM_RE: Regex =
-                Regex::new(r"((([ACGTUN])([-+])([a-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
+                Regex::new(r"((([ACGTUN])([-+])([A-Za-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
         }
         // Array to store all the different modifications within the MM tag
         let mut rtn = vec![];
