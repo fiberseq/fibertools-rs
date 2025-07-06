@@ -65,6 +65,21 @@ pub struct BaseMods {
     pub base_mods: Vec<BaseMod>,
 }
 
+fn convert_seq_uppercase(mut seq: Vec<u8>) -> Vec<u8> {
+    // convert seq to uppercase, ignoring invalid characters
+    for base in &mut seq {
+        match *base {
+            b'a' => *base = b'A',
+            b'c' => *base = b'C',
+            b'g' => *base = b'G',
+            b't' => *base = b'T',
+            b'n' => *base = b'N',
+            _ => {},
+        }
+    }
+    seq
+}
+
 impl BaseMods {
     pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // my basemod parser is ~25% faster than rust_htslib's
@@ -103,9 +118,9 @@ impl BaseMods {
 
                 // get forward sequence bases from the bam record
                 let forward_bases = if record.is_reverse() {
-                    revcomp(record.seq().as_bytes())
+                    convert_seq_uppercase(revcomp(record.seq().as_bytes()))
                 } else {
-                    record.seq().as_bytes()
+                    convert_seq_uppercase(record.seq().as_bytes())
                 };
                 log::trace!(
                     "mod_base: {}, mod_strand: {}, modification_type: {}, mod_dists: {:?}",
@@ -121,7 +136,7 @@ impl BaseMods {
                 let mut unfiltered_modified_positions: Vec<i64> = vec![0; mod_dists.len()];
                 while cur_seq_idx < forward_bases.len() && cur_mod_idx < mod_dists.len() {
                     let cur_base = forward_bases[cur_seq_idx];
-                    if cur_base == mod_base && dist_from_last_mod_base == mod_dists[cur_mod_idx] {
+                    if (cur_base == mod_base || mod_base == b'N') && dist_from_last_mod_base == mod_dists[cur_mod_idx] {
                         unfiltered_modified_positions[cur_mod_idx] =
                             i64::try_from(cur_seq_idx).unwrap();
                         dist_from_last_mod_base = 0;
