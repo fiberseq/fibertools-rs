@@ -396,3 +396,37 @@ pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
         vec![]
     }
 }
+
+/// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.
+///
+/// # Arguments
+///
+/// * `seq` - Input vector of bases in the sequence, all u8.
+///
+/// # Returns
+///
+/// * Output vector same as `seq` with a,c,g,t,n converted to uppercase.
+///
+/// # Example
+///
+/// ```
+/// use fibertools_rs::utils::bio_io::convert_seq_uppercase;
+/// let x = vec![b'A', b'C', b'G', b'T', b'N', b'a', b'c', b'g', b't', b'n', b'='];
+/// let out = convert_seq_uppercase(x);
+/// let expected_out = vec![b'A', b'C', b'G', b'T', b'N', b'A', b'C', b'G', b'T', b'N', b'='];
+/// let matching = out.iter().zip(expected_out.iter()).filter(|&(a, b)| a == b).count();
+/// assert!(matching == out.len() && matching == expected_out.len());
+/// ```
+pub fn convert_seq_uppercase(mut seq: Vec<u8>) -> Vec<u8> {
+    for base in &mut seq {
+        match *base {
+            b'a' => *base = b'A',
+            b'c' => *base = b'C',
+            b'g' => *base = b'G',
+            b't' => *base = b'T',
+            b'n' => *base = b'N',
+            _ => {}
+        }
+    }
+    seq
+}
