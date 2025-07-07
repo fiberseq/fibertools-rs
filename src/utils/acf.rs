@@ -25,9 +25,9 @@ use std::ops::{Add, AddAssign, Div};
 /// use fibertools_rs::utils::acf;
 /// let x = [1.0, 1.2, 1.4, 1.6];
 /// let ac = acf::acf(&x, Some(2), false).unwrap();
-/// assert!((ac[0] - 1.0).abs() < 1.0e-7);
-/// assert!((ac[1] - 0.25).abs() < 1.0e-7);
-/// assert!((ac[2] - (-0.3)).abs() < 1.0e-7);
+/// assert!((ac[0] - 1.0) * (ac[0] - 1.0) < 1.0e-14);
+/// assert!((ac[1] - 0.25) * (ac[1] - 0.25) < 1.0e-14);
+/// assert!((ac[2] - (-0.3)) * (ac[2] - (-0.3)) < 1.0e-14);
 /// ```
 pub fn acf<T: Float + From<u32> + From<f64> + Copy + Add + AddAssign + Div>(
     x: &[T],
