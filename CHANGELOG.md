@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5] - 2025-07-07
+
+- Add ft validate
+- Add `-u` to all commands to allow uncompressed BAM output
+- Outline Fiber-HMM
+- Add haplotype to footprint
+- Allow uppercase letters for the mod code in modBAM parsing.
+- Lots of clippy
+
 ## [0.6.4] - 2025-01-31
 
 - Fix: Error on unrecognized PacBio chemistry.
