@@ -74,9 +74,9 @@ impl BaseMods {
     pub fn my_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
         // regex for matching the MM tag
         lazy_static! {
-            // MM:Z:([ACGTUN][-+]([a-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
+            // MM:Z:([ACGTUN][-+]([A-Za-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
             static ref MM_RE: Regex =
-                Regex::new(r"((([ACGTUN])([-+])([a-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
+                Regex::new(r"((([ACGTUN])([-+])([A-Za-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
         }
         // Array to store all the different modifications within the MM tag
         let mut rtn = vec![];
@@ -103,9 +103,9 @@ impl BaseMods {
 
                 // get forward sequence bases from the bam record
                 let forward_bases = if record.is_reverse() {
-                    revcomp(record.seq().as_bytes())
+                    convert_seq_uppercase(revcomp(record.seq().as_bytes()))
                 } else {
-                    record.seq().as_bytes()
+                    convert_seq_uppercase(record.seq().as_bytes())
                 };
                 log::trace!(
                     "mod_base: {}, mod_strand: {}, modification_type: {}, mod_dists: {:?}",
@@ -121,7 +121,9 @@ impl BaseMods {
                 let mut unfiltered_modified_positions: Vec<i64> = vec![0; mod_dists.len()];
                 while cur_seq_idx < forward_bases.len() && cur_mod_idx < mod_dists.len() {
                     let cur_base = forward_bases[cur_seq_idx];
-                    if cur_base == mod_base && dist_from_last_mod_base == mod_dists[cur_mod_idx] {
+                    if (cur_base == mod_base || mod_base == b'N')
+                        && dist_from_last_mod_base == mod_dists[cur_mod_idx]
+                    {
                         unfiltered_modified_positions[cur_mod_idx] =
                             i64::try_from(cur_seq_idx).unwrap();
                         dist_from_last_mod_base = 0;
