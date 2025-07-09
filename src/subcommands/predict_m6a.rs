@@ -13,6 +13,7 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
@@ -43,7 +44,7 @@ where
     pub model: Vec<u8>,
     pub min_ml: u8,
     pub nuc_opts: cli::NucleosomeParameters,
-    pub burn_models: m6a_burn::BurnModels<B>,
+    pub burn_models: Arc<Mutex<m6a_burn::BurnModels<B>>>,
     pub fake: bool,
 }
 
@@ -76,7 +77,7 @@ where
             model: vec![],
             min_ml: 0,
             nuc_opts,
-            burn_models: m6a_burn::BurnModels::new(&polymerase),
+            burn_models: Arc::new(Mutex::new(m6a_burn::BurnModels::new(&polymerase))),
             fake,
         };
         options.add_model().expect("Error loading model");
@@ -310,7 +311,8 @@ where
     }
 
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
-        self.burn_models.forward(self, windows, count)
+        let burn_models = self.burn_models.lock().unwrap();
+        burn_models.forward(self, windows, count)
     }
 
     fn _fake_apply_model(&self, _: &[f32], count: usize) -> Vec<f32> {
