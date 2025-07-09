@@ -47,7 +47,7 @@ where
         let device = Self::get_libtorch_device();
 
         // log info about the device used
-        log::info!("Using {:?} for Burn device.", device);
+        log::info!("Using {device:?} for Burn device.");
 
         match polymerase {
             PbChem::Two => {

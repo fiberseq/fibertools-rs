@@ -129,7 +129,7 @@ pub fn main() -> Result<(), Error> {
     log::info!(
         "{} done! Time elapsed: {}",
         subcommand.bright_green().bold(),
-        format!("{:.2?}", duration).bright_yellow().bold()
+        format!("{duration:.2?}").bright_yellow().bold()
     );
     Ok(())
 }

@@ -125,7 +125,7 @@ where
         // set the variables for ML
         let final_min_ml = match self.min_ml_score {
             Some(x) => {
-                log::info!("Using provided minimum ML tag score: {}", x);
+                log::info!("Using provided minimum ML tag score: {x}");
                 x
             }
             None => min_ml,

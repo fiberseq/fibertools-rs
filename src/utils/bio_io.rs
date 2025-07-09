@@ -85,12 +85,12 @@ pub fn writer(filename: &str) -> Result<Box<dyn Write>> {
 
 /// write to a file, but don't error on broken pipes
 pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
-    let out = write!(buffer, "{}", out);
+    let out = write!(buffer, "{out}");
     if let Err(err) = out {
         if err.kind() == io::ErrorKind::BrokenPipe {
             exit(0);
         } else {
-            panic!("Error: {}", err);
+            panic!("Error: {err}");
         }
     }
 }
@@ -116,7 +116,7 @@ pub fn buffer_from<P: AsRef<Path>>(
         Box::new(io::BufReader::new(std::fs::File::open(path)?))
     };
     let (reader, compression) = get_reader(readable)?;
-    log::debug!("Compression: {:?}", compression);
+    log::debug!("Compression: {compression:?}");
     let buffer = BufReader::new(reader);
     Ok(buffer)
 }
@@ -147,7 +147,7 @@ pub fn program_bam_writer_from_header(
     let last_program = re_pp.captures_iter(&header_string).last();
     if let Some(last_program) = last_program {
         let last_program = last_program[1].to_string();
-        log::trace!("last program {}", last_program);
+        log::trace!("last program {last_program}");
         header_rec.push_tag(b"PP", &last_program);
     };
     // VN
@@ -183,7 +183,7 @@ pub fn bam_reader(bam: &str) -> bam::Reader {
     if bam == "-" {
         bam::Reader::from_stdin().unwrap_or_else(|_| panic!("Failed to open bam from stdin"))
     } else {
-        bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {}", bam))
+        bam::Reader::from_path(bam).unwrap_or_else(|_| panic!("Failed to open {bam}"))
     }
 }
 // This is a bam chunk reader
@@ -323,8 +323,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     // grab chemistry
     let chemistry = CHEMISTRY_MAP.get(binding_kit).unwrap_or_else(|| {
         log::error!(
-            "Model for BINDINGKIT={} not available. Unable to run predictions.",
-            binding_kit
+            "Model for BINDINGKIT={binding_kit} not available. Unable to run predictions."
         );
         std::process::exit(1);
     });
@@ -337,9 +336,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         PbChem::Revio => "Revio",
     };
     log::info!(
-        "Bam header implies PacBio chemistry {} binding kit {}.",
-        chem,
-        binding_kit
+        "Bam header implies PacBio chemistry {chem} binding kit {binding_kit}."
     );
     chemistry.clone()
 }

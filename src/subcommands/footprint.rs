@@ -265,7 +265,7 @@ impl<'a> Footprint<'a> {
             .footprint
             .modules
             .iter()
-            .map(|(st, en)| format!("module:{}-{}", st, en))
+            .map(|(st, en)| format!("module:{st}-{en}"))
             .collect::<Vec<_>>()
             .join("\t");
         out += "\tfootprint_codes\tfire_quals\tfiber_names\thaplotype";
@@ -319,7 +319,7 @@ impl std::fmt::Display for Footprint<'_> {
                 .join(","),
             haplotypes
         );
-        writeln!(f, "{}", out)
+        writeln!(f, "{out}")
     }
 }
 
@@ -335,7 +335,7 @@ pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyho
     let yaml_buff = bio_io::buffer_from(&opts.yaml)?;
     let yaml: FootprintYaml = serde_yaml::from_reader(yaml_buff)?;
     yaml.check_for_valid_input()?;
-    log::debug!("YAML: {:?}", yaml);
+    log::debug!("YAML: {yaml:?}");
 
     let mut bam = opts.input.indexed_bam_reader();
     let header_view = opts.input.header_view();
@@ -364,7 +364,7 @@ pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyho
             writeln!(out, "{}", footprint.out_bed_header())?;
             first = false;
         }
-        out.write_all(format!("{}", footprint).as_bytes())?;
+        out.write_all(format!("{footprint}").as_bytes())?;
     }
     Ok(())
 }
