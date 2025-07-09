@@ -523,28 +523,20 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
         // add m6a calls
-        // Extract the configuration data we need for parallel processing
-        let polymerase = predict_options.polymerase.clone();
-        let keep = predict_options.keep;
-        let min_ml_score = predict_options.min_ml_score;
-        let all_calls = predict_options.all_calls;
-        let batch_size = predict_options.batch_size;
-        let nuc_opts = predict_options.nuc_opts.clone();
-        let fake = predict_options.fake;
-        
+
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .chunks(batch_size)
+            .chunks(predict_options.batch_size)
             .map(|records| {
                 // Create a fresh PredictOptions instance for this thread
                 let thread_opts = PredictOptions::<MlBackend>::new(
-                    keep,
-                    min_ml_score,
-                    all_calls,
-                    polymerase.clone(),
-                    batch_size,
-                    nuc_opts.clone(),
-                    fake,
+                    predict_options.all_calls,
+                    predict_options.min_ml_score,
+                    predict_options.all_calls,
+                    predict_options.polymerase.clone(),
+                    predict_options.batch_size,
+                    predict_options.nuc_opts.clone(),
+                    predict_options.fake,
                 );
                 PredictOptions::predict_m6a_on_records(&thread_opts, records)
             })
