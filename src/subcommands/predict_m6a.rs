@@ -13,7 +13,6 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
@@ -44,7 +43,7 @@ where
     pub model: Vec<u8>,
     pub min_ml: u8,
     pub nuc_opts: cli::NucleosomeParameters,
-    pub burn_models: Arc<Mutex<m6a_burn::BurnModels<B>>>,
+    pub burn_models: m6a_burn::BurnModels<B>,
     pub fake: bool,
 }
 
@@ -77,7 +76,7 @@ where
             model: vec![],
             min_ml: 0,
             nuc_opts,
-            burn_models: Arc::new(Mutex::new(m6a_burn::BurnModels::new(&polymerase))),
+            burn_models: m6a_burn::BurnModels::new(&polymerase),
             fake,
         };
         options.add_model().expect("Error loading model");
@@ -311,8 +310,7 @@ where
     }
 
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {
-        let burn_models = self.burn_models.lock().unwrap();
-        burn_models.forward(self, windows, count)
+        self.burn_models.forward(self, windows, count)
     }
 
     fn _fake_apply_model(&self, _: &[f32], count: usize) -> Vec<f32> {
@@ -525,10 +523,31 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
         // add m6a calls
+        // Extract the configuration data we need for parallel processing
+        let polymerase = predict_options.polymerase.clone();
+        let keep = predict_options.keep;
+        let min_ml_score = predict_options.min_ml_score;
+        let all_calls = predict_options.all_calls;
+        let batch_size = predict_options.batch_size;
+        let nuc_opts = predict_options.nuc_opts.clone();
+        let fake = predict_options.fake;
+        
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
-            .chunks(predict_options.batch_size)
-            .map(|records| PredictOptions::predict_m6a_on_records(&predict_options, records))
+            .chunks(batch_size)
+            .map(|records| {
+                // Create a fresh PredictOptions instance for this thread
+                let thread_opts = PredictOptions::<MlBackend>::new(
+                    keep,
+                    min_ml_score,
+                    all_calls,
+                    polymerase.clone(),
+                    batch_size,
+                    nuc_opts.clone(),
+                    fake,
+                );
+                PredictOptions::predict_m6a_on_records(&thread_opts, records)
+            })
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
