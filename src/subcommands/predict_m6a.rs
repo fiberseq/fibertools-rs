@@ -13,10 +13,12 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::sync::Once;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 pub const MIN_F32_PRED: f32 = 1.0e-46;
+static LOG_ONCE: Once = Once::new();
 // json precision tables
 pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
 pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
@@ -88,7 +90,9 @@ where
         let min_ml = if let Ok(_file) = std::env::var("FT_MODEL") {
             244
         } else {
-            log::info!("Using semi-supervised CNN m6A model.");
+            LOG_ONCE.call_once(|| {
+                log::info!("Using semi-supervised CNN m6A model.");
+            });
             match self.polymerase {
                 PbChem::Two => {
                     precision_json = SEMI_JSON_2_0.to_string();
