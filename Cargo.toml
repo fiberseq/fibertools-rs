@@ -21,10 +21,6 @@ exclude = ["py-ft"]
 name = "ft"
 path = "src/main.rs"
 
-[[bench]]
-name = "predict_options_benchmark"
-harness = true
-
 [dependencies]
 anstyle = "1.0.0"
 anyhow = "1.0.58"
