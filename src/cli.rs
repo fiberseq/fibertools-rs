@@ -9,6 +9,7 @@ mod clear_kinetics_opts;
 mod ddda_to_m6a_opts;
 mod decorator_opts;
 mod extract_opts;
+mod fiber_fold_opts;
 mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
@@ -25,6 +26,7 @@ pub use clear_kinetics_opts::*;
 pub use ddda_to_m6a_opts::*;
 pub use decorator_opts::*;
 pub use extract_opts::*;
+pub use fiber_fold_opts::*;
 pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
@@ -61,7 +63,7 @@ pub struct Cli {
 //
 // Global options available to all subcommands
 //
-#[derive(Debug, Args, PartialEq, Eq)]
+#[derive(Debug, Args, PartialEq, Eq, Clone)]
 pub struct GlobalOpts {
     /// Threads
     #[clap(
@@ -137,6 +139,8 @@ pub enum Commands {
     FiberHmm(FiberHmmOptions),
     /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
     Validate(ValidateOptions),
+    /// Predict 3D chromatin structure using only fiberseq data
+    FiberFold(FiberFoldOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),

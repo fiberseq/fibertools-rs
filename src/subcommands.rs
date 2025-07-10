@@ -24,3 +24,5 @@ pub mod strip_basemods;
 pub mod fiber_hmm;
 
 pub mod validate;
+
+pub mod fiber_fold;
