@@ -1051,7 +1051,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.11",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -2796,7 +2796,7 @@ dependencies = [
  "log",
  "presser",
  "thiserror 1.0.63",
- "windows 0.57.0",
+ "windows 0.58.0",
 ]
 
 [[package]]
