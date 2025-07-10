@@ -27,7 +27,7 @@ pub fn add_fire_to_rec(
     rec.record
         .push_aux(b"aq", aux_array_field)
         .expect("Cannot add FIRE precision to bam");
-    log::trace!("precisions: {:?}", precisions);
+    log::trace!("precisions: {precisions:?}");
 }
 
 pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error> {

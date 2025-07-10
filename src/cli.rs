@@ -9,6 +9,7 @@ mod clear_kinetics_opts;
 mod ddda_to_m6a_opts;
 mod decorator_opts;
 mod extract_opts;
+mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
 mod nucleosome_opts;
@@ -16,6 +17,7 @@ mod pileup_opts;
 mod predict_opts;
 mod qc_opts;
 mod strip_basemods_opts;
+mod validate_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
 pub use center_opts::*;
@@ -23,6 +25,7 @@ pub use clear_kinetics_opts::*;
 pub use ddda_to_m6a_opts::*;
 pub use decorator_opts::*;
 pub use extract_opts::*;
+pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
 pub use nucleosome_opts::*;
@@ -30,6 +33,7 @@ pub use pileup_opts::*;
 pub use predict_opts::*;
 pub use qc_opts::*;
 pub use strip_basemods_opts::*;
+pub use validate_opts::ValidateOptions;
 
 //
 // The main CLI structure
@@ -129,6 +133,10 @@ pub enum Commands {
     StripBasemods(StripBasemodsOptions),
     /// Convert a DddA BAM file to pseudo m6A BAM file
     DddaToM6a(DddaToM6aOptions),
+    /// Apply FiberHMM to a bam file
+    FiberHmm(FiberHmmOptions),
+    /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
+    Validate(ValidateOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),

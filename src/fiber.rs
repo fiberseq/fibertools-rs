@@ -423,7 +423,7 @@ impl FiberseqData {
         let score = self.ec.round() as i64;
         let q_len = self.record.seq_len() as i64;
         let rq = match self.get_rq() {
-            Some(x) => format!("{}", x),
+            Some(x) => format!("{x}"),
             None => ".".to_string(),
         };
         // reference features
@@ -529,7 +529,7 @@ impl FiberseqData {
                     })
                     .map(|x| x.to_string() + ",")
                     .collect();
-                rtn.write_fmt(format_args!("{}\t", z)).unwrap();
+                rtn.write_fmt(format_args!("{z}\t")).unwrap();
             }
         }
         // replace the last tab with a newline
@@ -563,7 +563,7 @@ impl<'a> FiberseqRecords<'a> {
     }
 }
 
-impl<'a> Iterator for FiberseqRecords<'a> {
+impl Iterator for FiberseqRecords<'_> {
     type Item = FiberseqData;
 
     fn next(&mut self) -> Option<Self::Item> {

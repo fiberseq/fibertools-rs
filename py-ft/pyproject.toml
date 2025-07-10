@@ -3,14 +3,22 @@ build-backend = "maturin"
 requires = ["maturin>=1.1,<2.0"]
 
 [project]
+dynamic = ["version"]
 classifiers = [
-  "Programming Language :: Rust",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 name = "pyft"
 requires-python = ">=3.7"
-dependencies = ["pandas>=2.0", "altair==5.1", "vegafusion[embed]", "tqdm", "typing-extensions", "polars"]
+dependencies = [
+    "pandas>=2.0",
+    "altair==5.1",
+    "vegafusion[embed]",
+    "tqdm",
+    "typing-extensions",
+    "polars",
+]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
@@ -18,4 +26,3 @@ python-source = "python"
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
-

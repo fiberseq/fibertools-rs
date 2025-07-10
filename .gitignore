@@ -22,3 +22,4 @@ py-ft/test.html
 py-ft/test.py
 py-ft/test.tbl
 tests/data/shuffle.chr20.hifi.bed.gz
+benchmarks/2025-07-08-new-torch-version/bin/

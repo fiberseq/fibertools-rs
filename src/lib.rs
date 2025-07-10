@@ -97,14 +97,14 @@ pub fn region_parser(rgn: &str) -> (FetchDefinition<'_>, String) {
         let st: i64 = start
             .replace(',', "")
             .parse()
-            .unwrap_or_else(|_| panic!("Could not parse start of region: {}", start));
+            .unwrap_or_else(|_| panic!("Could not parse start of region: {start}"));
         (
             FetchDefinition::RegionString(
                 chrom.as_bytes(),
                 st,
                 end.replace(',', "")
                     .parse()
-                    .unwrap_or_else(|_| panic!("Could not parse end of region: {}", end)),
+                    .unwrap_or_else(|_| panic!("Could not parse end of region: {end}")),
             ),
             chrom.to_string(),
         )

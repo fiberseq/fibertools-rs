@@ -294,7 +294,7 @@ impl CenteredFiberData {
                     write_count += 1;
                 }
             }
-            log::debug!("{}: {}", t, write_count);
+            log::debug!("{t}: {write_count}");
         }
 
         rtn

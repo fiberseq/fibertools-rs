@@ -38,7 +38,7 @@ pub fn get_model(fire_opts: &FireOptions) -> (GBDT, MapPrecisionValues) {
             (temp_file_name.to_string(), FIRE_CONF_JSON.to_string())
         }
     };
-    log::info!("Using model: {}", model_file);
+    log::info!("Using model: {model_file}");
     // load model
     let model =
         GBDT::from_xgboost_dump(&model_file, "binary:logistic").expect("failed to load FIRE model");
@@ -146,7 +146,7 @@ impl FireFeatsInRange {
     pub fn header(tag: &str) -> String {
         let mut out = "".to_string();
         for col in FEATS_IN_USE.iter() {
-            out += &format!("\t{}_{}", tag, col);
+            out += &format!("\t{tag}_{col}");
         }
         out
     }
@@ -305,7 +305,7 @@ impl<'a> FireFeats<'a> {
         out += &FireFeatsInRange::header("best");
         out += &FireFeatsInRange::header("worst");
         for bin_num in 0..fire_opts.bin_num {
-            out += &FireFeatsInRange::header(&format!("bin_{}", bin_num));
+            out += &FireFeatsInRange::header(&format!("bin_{bin_num}"));
         }
         out += "\n";
         out

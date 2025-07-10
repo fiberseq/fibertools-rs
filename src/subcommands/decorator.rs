@@ -114,25 +114,25 @@ impl Display for Decorator<'_> {
     }
 }
 
-impl<'a> Ord for Decorator<'a> {
+impl Ord for Decorator<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.start, self.end).cmp(&(other.start, other.end))
     }
 }
 
-impl<'a> PartialOrd for Decorator<'a> {
+impl PartialOrd for Decorator<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> PartialEq for Decorator<'a> {
+impl PartialEq for Decorator<'_> {
     fn eq(&self, other: &Self) -> bool {
         (self.start, self.end) == (other.start, other.end)
     }
 }
 
-impl<'a> Eq for Decorator<'a> {}
+impl Eq for Decorator<'_> {}
 
 pub fn bed12_from_fiber(fiber: &FiberseqData) -> String {
     let strand = if fiber.record.is_reverse() { '-' } else { '+' };

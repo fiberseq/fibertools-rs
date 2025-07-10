@@ -336,7 +336,7 @@ impl<'a> QcStats<'a> {
     {
         let mut out = "".to_string();
         for (k, v) in hashmap.iter().sorted() {
-            out += &format!("{}\t{}\t{}\n", name, k, v);
+            out += &format!("{name}\t{k}\t{v}\n");
         }
         out
     }
