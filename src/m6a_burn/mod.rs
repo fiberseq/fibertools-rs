@@ -47,7 +47,7 @@ where
         let device = Self::get_libtorch_device();
 
         // log info about the device used
-        log::info!("Using {:?} for Burn device.", device);
+        log::info!("Using {device:?} for Burn device.");
 
         match polymerase {
             PbChem::Two => {
@@ -131,8 +131,8 @@ where
         };
         forward
             .into_data()
-            .convert()
-            .value
+            .to_vec::<f32>()
+            .unwrap()
             .chunks(2)
             .map(|c| c[0])
             .collect()
@@ -153,7 +153,7 @@ mod tests {
         let model: revio::Model<BurnBackend> = revio::Model::default();
         let input = Tensor::<BurnBackend, 3>::zeros([2, LAYERS, WINDOW], &device);
         let output = model.forward(input);
-        let z: Vec<f32> = output.to_data().value.chunks(2).map(|c| c[0]).collect();
+        let z: Vec<f32> = output.to_data().to_vec::<f32>().unwrap().chunks(2).map(|c| c[0]).collect();
         println!("{:?}", z);
     }
 }

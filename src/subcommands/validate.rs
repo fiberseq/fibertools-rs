@@ -6,18 +6,18 @@ use std::io::IsTerminal;
 /// but only if the output is a terminal
 pub fn eprintln_red(message: &str) {
     if std::io::stderr().is_terminal() {
-        eprintln!("\x1b[1;31m{}\x1b[0m", message);
+        eprintln!("\x1b[1;31m{message}\x1b[0m");
     } else {
-        eprintln!("{}", message);
+        eprintln!("{message}");
     }
 }
 
 /// same but with bright green
 pub fn eprintln_green(message: &str) {
     if std::io::stderr().is_terminal() {
-        eprintln!("\x1b[1;32m{}\x1b[0m", message);
+        eprintln!("\x1b[1;32m{message}\x1b[0m");
     } else {
-        eprintln!("{}", message);
+        eprintln!("{message}");
     }
 }
 
@@ -57,7 +57,7 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     }
 
     // total reads
-    eprintln!("Total reads tested: {}", n_reads);
+    eprintln!("Total reads tested: {n_reads}");
 
     // frac with m6a, frac with nucleosomes, and frac with fire
     eprintln!(

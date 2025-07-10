@@ -14,7 +14,7 @@ pub fn run_fiber_hmm(opts: &mut FiberHmmOptions) -> Result<(), Error> {
         if fiber.record.is_reverse() {
             seq = revcomp(seq);
         }
-        log::trace!("Run HMM on fiber: {:?}", seq);
+        log::trace!("Run HMM on fiber: {seq:?}");
 
         // TODO hmm stuff on the one read
 

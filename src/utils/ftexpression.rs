@@ -18,14 +18,14 @@ fn cmp(name: &str, value: f64, operator: &str, threshold: &Threshold) -> bool {
             "=" => value == *thr,
             "!=" => value != *thr,
             _ => {
-                eprintln!("Invalid operator for {} function: {}", name, operator);
+                eprintln!("Invalid operator for {name} function: {operator}");
                 std::process::exit(1);
             }
         },
         Threshold::Range(min, max) => match operator {
             "=" => value >= *min && value < *max,
             _ => {
-                eprintln!("Require = operator for {} when using ranged args", name);
+                eprintln!("Require = operator for {name} when using ranged args");
                 std::process::exit(1);
             }
         },
@@ -65,7 +65,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let func_name_end = filter.find('(').unwrap_or(filter.len());
     let func_name = filter[..func_name_end].trim().to_string();
     if !["len", "qual"].contains(&func_name.as_str()) {
-        eprintln!("Invalid function: {}", func_name);
+        eprintln!("Invalid function: {func_name}");
         std::process::exit(1);
     }
 
@@ -74,7 +74,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     let gnm_feat_end = filter.find(')').unwrap_or(filter.len());
     let gnm_feat = filter[gnm_feat_start..gnm_feat_end].to_string();
     if !["msp", "nuc", "m6a", "5mC"].contains(&gnm_feat.as_str()) {
-        eprintln!("Invalid argument for {} function: {}", func_name, gnm_feat);
+        eprintln!("Invalid argument for {func_name} function: {gnm_feat}");
         std::process::exit(1);
     }
 
@@ -124,7 +124,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     } else {
         let value_num = value_str.parse::<f64>();
         if value_num.is_err() {
-            eprintln!("Value is not numeric: {}.", value_str);
+            eprintln!("Value is not numeric: {value_str}.");
             std::process::exit(1);
         }
         Threshold::Single(value_num.unwrap())
