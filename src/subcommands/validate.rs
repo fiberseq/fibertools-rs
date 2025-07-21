@@ -54,6 +54,11 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
             n_nucleosomes += 1;
         }
         n_reads += 1;
+
+        // break if we have reached the number of reads to validate
+        if n_reads == opts.reads {
+            break;
+        }
     }
 
     // total reads
