@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add `ft validate` subcommand for Fiber-seq BAM validation
-- Add `-u` flag to all commands to allow uncompressed BAM output
+- Add `-u` flag to all commands to allow uncompressed BAM output, this is very useful for piping Fiber-seq data between tools.
 - Add haplotype support to footprint command
 - Enable Revio model for Vega sequencing platform
 - Allow uppercase letters for the mod code in modBAM parsing
