@@ -713,9 +713,7 @@ fn run_rgn(
         bam.fetch((chrom, chrom_start, chrom_end))?;
         let records = bam.records();
         // make the pileup
-        log::debug!(
-            "Initializing pileup for {chrom}:{chrom_start}-{chrom_end}"
-        );
+        log::debug!("Initializing pileup for {chrom}:{chrom_start}-{chrom_end}");
         let mut pileup = FiberseqPileup::new(
             chrom,
             chrom_start as usize,

@@ -322,9 +322,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
     assert_eq!(read_type, "CCS");
     // grab chemistry
     let chemistry = CHEMISTRY_MAP.get(binding_kit).unwrap_or_else(|| {
-        log::error!(
-            "Model for BINDINGKIT={binding_kit} not available. Unable to run predictions."
-        );
+        log::error!("Model for BINDINGKIT={binding_kit} not available. Unable to run predictions.");
         std::process::exit(1);
     });
 
@@ -335,9 +333,7 @@ pub fn find_pb_polymerase(header: &bam::Header) -> PbChem {
         PbChem::ThreePointTwo => "3.2",
         PbChem::Revio => "Revio",
     };
-    log::info!(
-        "Bam header implies PacBio chemistry {chem} binding kit {binding_kit}."
-    );
+    log::info!("Bam header implies PacBio chemistry {chem} binding kit {binding_kit}.");
     chemistry.clone()
 }
 
