@@ -1,3 +1,6 @@
+/// This module is used to extract the fire calls as well as nucs and msps from a bam file
+/// for every position in the bam file and output the results to a bed file.
+/// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 use crate::cli::PileupOptions;
 use crate::fiber::FiberseqData;
 use crate::utils::bamranges;
@@ -11,9 +14,6 @@ use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};
 
-/// This module is used to extract the fire calls as well as nucs and msps from a bam file
-/// for every position in the bam file and output the results to a bed file.
-/// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 static WINDOW_SIZE: usize = 1_000_000;
@@ -71,7 +71,7 @@ impl std::fmt::Display for FireRow<'_> {
         if self.pileup_opts.cpg {
             rtn += &format!("\t{}", self.cpg_coverage);
         }
-        write!(f, "{}", rtn)
+        write!(f, "{rtn}")
     }
 }
 
@@ -592,10 +592,7 @@ impl<'a> FiberseqPileup<'a> {
             let total_fire_coverage: i64 = data.fire_coverage.iter().map(|x| *x as i64).sum();
             let total_score: f64 = data.scores.iter().map(|x| *x as f64).sum();
             log::info!(
-                "Total coverage: {}, Total fire coverage: {}, Total score: {}",
-                total_coverage,
-                total_fire_coverage,
-                total_score
+                "Total coverage: {total_coverage}, Total fire coverage: {total_fire_coverage}, Total score: {total_score}"
             );
         }
     }
@@ -695,7 +692,7 @@ fn run_rgn(
     } else {
         WINDOW_SIZE
     };
-    log::info!("Window size on {}: {}", chrom, window_size);
+    log::info!("Window size on {chrom}: {window_size}");
 
     let windows = split_fetch_definition(&rgn, chrom_len as usize, window_size);
     log::debug!("Splitting {} into {} windows", chrom, windows.len());
@@ -716,12 +713,7 @@ fn run_rgn(
         bam.fetch((chrom, chrom_start, chrom_end))?;
         let records = bam.records();
         // make the pileup
-        log::debug!(
-            "Initializing pileup for {}:{}-{}",
-            chrom,
-            chrom_start,
-            chrom_end
-        );
+        log::debug!("Initializing pileup for {chrom}:{chrom_start}-{chrom_end}");
         let mut pileup = FiberseqPileup::new(
             chrom,
             chrom_start as usize,

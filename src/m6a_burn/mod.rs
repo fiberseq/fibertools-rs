@@ -4,6 +4,7 @@ use crate::utils::bio_io::PbChem;
 use burn::module::Module;
 use burn::tensor::backend::Backend;
 use burn::tensor::{Shape, Tensor};
+use std::sync::Once;
 
 pub mod two_zero {
     include!(concat!(env!("OUT_DIR"), "/m6a_burn/two_zero.rs"));
@@ -22,6 +23,8 @@ pub mod revio {
 pub type BurnDevice = burn::backend::libtorch::LibTorchDevice;
 #[cfg(not(feature = "tch"))]
 pub type BurnDevice = burn::backend::candle::CandleDevice;
+
+static LOG_DEVICE_ONCE: Once = Once::new();
 
 /// B is for the burn backend and D is for the device
 #[derive(Debug, Clone)]
@@ -47,7 +50,9 @@ where
         let device = Self::get_libtorch_device();
 
         // log info about the device used
-        log::info!("Using {:?} for Burn device.", device);
+        LOG_DEVICE_ONCE.call_once(|| {
+            log::info!("Using {device:?} for Burn device.");
+        });
 
         match polymerase {
             PbChem::Two => {
@@ -98,12 +103,13 @@ where
         use burn::backend::libtorch::LibTorchDevice;
         let device = if tch::utils::has_cuda() {
             LibTorchDevice::Cuda(0)
-        } else if tch::utils::has_mps() {
-            LibTorchDevice::Mps
-        } else {
+        }
+        //else if tch::utils::has_mps() {
+        //LibTorchDevice::Mps
+        //}
+        else {
             LibTorchDevice::Cpu
         };
-        log::info!("Number of threads for Torch: {}", tch::get_num_threads());
         device
     }
 
@@ -131,8 +137,8 @@ where
         };
         forward
             .into_data()
-            .convert()
-            .value
+            .to_vec::<f32>()
+            .unwrap()
             .chunks(2)
             .map(|c| c[0])
             .collect()
@@ -153,7 +159,13 @@ mod tests {
         let model: revio::Model<BurnBackend> = revio::Model::default();
         let input = Tensor::<BurnBackend, 3>::zeros([2, LAYERS, WINDOW], &device);
         let output = model.forward(input);
-        let z: Vec<f32> = output.to_data().value.chunks(2).map(|c| c[0]).collect();
+        let z: Vec<f32> = output
+            .to_data()
+            .to_vec::<f32>()
+            .unwrap()
+            .chunks(2)
+            .map(|c| c[0])
+            .collect();
         println!("{:?}", z);
     }
 }

@@ -335,7 +335,7 @@ impl BaseMods {
             mm_tag.push(basemod.strand);
             mm_tag.push(basemod.modification_type);
             for diff in cur_mm {
-                mm_tag.push_str(&format!(",{}", diff));
+                mm_tag.push_str(&format!(",{diff}"));
             }
             mm_tag.push(';')
             // next basemod

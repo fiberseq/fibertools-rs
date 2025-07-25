@@ -332,7 +332,7 @@ pub struct RangesIterator<'a> {
     index: usize,
 }
 
-impl<'a> Iterator for RangesIterator<'a> {
+impl Iterator for RangesIterator<'_> {
     type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.row.starts.len() {

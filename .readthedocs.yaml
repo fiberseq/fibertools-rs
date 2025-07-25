@@ -4,14 +4,15 @@ version: 2
 
 sphinx:
   builder: html
+  configuration: py-ft/docs/conf.py
 
 build:
   os: "ubuntu-20.04"
   apt_packages:
     - cmake
   tools:
-    python: "3.9"
-    rust: "1.75"
+    python: "3.10"
+    rust: "latest"
 
 python:
   install:

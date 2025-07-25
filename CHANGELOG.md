@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2025-07-10
+
+### 🚀 Features
+
+- Add `ft validate` subcommand for Fiber-seq BAM validation
+- Add `-u` flag to all commands to allow uncompressed BAM output
+- Add haplotype support to footprint command
+- Enable Revio model for Vega sequencing platform
+- Allow uppercase letters for the mod code in modBAM parsing
+
+### 🔧 Improvements
+
+- Upgrade to burn 0.18 for improved ML model performance
+- Outline Fiber-HMM functionality (experimental)
+- Extensive clippy fixes and code cleanup
+
 ## [0.6.4] - 2025-01-31
 
 - Fix: Error on unrecognized PacBio chemistry.

@@ -13,10 +13,12 @@ use rayon::prelude::IntoParallelRefMutIterator;
 use rust_htslib::{bam, bam::Read};
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use std::sync::Once;
 
 pub const WINDOW: usize = 15;
 pub const LAYERS: usize = 6;
 pub const MIN_F32_PRED: f32 = 1.0e-46;
+static LOG_ONCE: Once = Once::new();
 // json precision tables
 pub static SEMI_JSON_2_0: &str = include_str!("../../models/2.0_semi_torch.json");
 pub static SEMI_JSON_2_2: &str = include_str!("../../models/2.2_semi_torch.json");
@@ -88,7 +90,9 @@ where
         let min_ml = if let Ok(_file) = std::env::var("FT_MODEL") {
             244
         } else {
-            log::info!("Using semi-supervised CNN m6A model.");
+            LOG_ONCE.call_once(|| {
+                log::info!("Using semi-supervised CNN m6A model.");
+            });
             match self.polymerase {
                 PbChem::Two => {
                     precision_json = SEMI_JSON_2_0.to_string();
@@ -125,7 +129,7 @@ where
         // set the variables for ML
         let final_min_ml = match self.min_ml_score {
             Some(x) => {
-                log::info!("Using provided minimum ML tag score: {}", x);
+                log::info!("Using provided minimum ML tag score: {x}");
                 x
             }
             None => min_ml,
@@ -523,10 +527,23 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
     // iterate over chunks
     for mut chunk in bam_chunk_iter {
         // add m6a calls
+
         let number_of_reads_with_predictions = chunk
             .par_iter_mut()
             .chunks(predict_options.batch_size)
-            .map(|records| PredictOptions::predict_m6a_on_records(&predict_options, records))
+            .map(|records| {
+                // Create a fresh PredictOptions instance for this thread
+                let thread_opts = PredictOptions::<MlBackend>::new(
+                    predict_options.all_calls,
+                    predict_options.min_ml_score,
+                    predict_options.all_calls,
+                    predict_options.polymerase.clone(),
+                    predict_options.batch_size,
+                    predict_options.nuc_opts.clone(),
+                    predict_options.fake,
+                );
+                PredictOptions::predict_m6a_on_records(&thread_opts, records)
+            })
             .sum::<usize>() as f32;
 
         let frac_called = number_of_reads_with_predictions / chunk.len() as f32;
