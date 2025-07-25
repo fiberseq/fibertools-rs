@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Improvements
 
-- Upgrade to burn 0.17 for improved ML model performance
+- Upgrade to burn 0.18 for improved ML model performance
 - Outline Fiber-HMM functionality (experimental)
 - Extensive clippy fixes and code cleanup
 
