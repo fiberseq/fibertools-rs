@@ -82,8 +82,7 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
                         skip_because_num_msp += 1;
                         continue;
                     }
-                    let ave_msp_size =
-                        rec.msp.lengths().iter().flatten().sum::<i64>() / n_msps as i64;
+                    let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
                     if ave_msp_size < fire_opts.min_ave_msp_size {
                         skip_because_ave_msp_length += 1;
                         continue;

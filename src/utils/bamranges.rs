@@ -148,15 +148,26 @@ impl FiberAnnotations {
     }
 
     // Backward compatibility methods
-    pub fn starts(&self) -> Vec<Option<i64>> {
+    pub fn starts(&self) -> Vec<i64> {
+        self.annotations.iter().map(|a| a.start).collect()
+    }
+
+    pub fn ends(&self) -> Vec<i64> {
+        self.annotations.iter().map(|a| a.end).collect()
+    }
+
+    pub fn lengths(&self) -> Vec<i64> {
+        self.annotations.iter().map(|a| a.length).collect()
+    }
+
+    // Option versions for consistency with reference methods
+    pub fn option_starts(&self) -> Vec<Option<i64>> {
         self.annotations.iter().map(|a| Some(a.start)).collect()
     }
-
-    pub fn ends(&self) -> Vec<Option<i64>> {
+    pub fn option_ends(&self) -> Vec<Option<i64>> {
         self.annotations.iter().map(|a| Some(a.end)).collect()
     }
-
-    pub fn lengths(&self) -> Vec<Option<i64>> {
+    pub fn option_lengths(&self) -> Vec<Option<i64>> {
         self.annotations.iter().map(|a| Some(a.length)).collect()
     }
 
@@ -200,18 +211,10 @@ impl FiberAnnotations {
             .collect()
     }
 
-    pub fn get_starts(&self) -> Vec<i64> {
-        self.annotations.iter().map(|a| a.start).collect()
-    }
-
-    pub fn get_ends(&self) -> Vec<i64> {
-        self.annotations.iter().map(|a| a.end).collect()
-    }
-
-    pub fn get_forward_starts(&self) -> Vec<i64> {
+    pub fn forward_starts(&self) -> Vec<i64> {
         if !self.reverse {
             // For forward reads, just return the starts as-is
-            self.get_starts()
+            self.starts()
         } else {
             // For reverse reads, we need to convert back to forward coordinates
             // The stored starts are in reverse-complement coordinates and in reverse order
@@ -272,7 +275,12 @@ impl FiberAnnotations {
                 self.qual(),
             )
         } else {
-            (self.starts(), self.ends(), self.lengths(), self.qual())
+            (
+                self.option_starts(),
+                self.option_ends(),
+                self.option_lengths(),
+                self.qual(),
+            )
         };
 
         let s = crate::join_by_str_option_can_skip(&s, ",", skip_none);
@@ -405,7 +413,7 @@ impl FiberAnnotations {
 }
 
 impl<'a> IntoIterator for &'a FiberAnnotations {
-    type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
+    type Item = &'a FiberAnnotation;
     type IntoIter = FiberAnnotationsIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -421,27 +429,15 @@ pub struct FiberAnnotationsIterator<'a> {
     index: usize,
 }
 
-impl Iterator for FiberAnnotationsIterator<'_> {
-    type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
+impl<'a> Iterator for FiberAnnotationsIterator<'a> {
+    type Item = &'a FiberAnnotation;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.annotations.annotations.len() {
             return None;
         }
         let annotation = &self.annotations.annotations[self.index];
-        let start = annotation.start;
-        let end = annotation.end;
-        let length = annotation.length;
-        let qual = annotation.qual;
-        let reference = match (
-            annotation.reference_start,
-            annotation.reference_end,
-            annotation.reference_length,
-        ) {
-            (Some(s), Some(e), Some(l)) => Some((s, e, l)),
-            _ => None,
-        };
         self.index += 1;
-        Some((start, end, length, qual, reference))
+        Some(annotation)
     }
 }
 

@@ -194,9 +194,13 @@ impl<'a> FireTrack<'a> {
         cur_offset: i64,
         chrom_start: usize,
     ) {
-        for (_, _, _, _, r) in ranges {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in ranges {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     let re = if rs == re { re + 1 } else { re };
                     for i in rs..re {
                         let pos = i + cur_offset - chrom_start as i64;
@@ -221,18 +225,26 @@ impl<'a> FireTrack<'a> {
         }
         let mut start = i64::MAX;
         let mut end = i64::MIN;
-        for (_, _, _, _, r) in &fiber.msp {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in &fiber.msp {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     start = std::cmp::min(start, rs);
                     end = std::cmp::max(end, re);
                 }
                 _ => continue,
             }
         }
-        for (_, _, _, _, r) in &fiber.nuc {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in &fiber.nuc {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     start = std::cmp::min(start, rs);
                     end = std::cmp::max(end, re);
                 }
@@ -284,13 +296,17 @@ impl<'a> FireTrack<'a> {
         }
 
         // calculate the fire coverage and fire score
-        for (_, _, _, q, r) in &fiber.msp {
-            match r {
-                Some((rs, re, _)) => {
-                    if q < MIN_FIRE_QUAL {
+        for annotation in &fiber.msp {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
+                    if annotation.qual < MIN_FIRE_QUAL {
                         continue;
                     }
-                    let score_update = (1.0 - q as f32 / 255.0).log10() * -50.0;
+                    let score_update = (1.0 - annotation.qual as f32 / 255.0).log10() * -50.0;
                     for i in rs..re {
                         let pos = i + self.cur_offset - self.chrom_start as i64;
                         if pos < 0 || pos >= self.track_len as i64 {

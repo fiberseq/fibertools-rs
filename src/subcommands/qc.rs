@@ -130,7 +130,7 @@ impl<'a> QcStats<'a> {
 
         // add the m6a to the working queue
         let mut m6a_vec: Vec<f64> = vec![0.0; fiber.record.seq_len()];
-        for m6a in fiber.m6a.get_starts().iter() {
+        for m6a in fiber.m6a.starts().iter() {
             m6a_vec[*m6a as usize] = 1.0;
         }
 
@@ -232,21 +232,23 @@ impl<'a> QcStats<'a> {
     }
 
     fn add_range_lengths(hashmap: &mut HashMap<i64, i64>, range: &crate::utils::bamranges::Ranges) {
-        for r in range.lengths().iter().flatten() {
+        for r in range.lengths().iter() {
             hashmap.entry(*r).and_modify(|e| *e += 1).or_insert(1);
         }
     }
 
     /// calculate the m6a per MSP/FIRE element
     fn m6a_per_msp(&mut self, fiber: &fiber::FiberseqData) {
-        for (st, en, _, qual, _) in fiber.msp.into_iter() {
+        for annotation in fiber.msp.into_iter() {
+            let st = annotation.start;
+            let en = annotation.end;
+            let qual = annotation.qual;
             let is_fire = qual >= 230;
             let msp_size = en - st;
             let m6a_count = fiber
                 .m6a
                 .starts()
                 .iter()
-                .flatten()
                 .filter(|&&m6a_st| st <= m6a_st && m6a_st < en)
                 .count() as i64;
             self.m6a_per_msp_size

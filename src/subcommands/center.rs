@@ -173,14 +173,14 @@ impl CenteredFiberData {
             )
         } else {
             (
-                self.fiber.m6a.starts(),
+                self.fiber.m6a.option_starts(),
                 self.fiber.m6a.qual(),
-                self.fiber.cpg.starts(),
+                self.fiber.cpg.option_starts(),
                 self.fiber.cpg.qual(),
-                self.fiber.nuc.starts(),
-                self.fiber.nuc.ends(),
-                self.fiber.msp.starts(),
-                self.fiber.msp.ends(),
+                self.fiber.nuc.option_starts(),
+                self.fiber.nuc.option_ends(),
+                self.fiber.msp.option_starts(),
+                self.fiber.msp.option_ends(),
                 self.fiber.msp.qual(),
             )
         }

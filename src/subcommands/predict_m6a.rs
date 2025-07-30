@@ -244,7 +244,7 @@ where
             cur_basemods.add_mm_and_ml_tags(record);
 
             //let modified_bases_forward = cur_basemods.forward_m6a().0;
-            let modified_bases_forward = cur_basemods.m6a().get_forward_starts();
+            let modified_bases_forward = cur_basemods.m6a().forward_starts();
 
             // adding the nucleosomes
             nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &opts.nuc_opts);

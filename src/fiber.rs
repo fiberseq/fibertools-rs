@@ -191,7 +191,11 @@ impl FiberseqData {
                 self.msp.reference_lengths(),
             )
         } else {
-            (self.msp.starts(), self.msp.ends(), self.msp.lengths())
+            (
+                self.msp.option_starts(),
+                self.msp.option_ends(),
+                self.msp.option_lengths(),
+            )
         };
         self.to_bed12(reference, &starts, &lengths, LINKER_COLOR)
     }
@@ -204,7 +208,11 @@ impl FiberseqData {
                 self.nuc.reference_lengths(),
             )
         } else {
-            (self.nuc.starts(), self.nuc.ends(), self.nuc.lengths())
+            (
+                self.nuc.option_starts(),
+                self.nuc.option_ends(),
+                self.nuc.option_lengths(),
+            )
         };
         self.to_bed12(reference, &starts, &lengths, NUC_COLOR)
     }
@@ -213,7 +221,7 @@ impl FiberseqData {
         let starts = if reference {
             self.m6a.reference_starts()
         } else {
-            self.m6a.starts()
+            self.m6a.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, M6A_COLOR)
@@ -223,7 +231,7 @@ impl FiberseqData {
         let starts = if reference {
             self.cpg.reference_starts()
         } else {
-            self.cpg.starts()
+            self.cpg.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, CPG_COLOR)
@@ -426,8 +434,8 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = self.nuc.lengths().iter().flatten().sum::<i64>();
-        let total_msp_bp = self.msp.lengths().iter().flatten().sum::<i64>();
+        let total_nuc_bp = self.nuc.lengths().iter().sum::<i64>();
+        let total_msp_bp = self.msp.lengths().iter().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
@@ -435,19 +443,19 @@ impl FiberseqData {
         .unwrap();
         // add fiber features
         let vecs = [
-            self.nuc.starts(),
-            self.nuc.lengths(),
+            self.nuc.option_starts(),
+            self.nuc.option_lengths(),
             self.nuc.reference_starts(),
             self.nuc.reference_lengths(),
-            self.msp.starts(),
-            self.msp.lengths(),
+            self.msp.option_starts(),
+            self.msp.option_lengths(),
             fire,
             self.msp.reference_starts(),
             self.msp.reference_lengths(),
-            self.m6a.starts(),
+            self.m6a.option_starts(),
             self.m6a.reference_starts(),
             m6a_qual,
-            self.cpg.starts(),
+            self.cpg.option_starts(),
             self.cpg.reference_starts(),
             cpg_qual,
         ];

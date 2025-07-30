@@ -16,10 +16,10 @@ fn sum_qual(bam: &mut Reader) -> usize {
         let this_qual_sum = fiber
             .m6a
             .into_iter()
-            .filter(|(st, en, _, _, _)| *st >= min_pos && *en < max_pos)
-            .map(|(_, _, _, qual, _)| {
+            .filter(|annotation| annotation.start >= min_pos && annotation.end < max_pos)
+            .map(|annotation| {
                 this_count += 1;
-                qual as usize
+                annotation.qual as usize
             })
             .sum::<usize>();
         sum += this_qual_sum;

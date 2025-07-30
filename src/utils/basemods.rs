@@ -33,7 +33,7 @@ impl BaseMod {
         let mut ranges = Ranges::new(record, modified_bases_forward, None, None);
         ranges.set_qual(modified_probabilities_forward);
         let record_is_reverse = record.is_reverse();
-        assert_eq!(tmp, ranges.get_forward_starts(), "forward starts not equal");
+        assert_eq!(tmp, ranges.forward_starts(), "forward starts not equal");
         Self {
             modified_base,
             strand,
@@ -314,7 +314,7 @@ impl BaseMods {
             ml_tag.extend(basemod.ranges.get_forward_quals());
             // get MM tag values
             let mut cur_mm = vec![];
-            let positions = basemod.ranges.get_forward_starts();
+            let positions = basemod.ranges.forward_starts();
             let mut last_pos = 0;
             for pos in positions {
                 let u_pos = pos as usize;
