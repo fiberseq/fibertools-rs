@@ -166,12 +166,14 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
         map.insert(color, vec![]);
     }
 
-    for ((pos, length), qual) in fiber
-        .msp
-        .reference_starts
+    let ref_starts = fiber.msp.reference_starts();
+    let ref_lengths = fiber.msp.reference_lengths();
+    let quals = fiber.msp.qual();
+    
+    for ((pos, length), qual) in ref_starts
         .iter()
-        .zip(fiber.msp.reference_lengths.iter())
-        .zip(fiber.msp.qual.iter())
+        .zip(ref_lengths.iter())
+        .zip(quals.iter())
     {
         if let (Some(p), Some(l)) = (pos, length) {
             let l = Some(*l);
@@ -203,13 +205,18 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
 }
 
 pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator>) {
+    let m6a_starts = fiber.m6a.reference_starts();
+    let cpg_starts = fiber.cpg.reference_starts();
+    let nuc_starts = fiber.nuc.reference_starts();
+    let nuc_lengths = fiber.nuc.reference_lengths();
+    
     let mut decorators = vec![
-        Decorator::new(fiber, &fiber.m6a.reference_starts, None, M6A_COLOR, "m6A"),
-        Decorator::new(fiber, &fiber.cpg.reference_starts, None, CPG_COLOR, "5mC"),
+        Decorator::new(fiber, &m6a_starts, None, M6A_COLOR, "m6A"),
+        Decorator::new(fiber, &cpg_starts, None, CPG_COLOR, "5mC"),
         Decorator::new(
             fiber,
-            &fiber.nuc.reference_starts,
-            Some(&fiber.nuc.reference_lengths),
+            &nuc_starts,
+            Some(&nuc_lengths),
             NUC_COLOR,
             "NUC",
         ),

@@ -254,8 +254,8 @@ impl<'a> FireTrack<'a> {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
         if self.pileup_opts.fiber_coverage
-            && fiber.msp.reference_starts.is_empty()
-            && fiber.nuc.reference_starts.is_empty()
+            && fiber.msp.reference_starts().is_empty()
+            && fiber.nuc.reference_starts().is_empty()
         {
             return;
         }

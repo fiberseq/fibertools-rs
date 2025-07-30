@@ -69,11 +69,11 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
             });
             for rec in recs {
-                let n_msps = rec.msp.starts.len();
+                let n_msps = rec.msp.annotations.len();
                 if fire_opts.skip_no_m6a || fire_opts.min_msp > 0 || fire_opts.min_ave_msp_size > 0
                 {
                     // skip no calls
-                    if rec.m6a.starts.is_empty() || n_msps == 0 {
+                    if rec.m6a.annotations.is_empty() || n_msps == 0 {
                         skip_because_no_m6a += 1;
                         continue;
                     }
@@ -83,7 +83,7 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
                         continue;
                     }
                     let ave_msp_size =
-                        rec.msp.lengths.iter().flatten().sum::<i64>() / n_msps as i64;
+                        rec.msp.lengths().iter().flatten().sum::<i64>() / n_msps as i64;
                     if ave_msp_size < fire_opts.min_ave_msp_size {
                         skip_because_ave_msp_length += 1;
                         continue;
@@ -113,18 +113,17 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
     //out_buffer.write_all(header.as_bytes())?;
 
     for rec in fibers {
-        let start_iter = rec
-            .msp
-            .reference_starts
-            .iter()
-            .chain(rec.nuc.reference_starts.iter());
-        let end_iter = rec
-            .msp
-            .reference_ends
-            .iter()
-            .chain(rec.nuc.reference_ends.iter());
-        let qual_iter = rec.msp.qual.iter().chain(rec.nuc.qual.iter());
-        let n_msps = rec.msp.reference_starts.len();
+        let msp_starts = rec.msp.reference_starts();
+        let nuc_starts = rec.nuc.reference_starts();
+        let start_iter = msp_starts.iter().chain(nuc_starts.iter());
+        
+        let msp_ends = rec.msp.reference_ends();
+        let nuc_ends = rec.nuc.reference_ends();
+        let end_iter = msp_ends.iter().chain(nuc_ends.iter());
+        let msp_qual = rec.msp.qual();
+        let nuc_qual = rec.nuc.qual();
+        let qual_iter = msp_qual.iter().chain(nuc_qual.iter());
+        let n_msps = msp_starts.len();
         for (count, ((start, end), qual)) in start_iter.zip(end_iter).zip(qual_iter).enumerate() {
             if let (Some(start), Some(end)) = (start, end) {
                 let fdr = if count < n_msps {

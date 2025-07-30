@@ -1,5 +1,4 @@
 use crate::utils::bamlift::*;
-use itertools::{izip, multiunzip};
 use rust_htslib::bam;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
@@ -88,8 +87,8 @@ impl FiberAnnotations {
             .zip(reference_starts)
             .zip(reference_ends)
             .zip(reference_lengths)
-            .map(|(((((start, end), length), ref_start), ref_end), ref_length)| {
-                FiberAnnotation {
+            .map(
+                |(((((start, end), length), ref_start), ref_end), ref_length)| FiberAnnotation {
                     start,
                     end,
                     length: length.unwrap_or(end - start),
@@ -98,8 +97,8 @@ impl FiberAnnotations {
                     reference_end: ref_end,
                     reference_length: ref_length,
                     extra_columns: None,
-                }
-            })
+                },
+            )
             .collect();
 
         // return object
@@ -172,7 +171,10 @@ impl FiberAnnotations {
     }
 
     pub fn reference_lengths(&self) -> Vec<Option<i64>> {
-        self.annotations.iter().map(|a| a.reference_length).collect()
+        self.annotations
+            .iter()
+            .map(|a| a.reference_length)
+            .collect()
     }
 
     /// get positions on the complimented sequence in the cigar record
@@ -205,9 +207,25 @@ impl FiberAnnotations {
     }
 
     pub fn get_forward_starts(&self) -> Vec<i64> {
-        let mut z = self.get_starts();
-        Self::positions_on_aligned_sequence(&mut z, self.reverse, self.seq_len);
-        z
+        if !self.reverse {
+            // For forward reads, just return the starts as-is
+            self.get_starts()
+        } else {
+            // For reverse reads, we need to convert back to forward coordinates
+            // The stored starts are in reverse-complement coordinates and in reverse order
+            // We need to undo both transformations to get back to original forward coordinates
+
+            // First collect all transformations (reverse-complement back to forward)
+            let mut forward_starts: Vec<i64> = self
+                .annotations
+                .iter()
+                .map(|a| self.seq_len - a.start - 1)
+                .collect();
+
+            // Then reverse the order to undo the array reversal that was done during storage
+            forward_starts.reverse();
+            forward_starts
+        }
     }
 
     pub fn get_forward_quals(&self) -> Vec<u8> {
@@ -220,7 +238,8 @@ impl FiberAnnotations {
 
     // filter out ranges that are less than the passed quality score
     pub fn filter_by_qual(&mut self, min_qual: u8) {
-        self.annotations.retain(|annotation| annotation.qual >= min_qual);
+        self.annotations
+            .retain(|annotation| annotation.qual >= min_qual);
     }
 
     /// filter out ranges that are within the first or last X bp of the read
@@ -228,7 +247,7 @@ impl FiberAnnotations {
         if strip == 0 {
             return;
         }
-        
+
         let original_len = self.annotations.len();
         self.annotations.retain(|annotation| {
             annotation.start >= strip && annotation.start <= self.seq_len - strip
@@ -271,7 +290,11 @@ impl FiberAnnotations {
         self.annotations
             .iter()
             .map(|annotation| {
-                if let (Some(s), Some(e), Some(l)) = (annotation.reference_start, annotation.reference_end, annotation.reference_length) {
+                if let (Some(s), Some(e), Some(l)) = (
+                    annotation.reference_start,
+                    annotation.reference_end,
+                    annotation.reference_length,
+                ) {
                     Some((s, e, l))
                 } else {
                     None
@@ -288,7 +311,7 @@ impl FiberAnnotations {
                 reverse: false,
             };
         }
-        
+
         // check properties that must be the same
         let reverse = multiple_ranges[0].reverse;
         let seq_len = multiple_ranges[0].seq_len;
@@ -296,13 +319,13 @@ impl FiberAnnotations {
             assert_eq!(r.reverse, reverse);
             assert_eq!(r.seq_len, seq_len);
         }
-        
+
         // collect all annotations
         let mut annotations: Vec<FiberAnnotation> = multiple_ranges
             .iter()
             .flat_map(|r| r.annotations.clone())
             .collect();
-        
+
         // sort by start position
         annotations.sort_by_key(|a| a.start);
 
@@ -310,6 +333,71 @@ impl FiberAnnotations {
             annotations,
             seq_len,
             reverse,
+        }
+    }
+
+    /// Apply offset to all molecular coordinates in the annotations
+    pub fn apply_molecular_offset(&mut self, offset: i64, strand: char) {
+        for annotation in &mut self.annotations {
+            // Apply offset to molecular coordinates
+            annotation.start -= offset;
+            annotation.end -= offset;
+
+            if strand == '-' {
+                annotation.start = -annotation.start;
+                annotation.end = -annotation.end;
+                // Swap start and end if we reverse complemented
+                if annotation.start > annotation.end {
+                    std::mem::swap(&mut annotation.start, &mut annotation.end);
+                }
+            }
+        }
+        if strand == '-' {
+            self.annotations.reverse();
+        }
+    }
+
+    /// Apply offset to all reference coordinates in the annotations
+    pub fn apply_reference_offset(&mut self, offset: i64, strand: char) {
+        for annotation in &mut self.annotations {
+            // Apply offset to reference coordinates if they exist
+            if let Some(ref mut ref_start) = annotation.reference_start {
+                if *ref_start == -1 {
+                    *ref_start = i64::MIN;
+                    continue;
+                }
+                *ref_start -= offset;
+                if strand == '-' {
+                    *ref_start = -*ref_start;
+                }
+            }
+            if let Some(ref mut ref_end) = annotation.reference_end {
+                if *ref_end == -1 {
+                    *ref_end = i64::MIN;
+                    continue;
+                }
+                *ref_end -= offset;
+                if strand == '-' {
+                    *ref_end = -*ref_end;
+                }
+            }
+
+            // Swap reference coordinates if needed
+            if strand == '-' {
+                if let (Some(ref_start), Some(ref_end)) =
+                    (annotation.reference_start, annotation.reference_end)
+                {
+                    if ref_start > ref_end {
+                        std::mem::swap(
+                            &mut annotation.reference_start,
+                            &mut annotation.reference_end,
+                        );
+                    }
+                }
+            }
+        }
+        if strand == '-' {
+            self.annotations.reverse();
         }
     }
 }
@@ -342,7 +430,11 @@ impl Iterator for FiberAnnotationsIterator<'_> {
         let end = annotation.end;
         let length = annotation.length;
         let qual = annotation.qual;
-        let reference = match (annotation.reference_start, annotation.reference_end, annotation.reference_length) {
+        let reference = match (
+            annotation.reference_start,
+            annotation.reference_end,
+            annotation.reference_length,
+        ) {
             (Some(s), Some(e), Some(l)) => Some((s, e, l)),
             _ => None,
         };

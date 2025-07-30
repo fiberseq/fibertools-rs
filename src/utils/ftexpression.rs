@@ -142,51 +142,35 @@ pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
     range: &mut bamranges::Ranges,
 ) -> Result<(), anyhow::Error> {
-    let starting_len = range.starts.len();
+    let starting_len = range.annotations.len();
 
     let to_keep: Vec<bool> = if parsed.fn_name == "len" {
         range
-            .lengths
+            .annotations
             .iter()
-            .map(|l| len(l.unwrap(), &parsed.op, &parsed.threshold))
+            .map(|annotation| len(annotation.length, &parsed.op, &parsed.threshold))
             .collect()
     } else if parsed.fn_name == "qual" {
         range
-            .qual
+            .annotations
             .iter()
-            .map(|q| qual(*q, &parsed.op, &parsed.threshold))
+            .map(|annotation| qual(annotation.qual, &parsed.op, &parsed.threshold))
             .collect()
     } else {
         anyhow::bail!("Invalid function name: {}", &parsed.fn_name);
     };
 
-    // drop i64 values from the range
-    for vec in [
-        &mut range.starts,
-        &mut range.ends,
-        &mut range.lengths,
-        &mut range.reference_starts,
-        &mut range.reference_ends,
-        &mut range.reference_lengths,
-    ] {
-        *vec = vec
-            .iter()
-            .zip(to_keep.iter())
-            .filter_map(|(v, d)| if *d { Some(*v) } else { None })
-            .collect();
-    }
-
-    // drop u8 values from the range
-    range.qual = range
-        .qual
+    // Filter annotations based on the to_keep boolean vector
+    range.annotations = range
+        .annotations
         .iter()
         .zip(to_keep.iter())
-        .filter_map(|(v, d)| if *d { Some(*v) } else { None })
+        .filter_map(|(annotation, &keep)| if keep { Some(annotation.clone()) } else { None })
         .collect();
 
     // check we dropped the right number of values
     let n_dropped = to_keep.iter().filter(|&x| !x).count();
-    assert_eq!(starting_len, range.starts.len() + n_dropped);
+    assert_eq!(starting_len, range.annotations.len() + n_dropped);
 
     Ok(())
 }
@@ -221,14 +205,43 @@ mod test {
     use crate::utils::bamranges;
 
     fn make_fake_range() -> bamranges::Ranges {
-        bamranges::Ranges {
-            starts: vec![Some(0), Some(10), Some(17)],
-            ends: vec![Some(5), Some(15), Some(20)],
-            lengths: vec![Some(5), Some(5), Some(3)],
-            qual: vec![0, 255, 181],
-            reference_starts: vec![Some(0), Some(10), Some(17)],
-            reference_ends: vec![Some(5), Some(15), Some(20)],
-            reference_lengths: vec![Some(5), Some(5), Some(3)],
+        use bamranges::{FiberAnnotation, FiberAnnotations};
+        
+        let annotations = vec![
+            FiberAnnotation {
+                start: 0,
+                end: 5,
+                length: 5,
+                qual: 0,
+                reference_start: Some(0),
+                reference_end: Some(5),
+                reference_length: Some(5),
+                extra_columns: None,
+            },
+            FiberAnnotation {
+                start: 10,
+                end: 15,
+                length: 5,
+                qual: 255,
+                reference_start: Some(10),
+                reference_end: Some(15),
+                reference_length: Some(5),
+                extra_columns: None,
+            },
+            FiberAnnotation {
+                start: 17,
+                end: 20,
+                length: 3,
+                qual: 181,
+                reference_start: Some(17),
+                reference_end: Some(20),
+                reference_length: Some(3),
+                extra_columns: None,
+            },
+        ];
+        
+        FiberAnnotations {
+            annotations,
             seq_len: 100,
             reverse: false,
         }
@@ -239,8 +252,8 @@ mod test {
         let filter = "len(msp)=50:100";
         let mut range = make_fake_range();
         let parser = parse_filter(&filter);
-        eprintln!("{:?}", range.starts.len());
+        eprintln!("{:?}", range.annotations.len());
         apply_filter_to_range(&parser, &mut range).unwrap();
-        eprintln!("{:?}", range.starts.len());
+        eprintln!("{:?}", range.annotations.len());
     }
 }
