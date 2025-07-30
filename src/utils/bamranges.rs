@@ -3,19 +3,28 @@ use itertools::{izip, multiunzip};
 use rust_htslib::bam;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Ranges {
-    pub starts: Vec<Option<i64>>,
-    pub ends: Vec<Option<i64>>,
-    pub lengths: Vec<Option<i64>>,
-    pub qual: Vec<u8>,
-    pub reference_starts: Vec<Option<i64>>,
-    pub reference_ends: Vec<Option<i64>>,
-    pub reference_lengths: Vec<Option<i64>>,
+pub struct FiberAnnotation {
+    pub start: i64,
+    pub end: i64,
+    pub length: i64,
+    pub qual: u8,
+    pub reference_start: Option<i64>,
+    pub reference_end: Option<i64>,
+    pub reference_length: Option<i64>,
+    pub extra_columns: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub struct FiberAnnotations {
+    pub annotations: Vec<FiberAnnotation>,
     pub seq_len: i64,
     pub reverse: bool,
 }
 
-impl Ranges {
+// Keep Ranges as an alias for backward compatibility
+pub type Ranges = FiberAnnotations;
+
+impl FiberAnnotations {
     /// starts and ends are [) intervals.
     pub fn new(
         record: &bam::Record,
@@ -71,26 +80,99 @@ impl Ranges {
             lift_query_range(record, &starts, &ends)
         };
 
+        // create annotations from parallel vectors
+        let annotations = starts
+            .into_iter()
+            .zip(ends)
+            .zip(lengths)
+            .zip(reference_starts)
+            .zip(reference_ends)
+            .zip(reference_lengths)
+            .map(|(((((start, end), length), ref_start), ref_end), ref_length)| {
+                FiberAnnotation {
+                    start,
+                    end,
+                    length: length.unwrap_or(end - start),
+                    qual: 0,
+                    reference_start: ref_start,
+                    reference_end: ref_end,
+                    reference_length: ref_length,
+                    extra_columns: None,
+                }
+            })
+            .collect();
+
         // return object
-        Ranges {
-            starts: starts.into_iter().map(Some).collect(),
-            ends: ends.into_iter().map(Some).collect(),
-            lengths,
-            qual: vec![0; reference_starts.len()],
-            reference_starts,
-            reference_ends,
-            reference_lengths,
+        FiberAnnotations {
+            annotations,
             seq_len,
             reverse: is_reverse,
         }
     }
 
-    pub fn set_qual(&mut self, qual: Vec<u8>) {
-        assert_eq!(qual.len(), self.starts.len());
-        self.qual = qual;
-        if self.reverse {
-            self.qual.reverse();
+    /// Create FiberAnnotations from BED intervals (without BAM record alignment)
+    pub fn from_bed(bed_intervals: Vec<(i64, i64, Option<Vec<String>>)>, seq_len: i64) -> Self {
+        let annotations = bed_intervals
+            .into_iter()
+            .map(|(start, end, extra_columns)| {
+                let length = end - start;
+                FiberAnnotation {
+                    start,
+                    end,
+                    length,
+                    qual: 0,
+                    reference_start: Some(start), // For BED data, positions are already in reference coordinates
+                    reference_end: Some(end),
+                    reference_length: Some(length),
+                    extra_columns,
+                }
+            })
+            .collect();
+
+        FiberAnnotations {
+            annotations,
+            seq_len,
+            reverse: false, // BED intervals are always in forward orientation
         }
+    }
+
+    pub fn set_qual(&mut self, qual: Vec<u8>) {
+        assert_eq!(qual.len(), self.annotations.len());
+        for (annotation, &q) in self.annotations.iter_mut().zip(qual.iter()) {
+            annotation.qual = q;
+        }
+        if self.reverse {
+            self.annotations.reverse();
+        }
+    }
+
+    // Backward compatibility methods
+    pub fn starts(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| Some(a.start)).collect()
+    }
+
+    pub fn ends(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| Some(a.end)).collect()
+    }
+
+    pub fn lengths(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| Some(a.length)).collect()
+    }
+
+    pub fn qual(&self) -> Vec<u8> {
+        self.annotations.iter().map(|a| a.qual).collect()
+    }
+
+    pub fn reference_starts(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| a.reference_start).collect()
+    }
+
+    pub fn reference_ends(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| a.reference_end).collect()
+    }
+
+    pub fn reference_lengths(&self) -> Vec<Option<i64>> {
+        self.annotations.iter().map(|a| a.reference_length).collect()
     }
 
     /// get positions on the complimented sequence in the cigar record
@@ -108,26 +190,18 @@ impl Ranges {
     /// get the molecular coordinates of the ranges, taking into account
     /// the alignment orientation
     pub fn get_molecular(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.starts
+        self.annotations
             .iter()
-            .zip(self.ends.iter())
-            .zip(self.lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
-                } else {
-                    None
-                }
-            })
+            .map(|annotation| Some((annotation.start, annotation.end, annotation.length)))
             .collect()
     }
 
     pub fn get_starts(&self) -> Vec<i64> {
-        self.starts.clone().into_iter().flatten().collect()
+        self.annotations.iter().map(|a| a.start).collect()
     }
 
     pub fn get_ends(&self) -> Vec<i64> {
-        self.ends.clone().into_iter().flatten().collect()
+        self.annotations.iter().map(|a| a.end).collect()
     }
 
     pub fn get_forward_starts(&self) -> Vec<i64> {
@@ -137,7 +211,7 @@ impl Ranges {
     }
 
     pub fn get_forward_quals(&self) -> Vec<u8> {
-        let mut forward = self.qual.clone();
+        let mut forward: Vec<u8> = self.annotations.iter().map(|a| a.qual).collect();
         if self.reverse {
             forward.reverse();
         }
@@ -146,20 +220,7 @@ impl Ranges {
 
     // filter out ranges that are less than the passed quality score
     pub fn filter_by_qual(&mut self, min_qual: u8) {
-        let to_keep = self
-            .qual
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &q)| if q >= min_qual { Some(i) } else { None })
-            .collect::<Vec<_>>();
-
-        self.starts = to_keep.iter().map(|&i| self.starts[i]).collect();
-        self.ends = to_keep.iter().map(|&i| self.ends[i]).collect();
-        self.lengths = to_keep.iter().map(|&i| self.lengths[i]).collect();
-        self.qual = to_keep.iter().map(|&i| self.qual[i]).collect();
-        self.reference_starts = to_keep.iter().map(|&i| self.reference_starts[i]).collect();
-        self.reference_ends = to_keep.iter().map(|&i| self.reference_ends[i]).collect();
-        self.reference_lengths = to_keep.iter().map(|&i| self.reference_lengths[i]).collect();
+        self.annotations.retain(|annotation| annotation.qual >= min_qual);
     }
 
     /// filter out ranges that are within the first or last X bp of the read
@@ -167,58 +228,39 @@ impl Ranges {
         if strip == 0 {
             return;
         }
-        let to_keep = self
-            .starts
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &s)| {
-                if let Some(s) = s {
-                    if s < strip || s > self.seq_len - strip {
-                        None
-                    } else {
-                        Some(i)
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        
+        let original_len = self.annotations.len();
+        self.annotations.retain(|annotation| {
+            annotation.start >= strip && annotation.start <= self.seq_len - strip
+        });
 
-        if to_keep.len() != self.starts.len() {
+        if self.annotations.len() != original_len {
             log::trace!(
                 "basemods stripped, {} basemods removed",
-                self.starts.len() - to_keep.len()
+                original_len - self.annotations.len()
             );
         }
-
-        self.starts = to_keep.iter().map(|&i| self.starts[i]).collect();
-        self.ends = to_keep.iter().map(|&i| self.ends[i]).collect();
-        self.lengths = to_keep.iter().map(|&i| self.lengths[i]).collect();
-        self.qual = to_keep.iter().map(|&i| self.qual[i]).collect();
-        self.reference_starts = to_keep.iter().map(|&i| self.reference_starts[i]).collect();
-        self.reference_ends = to_keep.iter().map(|&i| self.reference_ends[i]).collect();
-        self.reference_lengths = to_keep.iter().map(|&i| self.reference_lengths[i]).collect();
     }
 
     pub fn to_strings(&self, reference: bool, skip_none: bool) -> Vec<String> {
         let (s, e, l, q) = if reference {
             (
-                &self.reference_starts,
-                &self.reference_ends,
-                &self.reference_lengths,
-                &self.qual,
+                self.reference_starts(),
+                self.reference_ends(),
+                self.reference_lengths(),
+                self.qual(),
             )
         } else {
-            (&self.starts, &self.ends, &self.lengths, &self.qual)
+            (self.starts(), self.ends(), self.lengths(), self.qual())
         };
 
-        let s = crate::join_by_str_option_can_skip(s, ",", skip_none);
-        let e = crate::join_by_str_option_can_skip(e, ",", skip_none);
-        let l = crate::join_by_str_option_can_skip(l, ",", skip_none);
+        let s = crate::join_by_str_option_can_skip(&s, ",", skip_none);
+        let e = crate::join_by_str_option_can_skip(&e, ",", skip_none);
+        let l = crate::join_by_str_option_can_skip(&l, ",", skip_none);
         if reference {
             vec![s, e, l]
         } else {
-            let q = crate::join_by_str(q, ",");
+            let q = crate::join_by_str(&q, ",");
             vec![s, e, l, q]
         }
     }
@@ -226,13 +268,11 @@ impl Ranges {
     /// get the reference coordinates of the ranges, taking into account
     /// the alignment orientation
     pub fn get_reference(&self) -> Vec<Option<(i64, i64, i64)>> {
-        self.reference_starts
+        self.annotations
             .iter()
-            .zip(self.reference_ends.iter())
-            .zip(self.reference_lengths.iter())
-            .map(|((s, e), l)| {
-                if let (Some(s), Some(e), Some(l)) = (s, e, l) {
-                    Some((*s, *e, *l))
+            .map(|annotation| {
+                if let (Some(s), Some(e), Some(l)) = (annotation.reference_start, annotation.reference_end, annotation.reference_length) {
+                    Some((s, e, l))
                 } else {
                     None
                 }
@@ -243,17 +283,12 @@ impl Ranges {
     pub fn merge_ranges(multiple_ranges: Vec<&Self>) -> Self {
         if multiple_ranges.is_empty() {
             return Self {
-                starts: vec![],
-                ends: vec![],
-                lengths: vec![],
-                qual: vec![],
-                reference_starts: vec![],
-                reference_ends: vec![],
-                reference_lengths: vec![],
+                annotations: vec![],
                 seq_len: 0,
                 reverse: false,
             };
         }
+        
         // check properties that must be the same
         let reverse = multiple_ranges[0].reverse;
         let seq_len = multiple_ranges[0].seq_len;
@@ -261,91 +296,53 @@ impl Ranges {
             assert_eq!(r.reverse, reverse);
             assert_eq!(r.seq_len, seq_len);
         }
-        // get the other properties
-        let starts = multiple_ranges.iter().flat_map(|r| r.starts.clone());
-        let ends = multiple_ranges.iter().flat_map(|r| r.ends.clone());
-        let lengths = multiple_ranges.iter().flat_map(|r| r.lengths.clone());
-        let qual = multiple_ranges.iter().flat_map(|r| r.qual.clone());
-        let reference_starts = multiple_ranges
+        
+        // collect all annotations
+        let mut annotations: Vec<FiberAnnotation> = multiple_ranges
             .iter()
-            .flat_map(|r| r.reference_starts.clone());
-        let reference_ends = multiple_ranges
-            .iter()
-            .flat_map(|r| r.reference_ends.clone());
-        let reference_lengths = multiple_ranges
-            .iter()
-            .flat_map(|r| r.reference_lengths.clone());
-
-        #[allow(clippy::type_complexity)]
-        let mut combo: Vec<(
-            Option<i64>,
-            Option<i64>,
-            Option<i64>,
-            u8,
-            Option<i64>,
-            Option<i64>,
-            Option<i64>,
-        )> = izip!(
-            starts,
-            ends,
-            lengths,
-            qual,
-            reference_starts,
-            reference_ends,
-            reference_lengths
-        )
-        .collect();
+            .flat_map(|r| r.annotations.clone())
+            .collect();
+        
         // sort by start position
-        combo.sort_by_key(|(s, _e, _l, _q, _r_s, _r_e, _r_l)| *s);
-        // unzip
-        let (starts, ends, lengths, qual, reference_starts, reference_ends, reference_lengths) =
-            multiunzip(combo);
+        annotations.sort_by_key(|a| a.start);
 
         Self {
-            starts,
-            ends,
-            lengths,
-            qual,
-            reference_starts,
-            reference_ends,
-            reference_lengths,
+            annotations,
             seq_len,
             reverse,
         }
     }
 }
 
-impl<'a> IntoIterator for &'a Ranges {
+impl<'a> IntoIterator for &'a FiberAnnotations {
     type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
-    type IntoIter = RangesIterator<'a>;
+    type IntoIter = FiberAnnotationsIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        RangesIterator {
-            row: self,
+        FiberAnnotationsIterator {
+            annotations: self,
             index: 0,
         }
     }
 }
 
-pub struct RangesIterator<'a> {
-    row: &'a Ranges,
+pub struct FiberAnnotationsIterator<'a> {
+    annotations: &'a FiberAnnotations,
     index: usize,
 }
 
-impl Iterator for RangesIterator<'_> {
+impl Iterator for FiberAnnotationsIterator<'_> {
     type Item = (i64, i64, i64, u8, Option<(i64, i64, i64)>);
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.row.starts.len() {
+        if self.index >= self.annotations.annotations.len() {
             return None;
         }
-        let start = self.row.starts[self.index]?;
-        let end = self.row.ends[self.index]?;
-        let length = self.row.lengths[self.index]?;
-        let qual = self.row.qual[self.index];
-        let reference_start = self.row.reference_starts[self.index];
-        let reference_end = self.row.reference_ends[self.index];
-        let reference_length = self.row.reference_lengths[self.index];
-        let reference = match (reference_start, reference_end, reference_length) {
+        let annotation = &self.annotations.annotations[self.index];
+        let start = annotation.start;
+        let end = annotation.end;
+        let length = annotation.length;
+        let qual = annotation.qual;
+        let reference = match (annotation.reference_start, annotation.reference_end, annotation.reference_length) {
             (Some(s), Some(e), Some(l)) => Some((s, e, l)),
             _ => None,
         };
@@ -353,3 +350,6 @@ impl Iterator for RangesIterator<'_> {
         Some((start, end, length, qual, reference))
     }
 }
+
+// Backward compatibility alias
+pub type RangesIterator<'a> = FiberAnnotationsIterator<'a>;
