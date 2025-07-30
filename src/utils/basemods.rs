@@ -33,7 +33,6 @@ impl BaseMod {
         let mut ranges = Ranges::new(record, modified_bases_forward, None, None);
         ranges.set_qual(modified_probabilities_forward);
         let record_is_reverse = record.is_reverse();
-        assert_eq!(tmp, ranges.get_starts(), "starts not equal");
         assert_eq!(tmp, ranges.get_forward_starts(), "forward starts not equal");
         Self {
             modified_base,
