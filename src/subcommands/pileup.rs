@@ -3,7 +3,7 @@
 /// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 use crate::cli::PileupOptions;
 use crate::fiber::FiberseqData;
-use crate::utils::bamranges;
+use crate::utils::bamannotations;
 use crate::utils::bio_io;
 use crate::*;
 use anyhow::{anyhow, Ok};
@@ -190,7 +190,7 @@ impl<'a> FireTrack<'a> {
     #[inline]
     fn add_range_set(
         array: &mut [i32],
-        ranges: &bamranges::Ranges,
+        ranges: &bamannotations::Ranges,
         cur_offset: i64,
         chrom_start: usize,
     ) {

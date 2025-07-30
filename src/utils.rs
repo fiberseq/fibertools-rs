@@ -1,6 +1,6 @@
 pub mod acf;
 pub mod bamlift;
-pub mod bamranges;
+pub mod bamannotations;
 pub mod basemods;
 pub mod bio_io;
 pub mod fire;

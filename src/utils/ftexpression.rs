@@ -1,5 +1,5 @@
 use crate::fiber::FiberseqData;
-use crate::utils::bamranges;
+use crate::utils::bamannotations;
 use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
@@ -140,7 +140,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
-    range: &mut bamranges::Ranges,
+    range: &mut bamannotations::Ranges,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.annotations.len();
 
@@ -202,10 +202,10 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::utils::bamranges;
+    use crate::utils::bamannotations;
 
-    fn make_fake_range() -> bamranges::Ranges {
-        use bamranges::{FiberAnnotation, FiberAnnotations};
+    fn make_fake_range() -> bamannotations::Ranges {
+        use bamannotations::{FiberAnnotation, FiberAnnotations};
 
         let annotations = vec![
             FiberAnnotation {

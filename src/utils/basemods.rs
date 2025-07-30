@@ -1,4 +1,4 @@
-use crate::utils::bamranges::*;
+use crate::utils::bamannotations::*;
 use crate::utils::bio_io::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
