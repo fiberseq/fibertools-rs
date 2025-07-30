@@ -206,7 +206,7 @@ mod test {
 
     fn make_fake_range() -> bamranges::Ranges {
         use bamranges::{FiberAnnotation, FiberAnnotations};
-        
+
         let annotations = vec![
             FiberAnnotation {
                 start: 0,
@@ -239,7 +239,7 @@ mod test {
                 extra_columns: None,
             },
         ];
-        
+
         FiberAnnotations {
             annotations,
             seq_len: 100,

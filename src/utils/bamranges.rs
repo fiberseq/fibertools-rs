@@ -135,13 +135,15 @@ impl FiberAnnotations {
         }
     }
 
-    pub fn set_qual(&mut self, qual: Vec<u8>) {
-        assert_eq!(qual.len(), self.annotations.len());
-        for (annotation, &q) in self.annotations.iter_mut().zip(qual.iter()) {
-            annotation.qual = q;
-        }
+    pub fn set_qual(&mut self, mut forward_qual: Vec<u8>) {
+        assert_eq!(forward_qual.len(), self.annotations.len());
+        // flip if we are on the reverse strand
         if self.reverse {
-            self.annotations.reverse();
+            forward_qual.reverse();
+        }
+
+        for (annotation, &q) in self.annotations.iter_mut().zip(forward_qual.iter()) {
+            annotation.qual = q;
         }
     }
 

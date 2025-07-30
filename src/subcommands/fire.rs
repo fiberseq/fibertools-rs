@@ -116,7 +116,7 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
         let msp_starts = rec.msp.reference_starts();
         let nuc_starts = rec.nuc.reference_starts();
         let start_iter = msp_starts.iter().chain(nuc_starts.iter());
-        
+
         let msp_ends = rec.msp.reference_ends();
         let nuc_ends = rec.nuc.reference_ends();
         let end_iter = msp_ends.iter().chain(nuc_ends.iter());
