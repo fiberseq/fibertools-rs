@@ -1,4 +1,5 @@
 use crate::utils::bamlift::*;
+use bio::bio_types::annot;
 use rust_htslib::bam;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
@@ -354,12 +355,14 @@ impl FiberAnnotations {
             annotation.end -= offset;
 
             if strand == '-' {
-                annotation.start = -annotation.start + 1; // Adjust for inclusive end
-                annotation.end = -annotation.end + 1; // Adjust for inclusive end
+                annotation.start = -annotation.start;
+                annotation.end = -annotation.end;
 
                 // Swap start and end if we reverse complemented
                 if annotation.start > annotation.end {
                     std::mem::swap(&mut annotation.start, &mut annotation.end);
+                    annotation.start += 1; // Adjust for exclusive end
+                    annotation.end += 1; // Adjust for exclusive end
                 }
             }
 
