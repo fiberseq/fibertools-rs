@@ -347,7 +347,7 @@ impl FiberAnnotations {
     }
 
     /// Apply offset to all molecular coordinates in the annotations
-    pub fn apply_molecular_offset(&mut self, offset: i64, strand: char) {
+    pub fn apply_offset(&mut self, offset: i64, ref_offset: i64, strand: char) {
         for annotation in &mut self.annotations {
             // Apply offset to molecular coordinates
             annotation.start -= offset;
@@ -361,22 +361,14 @@ impl FiberAnnotations {
                     std::mem::swap(&mut annotation.start, &mut annotation.end);
                 }
             }
-        }
-        if strand == '-' {
-            self.annotations.reverse();
-        }
-    }
 
-    /// Apply offset to all reference coordinates in the annotations
-    pub fn apply_reference_offset(&mut self, offset: i64, strand: char) {
-        for annotation in &mut self.annotations {
             // Apply offset to reference coordinates if they exist
             if let Some(ref mut ref_start) = annotation.reference_start {
                 if *ref_start == -1 {
                     *ref_start = i64::MIN;
                     continue;
                 }
-                *ref_start -= offset;
+                *ref_start -= ref_offset;
                 if strand == '-' {
                     *ref_start = -*ref_start;
                 }
@@ -386,7 +378,7 @@ impl FiberAnnotations {
                     *ref_end = i64::MIN;
                     continue;
                 }
-                *ref_end -= offset;
+                *ref_end -= ref_offset;
                 if strand == '-' {
                     *ref_end = -*ref_end;
                 }
@@ -406,6 +398,7 @@ impl FiberAnnotations {
                 }
             }
         }
+
         if strand == '-' {
             self.annotations.reverse();
         }

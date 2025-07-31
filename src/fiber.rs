@@ -156,27 +156,14 @@ impl FiberseqData {
 
         // Apply offsets to all annotations using the new methods
         new.m6a
-            .apply_molecular_offset(mol_offset, center_position.strand);
-        new.m6a
-            .apply_reference_offset(ref_offset, center_position.strand);
-
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
         new.cpg
-            .apply_molecular_offset(mol_offset, center_position.strand);
-        new.cpg
-            .apply_reference_offset(ref_offset, center_position.strand);
-
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
         new.msp
-            .apply_molecular_offset(mol_offset, center_position.strand);
-        new.msp
-            .apply_reference_offset(ref_offset, center_position.strand);
-
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
         new.nuc
-            .apply_molecular_offset(mol_offset, center_position.strand);
-        new.nuc
-            .apply_reference_offset(ref_offset, center_position.strand);
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
 
-        // TODO update start and end
-        // TODO update aligned block pairs
         Some(new)
     }
 
