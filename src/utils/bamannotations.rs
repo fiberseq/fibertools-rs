@@ -361,6 +361,7 @@ impl FiberAnnotations {
                 // Swap start and end if we reverse complemented
                 if annotation.start > annotation.end {
                     std::mem::swap(&mut annotation.start, &mut annotation.end);
+                } else {
                     annotation.start += 1; // Adjust for exclusive end
                     annotation.end += 1; // Adjust for exclusive end
                 }
