@@ -354,8 +354,9 @@ impl FiberAnnotations {
             annotation.end -= offset;
 
             if strand == '-' {
-                annotation.start = -annotation.start;
-                annotation.end = -annotation.end;
+                annotation.start = -annotation.start + 1; // Adjust for inclusive end
+                annotation.end = -annotation.end + 1; // Adjust for inclusive end
+
                 // Swap start and end if we reverse complemented
                 if annotation.start > annotation.end {
                     std::mem::swap(&mut annotation.start, &mut annotation.end);
