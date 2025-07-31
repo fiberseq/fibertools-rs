@@ -1,5 +1,4 @@
 use crate::utils::bamlift::*;
-use bio::bio_types::annot;
 use rust_htslib::bam;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
