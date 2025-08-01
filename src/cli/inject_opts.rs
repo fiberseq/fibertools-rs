@@ -1,3 +1,4 @@
+use crate::cli::GlobalOpts;
 use clap::Args;
 use std::fmt::Debug;
 
@@ -9,4 +10,6 @@ pub struct InjectOptions {
     /// Output BAM file
     #[clap(short, long, default_value = "-")]
     pub out: String,
+    #[clap(flatten)]
+    pub global: GlobalOpts,
 }

@@ -97,7 +97,7 @@ impl FiberTig {
     }
 
     /// Write the mock BAM to a file using fibertools BAM writer
-    pub fn write_to_bam(&self, output_path: &str) -> Result<()> {
+    pub fn write_to_bam(&self, output_path: &str, threads: usize) -> Result<()> {
         let program_name = "fibertools-rs";
         let program_id = "ft";
         let program_version = crate::VERSION;
@@ -110,7 +110,7 @@ impl FiberTig {
             program_version,
         );
         writer
-            .set_threads(8)
+            .set_threads(threads)
             .context("Failed to set threads for BAM writer")?;
 
         // Write records one at a time to avoid large buffer flushes

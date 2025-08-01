@@ -11,7 +11,7 @@ pub fn run_inject(opts: &InjectOptions) -> Result<()> {
     log::info!("Generated {} sequences", fibertig.records().len());
 
     // Write to BAM file (with built-in broken pipe handling)
-    fibertig.write_to_bam(&opts.out)?;
+    fibertig.write_to_bam(&opts.out, opts.global.threads)?;
 
     log::info!("Mock BAM written to: {}", opts.out);
 
