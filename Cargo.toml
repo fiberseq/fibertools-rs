@@ -10,7 +10,7 @@ license = "MIT"
 name = "fibertools-rs"
 readme = "README.md"
 repository = "https://github.com/fiberseq/fibertools-rs"
-version = "0.7.0"
+version = "0.8.0"
 # exclude py-ft and test data from cargo publish since they are too large
 exclude = ["py-ft/", "tests/data/"]
 
@@ -64,6 +64,7 @@ burn = { version = "0.18.0", optional = true, features = [
 ] }
 num = "0.4.3"
 rand = "0.8.5"
+noodles = { version = "0.100.0", features = ["fasta"] }
 #polars = "0.38"
 
 [build-dependencies]
