@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::{Header, HeaderView, Record};
-use std::collections::HashMap;
 
 pub struct FiberTig {
     pub header: Header,
@@ -10,24 +9,24 @@ pub struct FiberTig {
 }
 
 impl FiberTig {
-    fn read_fasta_into_hashmap(fasta_path: &str) -> Result<HashMap<String, fasta::record::Record>> {
+    fn read_fasta_into_vec(fasta_path: &str) -> Result<Vec<(String, fasta::record::Record)>> {
         // Use bio_io's buffer_from to handle compressed/uncompressed files
         let reader =
             crate::utils::bio_io::buffer_from(fasta_path).context("Failed to open FASTA file")?;
         let mut fasta_reader = fasta::io::Reader::new(reader);
-        let mut sequences = HashMap::new();
+        let mut sequences = Vec::new();
 
         for result in fasta_reader.records() {
             let record = result?;
-            let name = std::str::from_utf8(record.name())?;
-            sequences.insert(name.to_string(), record);
+            let name = std::str::from_utf8(record.name())?.to_string();
+            sequences.push((name, record));
         }
 
         Ok(sequences)
     }
 
     fn create_mock_bam_header_from_sequences(
-        sequences: &HashMap<String, fasta::record::Record>,
+        sequences: &[(String, fasta::record::Record)],
     ) -> Header {
         let mut header = Header::new();
 
@@ -43,7 +42,7 @@ impl FiberTig {
     }
 
     fn create_mock_bam_records_from_sequences(
-        sequences: &HashMap<String, fasta::record::Record>,
+        sequences: &[(String, fasta::record::Record)],
         header: &Header,
     ) -> Result<Vec<Record>> {
         let mut records = Vec::new();
@@ -82,7 +81,7 @@ impl FiberTig {
     }
 
     pub fn from_fasta(fasta_path: &str) -> Result<Self> {
-        let sequences = Self::read_fasta_into_hashmap(fasta_path)?;
+        let sequences = Self::read_fasta_into_vec(fasta_path)?;
         let header = Self::create_mock_bam_header_from_sequences(&sequences);
         let records = Self::create_mock_bam_records_from_sequences(&sequences, &header)?;
 
