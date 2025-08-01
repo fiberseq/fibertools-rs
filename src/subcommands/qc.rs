@@ -231,7 +231,10 @@ impl<'a> QcStats<'a> {
             .or_insert(1);
     }
 
-    fn add_range_lengths(hashmap: &mut HashMap<i64, i64>, range: &crate::utils::bamannotations::Ranges) {
+    fn add_range_lengths(
+        hashmap: &mut HashMap<i64, i64>,
+        range: &crate::utils::bamannotations::Ranges,
+    ) {
         for r in range.lengths().iter() {
             hashmap.entry(*r).and_modify(|e| *e += 1).or_insert(1);
         }
