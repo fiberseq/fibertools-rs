@@ -350,8 +350,8 @@ impl FiberAnnotations {
         let mut start = in_start - offset;
         let mut end = in_end - offset + 1; // make the end inclusive for
         if strand == '-' {
-            *start = -*start;
-            *end = -*end;
+            start = -start;
+            end = -end;
 
             // Swap start and end if we reverse complemented
             if *start > *end {
@@ -359,7 +359,7 @@ impl FiberAnnotations {
             }
         }
         // make the end exclusive again
-        *end += 1;
+        end += 1;
         (start, end)
     }
 
