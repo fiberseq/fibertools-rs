@@ -389,6 +389,10 @@ impl FiberAnnotations {
                 annotation.reference_length = Some(new_ref_end - new_ref_start + 1);
             }
         }
+        // reverse the annotations if we are on the reverse strand
+        if strand == '-' {
+            self.annotations.reverse();
+        }
     }
 }
 
