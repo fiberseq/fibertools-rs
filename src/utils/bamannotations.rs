@@ -346,64 +346,48 @@ impl FiberAnnotations {
         }
     }
 
+    fn apply_offset_helper(in_start: i64, in_end: i64, offset: i64, strand: char) -> (i64, i64) {
+        let mut start = in_start - offset;
+        let mut end = in_end - offset + 1; // make the end inclusive for
+        if strand == '-' {
+            *start = -*start;
+            *end = -*end;
+
+            // Swap start and end if we reverse complemented
+            if *start > *end {
+                std::mem::swap(start, end);
+            }
+        }
+        // make the end exclusive again
+        *end += 1;
+        (start, end)
+    }
+
     /// Apply offset to all molecular coordinates in the annotations
     pub fn apply_offset(&mut self, offset: i64, ref_offset: i64, strand: char) {
         for annotation in &mut self.annotations {
-            // Apply offset to molecular coordinates
-            annotation.start -= offset;
-            annotation.end -= offset;
-
-            if strand == '-' {
-                annotation.start = -annotation.start;
-                annotation.end = -annotation.end;
-
-                // Swap start and end if we reverse complemented
-                if annotation.start > annotation.end {
-                    std::mem::swap(&mut annotation.start, &mut annotation.end);
-                    //annotation.start += 1; // Adjust for exclusive end
-                    //annotation.end += 1; // Adjust for exclusive end
-                }
-            }
+            let (new_start, new_end) =
+                Self::apply_offset_helper(annotation.start, annotation.end, offset, strand);
+            annotation.start = new_start;
+            annotation.end = new_end;
+            assert!(
+                annotation.end - annotation.start == annotation.length,
+                "Annotation length mismatch after centering: {} != {} - {}",
+                annotation.length,
+                annotation.end,
+                annotation.start
+            );
 
             // Apply offset to reference coordinates if they exist
-            if let Some(ref mut ref_start) = annotation.reference_start {
-                if *ref_start == -1 {
-                    *ref_start = i64::MIN;
-                    continue;
-                }
-                *ref_start -= ref_offset;
-                if strand == '-' {
-                    *ref_start = -*ref_start;
-                }
+            if let (Some(ref_start), Some(ref_end)) =
+                (annotation.reference_start, annotation.reference_end)
+            {
+                let (new_ref_start, new_ref_end) =
+                    Self::apply_offset_helper(ref_start, ref_end, ref_offset, strand);
+                annotation.reference_start = Some(new_ref_start);
+                annotation.reference_end = Some(new_ref_end);
+                annotation.reference_length = Some(new_ref_end - new_ref_start + 1);
             }
-            if let Some(ref mut ref_end) = annotation.reference_end {
-                if *ref_end == -1 {
-                    *ref_end = i64::MIN;
-                    continue;
-                }
-                *ref_end -= ref_offset;
-                if strand == '-' {
-                    *ref_end = -*ref_end;
-                }
-            }
-
-            // Swap reference coordinates if needed
-            if strand == '-' {
-                if let (Some(ref_start), Some(ref_end)) =
-                    (annotation.reference_start, annotation.reference_end)
-                {
-                    if ref_start > ref_end {
-                        std::mem::swap(
-                            &mut annotation.reference_start,
-                            &mut annotation.reference_end,
-                        );
-                    }
-                }
-            }
-        }
-
-        if strand == '-' {
-            self.annotations.reverse();
         }
     }
 }

@@ -164,7 +164,35 @@ impl FiberseqData {
         new.nuc
             .apply_offset(mol_offset, ref_offset, center_position.strand);
 
+        // Validate that MSPs still start and end on m6A marks after centering
+        new.validate_msp_m6a_alignment();
+
         Some(new)
+    }
+
+    /// Validate that all MSP boundaries align with m6A positions after centering
+    fn validate_msp_m6a_alignment(&self) {
+        let m6a_positions = self.m6a.starts();
+        let msp_boundaries: Vec<i64> = self
+            .msp
+            .starts()
+            .into_iter()
+            .chain(self.msp.ends().into_iter().map(|x| x - 1))
+            .collect();
+
+        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
+            return; // Skip validation if no data
+        }
+
+        for msp_pos in &msp_boundaries {
+            if !m6a_positions.contains(msp_pos) {
+                log::warn!(
+                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
+                    msp_pos,
+                    String::from_utf8_lossy(self.record.qname())
+                );
+            }
+        }
     }
 
     //
