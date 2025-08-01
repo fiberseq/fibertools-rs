@@ -348,14 +348,14 @@ impl FiberAnnotations {
 
     fn apply_offset_helper(in_start: i64, in_end: i64, offset: i64, strand: char) -> (i64, i64) {
         let mut start = in_start - offset;
-        let mut end = in_end - offset + 1; // make the end inclusive for
+        let mut end = in_end - offset - 1; // make the end inclusive for
         if strand == '-' {
             start = -start;
             end = -end;
 
             // Swap start and end if we reverse complemented
-            if *start > *end {
-                std::mem::swap(start, end);
+            if start > end {
+                std::mem::swap(&mut start, &mut end);
             }
         }
         // make the end exclusive again
