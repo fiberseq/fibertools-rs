@@ -64,6 +64,7 @@ burn = { version = "0.18.0", optional = true, features = [
 ] }
 num = "0.4.3"
 rand = "0.8.5"
+noodles = { version = "0.100.0", features = ["fasta"] }
 #polars = "0.38"
 
 [build-dependencies]

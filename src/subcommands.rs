@@ -22,5 +22,7 @@ pub mod qc;
 pub mod strip_basemods;
 
 pub mod fiber_hmm;
+/// Create mock BAM from reference FASTA
+pub mod inject;
 
 pub mod validate;

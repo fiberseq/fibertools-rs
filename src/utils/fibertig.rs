@@ -1,168 +1,123 @@
-use crate::utils::bio_io::get_u32_tag;
-use rust_htslib::bam::{record::Aux, Record};
+use anyhow::{Context, Result};
+use noodles::fasta;
+use rust_htslib::bam::header::HeaderRecord;
+use rust_htslib::bam::{Header, HeaderView, Record};
 use std::collections::HashMap;
 
-pub const FIBERTIG_DELIMITER: &str = "|\t|";
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct BedInterval {
-    pub chrom: String,
-    pub start: i64,
-    pub end: i64,
-    pub extra_columns: Vec<String>,
+pub struct FiberTig {
+    pub header: Header,
+    pub records: Vec<Record>,
 }
 
-impl BedInterval {
-    pub fn from_bed_line(line: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let fields: Vec<&str> = line.trim().split('\t').collect();
-        if fields.len() < 3 {
-            return Err("BED line must have at least 3 columns (chrom, start, end)".into());
+impl FiberTig {
+    fn read_fasta_into_hashmap(fasta_path: &str) -> Result<HashMap<String, fasta::record::Record>> {
+        // Use bio_io's buffer_from to handle compressed/uncompressed files
+        let reader =
+            crate::utils::bio_io::buffer_from(fasta_path).context("Failed to open FASTA file")?;
+        let mut fasta_reader = fasta::io::Reader::new(reader);
+        let mut sequences = HashMap::new();
+
+        for result in fasta_reader.records() {
+            let record = result?;
+            let name = std::str::from_utf8(record.name())?;
+            sequences.insert(name.to_string(), record);
         }
 
-        let chrom = fields[0].to_string();
-        let start: i64 = fields[1].parse()?;
-        let end: i64 = fields[2].parse()?;
-        
-        let extra_columns = if fields.len() > 3 {
-            fields[3..].iter().map(|s| s.to_string()).collect()
-        } else {
-            vec![]
-        };
-
-        Ok(BedInterval {
-            chrom,
-            start,
-            end,
-            extra_columns,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FiberTigAnnotations {
-    pub intervals: Vec<BedInterval>,
-}
-
-impl FiberTigAnnotations {
-    pub fn new() -> Self {
-        Self {
-            intervals: Vec::new(),
-        }
+        Ok(sequences)
     }
 
-    pub fn from_bed_file(bed_path: &str) -> Result<HashMap<String, Self>, Box<dyn std::error::Error>> {
-        use std::fs::File;
-        use std::io::{BufRead, BufReader};
+    fn create_mock_bam_header_from_sequences(
+        sequences: &HashMap<String, fasta::record::Record>,
+    ) -> Header {
+        let mut header = Header::new();
 
-        let file = File::open(bed_path)?;
-        let reader = BufReader::new(file);
-        let mut annotations_by_chrom: HashMap<String, Self> = HashMap::new();
-
-        for line in reader.lines() {
-            let line = line?;
-            if line.starts_with('#') || line.trim().is_empty() {
-                continue;
-            }
-
-            let interval = BedInterval::from_bed_line(&line)?;
-            let chrom = interval.chrom.clone();
-            
-            annotations_by_chrom
-                .entry(chrom)
-                .or_insert_with(Self::new)
-                .intervals
-                .push(interval);
+        for (name, record) in sequences {
+            let mut sq_record = HeaderRecord::new(b"SQ");
+            sq_record.push_tag(b"SN", name);
+            let len_str = record.sequence().len().to_string();
+            sq_record.push_tag(b"LN", &len_str);
+            header.push_record(&sq_record);
         }
 
-        // Sort intervals by start position within each chromosome
-        for annotations in annotations_by_chrom.values_mut() {
-            annotations.intervals.sort_by_key(|i| i.start);
+        header
+    }
+
+    fn create_mock_bam_records_from_sequences(
+        sequences: &HashMap<String, fasta::record::Record>,
+        header: &Header,
+    ) -> Result<Vec<Record>> {
+        let mut records = Vec::new();
+        let header_view = HeaderView::from_header(header);
+
+        for (name, fasta_record) in sequences {
+            let seq_len = fasta_record.sequence().len();
+
+            // Create CIGAR with all matches for perfectly aligned sequence
+            let cigar_data = vec![rust_htslib::bam::record::Cigar::Equal(seq_len as u32)];
+            let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
+
+            // Convert FASTA sequence to bytes for BAM
+            let seq_bytes = fasta_record.sequence().as_ref();
+
+            // Create empty quality scores (no quality data)
+            let qual_bytes = vec![255u8; seq_len];
+
+            // Create the record
+            let mut record = Record::new();
+            record.set(name.as_bytes(), Some(&cigar_string), seq_bytes, &qual_bytes);
+
+            // Set additional fields - use HeaderView's tid function to get the correct tid
+            let tid = header_view
+                .tid(name.as_bytes())
+                .context("Invalid sequence name")?;
+            record.set_tid(tid as i32);
+            record.set_pos(0); // Position 0 (0-based)
+            record.set_mapq(60); // High mapping quality
+            record.set_flags(0); // No flags (mapped, primary alignment)
+
+            records.push(record);
         }
 
-        Ok(annotations_by_chrom)
-    }
-}
-
-pub fn set_fibertig_tags(record: &mut Record, intervals: &[BedInterval]) -> Result<(), Box<dyn std::error::Error>> {
-    if intervals.is_empty() {
-        return Ok(());
+        Ok(records)
     }
 
-    // Set start/end position arrays
-    let starts: Vec<u32> = intervals.iter().map(|b| b.start as u32).collect();
-    let ends: Vec<u32> = intervals.iter().map(|b| b.end as u32).collect();
-    
-    let start_aux = Aux::ArrayU32(starts);
-    let end_aux = Aux::ArrayU32(ends);
-    record.push_aux(b"fs", start_aux)?;
-    record.push_aux(b"fe", end_aux)?;
-    
-    // Set raw BED data string (columns 4+)
-    let bed_data: String = intervals
-        .iter()
-        .map(|b| b.extra_columns.join("\t"))
-        .collect::<Vec<_>>()
-        .join(FIBERTIG_DELIMITER);
-    
-    record.push_aux(b"fd", Aux::String(&bed_data))?;
-    
-    // Mark as FiberTig
-    record.push_aux(b"ft", Aux::String("1.0"))?;
-    
-    Ok(())
-}
+    pub fn from_fasta(fasta_path: &str) -> Result<Self> {
+        let sequences = Self::read_fasta_into_hashmap(fasta_path)?;
+        let header = Self::create_mock_bam_header_from_sequences(&sequences);
+        let records = Self::create_mock_bam_records_from_sequences(&sequences, &header)?;
 
-pub fn get_fibertig_starts(record: &Record) -> Vec<i64> {
-    get_u32_tag(record, b"fs")
-}
-
-pub fn get_fibertig_ends(record: &Record) -> Vec<i64> {
-    get_u32_tag(record, b"fe")
-}
-
-pub fn get_fibertig_data(record: &Record) -> Vec<Vec<String>> {
-    if let Ok(Aux::String(data)) = record.aux(b"fd") {
-        data.split(FIBERTIG_DELIMITER)
-            .map(|interval_data| {
-                if interval_data.is_empty() {
-                    vec![]
-                } else {
-                    interval_data.split('\t').map(|s| s.to_string()).collect()
-                }
-            })
-            .collect()
-    } else {
-        vec![]
-    }
-}
-
-pub fn is_fibertig_record(record: &Record) -> bool {
-    matches!(record.aux(b"ft"), Ok(Aux::String(_)))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_bed_interval_parsing() {
-        let line = "chr1\t100\t200\tgene1\t1000\t+";
-        let interval = BedInterval::from_bed_line(line).unwrap();
-        
-        assert_eq!(interval.chrom, "chr1");
-        assert_eq!(interval.start, 100);
-        assert_eq!(interval.end, 200);
-        assert_eq!(interval.extra_columns, vec!["gene1", "1000", "+"]);
+        Ok(Self { header, records })
     }
 
-    #[test]
-    fn test_minimal_bed() {
-        let line = "chr1\t100\t200";
-        let interval = BedInterval::from_bed_line(line).unwrap();
-        
-        assert_eq!(interval.chrom, "chr1");
-        assert_eq!(interval.start, 100);
-        assert_eq!(interval.end, 200);
-        assert!(interval.extra_columns.is_empty());
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
+    pub fn records(&self) -> &[Record] {
+        &self.records
+    }
+
+    /// Write the mock BAM to a file using fibertools BAM writer
+    pub fn write_to_bam(&self, output_path: &str) -> Result<()> {
+        let program_name = "fibertools-rs";
+        let program_id = "ft";
+        let program_version = crate::VERSION;
+
+        let mut writer = crate::utils::bio_io::program_bam_writer_from_header(
+            output_path,
+            self.header.clone(),
+            program_name,
+            program_id,
+            program_version,
+        );
+        writer
+            .set_threads(8)
+            .context("Failed to set threads for BAM writer")?;
+
+        // Write records one at a time to avoid large buffer flushes
+        for record in &self.records {
+            writer.write(record)?;
+        }
+        Ok(())
     }
 }

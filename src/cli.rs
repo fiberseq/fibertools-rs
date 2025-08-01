@@ -12,6 +12,7 @@ mod extract_opts;
 mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
+mod inject_opts;
 mod nucleosome_opts;
 mod pileup_opts;
 mod predict_opts;
@@ -28,6 +29,7 @@ pub use extract_opts::*;
 pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
+pub use inject_opts::*;
 pub use nucleosome_opts::*;
 pub use pileup_opts::*;
 pub use predict_opts::*;
@@ -137,6 +139,8 @@ pub enum Commands {
     FiberHmm(FiberHmmOptions),
     /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
     Validate(ValidateOptions),
+    /// Create a mock BAM file from a reference FASTA with perfectly aligned sequences
+    Inject(InjectOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),
