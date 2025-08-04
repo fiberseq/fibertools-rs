@@ -42,6 +42,28 @@ impl FiberTig {
         header
     }
 
+    fn create_bam_record(
+        name: &str,
+        cigar_string: &rust_htslib::bam::record::CigarString,
+        seq_bytes: &[u8],
+        qual_bytes: &[u8],
+        tid: i32,
+        pos: i64,
+    ) -> Record {
+        let mut record = Record::new();
+        record.set(name.as_bytes(), Some(cigar_string), seq_bytes, qual_bytes);
+
+        // Set shared fields
+        record.set_tid(tid);
+        record.set_pos(pos);
+        record.set_mapq(60); // High mapping quality
+        record.unset_paired(); // Unpaired read
+        record.set_mtid(-1); // No mate ID for unpaired read
+        record.set_mpos(-1); // No mate position
+
+        record
+    }
+
     fn create_mock_bam_records_from_sequences(
         sequences: &[(String, fasta::record::Record)],
         header: &Header,
@@ -68,17 +90,15 @@ impl FiberTig {
                 // Create empty quality scores (no quality data)
                 let qual_bytes = vec![255u8; seq_len];
 
-                // Create the record
-                let mut record = Record::new();
-                record.set(name.as_bytes(), Some(&cigar_string), seq_bytes, &qual_bytes);
-
-                // Set shared fields
-                record.set_tid(tid as i32);
-                record.set_pos(0); // Position 0 (0-based)
-                record.set_mapq(60); // High mapping quality
-                record.set_flags(0); // No flags (mapped, primary alignment)
-                record.unset_paired(); // Unpaired read
-                record.set_mtid(-1); // No mate ID for unpaired read
+                // Create the record using helper function
+                let record = Self::create_bam_record(
+                    name,
+                    &cigar_string,
+                    seq_bytes,
+                    &qual_bytes,
+                    tid as i32,
+                    0, // Position 0 (0-based)
+                );
 
                 records.push(record);
             } else {
@@ -113,22 +133,19 @@ impl FiberTig {
                     // Create empty quality scores for this chunk
                     let qual_bytes = vec![255u8; chunk_len];
 
-                    // Create the record with original sequence name
-                    let mut record = Record::new();
-                    record.set(name.as_bytes(), Some(&cigar_string), chunk_seq, &qual_bytes);
-
-                    // Set shared fields
-                    record.set_tid(tid as i32);
-                    record.set_pos(start_pos as i64); // Position within original contig
-                    record.set_mapq(60); // High mapping quality
-                    record.unset_paired(); // Unpaired read
-                    record.set_mtid(-1); // No mate ID for unpaired read
-    
-
-                    // make supplemental if not the first chunk
+                    // Create the record using helper function
+                    let mut record = Self::create_bam_record(
+                        name,
+                        &cigar_string,
+                        chunk_seq,
+                        &qual_bytes,
+                        tid as i32,
+                        start_pos as i64, // Position within original contig
+                    );
+                    // Set sup if needed
                     if chunk_num > 0 {
                         record.set_supplementary();
-                    }
+                    } 
 
                     // Add custom tags to indicate original contig and positions
                     record
