@@ -5,11 +5,14 @@ use gzp::{Compression, ZBuilder};
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use linear_map::LinearMap;
 use niffler::get_reader;
 use rayon::current_num_threads;
 use regex::Regex;
 use rust_htslib::bam;
+use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::record::Aux;
+use rust_htslib::bam::Header;
 use rust_htslib::bam::Read;
 use std::collections::HashMap;
 use std::env;
@@ -388,6 +391,20 @@ pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
     } else {
         vec![]
     }
+}
+
+pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, String>>>) -> Header {
+    let mut header = Header::new();
+    for (key, values) in hash_header.iter() {
+        for value in values {
+            let mut record = HeaderRecord::new(key.as_bytes());
+            for (tag, val) in value.iter() {
+                record.push_tag(tag.as_bytes(), val);
+            }
+            header.push_record(&record);
+        }
+    }
+    header
 }
 
 /// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.

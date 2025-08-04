@@ -160,10 +160,24 @@ impl FiberTig {
     }
 
     pub fn from_inject_opts(opts: &InjectOptions) -> Result<Self> {
-        let sequences = Self::read_fasta_into_vec(&opts.reference)?;
-        let header = Self::create_mock_bam_header_from_sequences(&sequences);
+        // read the fasta
+        let mut sequences = Self::read_fasta_into_vec(&opts.reference)?;
+
+        // Make the header from the sequences
+        let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
+
+        // Apply panspec prefix to sequence names and header if provided
+        if let Some(ref pansn_prefix) = opts.pansn_prefix {
+            header = crate::utils::panspec::add_pan_spec_header(&header, pansn_prefix);
+            sequences.iter_mut().for_each(|(name, _)| {
+                name.insert_str(0, pansn_prefix);
+            });
+        }
+
+        // Make the records
         let records =
             Self::create_mock_bam_records_from_sequences(&sequences, &header, opts.split_size)?;
+
         Ok(Self { header, records })
     }
 

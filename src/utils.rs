@@ -7,6 +7,6 @@ pub mod fibertig;
 pub mod fire;
 pub mod input_bam;
 pub mod nucleosome;
-
+pub mod panspec;
 // test modules for expressions
 pub mod ftexpression;

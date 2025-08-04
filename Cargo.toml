@@ -46,6 +46,7 @@ lazy_static = "1.4.0"
 log = "0.4"
 ordered-float = "3.4.0"
 rayon = "1.10"
+linear-map = "1.2.0"
 regex = "1.9.1"
 rust-htslib = "0.46"
 
