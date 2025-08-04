@@ -77,6 +77,8 @@ impl FiberTig {
                 record.set_pos(0); // Position 0 (0-based)
                 record.set_mapq(60); // High mapping quality
                 record.set_flags(0); // No flags (mapped, primary alignment)
+                record.unset_paired(); // Unpaired read
+                record.set_mtid(-1); // No mate ID for unpaired read
 
                 records.push(record);
             } else {
@@ -119,10 +121,14 @@ impl FiberTig {
                     record.set_tid(tid as i32);
                     record.set_pos(start_pos as i64); // Position within original contig
                     record.set_mapq(60); // High mapping quality
+                    record.unset_paired(); // Unpaired read
+                    record.set_mtid(-1); // No mate ID for unpaired read
+    
 
-                    // Set flags: first chunk is primary (0), subsequent are supplemental (0x800/2048)
-                    let flags = if chunk_num == 0 { 0 } else { 0x800 };
-                    record.set_flags(flags);
+                    // make supplemental if not the first chunk
+                    if chunk_num > 0 {
+                        record.set_supplementary();
+                    }
 
                     // Add custom tags to indicate original contig and positions
                     record
