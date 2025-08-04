@@ -11,7 +11,7 @@ pub struct InjectOptions {
     #[clap(short, long, default_value = "-")]
     pub out: String,
     /// Split contigs into multiple BAM records every N base pairs (0 = no splitting)
-    #[clap(long, default_value_t = 10_000_000)]
+    #[clap(short, long, default_value_t = 10_000_000)]
     pub split_size: usize,
     #[clap(flatten)]
     pub global: GlobalOpts,
