@@ -6,7 +6,7 @@ pub fn run_inject(opts: &InjectOptions) -> Result<()> {
     log::info!("Creating mock BAM from reference FASTA: {}", opts.reference);
 
     // Create FiberTig from FASTA
-    let fibertig = FiberTig::from_fasta(&opts.reference)?;
+    let fibertig = FiberTig::from_inject_opts(opts)?;
 
     log::info!("Generated {} sequences", fibertig.records().len());
 
