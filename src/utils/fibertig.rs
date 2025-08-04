@@ -72,6 +72,13 @@ impl FiberTig {
         let mut records = Vec::new();
         let header_view = HeaderView::from_header(header);
 
+        // If split_size is 0 or negative, treat it as no splitting
+        let split_size = if split_size == 0 {
+            usize::MAX
+        } else {
+            split_size
+        };
+
         for (name, fasta_record) in sequences {
             let seq_len = fasta_record.sequence().len();
             let seq_bytes = fasta_record.sequence().as_ref();
@@ -81,88 +88,64 @@ impl FiberTig {
                 .tid(name.as_bytes())
                 .context("Invalid sequence name")?;
 
-            // If split_size is 0 or sequence is shorter than split_size, don't split
-            if split_size == 0 || seq_len <= split_size {
-                // Create CIGAR with all matches for perfectly aligned sequence
-                let cigar_data = vec![rust_htslib::bam::record::Cigar::Equal(seq_len as u32)];
+            // Split the sequence into chunks (or single chunk if no splitting needed)
+            let mut start_pos = 0;
+            let mut chunk_num = 0;
+
+            while start_pos < seq_len {
+                let end_pos = std::cmp::min(start_pos + split_size, seq_len);
+                let chunk_len = end_pos - start_pos;
+
+                // Calculate hard clipping for this chunk
+                let left_clip = start_pos;
+                let right_clip = seq_len - end_pos;
+
+                // Create CIGAR with hard clipping and matches
+                let mut cigar_data = Vec::new();
+                if left_clip > 0 {
+                    cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
+                }
+                cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
+                if right_clip > 0 {
+                    cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(right_clip as u32));
+                }
                 let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
 
-                // Create empty quality scores (no quality data)
-                let qual_bytes = vec![255u8; seq_len];
+                // Extract sequence chunk (only the visible portion)
+                let chunk_seq = &seq_bytes[start_pos..end_pos];
+
+                // Create empty quality scores for this chunk
+                let qual_bytes = vec![255u8; chunk_len];
 
                 // Create the record using helper function
-                let record = Self::create_bam_record(
+                let mut record = Self::create_bam_record(
                     name,
                     &cigar_string,
-                    seq_bytes,
+                    chunk_seq,
                     &qual_bytes,
                     tid as i32,
-                    0, // Position 0 (0-based)
+                    start_pos as i64, // Position within original contig
                 );
+                // Set sup if needed
+                if chunk_num > 0 {
+                    record.set_supplementary();
+                }
+
+                // Add custom tags to indicate original contig and positions
+                record
+                    .push_aux(b"xs", rust_htslib::bam::record::Aux::I32(start_pos as i32))
+                    .context("Failed to add xs tag")?;
+                record
+                    .push_aux(
+                        b"xe",
+                        rust_htslib::bam::record::Aux::I32((end_pos - 1) as i32),
+                    )
+                    .context("Failed to add xe tag")?;
 
                 records.push(record);
-            } else {
-                // Split the sequence into chunks using supplemental alignments
-                let mut start_pos = 0;
-                let mut chunk_num = 0;
 
-                while start_pos < seq_len {
-                    let end_pos = std::cmp::min(start_pos + split_size, seq_len);
-                    let chunk_len = end_pos - start_pos;
-
-                    // Calculate hard clipping for this chunk
-                    let left_clip = start_pos;
-                    let right_clip = seq_len - end_pos;
-
-                    // Create CIGAR with hard clipping and matches
-                    let mut cigar_data = Vec::new();
-                    if left_clip > 0 {
-                        cigar_data
-                            .push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
-                    }
-                    cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
-                    if right_clip > 0 {
-                        cigar_data
-                            .push(rust_htslib::bam::record::Cigar::HardClip(right_clip as u32));
-                    }
-                    let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
-
-                    // Extract sequence chunk (only the visible portion)
-                    let chunk_seq = &seq_bytes[start_pos..end_pos];
-
-                    // Create empty quality scores for this chunk
-                    let qual_bytes = vec![255u8; chunk_len];
-
-                    // Create the record using helper function
-                    let mut record = Self::create_bam_record(
-                        name,
-                        &cigar_string,
-                        chunk_seq,
-                        &qual_bytes,
-                        tid as i32,
-                        start_pos as i64, // Position within original contig
-                    );
-                    // Set sup if needed
-                    if chunk_num > 0 {
-                        record.set_supplementary();
-                    } 
-
-                    // Add custom tags to indicate original contig and positions
-                    record
-                        .push_aux(b"xs", rust_htslib::bam::record::Aux::I32(start_pos as i32))
-                        .context("Failed to add xs tag")?;
-                    record
-                        .push_aux(
-                            b"xe",
-                            rust_htslib::bam::record::Aux::I32((end_pos - 1) as i32),
-                        )
-                        .context("Failed to add xe tag")?;
-
-                    records.push(record);
-
-                    start_pos += chunk_len;
-                    chunk_num += 1;
-                }
+                start_pos += chunk_len;
+                chunk_num += 1;
             }
         }
 
