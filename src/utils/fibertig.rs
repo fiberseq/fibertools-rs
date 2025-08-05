@@ -6,6 +6,7 @@ use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::{Header, HeaderView, Record};
 use std::collections::HashMap;
+use std::usize;
 
 pub struct FiberTig {
     pub header: Header,
@@ -15,7 +16,7 @@ pub struct FiberTig {
 
 impl FiberTig {
     /// Read BED file and return a mapping from contig name to FiberAnnotations
-    fn read_bed_annotations(bed_path: &str) -> Result<HashMap<String, FiberAnnotations>> {
+    fn read_bed_annotations(&self, bed_path: &str) -> Result<HashMap<String, FiberAnnotations>> {
         use std::io::BufRead;
 
         let reader = bio_io::buffer_from(bed_path).context("Failed to open BED file")?;
@@ -57,15 +58,27 @@ impl FiberTig {
                 .push(annotation);
         }
 
+        // Get sequence lengths from the header
+        let header_view = HeaderView::from_header(&self.header);
+
         // Convert to FiberAnnotations for each contig
         let mut fiber_annotations_map = HashMap::new();
         for (contig_name, mut annotations) in contig_annotations {
-            // Sort annotations by start position
+            // Sort annotations by start position for this contig
             annotations.sort_by_key(|a| a.start);
+
+            // Get sequence length for this contig
+            let tid = header_view
+                .tid(contig_name.as_bytes())
+                .with_context(|| format!("Contig '{}' not found in BAM header", contig_name))?;
+            let seq_len = header_view
+                .target_len(tid)
+                .with_context(|| format!("Failed to get length for contig '{}'", contig_name))?
+                as i64;
 
             let fiber_annotations = FiberAnnotations::from_annotations(
                 annotations,
-                0,     // Will be set when we know the sequence length
+                seq_len,
                 false, // BED coordinates are always forward
             );
 
@@ -221,7 +234,8 @@ impl FiberTig {
     pub fn from_fasta(fasta_path: &str) -> Result<Self> {
         let sequences = Self::read_fasta_into_vec(fasta_path)?;
         let header = Self::create_mock_bam_header_from_sequences(&sequences);
-        let records = Self::create_mock_bam_records_from_sequences(&sequences, &header, 0)?;
+        let records =
+            Self::create_mock_bam_records_from_sequences(&sequences, &header, usize::MAX)?;
         Ok(Self {
             header,
             records,
@@ -261,13 +275,13 @@ impl FiberTig {
 
         // If BED annotations are provided, read and apply them
         if let Some(ref bed_path) = opts.bed {
-            let bed_annotations = Self::read_bed_annotations(bed_path)
+            let bed_annotations = fiber_tig
+                .read_bed_annotations(bed_path)
                 .context("Failed to read BED annotations")?;
             // Add annotations to records
-            fiber_tig.add_annotations_to_records(
-                &bed_annotations,
-            )
-            .context("Failed to add BED annotations to records")?;
+            fiber_tig
+                .add_annotations_to_records(&bed_annotations)
+                .context("Failed to add BED annotations to records")?;
         }
         Ok(fiber_tig)
     }
@@ -308,6 +322,141 @@ impl FiberTig {
         for record in &self.records {
             writer.write(record)?;
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_from_fasta_simple() -> Result<()> {
+        // Create a temporary FASTA file
+        let mut fasta_file = NamedTempFile::new()?;
+        writeln!(fasta_file, ">chr1")?;
+        writeln!(fasta_file, "ATCGATCGATCG")?;
+        writeln!(fasta_file, ">chr2")?;
+        writeln!(fasta_file, "GCTAGCTAGCTA")?;
+        fasta_file.flush()?;
+
+        eprintln!("FASTA file path: {}", fasta_file.path().display());
+
+        // Test creating FiberTig from FASTA
+        let fiber_tig = FiberTig::from_fasta(fasta_file.path().to_str().unwrap())?;
+
+        eprintln!("Header: {:?}", fiber_tig.header());
+
+        // Verify header has correct sequences
+        let header_view = HeaderView::from_header(&fiber_tig.header);
+        assert_eq!(header_view.target_count(), 2);
+
+        eprintln!("Header view: {:?}", header_view);
+
+        // Check sequence names and lengths
+        assert_eq!(header_view.target_names(), vec![b"chr1", b"chr2"]);
+        assert_eq!(header_view.target_len(0).unwrap(), 12);
+        assert_eq!(header_view.target_len(1).unwrap(), 12);
+
+        // Verify records were created
+        assert_eq!(fiber_tig.records.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_bed_annotations() -> Result<()> {
+        // Create a temporary FASTA file with known sequences
+        let mut fasta_file = NamedTempFile::new()?;
+        writeln!(fasta_file, ">chr1")?;
+        writeln!(fasta_file, "ATCGATCGATCGATCGATCG")?; // 20bp
+        fasta_file.flush()?;
+
+        // Create FiberTig from FASTA
+        let fiber_tig = FiberTig::from_fasta(fasta_file.path().to_str().unwrap())?;
+
+        // Create a temporary BED file
+        let mut bed_file = NamedTempFile::new()?;
+        writeln!(bed_file, "chr1\t5\t10")?;
+        writeln!(bed_file, "chr1\t15\t18")?;
+        bed_file.flush()?;
+
+        // Test reading BED annotations
+        let annotations = fiber_tig.read_bed_annotations(bed_file.path().to_str().unwrap())?;
+
+        // Verify annotations were parsed correctly
+        assert_eq!(annotations.len(), 1);
+        let chr1_annotations = annotations.get("chr1").unwrap();
+        assert_eq!(chr1_annotations.annotations.len(), 2);
+        assert_eq!(chr1_annotations.seq_len, 20);
+
+        // Check first annotation
+        let first_ann = &chr1_annotations.annotations[0];
+        assert_eq!(first_ann.start, 5);
+        assert_eq!(first_ann.end, 10);
+        assert_eq!(first_ann.length, 5);
+
+        // Check second annotation
+        let second_ann = &chr1_annotations.annotations[1];
+        assert_eq!(second_ann.start, 15);
+        assert_eq!(second_ann.end, 18);
+        assert_eq!(second_ann.length, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bed_annotations_with_unknown_contig() {
+        // Create a temporary FASTA file
+        let mut fasta_file = NamedTempFile::new().unwrap();
+        writeln!(fasta_file, ">chr1").unwrap();
+        writeln!(fasta_file, "ATCGATCGATCG").unwrap();
+        fasta_file.flush().unwrap();
+
+        // Create FiberTig from FASTA
+        let fiber_tig = FiberTig::from_fasta(fasta_file.path().to_str().unwrap()).unwrap();
+
+        // Create a BED file with unknown contig
+        let mut bed_file = NamedTempFile::new().unwrap();
+        writeln!(bed_file, "unknown_chr\t5\t10").unwrap();
+        bed_file.flush().unwrap();
+
+        // Test should fail with meaningful error
+        let result = fiber_tig.read_bed_annotations(bed_file.path().to_str().unwrap());
+        assert!(result.is_err());
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains("Contig 'unknown_chr' not found in BAM header"));
+    }
+
+    #[test]
+    fn test_bed_annotations_sorted() -> Result<()> {
+        // Create a temporary FASTA file
+        let mut fasta_file = NamedTempFile::new()?;
+        writeln!(fasta_file, ">chr1")?;
+        writeln!(fasta_file, "ATCGATCGATCGATCGATCG")?; // 20bp
+        fasta_file.flush()?;
+
+        // Create FiberTig from FASTA
+        let fiber_tig = FiberTig::from_fasta(fasta_file.path().to_str().unwrap())?;
+
+        // Create a BED file with unsorted positions (should be sorted automatically)
+        let mut bed_file = NamedTempFile::new()?;
+        writeln!(bed_file, "chr1\t15\t18")?;
+        writeln!(bed_file, "chr1\t5\t10")?;
+        bed_file.flush()?;
+
+        // Test reading BED annotations - should sort automatically
+        let annotations = fiber_tig.read_bed_annotations(bed_file.path().to_str().unwrap())?;
+
+        let chr1_annotations = annotations.get("chr1").unwrap();
+        assert_eq!(chr1_annotations.annotations.len(), 2);
+
+        // Should be sorted by start position
+        assert_eq!(chr1_annotations.annotations[0].start, 5);
+        assert_eq!(chr1_annotations.annotations[1].start, 15);
+
         Ok(())
     }
 }
