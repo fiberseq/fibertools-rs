@@ -24,6 +24,15 @@ pub struct FiberAnnotations {
 pub type Ranges = FiberAnnotations;
 
 impl FiberAnnotations {
+    /// Create FiberAnnotations from a vector of FiberAnnotation items
+    pub fn from_annotations(annotations: Vec<FiberAnnotation>, seq_len: i64, reverse: bool) -> Self {
+        Self {
+            annotations,
+            seq_len,
+            reverse,
+        }
+    }
+
     /// starts and ends are [) intervals.
     pub fn new(
         record: &bam::Record,
@@ -107,33 +116,7 @@ impl FiberAnnotations {
             seq_len,
             reverse: is_reverse,
         }
-    }
-
-    /// Create FiberAnnotations from BED intervals (without BAM record alignment)
-    pub fn from_bed(bed_intervals: Vec<(i64, i64, Option<Vec<String>>)>, seq_len: i64) -> Self {
-        let annotations = bed_intervals
-            .into_iter()
-            .map(|(start, end, extra_columns)| {
-                let length = end - start;
-                FiberAnnotation {
-                    start,
-                    end,
-                    length,
-                    qual: 0,
-                    reference_start: Some(start), // For BED data, positions are already in reference coordinates
-                    reference_end: Some(end),
-                    reference_length: Some(length),
-                    extra_columns,
-                }
-            })
-            .collect();
-
-        FiberAnnotations {
-            annotations,
-            seq_len,
-            reverse: false, // BED intervals are always in forward orientation
-        }
-    }
+    } 
 
     pub fn set_qual(&mut self, mut forward_qual: Vec<u8>) {
         assert_eq!(forward_qual.len(), self.annotations.len());

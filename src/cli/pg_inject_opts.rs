@@ -19,6 +19,9 @@ pub struct PgInjectOptions {
     /// Uncompressed BAM output (default: compressed)
     #[clap(short, long)]
     pub uncompressed: bool,
+    /// Optional BED file with annotations to add to mock BAM records
+    #[clap(short, long)]
+    pub bed: Option<String>,
     #[clap(flatten)]
     pub global: GlobalOpts,
 }

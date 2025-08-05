@@ -1,8 +1,11 @@
 use crate::cli::PgInjectOptions;
+use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
+use crate::utils::bio_io;
 use anyhow::{Context, Result};
 use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::{Header, HeaderView, Record};
+use std::collections::HashMap;
 
 pub struct FiberTig {
     pub header: Header,
@@ -10,6 +13,73 @@ pub struct FiberTig {
 }
 
 impl FiberTig {
+    /// Read BED file and return a mapping from contig name to FiberAnnotations
+    fn read_bed_annotations(bed_path: &str) -> Result<HashMap<String, FiberAnnotations>> {
+        use std::io::BufRead;
+        
+        let reader = bio_io::buffer_from(bed_path).context("Failed to open BED file")?;
+        let mut contig_annotations: HashMap<String, Vec<FiberAnnotation>> = HashMap::new();
+
+        // Parse BED file line by line (simple approach)
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with('#') || line.trim().is_empty() {
+                continue; // Skip comments and empty lines
+            }
+            
+            let fields: Vec<&str> = line.split('\t').collect();
+            if fields.len() < 3 {
+                continue; // Skip malformed lines
+            }
+            
+            let contig_name = fields[0].to_string();
+            let start: i64 = fields[1].parse().context("Failed to parse start position")?;
+            let end: i64 = fields[2].parse().context("Failed to parse end position")?;
+            let length = end - start;
+
+            let annotation = FiberAnnotation {
+                start,
+                end,
+                length,
+                qual: 0, 
+                reference_start: Some(start), 
+                reference_end: Some(end),
+                reference_length: Some(length),
+                extra_columns: None,
+            };
+
+            contig_annotations.entry(contig_name).or_default().push(annotation);
+        }
+
+        // Convert to FiberAnnotations for each contig
+        let mut fiber_annotations_map = HashMap::new();
+        for (contig_name, mut annotations) in contig_annotations {
+            // Sort annotations by start position
+            annotations.sort_by_key(|a| a.start);
+            
+            let fiber_annotations = FiberAnnotations::from_annotations(
+                annotations,
+                0, // Will be set when we know the sequence length
+                false, // BED coordinates are always forward
+            );
+            
+            fiber_annotations_map.insert(contig_name, fiber_annotations);
+        }
+
+        Ok(fiber_annotations_map)
+    }
+
+    /// Add BED annotations to BAM records
+    fn add_annotations_to_records(
+        _records: &mut [Record],
+        _sequences: &[(String, fasta::record::Record)],
+        _bed_annotations: &HashMap<String, FiberAnnotations>,
+    ) -> Result<()> {
+        // TODO: Implement annotation addition logic
+        log::info!("BED annotations loaded but not yet applied to records");
+        Ok(())
+    }
+
     fn read_fasta_into_vec(fasta_path: &str) -> Result<Vec<(String, fasta::record::Record)>> {
         // Use bio_io's buffer_from to handle compressed/uncompressed files
         let reader =
@@ -71,6 +141,7 @@ impl FiberTig {
     ) -> Result<Vec<Record>> {
         let mut records = Vec::new();
         let header_view = HeaderView::from_header(header);
+        let use_hard_clipping = false; // Hard clipping not used in this mock
 
         // If split_size is 0 or negative, treat it as no splitting
         let split_size = if split_size == 0 {
@@ -102,11 +173,11 @@ impl FiberTig {
 
                 // Create CIGAR with hard clipping and matches
                 let mut cigar_data = Vec::new();
-                if left_clip > 0 {
+                if left_clip > 0  && use_hard_clipping {
                     cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
                 }
                 cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
-                if right_clip > 0 {
+                if right_clip > 0 && use_hard_clipping {
                     cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(right_clip as u32));
                 }
                 let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
@@ -164,6 +235,13 @@ impl FiberTig {
         let mut sequences = Self::read_fasta_into_vec(&opts.reference)?;
         let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
 
+        // Read BED annotations if provided
+        let bed_annotations = if let Some(ref bed_path) = opts.bed {
+            Some(Self::read_bed_annotations(bed_path)?)
+        } else {
+            None
+        };
+
         // Apply panspec prefix to sequence names and header if provided
         if let Some(ref pansn_prefix) = opts.pansn_prefix {
             header = crate::utils::panspec::add_pan_spec_header(&header, pansn_prefix);
@@ -173,8 +251,13 @@ impl FiberTig {
         }
 
         // Make the records
-        let records =
+        let mut records =
             Self::create_mock_bam_records_from_sequences(&sequences, &header, opts.split_size)?;
+
+        // Add BED annotations to records if provided
+        if let Some(ref annotations) = bed_annotations {
+            Self::add_annotations_to_records(&mut records, &sequences, annotations)?;
+        }
 
         Ok(Self { header, records })
     }
