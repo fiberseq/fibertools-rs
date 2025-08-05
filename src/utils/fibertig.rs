@@ -16,7 +16,7 @@ impl FiberTig {
     /// Read BED file and return a mapping from contig name to FiberAnnotations
     fn read_bed_annotations(bed_path: &str) -> Result<HashMap<String, FiberAnnotations>> {
         use std::io::BufRead;
-        
+
         let reader = bio_io::buffer_from(bed_path).context("Failed to open BED file")?;
         let mut contig_annotations: HashMap<String, Vec<FiberAnnotation>> = HashMap::new();
 
@@ -26,14 +26,16 @@ impl FiberTig {
             if line.starts_with('#') || line.trim().is_empty() {
                 continue; // Skip comments and empty lines
             }
-            
+
             let fields: Vec<&str> = line.split('\t').collect();
             if fields.len() < 3 {
                 continue; // Skip malformed lines
             }
-            
+
             let contig_name = fields[0].to_string();
-            let start: i64 = fields[1].parse().context("Failed to parse start position")?;
+            let start: i64 = fields[1]
+                .parse()
+                .context("Failed to parse start position")?;
             let end: i64 = fields[2].parse().context("Failed to parse end position")?;
             let length = end - start;
 
@@ -41,14 +43,17 @@ impl FiberTig {
                 start,
                 end,
                 length,
-                qual: 0, 
-                reference_start: Some(start), 
+                qual: 0,
+                reference_start: Some(start),
                 reference_end: Some(end),
                 reference_length: Some(length),
                 extra_columns: None,
             };
 
-            contig_annotations.entry(contig_name).or_default().push(annotation);
+            contig_annotations
+                .entry(contig_name)
+                .or_default()
+                .push(annotation);
         }
 
         // Convert to FiberAnnotations for each contig
@@ -56,13 +61,13 @@ impl FiberTig {
         for (contig_name, mut annotations) in contig_annotations {
             // Sort annotations by start position
             annotations.sort_by_key(|a| a.start);
-            
+
             let fiber_annotations = FiberAnnotations::from_annotations(
                 annotations,
-                0, // Will be set when we know the sequence length
+                0,     // Will be set when we know the sequence length
                 false, // BED coordinates are always forward
             );
-            
+
             fiber_annotations_map.insert(contig_name, fiber_annotations);
         }
 
@@ -173,7 +178,7 @@ impl FiberTig {
 
                 // Create CIGAR with hard clipping and matches
                 let mut cigar_data = Vec::new();
-                if left_clip > 0  && use_hard_clipping {
+                if left_clip > 0 && use_hard_clipping {
                     cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
                 }
                 cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
@@ -204,13 +209,10 @@ impl FiberTig {
 
                 // Add custom tags to indicate original contig and positions
                 record
-                    .push_aux(b"xs", rust_htslib::bam::record::Aux::I32(start_pos as i32))
+                    .push_aux(b"xs", rust_htslib::bam::record::Aux::U32(start_pos as u32))
                     .context("Failed to add xs tag")?;
                 record
-                    .push_aux(
-                        b"xe",
-                        rust_htslib::bam::record::Aux::I32((end_pos - 1) as i32),
-                    )
+                    .push_aux(b"xe", rust_htslib::bam::record::Aux::U32(end_pos as u32))
                     .context("Failed to add xe tag")?;
 
                 records.push(record);

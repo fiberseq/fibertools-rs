@@ -25,7 +25,11 @@ pub type Ranges = FiberAnnotations;
 
 impl FiberAnnotations {
     /// Create FiberAnnotations from a vector of FiberAnnotation items
-    pub fn from_annotations(annotations: Vec<FiberAnnotation>, seq_len: i64, reverse: bool) -> Self {
+    pub fn from_annotations(
+        annotations: Vec<FiberAnnotation>,
+        seq_len: i64,
+        reverse: bool,
+    ) -> Self {
         Self {
             annotations,
             seq_len,
@@ -116,7 +120,7 @@ impl FiberAnnotations {
             seq_len,
             reverse: is_reverse,
         }
-    } 
+    }
 
     pub fn set_qual(&mut self, mut forward_qual: Vec<u8>) {
         assert_eq!(forward_qual.len(), self.annotations.len());
