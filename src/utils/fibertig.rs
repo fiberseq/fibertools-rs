@@ -162,8 +162,6 @@ impl FiberTig {
     pub fn from_inject_opts(opts: &InjectOptions) -> Result<Self> {
         // read the fasta
         let mut sequences = Self::read_fasta_into_vec(&opts.reference)?;
-
-        // Make the header from the sequences
         let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
 
         // Apply panspec prefix to sequence names and header if provided
@@ -190,21 +188,27 @@ impl FiberTig {
     }
 
     /// Write the mock BAM to a file using fibertools BAM writer
-    pub fn write_to_bam(&self, output_path: &str, threads: usize) -> Result<()> {
+    pub fn write_to_bam(&self, opts: &InjectOptions) -> Result<()> {
         let program_name = "fibertools-rs";
         let program_id = "ft";
         let program_version = crate::VERSION;
 
         let mut writer = crate::utils::bio_io::program_bam_writer_from_header(
-            output_path,
+            &opts.out,
             self.header.clone(),
             program_name,
             program_id,
             program_version,
         );
         writer
-            .set_threads(threads)
+            .set_threads(opts.global.threads)
             .context("Failed to set threads for BAM writer")?;
+        
+        // If uncompressed, set the compression level to uncompressed
+        if opts.uncompressed {
+            writer.set_compression_level(rust_htslib::bam::CompressionLevel::Uncompressed).context("Failed to set uncompressed BAM")?;
+        }
+
 
         // Write records one at a time to avoid large buffer flushes
         for record in &self.records {

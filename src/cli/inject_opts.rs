@@ -16,6 +16,9 @@ pub struct InjectOptions {
     /// Split contigs into multiple BAM records every N base pairs (0 = no splitting)
     #[clap(short, long, default_value_t = 10_000_000)]
     pub split_size: usize,
+    /// Uncompressed BAM output (default: compressed)
+    #[clap(short, long)]
+    pub uncompressed: bool,
     #[clap(flatten)]
     pub global: GlobalOpts,
 }
