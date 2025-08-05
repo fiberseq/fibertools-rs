@@ -203,12 +203,13 @@ impl FiberTig {
         writer
             .set_threads(opts.global.threads)
             .context("Failed to set threads for BAM writer")?;
-        
+
         // If uncompressed, set the compression level to uncompressed
         if opts.uncompressed {
-            writer.set_compression_level(rust_htslib::bam::CompressionLevel::Uncompressed).context("Failed to set uncompressed BAM")?;
+            writer
+                .set_compression_level(rust_htslib::bam::CompressionLevel::Uncompressed)
+                .context("Failed to set uncompressed BAM")?;
         }
-
 
         // Write records one at a time to avoid large buffer flushes
         for record in &self.records {
