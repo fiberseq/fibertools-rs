@@ -14,6 +14,7 @@ mod fire_opts;
 mod footprint_opts;
 mod inject_opts;
 mod nucleosome_opts;
+mod pg_pansn_opts;
 mod pileup_opts;
 mod predict_opts;
 mod qc_opts;
@@ -31,6 +32,7 @@ pub use fire_opts::*;
 pub use footprint_opts::*;
 pub use inject_opts::*;
 pub use nucleosome_opts::*;
+pub use pg_pansn_opts::*;
 pub use pileup_opts::*;
 pub use predict_opts::*;
 pub use qc_opts::*;
@@ -141,6 +143,9 @@ pub enum Commands {
     Validate(ValidateOptions),
     /// Create a mock BAM file from a reference FASTA with perfectly aligned sequences
     Inject(InjectOptions),
+    /// Add or strip panSN-spec prefixes from BAM contig names
+    #[clap(name = "pg-pansn")]
+    PgPansn(PgPansnOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),

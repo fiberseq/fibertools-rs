@@ -156,6 +156,23 @@ impl InputBam {
         }
         out
     }
+
+    /// Add panSN-spec prefix to all contig names in the stored header
+    /// This must be called after opening the BAM reader to have an effect
+    pub fn add_pansn_prefix(&mut self, pansn_prefix: &str) {
+        if let Some(ref mut header) = self.header {
+            *header = crate::utils::panspec::add_pan_spec_header(header, pansn_prefix);
+        }
+    }
+
+    /// Strip panSN-spec information from all contig names in the stored header
+    /// using the provided delimiter character (e.g., '#' for panSN format)
+    /// This must be called after opening the BAM reader to have an effect
+    pub fn strip_pansn_spec(&mut self, delimiter: char) {
+        if let Some(ref mut header) = self.header {
+            *header = crate::utils::panspec::strip_pan_spec_header(header, &delimiter);
+        }
+    }
 }
 
 impl std::default::Default for InputBam {
