@@ -1,8 +1,8 @@
-use crate::cli::InjectOptions;
+use crate::cli::PgInjectOptions;
 use crate::utils::fibertig::FiberTig;
 use anyhow::Result;
 
-pub fn run_inject(opts: &InjectOptions) -> Result<()> {
+pub fn run_pg_inject(opts: &PgInjectOptions) -> Result<()> {
     log::info!("Creating mock BAM from reference FASTA: {}", opts.reference);
 
     // Create FiberTig from FASTA

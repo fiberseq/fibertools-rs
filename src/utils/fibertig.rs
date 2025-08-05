@@ -1,4 +1,4 @@
-use crate::cli::InjectOptions;
+use crate::cli::PgInjectOptions;
 use anyhow::{Context, Result};
 use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
@@ -159,7 +159,7 @@ impl FiberTig {
         Ok(Self { header, records })
     }
 
-    pub fn from_inject_opts(opts: &InjectOptions) -> Result<Self> {
+    pub fn from_inject_opts(opts: &PgInjectOptions) -> Result<Self> {
         // read the fasta
         let mut sequences = Self::read_fasta_into_vec(&opts.reference)?;
         let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
@@ -188,7 +188,7 @@ impl FiberTig {
     }
 
     /// Write the mock BAM to a file using fibertools BAM writer
-    pub fn write_to_bam(&self, opts: &InjectOptions) -> Result<()> {
+    pub fn write_to_bam(&self, opts: &PgInjectOptions) -> Result<()> {
         let program_name = "fibertools-rs";
         let program_id = "ft";
         let program_version = crate::VERSION;

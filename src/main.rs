@@ -123,8 +123,8 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::Validate(validate_opts)) => {
             subcommands::validate::validate_fiberseq_bam(validate_opts)?;
         }
-        Some(Commands::Inject(inject_opts)) => {
-            subcommands::inject::run_inject(inject_opts)?;
+        Some(Commands::PgInject(pg_inject_opts)) => {
+            subcommands::pg_inject::run_pg_inject(pg_inject_opts)?;
         }
         Some(Commands::PgPansn(pg_pansn_opts)) => {
             subcommands::pg_pansn::run_pg_pansn(pg_pansn_opts)?;
