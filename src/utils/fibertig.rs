@@ -10,6 +10,7 @@ use std::collections::HashMap;
 pub struct FiberTig {
     pub header: Header,
     pub records: Vec<Record>,
+    pub split_size: usize, // Size to split sequences into chunks
 }
 
 impl FiberTig {
@@ -76,8 +77,7 @@ impl FiberTig {
 
     /// Add BED annotations to BAM records
     fn add_annotations_to_records(
-        _records: &mut [Record],
-        _sequences: &[(String, fasta::record::Record)],
+        &mut self,
         _bed_annotations: &HashMap<String, FiberAnnotations>,
     ) -> Result<()> {
         // TODO: Implement annotation addition logic
@@ -147,13 +147,6 @@ impl FiberTig {
         let mut records = Vec::new();
         let header_view = HeaderView::from_header(header);
         let use_hard_clipping = false; // Hard clipping not used in this mock
-
-        // If split_size is 0 or negative, treat it as no splitting
-        let split_size = if split_size == 0 {
-            usize::MAX
-        } else {
-            split_size
-        };
 
         for (name, fasta_record) in sequences {
             let seq_len = fasta_record.sequence().len();
@@ -229,22 +222,26 @@ impl FiberTig {
         let sequences = Self::read_fasta_into_vec(fasta_path)?;
         let header = Self::create_mock_bam_header_from_sequences(&sequences);
         let records = Self::create_mock_bam_records_from_sequences(&sequences, &header, 0)?;
-        Ok(Self { header, records })
+        Ok(Self {
+            header,
+            records,
+            split_size: usize::MAX,
+        })
     }
 
     pub fn from_inject_opts(opts: &PgInjectOptions) -> Result<Self> {
+        // If split_size is 0 or negative, treat it as no splitting
+        let split_size = if opts.split_size == 0 {
+            usize::MAX
+        } else {
+            opts.split_size
+        };
+
         // read the fasta
         let mut sequences = Self::read_fasta_into_vec(&opts.reference)?;
         let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
 
-        // Read BED annotations if provided
-        let bed_annotations = if let Some(ref bed_path) = opts.bed {
-            Some(Self::read_bed_annotations(bed_path)?)
-        } else {
-            None
-        };
-
-        // Apply panspec prefix to sequence names and header if provided
+        // Apply pansn prefix to sequence names and header if provided
         if let Some(ref pansn_prefix) = opts.pansn_prefix {
             header = crate::utils::panspec::add_pan_spec_header(&header, pansn_prefix);
             sequences.iter_mut().for_each(|(name, _)| {
@@ -253,15 +250,26 @@ impl FiberTig {
         }
 
         // Make the records
-        let mut records =
-            Self::create_mock_bam_records_from_sequences(&sequences, &header, opts.split_size)?;
+        let records =
+            Self::create_mock_bam_records_from_sequences(&sequences, &header, split_size)?;
 
-        // Add BED annotations to records if provided
-        if let Some(ref annotations) = bed_annotations {
-            Self::add_annotations_to_records(&mut records, &sequences, annotations)?;
+        let mut fiber_tig = Self {
+            header,
+            records,
+            split_size,
+        };
+
+        // If BED annotations are provided, read and apply them
+        if let Some(ref bed_path) = opts.bed {
+            let bed_annotations = Self::read_bed_annotations(bed_path)
+                .context("Failed to read BED annotations")?;
+            // Add annotations to records
+            fiber_tig.add_annotations_to_records(
+                &bed_annotations,
+            )
+            .context("Failed to add BED annotations to records")?;
         }
-
-        Ok(Self { header, records })
+        Ok(fiber_tig)
     }
 
     pub fn header(&self) -> &Header {
