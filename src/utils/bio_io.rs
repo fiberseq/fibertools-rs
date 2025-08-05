@@ -242,7 +242,7 @@ impl Iterator for BamChunk<'_> {
                 && (r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0)
             {
                 log::warn!(
-                    "Skipping read ({}) because it has been hard clipped. This read will be excluded from calculations and any output.",
+                    "Skipping read ({}) because it has been hard clipped and has ML and MM tags. This read will be excluded from calculations and any output.",
                     String::from_utf8_lossy(r.qname())
                 );
                 continue;
