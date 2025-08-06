@@ -3,10 +3,10 @@ use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
 use crate::utils::bio_io;
 use anyhow::{Context, Result};
 use noodles::fasta;
+use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::header::HeaderRecord;
-use rust_htslib::bam::{Header, HeaderView, Record};
+use rust_htslib::bam::{Header, HeaderView, Read, Record};
 use std::collections::HashMap;
-use std::usize;
 
 pub struct FiberTig {
     pub header: Header,
@@ -41,6 +41,13 @@ impl FiberTig {
             let end: i64 = fields[2].parse().context("Failed to parse end position")?;
             let length = end - start;
 
+            // Capture extra columns if they exist (columns 4 and beyond)
+            let extra_columns = if fields.len() > 3 {
+                Some(fields[3..].iter().map(|s| s.to_string()).collect())
+            } else {
+                None
+            };
+
             let annotation = FiberAnnotation {
                 start,
                 end,
@@ -49,7 +56,7 @@ impl FiberTig {
                 reference_start: Some(start),
                 reference_end: Some(end),
                 reference_length: Some(length),
-                extra_columns: None,
+                extra_columns,
             };
 
             contig_annotations
@@ -70,10 +77,10 @@ impl FiberTig {
             // Get sequence length for this contig
             let tid = header_view
                 .tid(contig_name.as_bytes())
-                .with_context(|| format!("Contig '{}' not found in BAM header", contig_name))?;
+                .with_context(|| format!("Contig '{contig_name}' not found in BAM header"))?;
             let seq_len = header_view
                 .target_len(tid)
-                .with_context(|| format!("Failed to get length for contig '{}'", contig_name))?
+                .with_context(|| format!("Failed to get length for contig '{contig_name}'"))?
                 as i64;
 
             let fiber_annotations = FiberAnnotations::from_annotations(
@@ -91,10 +98,51 @@ impl FiberTig {
     /// Add BED annotations to BAM records
     fn add_annotations_to_records(
         &mut self,
-        _bed_annotations: &HashMap<String, FiberAnnotations>,
+        bed_annotations: &HashMap<String, FiberAnnotations>,
     ) -> Result<()> {
-        // TODO: Implement annotation addition logic
-        log::info!("BED annotations loaded but not yet applied to records");
+        let header_view = HeaderView::from_header(&self.header);
+
+        for record in &mut self.records {
+            let tid = record.tid();
+            if tid < 0 {
+                continue; // Skip unmapped reads
+            }
+
+            // Get the contig name for this record
+            let name_bytes = header_view.tid2name(tid as u32);
+            let contig_name =
+                std::str::from_utf8(name_bytes).context("Invalid UTF-8 in contig name")?;
+
+            // Get annotations for this contig
+            let annotations = match bed_annotations.get(contig_name) {
+                Some(ann) => ann,
+                None => continue, // No annotations for this contig
+            };
+
+            // Get the range of this BAM record on the reference
+            let record_start = record.reference_start(); // 0-based
+            let record_end = record.reference_end(); // 0-based exclusive
+
+            // Get overlapping annotations
+            let mut overlapping_annotations =
+                annotations.overlapping_annotations(record_start, record_end);
+
+            // Adjust coordinates to be relative to record start
+            for annotation in &mut overlapping_annotations.annotations {
+                annotation.start -= record_start;
+                annotation.end -= record_start;
+            }
+
+            // Write annotations to BAM tags
+            overlapping_annotations.write_to_bam_tags(
+                record,
+                b"fs",       // feature starts
+                b"fl",       // feature lengths
+                Some(b"fa"), // feature annotations (extra columns)
+            )?;
+        }
+
+        log::info!("BED annotations applied to {} records", self.records.len());
         Ok(())
     }
 
@@ -294,6 +342,64 @@ impl FiberTig {
         &self.records
     }
 
+    /// Extract BED annotations from an annotated BAM file using FiberAnnotations
+    pub fn extract_to_bed(opts: &PgInjectOptions) -> Result<()> {
+        use crate::utils::bio_io;
+        use std::io::Write;
+        
+        // Open the BAM file (using the reference field as the input BAM)
+        let mut reader = bio_io::bam_reader(&opts.reference);
+        
+        // Open output file for BED data
+        let mut writer = bio_io::writer(&opts.out)?;
+        
+        // Get header view before iterating over records
+        let header_view = reader.header().clone();
+        
+        // Read through BAM records and extract annotations
+        for result in reader.records() {
+            let record = result?;
+            
+            // Skip unmapped reads
+            if record.tid() < 0 {
+                continue;
+            }
+            
+            // Try to extract annotations using the standard fs/fl/fa tags
+            if let Some(fiber_annotations) = FiberAnnotations::from_bam_tags(
+                &record, 
+                b"fs",      // feature starts
+                b"fl",      // feature lengths  
+                Some(b"fa") // feature annotations
+            )? {
+                // Get contig name from header
+                let contig_name = std::str::from_utf8(header_view.tid2name(record.tid() as u32))?;
+                
+                // Write each annotation as a BED line
+                for annotation in &fiber_annotations.annotations {
+                    // Skip if reference coordinates are None
+                    let (ref_start, ref_end) = match (annotation.reference_start, annotation.reference_end) {
+                        (Some(start), Some(end)) => (start, end),
+                        _ => continue, // Skip this annotation if coordinates are missing
+                    };
+                    
+                    // Write basic BED format (chrom, start, end)
+                    write!(writer, "{contig_name}\t{ref_start}\t{ref_end}")?;
+                    
+                    // Add extra columns if they exist
+                    if let Some(ref extra_cols) = annotation.extra_columns {
+                        for col in extra_cols {
+                            write!(writer, "\t{col}")?;
+                        }
+                    }
+                    writeln!(writer)?;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Write the mock BAM to a file using fibertools BAM writer
     pub fn write_to_bam(&self, opts: &PgInjectOptions) -> Result<()> {
         let program_name = "fibertools-rs";
@@ -456,6 +562,63 @@ mod tests {
         // Should be sorted by start position
         assert_eq!(chr1_annotations.annotations[0].start, 5);
         assert_eq!(chr1_annotations.annotations[1].start, 15);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_annotations_to_records() -> Result<()> {
+        // Create a temporary FASTA file
+        let mut fasta_file = NamedTempFile::new()?;
+        writeln!(fasta_file, ">chr1")?;
+        writeln!(fasta_file, "ATCGATCGATCGATCGATCGAAAAAAAAAA")?; // 30bp
+        fasta_file.flush()?;
+
+        // Create FiberTig from FASTA
+        let mut fiber_tig = FiberTig::from_fasta(fasta_file.path().to_str().unwrap())?;
+
+        // Create a temporary BED file with extra columns
+        let mut bed_file = NamedTempFile::new()?;
+        writeln!(bed_file, "chr1\t5\t15\tfeature1\t100\t+")?; // overlaps with record
+        writeln!(bed_file, "chr1\t25\t35\tfeature2\t200\t-")?; // partially overlaps
+        writeln!(bed_file, "chr1\t50\t60\tfeature3\t300\t+")?; // no overlap
+        bed_file.flush()?;
+
+        // Read BED annotations
+        let bed_annotations = fiber_tig.read_bed_annotations(bed_file.path().to_str().unwrap())?;
+
+        // Apply annotations to records
+        fiber_tig.add_annotations_to_records(&bed_annotations)?;
+
+        // Verify that annotations were added to the record
+        assert_eq!(fiber_tig.records.len(), 1);
+        let record = &fiber_tig.records[0];
+
+        // Check that fs tag exists and has correct values
+        let fs_aux = record.aux(b"fs").expect("fs tag should exist");
+        if let rust_htslib::bam::record::Aux::ArrayU32(fs_array) = fs_aux {
+            let fs_values: Vec<u32> = fs_array.iter().collect();
+            assert_eq!(fs_values, vec![5, 25]); // Two overlapping annotations
+        } else {
+            panic!("fs tag should be ArrayU32");
+        }
+
+        // Check that fl tag exists and has correct values
+        let fl_aux = record.aux(b"fl").expect("fl tag should exist");
+        if let rust_htslib::bam::record::Aux::ArrayU32(fl_array) = fl_aux {
+            let fl_values: Vec<u32> = fl_array.iter().collect();
+            assert_eq!(fl_values, vec![10, 10]); // Lengths: 15-5=10, 35-25=10
+        } else {
+            panic!("fl tag should be ArrayU32");
+        }
+
+        // Check that fa tag exists and has correct values
+        let fa_aux = record.aux(b"fa").expect("fa tag should exist");
+        if let rust_htslib::bam::record::Aux::String(fa_string) = fa_aux {
+            assert_eq!(fa_string, "feature1;100;+|feature2;200;-");
+        } else {
+            panic!("fa tag should be String");
+        }
 
         Ok(())
     }

@@ -26,10 +26,13 @@ pub type Ranges = FiberAnnotations;
 impl FiberAnnotations {
     /// Create FiberAnnotations from a vector of FiberAnnotation items
     pub fn from_annotations(
-        annotations: Vec<FiberAnnotation>,
+        mut annotations: Vec<FiberAnnotation>,
         seq_len: i64,
         reverse: bool,
     ) -> Self {
+        // Sort annotations by start position to ensure they are always in order
+        annotations.sort_by_key(|a| a.start);
+        
         Self {
             annotations,
             seq_len,
@@ -93,7 +96,7 @@ impl FiberAnnotations {
         };
 
         // create annotations from parallel vectors
-        let annotations = starts
+        let mut annotations: Vec<FiberAnnotation> = starts
             .into_iter()
             .zip(ends)
             .zip(lengths)
@@ -113,6 +116,9 @@ impl FiberAnnotations {
                 },
             )
             .collect();
+
+        // Sort annotations by start position to ensure they are always in order
+        annotations.sort_by_key(|a| a.start);
 
         // return object
         FiberAnnotations {
@@ -302,11 +308,7 @@ impl FiberAnnotations {
 
     pub fn merge_ranges(multiple_ranges: Vec<&Self>) -> Self {
         if multiple_ranges.is_empty() {
-            return Self {
-                annotations: vec![],
-                seq_len: 0,
-                reverse: false,
-            };
+            return Self::from_annotations(vec![], 0, false);
         }
 
         // check properties that must be the same
@@ -318,19 +320,13 @@ impl FiberAnnotations {
         }
 
         // collect all annotations
-        let mut annotations: Vec<FiberAnnotation> = multiple_ranges
+        let annotations: Vec<FiberAnnotation> = multiple_ranges
             .iter()
             .flat_map(|r| r.annotations.clone())
             .collect();
 
-        // sort by start position
-        annotations.sort_by_key(|a| a.start);
-
-        Self {
-            annotations,
-            seq_len,
-            reverse,
-        }
+        // Use from_annotations to ensure proper sorting
+        Self::from_annotations(annotations, seq_len, reverse)
     }
 
     fn apply_offset_helper(in_start: i64, in_end: i64, offset: i64, strand: char) -> (i64, i64) {
@@ -380,6 +376,154 @@ impl FiberAnnotations {
         if strand == '-' {
             self.annotations.reverse();
         }
+    }
+
+    /// Create FiberAnnotations from BAM tags with configurable tag names
+    pub fn from_bam_tags(
+        record: &rust_htslib::bam::Record,
+        start_tag: &[u8; 2],
+        length_tag: &[u8; 2],
+        annotation_tag: Option<&[u8; 2]>,
+    ) -> anyhow::Result<Option<Self>> {
+        // Check if record has the specified start and length tags
+        if let (Ok(start_aux), Ok(length_aux)) = (record.aux(start_tag), record.aux(length_tag)) {
+            if let (
+                rust_htslib::bam::record::Aux::ArrayU32(start_array),
+                rust_htslib::bam::record::Aux::ArrayU32(length_array),
+            ) = (start_aux, length_aux)
+            {
+                let start_values: Vec<u32> = start_array.iter().collect();
+                let length_values: Vec<u32> = length_array.iter().collect();
+
+                if start_values.len() != length_values.len() {
+                    return Err(anyhow::anyhow!(
+                        "Mismatched {} and {} array lengths", 
+                        String::from_utf8_lossy(start_tag),
+                        String::from_utf8_lossy(length_tag)
+                    ));
+                }
+
+                // Convert to i64 vectors for FiberAnnotations::new
+                let forward_starts: Vec<i64> = start_values.iter().map(|&x| x as i64).collect();
+                let lengths: Vec<i64> = length_values.iter().map(|&x| x as i64).collect();
+
+                // Get annotation tag for extra columns if specified
+                let annotation_values = if let Some(ann_tag) = annotation_tag {
+                    if let Ok(rust_htslib::bam::record::Aux::String(ann_string)) = record.aux(ann_tag) {
+                        Some(ann_string.split('|').collect::<Vec<_>>())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                // Use the existing FiberAnnotations::new method
+                let mut fiber_annotations = FiberAnnotations::new(
+                    record,
+                    forward_starts,
+                    None,          // no ends provided
+                    Some(lengths), // use lengths from fl tag
+                );
+
+                // Add extra columns to the annotations if present
+                if let Some(ann_vals) = annotation_values {
+                    for (i, annotation) in fiber_annotations.annotations.iter_mut().enumerate() {
+                        if i < ann_vals.len() && !ann_vals[i].is_empty() {
+                            annotation.extra_columns =
+                                Some(ann_vals[i].split(';').map(|s| s.to_string()).collect());
+                        }
+                    }
+                }
+
+                Ok(Some(fiber_annotations))
+            } else {
+                Ok(None) // Tags exist but wrong type
+            }
+        } else {
+            Ok(None) // No annotation tags
+        }
+    }
+
+    /// Create FiberAnnotations containing only annotations that overlap with the given range
+    pub fn overlapping_annotations(&self, range_start: i64, range_end: i64) -> Self {
+        let mut overlapping = Vec::new();
+
+        for annotation in &self.annotations {
+            // Check if annotation overlaps with range
+            if annotation.end > range_start && annotation.start < range_end {
+                overlapping.push(annotation.clone());
+            }
+        }
+
+        FiberAnnotations::from_annotations(overlapping, range_end - range_start, self.reverse)
+    }
+
+    /// Write annotations to BAM record as auxiliary tags
+    pub fn write_to_bam_tags(
+        &self,
+        record: &mut rust_htslib::bam::Record,
+        start_tag: &[u8; 2],
+        length_tag: &[u8; 2],
+        annotation_tag: Option<&[u8; 2]>,
+    ) -> anyhow::Result<()> {
+        use anyhow::Context;
+
+        if self.annotations.is_empty() {
+            return Ok(());
+        }
+
+        // Collect starts and lengths
+        let starts: Vec<u32> = self.annotations.iter().map(|a| a.start as u32).collect();
+
+        let lengths: Vec<u32> = self.annotations.iter().map(|a| a.length as u32).collect();
+
+        // Add start positions tag
+        record
+            .push_aux(
+                start_tag,
+                rust_htslib::bam::record::Aux::ArrayU32((&starts).into()),
+            )
+            .with_context(|| format!("Failed to add {} tag", String::from_utf8_lossy(start_tag)))?;
+
+        // Add lengths tag
+        record
+            .push_aux(
+                length_tag,
+                rust_htslib::bam::record::Aux::ArrayU32((&lengths).into()),
+            )
+            .with_context(|| {
+                format!("Failed to add {} tag", String::from_utf8_lossy(length_tag))
+            })?;
+
+        // Add annotation tag if requested and any annotations have extra columns
+        if let Some(ann_tag) = annotation_tag {
+            let extra_strings: Vec<String> = self
+                .annotations
+                .iter()
+                .map(|a| {
+                    if let Some(ref extra_cols) = a.extra_columns {
+                        extra_cols.join(";")
+                    } else {
+                        String::new()
+                    }
+                })
+                .collect();
+
+            // Only add the tag if there are non-empty extra columns
+            if extra_strings.iter().any(|s| !s.is_empty()) {
+                let joined_extra = extra_strings.join("|");
+                record
+                    .push_aux(
+                        ann_tag,
+                        rust_htslib::bam::record::Aux::String(&joined_extra),
+                    )
+                    .with_context(|| {
+                        format!("Failed to add {} tag", String::from_utf8_lossy(ann_tag))
+                    })?;
+            }
+        }
+        Ok(())
     }
 }
 

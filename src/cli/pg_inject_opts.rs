@@ -22,6 +22,9 @@ pub struct PgInjectOptions {
     /// Optional BED file with annotations to add to mock BAM records
     #[clap(short, long)]
     pub bed: Option<String>,
+    /// Extract BED annotations from an annotated BAM file (reverses injection)
+    #[clap(short, long)]
+    pub extract: bool,
     #[clap(flatten)]
     pub global: GlobalOpts,
 }
