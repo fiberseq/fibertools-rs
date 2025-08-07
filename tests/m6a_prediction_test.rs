@@ -25,7 +25,7 @@ fn sum_qual(bam: &mut Reader) -> usize {
         sum += this_qual_sum;
         count += this_count;
     }
-    eprintln!("sum {:?}; count {:?}", sum, count);
+    eprintln!("sum {sum:?}; count {count:?}");
     // now count for the input bam file as well
     sum
 }
@@ -37,7 +37,8 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
     // with candle all batch sizes tested were the same
     // however with libtorch was different with a batch size
     // of 5 or more. I am not sure why this is the case.
-    for b in [1] {
+    {
+        let b = 1;
         let named_tmp_bam_out = NamedTempFile::new().unwrap();
         let out_str = named_tmp_bam_out.path().to_str().unwrap();
         let mut predict_options = fibertools_rs::cli::PredictM6AOptions::default();
@@ -56,7 +57,7 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
         counts.push(sum_qual(&mut predicted_bam));
     }
     // assert that the counts are the same
-    eprintln!("counts from different batch sizes: {:?}", counts);
+    eprintln!("counts from different batch sizes: {counts:?}");
     for i in 1..counts.len() {
         assert_eq!(counts[0], counts[i]);
     }
@@ -65,11 +66,11 @@ fn run_prediction_and_count_qual(inbam: String) -> usize {
 
 fn run_comparison(file: &str) {
     let files = vec![file];
-    eprintln!("{:?}", files);
+    eprintln!("{files:?}");
     let results_before_this_predict = sum_qual(&mut bio_io::bam_reader(file));
-    eprintln!("{:?}", results_before_this_predict);
+    eprintln!("{results_before_this_predict:?}");
     let results = run_prediction_and_count_qual(file.to_string());
-    eprintln!("{:?}", results);
+    eprintln!("{results:?}");
     assert_eq!(results, results_before_this_predict);
 }
 

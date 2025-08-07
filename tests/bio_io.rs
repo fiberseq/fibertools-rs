@@ -10,6 +10,6 @@ pub fn test_msp_nuc_tags() {
         let _n_l = bio_io::get_u32_tag(&record, b"nl");
         let a_s = bio_io::get_u32_tag(&record, b"as");
         let _a_l = bio_io::get_u32_tag(&record, b"al");
-        log::debug!("{:?}", a_s);
+        log::debug!("{a_s:?}");
     }
 }

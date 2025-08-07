@@ -47,8 +47,8 @@ fn test_many_msps() {
             .copied()
             .chain(fiber_data.msp.ends().iter().map(|&x| x - 1))
             .collect::<Vec<_>>();
-        eprintln!("m6a: {:?}", m6a);
-        eprintln!("msp: {:?}", msps);
+        eprintln!("m6a: {m6a:?}");
+        eprintln!("msp: {msps:?}");
         /*
         eprintln!(
             "strand: {:?}\t{:?}",

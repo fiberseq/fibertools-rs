@@ -251,7 +251,7 @@ mod test {
     fn test_this_one() {
         let filter = "len(msp)=50:100";
         let mut range = make_fake_range();
-        let parser = parse_filter(&filter);
+        let parser = parse_filter(filter);
         eprintln!("{:?}", range.annotations.len());
         apply_filter_to_range(&parser, &mut range).unwrap();
         eprintln!("{:?}", range.annotations.len());

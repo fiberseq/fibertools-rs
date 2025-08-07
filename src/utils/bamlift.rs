@@ -83,8 +83,14 @@ fn liftover_closest(
     if !is_sorted(positions) {
         log::error!("Unsorted positions passed to liftover_closest!");
         log::error!("Full positions array: {:?}", positions);
-        log::error!("First 5 positions: {:?}", &positions[..std::cmp::min(5, positions.len())]);
-        log::error!("Last 5 positions: {:?}", &positions[positions.len().saturating_sub(5)..]);
+        log::error!(
+            "First 5 positions: {:?}",
+            &positions[..std::cmp::min(5, positions.len())]
+        );
+        log::error!(
+            "Last 5 positions: {:?}",
+            &positions[positions.len().saturating_sub(5)..]
+        );
         log::error!("Array length: {}", positions.len());
         panic!("Positions must be sorted before calling liftover!");
     }
@@ -168,14 +174,14 @@ fn lift_range(
     lift_reference_to_query: bool,
 ) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
     assert_eq!(starts.len(), ends.len());
-    
+
     // Lift starts (always sorted)
     let ref_starts = if !lift_reference_to_query {
         lift_reference_positions(aligned_block_pairs, starts)
     } else {
         lift_query_positions(aligned_block_pairs, starts)
     };
-    
+
     // Handle ends, which may or may not be sorted
     let ref_ends = if is_sorted(ends) {
         // Fast path: ends are sorted, lift normally
@@ -188,25 +194,25 @@ fn lift_range(
         // Slow path: ends are unsorted, need to sort ends independently
         let mut end_indices: Vec<usize> = (0..ends.len()).collect();
         end_indices.sort_by_key(|&i| ends[i]);
-        
+
         let sorted_ends: Vec<i64> = end_indices.iter().map(|&i| ends[i]).collect();
-        
+
         // Lift sorted ends
         let lifted_ends = if !lift_reference_to_query {
             lift_reference_positions(aligned_block_pairs, &sorted_ends)
         } else {
             lift_query_positions(aligned_block_pairs, &sorted_ends)
         };
-        
+
         // Restore original order for ends
         let mut original_ends = vec![None; ends.len()];
         for (sorted_idx, &original_idx) in end_indices.iter().enumerate() {
             original_ends[original_idx] = lifted_ends[sorted_idx];
         }
-        
+
         original_ends
     };
-    
+
     // Common logic for processing lifted positions
     assert_eq!(ref_starts.len(), ref_ends.len());
     let rtn = ref_starts

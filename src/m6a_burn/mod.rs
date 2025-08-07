@@ -166,6 +166,6 @@ mod tests {
             .chunks(2)
             .map(|c| c[0])
             .collect();
-        println!("{:?}", z);
+        println!("{z:?}");
     }
 }

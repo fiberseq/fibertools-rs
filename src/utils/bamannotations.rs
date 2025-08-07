@@ -32,7 +32,7 @@ impl FiberAnnotations {
     ) -> Self {
         // Sort annotations by start position to ensure they are always in order
         annotations.sort_by_key(|a| a.start);
-        
+
         Self {
             annotations,
             seq_len,
@@ -397,7 +397,7 @@ impl FiberAnnotations {
 
                 if start_values.len() != length_values.len() {
                     return Err(anyhow::anyhow!(
-                        "Mismatched {} and {} array lengths", 
+                        "Mismatched {} and {} array lengths",
                         String::from_utf8_lossy(start_tag),
                         String::from_utf8_lossy(length_tag)
                     ));
@@ -409,7 +409,9 @@ impl FiberAnnotations {
 
                 // Get annotation tag for extra columns if specified
                 let annotation_values = if let Some(ann_tag) = annotation_tag {
-                    if let Ok(rust_htslib::bam::record::Aux::String(ann_string)) = record.aux(ann_tag) {
+                    if let Ok(rust_htslib::bam::record::Aux::String(ann_string)) =
+                        record.aux(ann_tag)
+                    {
                         Some(ann_string.split('|').collect::<Vec<_>>())
                     } else {
                         None
