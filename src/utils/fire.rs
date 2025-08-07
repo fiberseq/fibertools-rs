@@ -93,7 +93,7 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
     let mut _max_pos = 0;
     // if you are a position, on average you will be in an rle length of weighted_rle
     let mut weighted_rle = 0.0;
-    for (m6a_1, m6a_2) in rec.m6a.starts.iter().flatten().tuple_windows() {
+    for (m6a_1, m6a_2) in rec.m6a.starts().iter().tuple_windows() {
         // we only want m6a in the window
         if *m6a_1 < start || *m6a_1 > end || *m6a_2 < start || *m6a_2 > end {
             continue;
@@ -203,7 +203,7 @@ impl<'a> FireFeats<'a> {
         } else {
             b'A'
         };
-        for m6a_st in self.rec.m6a.starts.iter().flatten() {
+        for m6a_st in self.rec.m6a.starts().iter() {
             let m6a_bp = self.seq[*m6a_st as usize];
             if m6a_bp != sequenced_bp {
                 log::warn!(
@@ -227,9 +227,8 @@ impl<'a> FireFeats<'a> {
     fn get_5mc_count(&self, start: i64, end: i64) -> usize {
         self.rec
             .cpg
-            .starts
+            .starts()
             .iter()
-            .flatten()
             .filter(|&&pos| pos >= start && pos < end)
             .count()
     }
@@ -238,9 +237,8 @@ impl<'a> FireFeats<'a> {
         let mut m6a_count = self
             .rec
             .m6a
-            .starts
+            .starts()
             .iter()
-            .flatten()
             .filter(|&&pos| pos >= start && pos < end)
             .count();
 
@@ -392,8 +390,17 @@ impl<'a> FireFeats<'a> {
         let msp_data = self.rec.msp.into_iter().collect_vec();
         self.fire_feats = msp_data
             .into_iter()
-            .map(|(s, e, _l, _q, refs)| {
-                let (rs, re, _rl) = refs.unwrap_or((0, 0, 0));
+            .map(|annotation| {
+                let s = annotation.start;
+                let e = annotation.end;
+                let (rs, re, _rl) = match (
+                    annotation.reference_start,
+                    annotation.reference_end,
+                    annotation.reference_length,
+                ) {
+                    (Some(rs), Some(re), Some(rl)) => (rs, re, rl),
+                    _ => (0, 0, 0),
+                };
                 (rs, re, self.msp_get_fire_features(s, e))
             })
             .collect();

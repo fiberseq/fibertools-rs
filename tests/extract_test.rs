@@ -26,7 +26,7 @@ fn test_msp_extract() -> Result<(), Box<dyn std::error::Error>> {
     let fiber_records = get_fiber_data_from_test_bam("tests/data/msp_nuc.bam");
     assert!(fiber_records.len() == 1);
     let fiber_data = &fiber_records[0];
-    assert_eq!(fiber_data.msp.starts, expected_msp_starts);
+    assert_eq!(fiber_data.msp.option_starts(), expected_msp_starts);
     Ok(())
 }
 
@@ -34,21 +34,21 @@ fn test_msp_extract() -> Result<(), Box<dyn std::error::Error>> {
 fn test_many_msps() {
     let fiber_records = get_fiber_data_from_test_bam("tests/data/all.bam");
     for fiber_data in fiber_records {
-        let m6a = fiber_data.m6a.starts.iter().flatten().collect::<Vec<_>>();
+        let m6a_starts = fiber_data.m6a.starts();
+        let m6a = m6a_starts.iter().collect::<Vec<_>>();
         if m6a.is_empty() {
             continue;
         }
 
         let msps = fiber_data
             .msp
-            .starts
+            .starts()
             .iter()
-            .flatten()
             .copied()
-            .chain(fiber_data.msp.ends.iter().flatten().map(|&x| x - 1))
+            .chain(fiber_data.msp.ends().iter().map(|&x| x - 1))
             .collect::<Vec<_>>();
-        eprintln!("m6a: {:?}", m6a);
-        eprintln!("msp: {:?}", msps);
+        eprintln!("m6a: {m6a:?}");
+        eprintln!("msp: {msps:?}");
         /*
         eprintln!(
             "strand: {:?}\t{:?}",
