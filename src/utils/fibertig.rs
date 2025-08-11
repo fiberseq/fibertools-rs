@@ -154,11 +154,11 @@ impl FiberTig {
         seq_len: i64,
         split_size: i64,
         annotations: &FiberAnnotations,
-    ) -> HashMap<(i64, i64), FiberAnnotations> {
-        let mut split_to_annotations: HashMap<(i64, i64), FiberAnnotations> = HashMap::new();
+    ) -> Vec<((i64, i64), FiberAnnotations)> {
+        let mut split_to_annotations: Vec<((i64, i64), FiberAnnotations)> = Vec::new();
 
         if split_size >= seq_len {
-            split_to_annotations.insert((0, seq_len), annotations.clone());
+            split_to_annotations.push(((0, seq_len), annotations.clone()));
             return split_to_annotations;
         }
 
@@ -175,14 +175,14 @@ impl FiberTig {
             // If the annotation ends after the current target end, we need to split
             if anno.end >= current_target_end as i64 {
                 // Save the current split
-                split_to_annotations.insert(
+                split_to_annotations.push((
                     (current_start, anno.end),
                     FiberAnnotations::from_annotations(
                         current_annotations.clone(),
                         seq_len,
                         false, // BED coordinates are always forward
                     ),
-                );
+                ));
 
                 // if we are the last annotation, we can stop
                 if anno_index == annotations.annotations.len() - 1 {
@@ -203,14 +203,14 @@ impl FiberTig {
 
         // If we have any remaining annotations after the last split, add them
         if !current_annotations.is_empty() {
-            split_to_annotations.insert(
+            split_to_annotations.push((
                 (current_start, seq_len),
                 FiberAnnotations::from_annotations(
                     current_annotations,
                     seq_len,
                     false, // BED coordinates are always forward
                 ),
-            );
+            ));
         }
 
         split_to_annotations
@@ -221,7 +221,7 @@ impl FiberTig {
     fn create_annotated_records_from_splits(
         contig_name: &str,
         fasta_record: &fasta::record::Record,
-        split_annotations: &mut HashMap<(i64, i64), FiberAnnotations>,
+        split_annotations: &mut [((i64, i64), FiberAnnotations)],
         header_view: &HeaderView,
     ) -> Result<Vec<Record>> {
         let mut records = Vec::new();
@@ -759,7 +759,7 @@ mod tests {
         let header_view = HeaderView::from_header(&header);
 
         // Create test split annotations
-        let mut split_annotations = HashMap::new();
+        let mut split_annotations = Vec::new();
 
         // First split: 0-20
         let split1_anns = vec![FiberAnnotation {
@@ -772,10 +772,10 @@ mod tests {
             reference_length: Some(10),
             extra_columns: Some(vec!["feature1".to_string()]),
         }];
-        split_annotations.insert(
+        split_annotations.push((
             (0, 20),
             FiberAnnotations::from_annotations(split1_anns, 36, false),
-        );
+        ));
 
         // Second split: 20-36
         let split2_anns = vec![FiberAnnotation {
@@ -788,10 +788,10 @@ mod tests {
             reference_length: Some(10),
             extra_columns: Some(vec!["feature2".to_string()]),
         }];
-        split_annotations.insert(
+        split_annotations.push((
             (20, 36),
             FiberAnnotations::from_annotations(split2_anns, 36, false),
-        );
+        ));
 
         // Create records from splits
         let records = FiberTig::create_annotated_records_from_splits(
