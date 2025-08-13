@@ -137,13 +137,13 @@ impl FiberTig {
 
     fn extract_bed_header_from_bam_header(header: &Header) -> Option<String> {
         let mut bed_header = None;
-        
+
         for comment in header.comments() {
-            if comment.starts_with("BED_HEADER:") {
-                bed_header = Some(comment["BED_HEADER:".len()..].to_string());
+            if let Some(stripped) = comment.strip_prefix("BED_HEADER:") {
+                bed_header = Some(stripped.to_string());
             }
         }
-        
+
         bed_header
     }
 
@@ -437,7 +437,7 @@ impl FiberTig {
             let (bed_annotations, bed_header) =
                 Self::read_bed_annotations(bed_path, &HeaderView::from_header(&header))
                     .context("Failed to read BED annotations")?;
-            
+
             // Add bed header as comment if present
             if let Some(ref bed_header_line) = bed_header {
                 Self::add_bed_header_comment(&mut header, bed_header_line);
@@ -518,10 +518,10 @@ impl FiberTig {
 
         // Get header view before iterating over records
         let header_view = reader.header().clone();
-        
+
         // Convert HeaderView to Header for extracting bed header
         let header = Header::from_template(&header_view);
-        
+
         // Extract and write BED header if present
         if let Some(bed_header) = Self::extract_bed_header_from_bam_header(&header) {
             writeln!(writer, "{}", bed_header)?;
