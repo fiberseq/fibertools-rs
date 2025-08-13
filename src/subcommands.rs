@@ -22,5 +22,9 @@ pub mod qc;
 pub mod strip_basemods;
 
 pub mod fiber_hmm;
+/// Create mock BAM from reference FASTA
+pub mod pg_inject;
+/// Add or strip panSN-spec prefixes from BAM contig names
+pub mod pg_pansn;
 
 pub mod validate;

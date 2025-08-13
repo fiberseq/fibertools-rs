@@ -33,9 +33,9 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     let mut bam = opts.bam.bam_reader();
 
     for fiber in opts.bam.fibers(&mut bam) {
-        let m6a_okay = !fiber.m6a.starts.is_empty();
-        let nuc_okay = !fiber.nuc.starts.is_empty();
-        n_fire_calls += fiber.msp.qual.iter().filter(|q| **q > 0).count();
+        let m6a_okay = !fiber.m6a.annotations.is_empty();
+        let nuc_okay = !fiber.nuc.annotations.is_empty();
+        n_fire_calls += fiber.msp.qual().iter().filter(|q| **q > 0).count();
 
         n_aligned += !fiber.record.is_unmapped() as usize;
         n_phased += fiber.record.aux(b"HP").is_ok() as usize;
