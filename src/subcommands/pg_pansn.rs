@@ -2,6 +2,9 @@ use crate::cli::PgPansnOptions;
 use anyhow::Result;
 use rust_htslib::bam::{self, Read};
 use std::collections::HashMap;
+use std::sync::Once;
+
+static ALIGNMENT_WARNING: Once = Once::new();
 
 /// Determine haplotype based on contig name and provided haplotype tags
 fn determine_haplotype(contig_name: &str, hap1_tag: &str, hap2_tag: &str) -> Option<u8> {
@@ -52,8 +55,17 @@ fn add_haplotype_tag(
     // Remove existing HP tag if present
     record.remove_aux(b"HP").unwrap_or(());
 
+    // warn one time if the reads are not primary alignments
+    if record.is_secondary() || record.is_supplementary() {
+        ALIGNMENT_WARNING.call_once(|| {
+            log::warn!(
+                "Secondary alignments will not be haplotagged. Supplementary alignments, may be tagged with a different HP value than the primary alignment.",
+            );
+        });
+    }
+
     // Only tag primary alignments with sufficient mapping quality
-    if !record.is_secondary() && !record.is_supplementary() && record.mapq() >= min_mapq {
+    if !record.is_secondary() && record.mapq() >= min_mapq {
         let tid = record.tid();
         if let Some(&Some(haplotype)) = haplotype_map.get(&tid) {
             record.push_aux(b"HP", bam::record::Aux::U8(haplotype))?;
