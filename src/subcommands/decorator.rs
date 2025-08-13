@@ -159,7 +159,7 @@ pub fn bed12_from_fiber(fiber: &FiberseqData) -> String {
     bed6 + &bed12
 }
 
-pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
+pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
     // hashmap with colors and empty vecs
     let mut map = std::collections::HashMap::new();
     for (_, color) in FIRE_COLORS.iter() {
@@ -200,7 +200,7 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator> {
     rtn
 }
 
-pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator>) {
+pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator<'_>>) {
     let m6a_starts = fiber.m6a.reference_starts();
     let cpg_starts = fiber.cpg.reference_starts();
     let nuc_starts = fiber.nuc.reference_starts();

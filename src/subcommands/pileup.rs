@@ -374,7 +374,7 @@ impl<'a> FireTrack<'a> {
         rolling_max
     }
 
-    pub fn row(&self, i: usize) -> FireRow {
+    pub fn row(&self, i: usize) -> FireRow<'_> {
         FireRow {
             score: &self.scores[i],
             coverage: &self.coverage[i],
