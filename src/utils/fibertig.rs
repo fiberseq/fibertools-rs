@@ -871,7 +871,6 @@ mod tests {
             split_size: 20, // Small split size to force splitting
             uncompressed: false,
             extract: false,
-            pansn_prefix: None,
         };
 
         // Test creating FiberTig with BED annotations
