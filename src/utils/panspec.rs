@@ -26,7 +26,14 @@ pub fn strip_pan_spec_header(header: &bam::Header, pan_spec_delimiter: &char) ->
             }
         }
     }
-    header_from_hashmap(hash_map)
+    let mut new_header = header_from_hashmap(hash_map);
+    
+    // Preserve comments from original header
+    for comment in header.comments() {
+        new_header.push_comment(comment.as_bytes());
+    }
+    
+    new_header
 }
 
 pub fn add_pan_spec_header(header: &bam::Header, pan_spec_prefix: &str) -> Header {
@@ -45,5 +52,12 @@ pub fn add_pan_spec_header(header: &bam::Header, pan_spec_prefix: &str) -> Heade
             }
         }
     }
-    header_from_hashmap(hash_map)
+    let mut new_header = header_from_hashmap(hash_map);
+    
+    // Preserve comments from original header
+    for comment in header.comments() {
+        new_header.push_comment(comment.as_bytes());
+    }
+    
+    new_header
 }

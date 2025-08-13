@@ -14,19 +14,24 @@ pub struct FiberTig {
 }
 
 impl FiberTig {
-    /// Read BED file and return a mapping from contig name to FiberAnnotations
+    /// Read BED file and return a mapping from contig name to FiberAnnotations and the header line if present
     fn read_bed_annotations(
         bed_path: &str,
         header_view: &HeaderView,
-    ) -> Result<HashMap<String, FiberAnnotations>> {
+    ) -> Result<(HashMap<String, FiberAnnotations>, Option<String>)> {
         use std::io::BufRead;
 
         let reader = bio_io::buffer_from(bed_path).context("Failed to open BED file")?;
         let mut contig_annotations: HashMap<String, Vec<FiberAnnotation>> = HashMap::new();
+        let mut bed_header: Option<String> = None;
 
         // Parse BED file line by line (simple approach)
-        for line in reader.lines() {
+        for (line_num, line) in reader.lines().enumerate() {
             let line = line?;
+            if line.starts_with('#') && line_num == 0 {
+                bed_header = Some(line);
+                continue;
+            }
             if line.starts_with('#') || line.trim().is_empty() {
                 continue; // Skip comments and empty lines
             }
@@ -91,7 +96,7 @@ impl FiberTig {
             fiber_annotations_map.insert(contig_name, fiber_annotations);
         }
 
-        Ok(fiber_annotations_map)
+        Ok((fiber_annotations_map, bed_header))
     }
 
     fn read_fasta_into_vec(fasta_path: &str) -> Result<Vec<(String, fasta::record::Record)>> {
@@ -124,6 +129,22 @@ impl FiberTig {
         }
 
         header
+    }
+
+    fn add_bed_header_comment(header: &mut Header, bed_header: &str) {
+        header.push_comment(format!("BED_HEADER:{}", bed_header).as_bytes());
+    }
+
+    fn extract_bed_header_from_bam_header(header: &Header) -> Option<String> {
+        let mut bed_header = None;
+        
+        for comment in header.comments() {
+            if comment.starts_with("BED_HEADER:") {
+                bed_header = Some(comment["BED_HEADER:".len()..].to_string());
+            }
+        }
+        
+        bed_header
     }
 
     fn create_bam_record(
@@ -410,12 +431,17 @@ impl FiberTig {
 
         // read the fasta
         let sequences = Self::read_fasta_into_vec(&opts.reference)?;
-        let header = Self::create_mock_bam_header_from_sequences(&sequences);
+        let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
         // If BED annotations are provided, read and apply them
         let records = if let Some(ref bed_path) = opts.bed {
-            let bed_annotations =
+            let (bed_annotations, bed_header) =
                 Self::read_bed_annotations(bed_path, &HeaderView::from_header(&header))
                     .context("Failed to read BED annotations")?;
+            
+            // Add bed header as comment if present
+            if let Some(ref bed_header_line) = bed_header {
+                Self::add_bed_header_comment(&mut header, bed_header_line);
+            }
 
             let mut records = Vec::new();
             // build the records around the annotations
@@ -492,6 +518,14 @@ impl FiberTig {
 
         // Get header view before iterating over records
         let header_view = reader.header().clone();
+        
+        // Convert HeaderView to Header for extracting bed header
+        let header = Header::from_template(&header_view);
+        
+        // Extract and write BED header if present
+        if let Some(bed_header) = Self::extract_bed_header_from_bam_header(&header) {
+            writeln!(writer, "{}", bed_header)?;
+        }
 
         // Read through BAM records and extract annotations
         for result in reader.records() {
@@ -630,7 +664,7 @@ mod tests {
         bed_file.flush()?;
 
         // Test reading BED annotations
-        let annotations =
+        let (annotations, _) =
             FiberTig::read_bed_annotations(bed_file.path().to_str().unwrap(), &header_view)?;
 
         // Verify annotations were parsed correctly
@@ -674,7 +708,7 @@ mod tests {
         bed_file.flush()?;
 
         // Test reading BED annotations - should sort automatically
-        let annotations =
+        let (annotations, _) =
             FiberTig::read_bed_annotations(bed_file.path().to_str().unwrap(), &header_view)?;
 
         let chr1_annotations = annotations.get("chr1").unwrap();
