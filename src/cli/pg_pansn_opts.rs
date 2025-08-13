@@ -28,7 +28,7 @@ pub struct PgPansnOptions {
     /// If both hap1-tag and hap2-tag are provided, reads will be tagged with HP based on contig names
     #[clap(short = '2', long = "hap2-tag")]
     pub hap2_tag: Option<String>,
-    /// The mapping quality must be greater than this value for haplotag assignment
+    /// The mapping quality must be greater than or equal to this value for haplotag assignment
     #[clap(short = 'q', long = "min-mapq", default_value = "0")]
     pub min_mapq: u8,
 }

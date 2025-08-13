@@ -53,7 +53,7 @@ fn add_haplotype_tag(
     record.remove_aux(b"HP").unwrap_or(());
 
     // Only tag primary alignments with sufficient mapping quality
-    if !record.is_secondary() && !record.is_supplementary() && record.mapq() > min_mapq {
+    if !record.is_secondary() && !record.is_supplementary() && record.mapq() >= min_mapq {
         let tid = record.tid();
         if let Some(&Some(haplotype)) = haplotype_map.get(&tid) {
             record.push_aux(b"HP", bam::record::Aux::U8(haplotype))?;
