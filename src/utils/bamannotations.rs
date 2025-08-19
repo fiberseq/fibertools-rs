@@ -93,8 +93,12 @@ impl FiberAnnotations {
             lift_query_range_exact(record, &starts, &starts)
         } else {
             lift_query_range(record, &starts, &ends)
-        }.unwrap_or_else(|e| {
-            log::error!("Failed lifting over annotations in BAM record: {:#?}", record.qname());
+        }
+        .unwrap_or_else(|e| {
+            log::error!(
+                "Failed lifting over annotations in BAM record: {:#?}",
+                record.qname()
+            );
             log::error!("Failed to lift query range: {}", e);
             panic!("Failed to lift query range: {}", e);
         });
