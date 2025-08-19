@@ -96,8 +96,8 @@ impl FiberAnnotations {
         }
         .unwrap_or_else(|e| {
             log::error!(
-                "Failed lifting over annotations in BAM record: {:#?}",
-                record.qname()
+                "Failed lifting over annotations in BAM record: {}",
+                String::from_utf8_lossy(record.qname())
             );
             log::error!("Failed to lift query range: {}", e);
             panic!("Failed to lift query range: {}", e);
