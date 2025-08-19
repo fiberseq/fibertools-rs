@@ -90,10 +90,14 @@ impl FiberAnnotations {
             .collect::<Vec<_>>();
 
         let (reference_starts, reference_ends, reference_lengths) = if single_bp_liftover {
-            lift_query_range_exact(record, &starts, &starts).unwrap()
+            lift_query_range_exact(record, &starts, &starts)
         } else {
-            lift_query_range(record, &starts, &ends).unwrap()
-        };
+            lift_query_range(record, &starts, &ends)
+        }.unwrap_or_else(|e| {
+            log::error!("Failed lifting over annotations in BAM record: {:#?}", record.qname());
+            log::error!("Failed to lift query range: {}", e);
+            panic!("Failed to lift query range: {}", e);
+        });
 
         // create annotations from parallel vectors
         let mut annotations: Vec<FiberAnnotation> = starts
