@@ -190,11 +190,8 @@ impl FiberTig {
 
         while anno_index < annotations.annotations.len() {
             let anno = &annotations.annotations[anno_index];
-            // Add the annotation to the current annotations
-            current_annotations.push(anno.clone());
-
-            // If the annotation ends after the current target end, we need to split
-            if anno.end >= current_target_end as i64 {
+            // If the annotation starts after the current target end, we need to split               
+            if anno.start >= current_target_end {
                 // Save the current split
                 split_to_annotations.push((
                     (current_start, anno.end),
@@ -211,14 +208,17 @@ impl FiberTig {
                 }
 
                 // Move to the next split
-                // next split should start at the min of the next annotation start and the current target end
-                current_start = std::cmp::min(
-                    annotations.annotations[anno_index + 1].start,
-                    current_target_end,
-                );
+                current_start = anno.start;
                 current_target_end = std::cmp::min(current_start + split_size, seq_len);
                 current_annotations.clear();
             }
+
+            // if the annotation ends after the current target end, we need to extend the target end
+            if anno.end > current_target_end {
+                current_target_end = anno.end;
+            }
+            // Add the annotation to the current annotations
+            current_annotations.push(anno.clone());         
             anno_index += 1;
         }
 
