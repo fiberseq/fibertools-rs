@@ -1,5 +1,6 @@
 use crate::utils::bamlift::*;
 use rust_htslib::bam;
+use rust_htslib::bam::ext::BamRecordExtensions;
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct FiberAnnotation {
@@ -98,8 +99,8 @@ impl FiberAnnotations {
             log::error!(
                 "Failed lifting over annotations in BAM record:\n{} {} {}",
                 String::from_utf8_lossy(record.qname()),
-                record.reference_start,
-                record.reference_end
+                record.reference_start(),
+                record.reference_end()
             );
             log::error!("Failed to lift query range: {}", e);
             panic!("Failed to lift query range: {}", e);
