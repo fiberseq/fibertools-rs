@@ -97,9 +97,9 @@ impl FiberAnnotations {
         }
         .unwrap_or_else(|e| {
             log::error!(
-                "Failed lifting over annotations in BAM record:\n{} {} {}",
+                "Failed lifting over annotations in BAM record: {} aligned from {} to {}.",
                 String::from_utf8_lossy(record.qname()),
-                record.reference_start(),
+                record.reference_start() + 1,
                 record.reference_end()
             );
             log::error!("Failed to lift query range: {}", e);
