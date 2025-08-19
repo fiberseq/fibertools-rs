@@ -194,18 +194,13 @@ impl FiberTig {
             if anno.start >= current_target_end {
                 // Save the current split
                 split_to_annotations.push((
-                    (current_start, anno.end),
+                    (current_start, current_target_end),
                     FiberAnnotations::from_annotations(
                         current_annotations.clone(),
                         seq_len,
                         false, // BED coordinates are always forward
                     ),
                 ));
-
-                // if we are the last annotation, we can stop
-                if anno_index == annotations.annotations.len() - 1 {
-                    break;
-                }
 
                 // Move to the next split
                 current_start = anno.start;
