@@ -90,9 +90,9 @@ impl FiberAnnotations {
             .collect::<Vec<_>>();
 
         let (reference_starts, reference_ends, reference_lengths) = if single_bp_liftover {
-            lift_query_range_exact(record, &starts, &starts)
+            lift_query_range_exact(record, &starts, &starts).unwrap()
         } else {
-            lift_query_range(record, &starts, &ends)
+            lift_query_range(record, &starts, &ends).unwrap()
         };
 
         // create annotations from parallel vectors

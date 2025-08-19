@@ -190,7 +190,7 @@ impl FiberTig {
 
         while anno_index < annotations.annotations.len() {
             let anno = &annotations.annotations[anno_index];
-            // If the annotation starts after the current target end, we need to split               
+            // If the annotation starts after the current target end, we need to split
             if anno.start >= current_target_end {
                 // Save the current split
                 split_to_annotations.push((
@@ -213,7 +213,7 @@ impl FiberTig {
                 current_target_end = anno.end;
             }
             // Add the annotation to the current annotations
-            current_annotations.push(anno.clone());         
+            current_annotations.push(anno.clone());
             anno_index += 1;
         }
 
