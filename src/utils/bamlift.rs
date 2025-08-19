@@ -170,11 +170,35 @@ fn lift_range(
 ) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     assert_eq!(starts.len(), ends.len());
 
-    // Lift starts (always sorted)
-    let ref_starts = if !lift_reference_to_query {
-        lift_reference_positions(aligned_block_pairs, starts)?
+    // Handle starts, which may or may not be sorted
+    let ref_starts = if is_sorted(starts) {
+        // Fast path: starts are sorted, lift normally
+        if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, starts)?
+        } else {
+            lift_query_positions(aligned_block_pairs, starts)?
+        }
     } else {
-        lift_query_positions(aligned_block_pairs, starts)?
+        // Slow path: starts are unsorted, need to sort starts independently
+        let mut start_indices: Vec<usize> = (0..starts.len()).collect();
+        start_indices.sort_by_key(|&i| starts[i]);
+
+        let sorted_starts: Vec<i64> = start_indices.iter().map(|&i| starts[i]).collect();
+
+        // Lift sorted starts
+        let lifted_starts = if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, &sorted_starts)?
+        } else {
+            lift_query_positions(aligned_block_pairs, &sorted_starts)?
+        };
+
+        // Restore original order for starts
+        let mut original_starts = vec![None; starts.len()];
+        for (sorted_idx, &original_idx) in start_indices.iter().enumerate() {
+            original_starts[original_idx] = lifted_starts[sorted_idx];
+        }
+
+        original_starts
     };
 
     // Handle ends, which may or may not be sorted
