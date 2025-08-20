@@ -161,6 +161,43 @@ pub fn lift_query_positions(
     liftover_closest(reference_positions, &aligned_block_pairs)
 }
 
+/// Helper function to lift positions that may or may not be sorted
+fn lift_positions_with_sort_handling(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    positions: &[i64],
+    lift_reference_to_query: bool,
+) -> Result<Vec<Option<i64>>> {
+    if is_sorted(positions) {
+        // Fast path: positions are sorted, lift normally
+        if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, positions)
+        } else {
+            lift_query_positions(aligned_block_pairs, positions)
+        }
+    } else {
+        // Slow path: positions are unsorted, need to sort positions independently
+        let mut indices: Vec<usize> = (0..positions.len()).collect();
+        indices.sort_by_key(|&i| positions[i]);
+
+        let sorted_positions: Vec<i64> = indices.iter().map(|&i| positions[i]).collect();
+
+        // Lift sorted positions
+        let lifted_positions = if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, &sorted_positions)?
+        } else {
+            lift_query_positions(aligned_block_pairs, &sorted_positions)?
+        };
+
+        // Restore original order
+        let mut original_positions = vec![None; positions.len()];
+        for (sorted_idx, &original_idx) in indices.iter().enumerate() {
+            original_positions[original_idx] = lifted_positions[sorted_idx];
+        }
+
+        Ok(original_positions)
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn lift_range(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
@@ -170,67 +207,9 @@ fn lift_range(
 ) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     assert_eq!(starts.len(), ends.len());
 
-    // Handle starts, which may or may not be sorted
-    let ref_starts = if is_sorted(starts) {
-        // Fast path: starts are sorted, lift normally
-        if !lift_reference_to_query {
-            lift_reference_positions(aligned_block_pairs, starts)?
-        } else {
-            lift_query_positions(aligned_block_pairs, starts)?
-        }
-    } else {
-        // Slow path: starts are unsorted, need to sort starts independently
-        let mut start_indices: Vec<usize> = (0..starts.len()).collect();
-        start_indices.sort_by_key(|&i| starts[i]);
-
-        let sorted_starts: Vec<i64> = start_indices.iter().map(|&i| starts[i]).collect();
-
-        // Lift sorted starts
-        let lifted_starts = if !lift_reference_to_query {
-            lift_reference_positions(aligned_block_pairs, &sorted_starts)?
-        } else {
-            lift_query_positions(aligned_block_pairs, &sorted_starts)?
-        };
-
-        // Restore original order for starts
-        let mut original_starts = vec![None; starts.len()];
-        for (sorted_idx, &original_idx) in start_indices.iter().enumerate() {
-            original_starts[original_idx] = lifted_starts[sorted_idx];
-        }
-
-        original_starts
-    };
-
-    // Handle ends, which may or may not be sorted
-    let ref_ends = if is_sorted(ends) {
-        // Fast path: ends are sorted, lift normally
-        if !lift_reference_to_query {
-            lift_reference_positions(aligned_block_pairs, ends)?
-        } else {
-            lift_query_positions(aligned_block_pairs, ends)?
-        }
-    } else {
-        // Slow path: ends are unsorted, need to sort ends independently
-        let mut end_indices: Vec<usize> = (0..ends.len()).collect();
-        end_indices.sort_by_key(|&i| ends[i]);
-
-        let sorted_ends: Vec<i64> = end_indices.iter().map(|&i| ends[i]).collect();
-
-        // Lift sorted ends
-        let lifted_ends = if !lift_reference_to_query {
-            lift_reference_positions(aligned_block_pairs, &sorted_ends)?
-        } else {
-            lift_query_positions(aligned_block_pairs, &sorted_ends)?
-        };
-
-        // Restore original order for ends
-        let mut original_ends = vec![None; ends.len()];
-        for (sorted_idx, &original_idx) in end_indices.iter().enumerate() {
-            original_ends[original_idx] = lifted_ends[sorted_idx];
-        }
-
-        original_ends
-    };
+    // Lift starts and ends using the helper function
+    let ref_starts = lift_positions_with_sort_handling(aligned_block_pairs, starts, lift_reference_to_query)?;
+    let ref_ends = lift_positions_with_sort_handling(aligned_block_pairs, ends, lift_reference_to_query)?;
 
     // Common logic for processing lifted positions
     assert_eq!(ref_starts.len(), ref_ends.len());
