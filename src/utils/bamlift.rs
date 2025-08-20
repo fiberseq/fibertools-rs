@@ -208,8 +208,10 @@ fn lift_range(
     assert_eq!(starts.len(), ends.len());
 
     // Lift starts and ends using the helper function
-    let ref_starts = lift_positions_with_sort_handling(aligned_block_pairs, starts, lift_reference_to_query)?;
-    let ref_ends = lift_positions_with_sort_handling(aligned_block_pairs, ends, lift_reference_to_query)?;
+    let ref_starts =
+        lift_positions_with_sort_handling(aligned_block_pairs, starts, lift_reference_to_query)?;
+    let ref_ends =
+        lift_positions_with_sort_handling(aligned_block_pairs, ends, lift_reference_to_query)?;
 
     // Common logic for processing lifted positions
     assert_eq!(ref_starts.len(), ref_ends.len());
