@@ -8,9 +8,15 @@ use std::sync::Once;
 static ALIGNMENT_WARNING: Once = Once::new();
 
 /// Copy header information from source BAM, excluding SQ and HD tags
+/// Also removes existing RG tags from target header before copying new ones
 fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) -> Result<()> {
     let source_reader = bio_io::bam_reader(source_bam_path);
     let source_header = bam::Header::from_template(source_reader.header());
+
+    // First, remove existing RG tags from target header to avoid conflicts
+    let mut target_hashmap = target_header.to_hashmap();
+    target_hashmap.remove("RG");
+    *target_header = crate::utils::bio_io::header_from_hashmap(target_hashmap);
 
     // Convert source header to hashmap to access individual record types
     let source_hashmap = source_header.to_hashmap();
@@ -34,7 +40,7 @@ fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) 
     }
 
     log::info!(
-        "Copied header records from '{}' (excluding SQ and HD tags)",
+        "Copied header records from '{}' (excluding SQ and HD tags), removed existing RG tags",
         source_bam_path
     );
     Ok(())
