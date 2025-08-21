@@ -31,4 +31,7 @@ pub struct PgPansnOptions {
     /// The mapping quality must be greater than or equal to this value for haplotag assignment
     #[clap(short = 'q', long = "min-mapq", default_value = "0")]
     pub min_mapq: u8,
+    /// BAM file to copy header from (excluding SQ and HD tags)
+    #[clap(short = 'c', long = "copy-header")]
+    pub copy_header: Option<String>,
 }

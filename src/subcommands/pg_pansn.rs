@@ -1,10 +1,44 @@
 use crate::cli::PgPansnOptions;
+use crate::utils::bio_io;
 use anyhow::Result;
 use rust_htslib::bam::{self, Read};
 use std::collections::HashMap;
 use std::sync::Once;
 
 static ALIGNMENT_WARNING: Once = Once::new();
+
+/// Copy header information from source BAM, excluding SQ and HD tags
+fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) -> Result<()> {
+    let source_reader = bio_io::bam_reader(source_bam_path);
+    let source_header = bam::Header::from_template(source_reader.header());
+
+    // Convert source header to hashmap to access individual record types
+    let source_hashmap = source_header.to_hashmap();
+
+    // Copy all header records except SQ (sequence dictionary) and HD (header) tags
+    for (record_type, records) in source_hashmap.iter() {
+        if record_type != "SQ" && record_type != "HD" {
+            for record in records.iter() {
+                let mut header_record = bam::header::HeaderRecord::new(record_type.as_bytes());
+                for (key, value) in record.iter() {
+                    header_record.push_tag(key.as_bytes(), value);
+                }
+                target_header.push_record(&header_record);
+            }
+        }
+    }
+
+    // Also copy comments from source header
+    for comment in source_header.comments() {
+        target_header.push_comment(comment.as_bytes());
+    }
+
+    log::info!(
+        "Copied header records from '{}' (excluding SQ and HD tags)",
+        source_bam_path
+    );
+    Ok(())
+}
 
 /// Determine haplotype based on contig name and provided haplotype tags
 fn determine_haplotype(contig_name: &str, hap1_tag: &str, hap2_tag: &str) -> Option<u8> {
@@ -75,12 +109,13 @@ fn add_haplotype_tag(
 }
 
 pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
-    // Validate that either prefix, strip, or both haplotype tags are provided
+    // Validate that either prefix, strip, both haplotype tags, or copy-header are provided
     let has_panspec_operation = opts.prefix.is_some() || opts.strip;
     let has_haplotag_operation = opts.hap1_tag.is_some() && opts.hap2_tag.is_some();
+    let has_copy_header_operation = opts.copy_header.is_some();
 
-    if !has_panspec_operation && !has_haplotag_operation {
-        anyhow::bail!("Either --prefix/--strip or both --hap1-tag and --hap2-tag must be provided");
+    if !has_panspec_operation && !has_haplotag_operation && !has_copy_header_operation {
+        anyhow::bail!("Either --prefix/--strip, both --hap1-tag and --hap2-tag, or --copy-header must be provided");
     }
 
     let mut reader = opts.input.bam_reader();
@@ -95,6 +130,13 @@ pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
             delimiter = opts.delimiter
         );
         opts.input.strip_pansn_spec(opts.delimiter);
+    }
+
+    // Copy header from source BAM if specified
+    if let Some(ref copy_header_path) = opts.copy_header {
+        let mut header = opts.input.header().clone();
+        copy_header_from_bam(&mut header, copy_header_path)?;
+        opts.input.header = Some(header);
     }
 
     // Build haplotype mapping if haplotag options are provided
