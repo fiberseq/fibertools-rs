@@ -1,4 +1,4 @@
-use crate::cli::GlobalOpts;
+use crate::cli::{GlobalOpts, PansnParameters};
 use clap::Args;
 use std::fmt::Debug;
 
@@ -24,4 +24,6 @@ pub struct PgInjectOptions {
     pub extract: bool,
     #[clap(flatten)]
     pub global: GlobalOpts,
+    #[clap(flatten)]
+    pub pansn: PansnParameters,
 }

@@ -1,4 +1,4 @@
-use crate::cli::PgPansnOptions;
+use crate::cli::{PansnParameters, PgPansnOptions};
 use crate::utils::bio_io;
 use anyhow::Result;
 use rust_htslib::bam::{self, Read};
@@ -48,110 +48,172 @@ fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) 
     Ok(())
 }
 
-/// Determine haplotype based on contig name and provided haplotype tags
-fn determine_haplotype(contig_name: &str, hap1_tag: &str, hap2_tag: &str) -> Option<u8> {
-    let has_hap1 = contig_name.contains(hap1_tag);
-    let has_hap2 = contig_name.contains(hap2_tag);
+/// Haplotype tagging utilities
+pub mod haplotype {
+    use super::*;
 
-    match (has_hap1, has_hap2) {
-        (true, false) => Some(1),
-        (false, true) => Some(2),
-        _ => None, // Either both or neither tag found
+    /// Determine haplotype based on contig name and provided haplotype tags
+    pub fn determine_haplotype(contig_name: &str, hap1_tag: &str, hap2_tag: &str) -> Option<u8> {
+        let has_hap1 = contig_name.contains(hap1_tag);
+        let has_hap2 = contig_name.contains(hap2_tag);
+
+        match (has_hap1, has_hap2) {
+            (true, false) => Some(1),
+            (false, true) => Some(2),
+            _ => None, // Either both or neither tag found
+        }
     }
-}
 
-/// Build a mapping of contig IDs to haplotype numbers, returning None if no haplotype tags provided
-fn build_haplotype_map(
-    header: &bam::Header,
-    hap1_tag: Option<&str>,
-    hap2_tag: Option<&str>,
-) -> Result<Option<HashMap<i32, Option<u8>>>> {
-    // Only build map if both haplotype tags are provided
-    if let (Some(hap1), Some(hap2)) = (hap1_tag, hap2_tag) {
-        log::info!("Building haplotype map with tags: '{hap1}' (hap1), '{hap2}' (hap2)");
-        let header_view = bam::HeaderView::from_header(header);
+    /// Build a mapping of contig IDs to haplotype numbers, returning None if no haplotype tags provided
+    pub fn build_haplotype_map(
+        header: &bam::Header,
+        hap1_tag: Option<&str>,
+        hap2_tag: Option<&str>,
+    ) -> Result<Option<HashMap<i32, Option<u8>>>> {
+        // Only build map if both haplotype tags are provided
+        if let (Some(hap1), Some(hap2)) = (hap1_tag, hap2_tag) {
+            log::info!("Building haplotype map with tags: '{hap1}' (hap1), '{hap2}' (hap2)");
+            let header_view = bam::HeaderView::from_header(header);
 
-        let mut map = HashMap::new();
-        for i in 0..header_view.target_count() {
-            let contig_name = std::str::from_utf8(header_view.target_names()[i as usize])
-                .map_err(|e| anyhow::anyhow!("Invalid contig name: {}", e))?;
-            let haplotype = determine_haplotype(contig_name, hap1, hap2);
-            map.insert(i as i32, haplotype);
+            let mut map = HashMap::new();
+            for i in 0..header_view.target_count() {
+                let contig_name = std::str::from_utf8(header_view.target_names()[i as usize])
+                    .map_err(|e| anyhow::anyhow!("Invalid contig name: {}", e))?;
+                let haplotype = determine_haplotype(contig_name, hap1, hap2);
+                map.insert(i as i32, haplotype);
 
-            if let Some(hp) = haplotype {
-                log::debug!("Contig '{contig_name}' -> haplotype {hp}");
+                if let Some(hp) = haplotype {
+                    log::debug!("Contig '{contig_name}' -> haplotype {hp}");
+                }
+            }
+            Ok(Some(map))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Add haplotype tag to a BAM record if conditions are met
+    pub fn add_haplotype_tag(
+        record: &mut bam::Record,
+        haplotype_map: &HashMap<i32, Option<u8>>,
+        min_mapq: u8,
+    ) -> Result<()> {
+        // Remove existing HP tag if present
+        record.remove_aux(b"HP").unwrap_or(());
+
+        // warn one time if the reads are not primary alignments
+        if record.is_secondary() || record.is_supplementary() {
+            super::ALIGNMENT_WARNING.call_once(|| {
+                log::warn!(
+                    "Secondary alignments will not be haplotagged. Supplementary alignments, may be tagged with a different HP value than the primary alignment.",
+                );
+            });
+        }
+
+        // Only tag primary alignments with sufficient mapping quality
+        if !record.is_secondary() && record.mapq() >= min_mapq {
+            let tid = record.tid();
+            if let Some(&Some(haplotype)) = haplotype_map.get(&tid) {
+                record.push_aux(b"HP", bam::record::Aux::U8(haplotype))?;
             }
         }
-        Ok(Some(map))
-    } else {
-        Ok(None)
+        Ok(())
     }
 }
 
-/// Add haplotype tag to a BAM record if conditions are met
-fn add_haplotype_tag(
-    record: &mut bam::Record,
-    haplotype_map: &HashMap<i32, Option<u8>>,
-    min_mapq: u8,
-) -> Result<()> {
-    // Remove existing HP tag if present
-    record.remove_aux(b"HP").unwrap_or(());
-
-    // warn one time if the reads are not primary alignments
-    if record.is_secondary() || record.is_supplementary() {
-        ALIGNMENT_WARNING.call_once(|| {
-            log::warn!(
-                "Secondary alignments will not be haplotagged. Supplementary alignments, may be tagged with a different HP value than the primary alignment.",
-            );
-        });
-    }
-
-    // Only tag primary alignments with sufficient mapping quality
-    if !record.is_secondary() && record.mapq() >= min_mapq {
-        let tid = record.tid();
-        if let Some(&Some(haplotype)) = haplotype_map.get(&tid) {
-            record.push_aux(b"HP", bam::record::Aux::U8(haplotype))?;
+/// Strip panSN-spec information from a single contig name using the specified delimiter
+pub fn strip_pansn_from_contig_name(contig_name: &str, delimiter: char) -> String {
+    let mut del_count = 0;
+    let mut new_name = String::new();
+    for char in contig_name.chars() {
+        if del_count >= 2 {
+            new_name.push(char);
+        } else if char == delimiter {
+            del_count += 1;
         }
     }
+    new_name
+}
+
+/// Apply panSN transformations to a header based on PansnParameters
+pub fn apply_pansn_transformations(
+    header: &mut bam::Header,
+    params: &PansnParameters,
+) -> Result<()> {
+    // Apply panSN prefix or strip operations
+    if let Some(ref prefix) = params.prefix {
+        log::info!("Adding panSN-spec prefix: {prefix}");
+        let mut header_hashmap = header.to_hashmap();
+        for (key, value) in header_hashmap.iter_mut() {
+            if key.eq("SQ") {
+                for sn_line in value.iter_mut() {
+                    let name = sn_line
+                        .get_mut("SN")
+                        .expect("SN tag not found within an @SQ line");
+                    let mut new_name = String::new();
+                    new_name.push_str(prefix);
+                    new_name.push_str(name);
+                    name.clear();
+                    name.push_str(&new_name);
+                }
+            }
+        }
+        *header = crate::utils::bio_io::header_from_hashmap(header_hashmap);
+    } else if params.strip {
+        log::info!(
+            "Stripping panSN-spec with delimiter: {delimiter}",
+            delimiter = params.delimiter
+        );
+        let mut header_hashmap = header.to_hashmap();
+        for (key, value) in header_hashmap.iter_mut() {
+            if key.eq("SQ") {
+                for sn_line in value.iter_mut() {
+                    let name = sn_line
+                        .get_mut("SN")
+                        .expect("SN tag not found within an @SQ line");
+                    let mut del_count = 0;
+                    let mut new_name = String::new();
+                    for char in name.chars() {
+                        if del_count >= 2 {
+                            new_name.push(char);
+                        } else if char == params.delimiter {
+                            del_count += 1;
+                        }
+                    }
+                    name.clear();
+                    name.push_str(&new_name);
+                }
+            }
+        }
+        *header = crate::utils::bio_io::header_from_hashmap(header_hashmap);
+    }
+
+    // Copy header from source BAM if specified
+    if let Some(ref copy_header_path) = params.copy_header {
+        copy_header_from_bam(header, copy_header_path)?;
+    }
+
     Ok(())
 }
 
 pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
-    // Validate that either prefix, strip, both haplotype tags, or copy-header are provided
-    let has_panspec_operation = opts.prefix.is_some() || opts.strip;
-    let has_haplotag_operation = opts.hap1_tag.is_some() && opts.hap2_tag.is_some();
-    let has_copy_header_operation = opts.copy_header.is_some();
-
-    if !has_panspec_operation && !has_haplotag_operation && !has_copy_header_operation {
+    // Validate that some operation is provided
+    if !opts.pansn.has_operations() {
         anyhow::bail!("Either --prefix/--strip, both --hap1-tag and --hap2-tag, or --copy-header must be provided");
     }
 
     let mut reader = opts.input.bam_reader();
 
-    // Apply the requested panSN transformations
-    if let Some(ref prefix) = opts.prefix {
-        log::info!("Adding panSN-spec prefix: {prefix}");
-        opts.input.add_pansn_prefix(prefix);
-    } else if opts.strip {
-        log::info!(
-            "Stripping panSN-spec with delimiter: {delimiter}",
-            delimiter = opts.delimiter
-        );
-        opts.input.strip_pansn_spec(opts.delimiter);
-    }
-
-    // Copy header from source BAM if specified
-    if let Some(ref copy_header_path) = opts.copy_header {
-        let mut header = opts.input.header().clone();
-        copy_header_from_bam(&mut header, copy_header_path)?;
-        opts.input.header = Some(header);
-    }
+    // Apply panSN transformations to header
+    let mut header = opts.input.header().clone();
+    apply_pansn_transformations(&mut header, &opts.pansn)?;
+    opts.input.header = Some(header);
 
     // Build haplotype mapping if haplotag options are provided
-    let haplotype_map = build_haplotype_map(
+    let haplotype_map = haplotype::build_haplotype_map(
         &opts.input.header(),
-        opts.hap1_tag.as_deref(),
-        opts.hap2_tag.as_deref(),
+        opts.pansn.hap1_tag.as_deref(),
+        opts.pansn.hap2_tag.as_deref(),
     )?;
 
     // Create writer with the modified header
@@ -162,7 +224,7 @@ pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
 
         // Add haplotype tag if haplotag mapping is available
         if let Some(ref hap_map) = haplotype_map {
-            add_haplotype_tag(&mut record, hap_map, opts.min_mapq)?;
+            haplotype::add_haplotype_tag(&mut record, hap_map, opts.pansn.min_mapq)?;
         }
 
         bio_io::write_record(&mut writer, &record)?;
