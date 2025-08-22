@@ -98,6 +98,39 @@ pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
     }
 }
 
+/// write a BAM record, but don't error on broken pipes
+pub fn write_record(writer: &mut bam::Writer, record: &bam::Record) -> anyhow::Result<()> {
+    match writer.write(record) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            // Check for the specific WriteRecord error that indicates broken pipe
+            if matches!(err, rust_htslib::errors::Error::WriteRecord) {
+                let error_msg = err.to_string();
+                if error_msg.contains("failed to write BAM/BCF record (out of disk space?)") {
+                    exit(0);
+                }
+            }
+
+            // Convert to anyhow error first to access the error chain
+            let anyhow_err: anyhow::Error = err.into();
+
+            // Also check for actual BrokenPipe IO errors in the error chain
+            let mut current_err = anyhow_err.source();
+            while let Some(err) = current_err {
+                if let Some(io_err) = err.downcast_ref::<io::Error>() {
+                    if io_err.kind() == io::ErrorKind::BrokenPipe {
+                        exit(0);
+                    }
+                }
+                current_err = err.source();
+            }
+
+            // For all other errors, return them normally
+            Err(anyhow_err)
+        }
+    }
+}
+
 /// a reader that can read compressed files but also stdin (indicated by -)
 /// ```
 /// use fibertools_rs::utils::bio_io::buffer_from;

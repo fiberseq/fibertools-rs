@@ -593,7 +593,7 @@ impl FiberTig {
 
         // Write records one at a time to avoid large buffer flushes
         for record in &self.records {
-            writer.write(record)?;
+            crate::utils::bio_io::write_record(&mut writer, record)?;
         }
         Ok(())
     }

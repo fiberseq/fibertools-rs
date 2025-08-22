@@ -165,7 +165,7 @@ pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
             add_haplotype_tag(&mut record, hap_map, opts.min_mapq)?;
         }
 
-        writer.write(&record)?;
+        bio_io::write_record(&mut writer, &record)?;
     }
 
     Ok(())
