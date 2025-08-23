@@ -158,7 +158,7 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
 
 /// Check if vg binary exists and is executable
 fn which_vg(vg_binary: &str) -> Result<()> {
-    cmd!(vg_binary, "--version")
+    cmd!(vg_binary, "help")
         .stdout_null()
         .stderr_null()
         .run()
