@@ -13,6 +13,9 @@ mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
 mod nucleosome_opts;
+mod pg_inject_opts;
+mod pg_lift_opts;
+mod pg_pansn_opts;
 mod pileup_opts;
 mod predict_opts;
 mod qc_opts;
@@ -29,6 +32,9 @@ pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
 pub use nucleosome_opts::*;
+pub use pg_inject_opts::*;
+pub use pg_lift_opts::*;
+pub use pg_pansn_opts::*;
 pub use pileup_opts::*;
 pub use predict_opts::*;
 pub use qc_opts::*;
@@ -137,6 +143,15 @@ pub enum Commands {
     FiberHmm(FiberHmmOptions),
     /// Validate a Fiber-seq BAM file for m6A, nucleosome, and optionally FIRE calls
     Validate(ValidateOptions),
+    /// Create a mock BAM file from a reference FASTA with perfectly aligned sequences
+    #[clap(name = "pg-inject")]
+    PgInject(PgInjectOptions),
+    /// Lift annotations through a pangenome graph from source to target coordinates
+    #[clap(name = "pg-lift")]
+    PgLift(PgLiftOptions),
+    /// Add or strip panSN-spec prefixes from BAM contig names
+    #[clap(name = "pg-pansn")]
+    PgPansn(PgPansnOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),
