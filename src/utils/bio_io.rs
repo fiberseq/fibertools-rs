@@ -453,26 +453,29 @@ pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, St
 ///
 /// * String representation of the header including any comments
 pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
-    // Create a Header from the HeaderView to access comments
+    // Use HeaderView directly to get the complete header bytes (includes HD line and all content)
+    let header_bytes = header_view.as_bytes();
+    let header_string = String::from_utf8_lossy(header_bytes).to_string();
+    
+    // Create a Header from the HeaderView to access comments if needed
     let header = bam::Header::from_template(header_view);
-
-    // Convert header to bytes and then to string
-    let header_bytes = header.to_bytes();
-    let mut header_string = String::from_utf8_lossy(&header_bytes).to_string();
-
-    // Add comments if they exist
+    
+    // Check if there are additional comments that might not be in the header bytes
     let comment_strings = header
         .comments()
         .map(|c| c.to_string())
         .collect::<Vec<_>>()
         .join("\n");
 
-    if !comment_strings.is_empty() {
-        header_string.push_str(&comment_strings);
-        header_string.push('\n');
+    if !comment_strings.is_empty() && !header_string.contains(&comment_strings) {
+        // Only add comments if they're not already in the header string
+        let mut complete_header = header_string;
+        complete_header.push_str(&comment_strings);
+        complete_header.push('\n');
+        complete_header
+    } else {
+        header_string
     }
-
-    header_string
 }
 
 /// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.
