@@ -455,23 +455,23 @@ pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, St
 pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
     // Create a Header from the HeaderView to access comments
     let header = bam::Header::from_template(header_view);
-    
+
     // Convert header to bytes and then to string
     let header_bytes = header.to_bytes();
     let mut header_string = String::from_utf8_lossy(&header_bytes).to_string();
-    
+
     // Add comments if they exist
     let comment_strings = header
         .comments()
         .map(|c| c.to_string())
         .collect::<Vec<_>>()
         .join("\n");
-    
+
     if !comment_strings.is_empty() {
         header_string.push_str(&comment_strings);
         header_string.push('\n');
     }
-    
+
     header_string
 }
 
