@@ -50,18 +50,6 @@ fn validate_pipeline_requirements(opts: &PgLiftOptions) -> Result<()> {
         ));
     }
 
-    // 3. Check output directory is writable (if not stdout)
-    if opts.out != "-" {
-        if let Some(parent) = std::path::Path::new(&opts.out).parent() {
-            if !parent.exists() {
-                return Err(anyhow::anyhow!(
-                    "Output directory does not exist: {}",
-                    parent.display()
-                ));
-            }
-        }
-    }
-
     log::info!("✓ All pipeline requirements validated");
     Ok(())
 }
@@ -73,21 +61,33 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
     let vg_threads_str = opts.vg_threads.to_string();
     let delimiter_str = opts.delimiter.to_string();
 
+    // Create temporary file for header transfer between first and final commands
+    let temp_header_file =
+        tempfile::NamedTempFile::new().context("Failed to create temporary header file")?;
+    let temp_header_path = temp_header_file.path().to_string_lossy().to_string();
+
     // Create the first command based on input type
     let first_cmd = if opts.bam {
-        log::info!("Running BAM pipeline: pg-pansn --prefix | vg inject | vg surject | pg-inject --extract");
+        log::info!(
+            "Running BAM pipeline: pg-pansn --prefix | vg inject | vg surject | pg-pansn --strip"
+        );
+        // Always use uncompressed for intermediate pipe and write header to temp file
         cmd!(
             std::env::current_exe()?,
             "pg-pansn",
             &opts.input,
             "--prefix",
             &opts.prefix,
+            "--uncompressed",
+            "--header-out",
+            &temp_header_path
         )
     } else {
         log::info!(
             "Running BED pipeline: pg-inject | vg inject | vg surject | pg-inject --extract"
         );
-        let mut pg_inject_args = vec![
+        // Always use uncompressed for intermediate pipes and write header to temp file
+        let pg_inject_args = vec![
             "pg-inject",
             &opts.reference,
             "--prefix",
@@ -96,11 +96,10 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
             &split_size_str,
             "--bed",
             &opts.input,
+            "--uncompressed", // Always uncompressed for intermediate pipes
+            "--header-out",
+            &temp_header_path,
         ];
-
-        if opts.uncompressed {
-            pg_inject_args.push("--uncompressed");
-        }
 
         cmd(std::env::current_exe()?, pg_inject_args)
     };
@@ -132,24 +131,44 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
         "-" // Read from stdin
     );
 
-    // Last command is always pg-inject --extract (works for both BAM and BED output)
-    let pg_extract_cmd = cmd!(
-        std::env::current_exe()?,
-        "pg-inject",
-        "-", // Read from stdin
-        "--extract",
-        "--strip",
-        "--delimiter",
-        &delimiter_str,
-        "--out",
-        &opts.out,
-    );
+    // Final command depends on input type - always use uncompressed for final BAM output
+    let final_cmd = if opts.bam {
+        // For BAM input, use pg-pansn --strip with uncompressed output
+        cmd!(
+            std::env::current_exe()?,
+            "pg-pansn",
+            "-", // Read from stdin
+            "--strip",
+            "--delimiter",
+            &delimiter_str,
+            "--out",
+            &opts.out,
+            "--copy-header",
+            &temp_header_path,
+            "--uncompressed"
+        )
+    } else {
+        // For BED input, use pg-inject --extract (BED output is always uncompressed text)
+        cmd!(
+            std::env::current_exe()?,
+            "pg-inject",
+            "-", // Read from stdin
+            "--extract",
+            "--strip",
+            "--delimiter",
+            &delimiter_str,
+            "--out",
+            &opts.out,
+            "--copy-header",
+            &temp_header_path
+        )
+    };
 
     // Execute the complete pipeline
     let pipeline = first_cmd
         .pipe(vg_inject_cmd)
         .pipe(vg_surject_cmd)
-        .pipe(pg_extract_cmd);
+        .pipe(final_cmd);
 
     pipeline.run().context("Failed to execute pipeline")?;
 

@@ -600,6 +600,13 @@ impl FiberTig {
                 .context("Failed to set uncompressed BAM")?;
         }
 
+        // Write header to separate file if requested
+        if let Some(header_out) = &opts.header_out {
+            // write the header to the specified file
+            let mut header_writer = crate::utils::bio_io::writer(header_out)?;
+            header_writer.write_all(writer.header().as_bytes())?;
+        }
+
         // Write records one at a time to avoid large buffer flushes
         for record in &self.records {
             crate::utils::bio_io::write_record(&mut writer, record)?;

@@ -22,6 +22,9 @@ pub struct PgInjectOptions {
     /// Extract BED annotations from an annotated BAM file (reverses injection)
     #[clap(short, long)]
     pub extract: bool,
+    /// Additionally write the output BAM header to this file
+    #[clap(long)]
+    pub header_out: Option<String>,
     #[clap(flatten)]
     pub global: GlobalOpts,
     #[clap(flatten)]

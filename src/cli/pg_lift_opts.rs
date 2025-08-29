@@ -26,7 +26,7 @@ pub struct PgLiftOptions {
     #[clap(long)]
     pub target: String,
     /// Split contigs into multiple BAM records every N base pairs for graph injection
-    #[clap(long, default_value_t = 10_000)]
+    #[clap(long, default_value_t = 100_000)]
     pub split_size: usize,
     /// Number of threads to use for vg operations
     #[clap(long, default_value_t = 16)]
@@ -37,9 +37,6 @@ pub struct PgLiftOptions {
     /// Delimiter character to use when stripping panSN-spec (default: '#')
     #[clap(short, long, default_value = "#")]
     pub delimiter: char,
-    /// Uncompressed BAM output for intermediate processing (default: compressed)
-    #[clap(short, long)]
-    pub uncompressed: bool,
     /// Keep intermediate files for debugging
     #[clap(long)]
     pub keep_intermediate: bool,

@@ -63,6 +63,9 @@ pub struct PgPansnOptions {
     /// Output BAM file
     #[clap(default_value = "-")]
     pub out: String,
+    /// Additionally write the output BAM header to this file
+    #[clap(long)]
+    pub header_out: Option<String>,
     #[clap(flatten)]
     pub pansn: PansnParameters,
 }
