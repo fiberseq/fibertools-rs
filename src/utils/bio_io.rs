@@ -443,6 +443,38 @@ pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, St
     header
 }
 
+/// Convert a BAM header to a string representation including comments
+///
+/// # Arguments
+///
+/// * `header_view` - The BAM HeaderView to convert
+///
+/// # Returns
+///
+/// * String representation of the header including any comments
+pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
+    // Create a Header from the HeaderView to access comments
+    let header = bam::Header::from_template(header_view);
+    
+    // Convert header to bytes and then to string
+    let header_bytes = header.to_bytes();
+    let mut header_string = String::from_utf8_lossy(&header_bytes).to_string();
+    
+    // Add comments if they exist
+    let comment_strings = header
+        .comments()
+        .map(|c| c.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    
+    if !comment_strings.is_empty() {
+        header_string.push_str(&comment_strings);
+        header_string.push('\n');
+    }
+    
+    header_string
+}
+
 /// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.
 ///
 /// # Arguments

@@ -224,7 +224,8 @@ pub fn run_pg_pansn(opts: &mut PgPansnOptions) -> Result<()> {
     if let Some(header_out) = &opts.header_out {
         // write the header to the specified file
         let mut header_writer = bio_io::writer(header_out)?;
-        header_writer.write_all(writer.header().as_bytes())?;
+        let header_string = bio_io::bam_header_to_string(writer.header());
+        header_writer.write_all(header_string.as_bytes())?;
         log::info!("BAM header written to: {}", header_out);
     }
 
