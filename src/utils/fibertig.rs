@@ -507,6 +507,7 @@ impl FiberTig {
 
         // Open the BAM file (using the reference field as the input BAM)
         let mut reader = bio_io::bam_reader(&opts.reference);
+        // TODO copy the input header if provided
 
         // Open output file for BED data
         let mut writer = bio_io::writer(&opts.out)?;
