@@ -602,7 +602,10 @@ impl FiberTig {
 
         // Write header to separate file if requested
         if let Some(header_out) = &opts.header_out {
-            log::info!("self header\n{}", self.header().to_string());
+            log::info!(
+                "self header\n{}",
+                String::from_utf8_lossy(&self.header().to_bytes())
+            );
             // write the header to the specified file
             let mut header_writer = crate::utils::bio_io::writer(header_out)?;
             let header_string = crate::utils::bio_io::bam_header_to_string(writer.header());
