@@ -1,4 +1,5 @@
 use crate::cli::PgInjectOptions;
+use crate::subcommands::pg_pansn;
 pub use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
 use crate::utils::bio_io;
 use anyhow::{Context, Result};
@@ -507,16 +508,12 @@ impl FiberTig {
 
         // Open the BAM file (using the reference field as the input BAM)
         let mut reader = bio_io::bam_reader(&opts.reference);
-        // TODO copy the input header if provided
+        let mut header = Header::from_template(&reader.header());
+        pg_pansn::apply_pansn_transformations(&mut header, &opts.pansn)?;
+        let header_view = HeaderView::from_header(&header);
 
         // Open output file for BED data
         let mut writer = bio_io::writer(&opts.out)?;
-
-        // Get header view before iterating over records
-        let header_view = reader.header().clone();
-
-        // Convert HeaderView to Header for extracting bed header
-        let header = Header::from_template(&header_view);
 
         // Extract and write BED header if present
         if let Some(bed_header) = Self::extract_bed_header_from_bam_header(&header) {
@@ -540,16 +537,8 @@ impl FiberTig {
                 Some(b"fa"), // feature annotations
             )? {
                 // Get contig name from header
-                let mut contig_name =
+                let contig_name =
                     std::str::from_utf8(header_view.tid2name(record.tid() as u32))?.to_string();
-
-                // Apply panSN strip if enabled
-                if opts.pansn.strip {
-                    contig_name = crate::subcommands::pg_pansn::strip_pansn_from_contig_name(
-                        &contig_name,
-                        opts.pansn.delimiter,
-                    );
-                }
 
                 // Write each annotation as a BED line
                 for annotation in &fiber_annotations.annotations {

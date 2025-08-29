@@ -10,7 +10,7 @@ static ALIGNMENT_WARNING: Once = Once::new();
 
 /// Copy header information from source BAM, excluding SQ and HD tags
 /// Also removes existing RG tags from target header if source has RG tags to copy
-fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) -> Result<()> {
+pub fn copy_header_from_bam(target_header: &mut bam::Header, source_bam_path: &str) -> Result<()> {
     let source_reader = bio_io::bam_reader(source_bam_path);
     let source_header = bam::Header::from_template(source_reader.header());
 
