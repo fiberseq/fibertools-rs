@@ -453,29 +453,51 @@ pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, St
 ///
 /// * String representation of the header including any comments
 pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
-    // Use HeaderView directly to get the complete header bytes (includes HD line and all content)
-    let header_bytes = header_view.as_bytes();
-    let header_string = String::from_utf8_lossy(header_bytes).to_string();
-    
-    // Create a Header from the HeaderView to access comments if needed
+    // Create a Header from the HeaderView to access full functionality
     let header = bam::Header::from_template(header_view);
     
-    // Check if there are additional comments that might not be in the header bytes
-    let comment_strings = header
-        .comments()
-        .map(|c| c.to_string())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    if !comment_strings.is_empty() && !header_string.contains(&comment_strings) {
-        // Only add comments if they're not already in the header string
-        let mut complete_header = header_string;
-        complete_header.push_str(&comment_strings);
-        complete_header.push('\n');
-        complete_header
-    } else {
-        header_string
+    // Use to_hashmap to get structured header data
+    let header_hashmap = header.to_hashmap();
+    
+    let mut header_lines = Vec::new();
+    
+    // Process header records in a specific order: HD first, then SQ, then others
+    let record_order = ["HD", "SQ", "RG", "PG", "CO"];
+    
+    for record_type in &record_order {
+        if let Some(records) = header_hashmap.get(*record_type) {
+            for record in records {
+                let mut line = format!("@{}", record_type);
+                for (key, value) in record {
+                    line.push_str(&format!("\t{}:{}", key, value));
+                }
+                header_lines.push(line);
+            }
+        }
     }
+    
+    // Add any remaining record types not in the standard order
+    for (record_type, records) in &header_hashmap {
+        if !record_order.contains(&record_type.as_str()) {
+            for record in records {
+                let mut line = format!("@{}", record_type);
+                for (key, value) in record {
+                    line.push_str(&format!("\t{}:{}", key, value));
+                }
+                header_lines.push(line);
+            }
+        }
+    }
+    
+    // Add comments
+    for comment in header.comments() {
+        header_lines.push(format!("@CO\t{}", comment));
+    }
+    
+    // Join all lines with newlines and add final newline
+    let mut result = header_lines.join("\n");
+    result.push('\n');
+    result
 }
 
 /// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.
