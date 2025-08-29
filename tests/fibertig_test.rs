@@ -297,6 +297,7 @@ fn test_inject_with_bed_annotations() -> Result<()> {
         split_size: 20, // Small split size to force splitting
         uncompressed: false,
         extract: false,
+        header_out: None,
         pansn: PansnParameters::default(),
     };
 
@@ -393,6 +394,7 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
         split_size: 100_000, // Large split size to avoid splitting
         uncompressed: false,
         extract: false,
+        header_out: None,
         pansn: PansnParameters::default(),
     };
 
@@ -410,6 +412,7 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
         split_size: 100_000,
         uncompressed: false,
         extract: true,
+        header_out: None,
         pansn: PansnParameters {
             strip: true,
             delimiter: '#',
