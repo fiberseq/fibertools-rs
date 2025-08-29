@@ -65,6 +65,7 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
     let temp_header_file =
         tempfile::NamedTempFile::new().context("Failed to create temporary header file")?;
     let temp_header_path = temp_header_file.path().to_string_lossy().to_string();
+    log::info!("Using temporary header file: {}", temp_header_path);
 
     // Create the first command based on input type
     let first_cmd = if opts.bam {
