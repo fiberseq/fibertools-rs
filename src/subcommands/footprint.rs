@@ -157,16 +157,16 @@ impl<'a> Footprint<'a> {
             let mut msp_qual = -1;
             for msp in &fiber.msp {
                 // skip if there is no mapping of the msp
-                match msp.4 {
-                    Some((rs, re, _rl)) => {
+                match (msp.reference_start, msp.reference_end, msp.reference_length) {
+                    (Some(rs), Some(re), Some(_rl)) => {
                         if self.motif.spans(rs, re) {
                             self.n_spanning_msps += 1;
                             has_spanning_msp = true;
-                            msp_qual = msp.3 as i16;
+                            msp_qual = msp.qual as i16;
                             break;
                         }
                     }
-                    None => continue,
+                    _ => continue,
                 }
             }
             self.has_spanning_msp.push(has_spanning_msp);
@@ -179,15 +179,15 @@ impl<'a> Footprint<'a> {
         for fiber in self.fibers.iter() {
             let mut has_overlapping_nucleosome = false;
             for nuc in &fiber.nuc {
-                match nuc.4 {
-                    Some((rs, re, _rl)) => {
+                match (nuc.reference_start, nuc.reference_end, nuc.reference_length) {
+                    (Some(rs), Some(re), Some(_rl)) => {
                         if self.motif.overlaps(rs, re) {
                             self.n_overlapping_nucs += 1;
                             has_overlapping_nucleosome = true;
                             break;
                         }
                     }
-                    None => continue,
+                    _ => continue,
                 }
             }
             self.has_overlapping_nucleosome
@@ -209,7 +209,7 @@ impl<'a> Footprint<'a> {
         // make a binary vector over the motif indicating the presence of an m6a
         let mut m6a_vec = vec![false; motif_end];
 
-        for m6a in fiber.m6a.reference_starts.iter().flatten() {
+        for m6a in fiber.m6a.reference_starts().iter().flatten() {
             if m6a < &self.motif.start {
                 continue;
             }

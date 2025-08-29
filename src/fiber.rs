@@ -2,7 +2,7 @@ use super::subcommands::center::CenterPosition;
 use super::subcommands::center::CenteredFiberData;
 use super::utils::input_bam::FiberFilters;
 use super::*;
-use crate::utils::bamranges::*;
+use crate::utils::bamannotations::*;
 use crate::utils::basemods::BaseMods;
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
@@ -147,45 +147,6 @@ impl FiberseqData {
         }
     }
 
-    //
-    //  CENTERING FUNCTIONS
-    //
-
-    /// Center positions on the read around the reference position.
-    fn apply_offset(positions: &mut [Option<i64>], offset: i64, strand: char) {
-        for pos in positions.iter_mut().flatten() {
-            // bp is unaligned
-            if *pos == -1 {
-                *pos = i64::MIN;
-                continue;
-            }
-            // else
-            *pos -= offset;
-            if strand == '-' {
-                *pos = -*pos;
-            }
-        }
-        if strand == '-' {
-            positions.reverse();
-        }
-    }
-
-    /// Center ranges on the read around the reference position.
-    fn offset_range(
-        starts: &mut [Option<i64>],
-        ends: &mut [Option<i64>],
-        offset: i64,
-        strand: char,
-    ) {
-        FiberseqData::apply_offset(starts, offset, strand);
-        FiberseqData::apply_offset(ends, offset, strand);
-        for (start, end) in starts.iter_mut().zip(ends.iter_mut()) {
-            if start > end {
-                std::mem::swap(start, end);
-            }
-        }
-    }
-
     /// Center all coordinates on the read using the offset attribute.
     pub fn center(&self, center_position: &CenterPosition) -> Option<Self> {
         // setup new fiberseq data object to return
@@ -193,57 +154,45 @@ impl FiberseqData {
         let (ref_offset, mol_offset) =
             CenteredFiberData::find_offsets(&self.record, center_position);
 
-        // move basemods
-        FiberseqData::apply_offset(&mut new.m6a.starts, mol_offset, center_position.strand);
-        FiberseqData::apply_offset(
-            &mut new.m6a.reference_starts,
-            ref_offset,
-            center_position.strand,
-        );
-        FiberseqData::apply_offset(&mut new.cpg.starts, mol_offset, center_position.strand);
-        FiberseqData::apply_offset(
-            &mut new.cpg.reference_starts,
-            ref_offset,
-            center_position.strand,
-        );
-        // move ranges
-        FiberseqData::offset_range(
-            &mut new.msp.starts,
-            &mut new.msp.ends,
-            mol_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.msp.reference_starts,
-            &mut new.msp.reference_ends,
-            ref_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.nuc.starts,
-            &mut new.nuc.ends,
-            mol_offset,
-            center_position.strand,
-        );
-        FiberseqData::offset_range(
-            &mut new.nuc.reference_starts,
-            &mut new.nuc.reference_ends,
-            ref_offset,
-            center_position.strand,
-        );
-        // correct orientations
-        if center_position.strand == '-' {
-            new.m6a.qual.reverse();
-            new.cpg.qual.reverse();
-            new.msp.lengths.reverse();
-            new.msp.reference_lengths.reverse();
-            new.msp.qual.reverse();
-            new.nuc.lengths.reverse();
-            new.nuc.reference_lengths.reverse();
-        }
-        // TODO update start and end
-        // TODO update aligned block pairs
+        // Apply offsets to all annotations using the new methods
+        new.m6a
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
+        new.cpg
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
+        new.msp
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
+        new.nuc
+            .apply_offset(mol_offset, ref_offset, center_position.strand);
+
+        // Validate that MSPs still start and end on m6A marks after centering
+        new.validate_msp_m6a_alignment();
+
         Some(new)
+    }
+
+    /// Validate that all MSP boundaries align with m6A positions after centering
+    fn validate_msp_m6a_alignment(&self) {
+        let m6a_positions = self.m6a.starts();
+        let msp_boundaries: Vec<i64> = self
+            .msp
+            .starts()
+            .into_iter()
+            .chain(self.msp.ends().into_iter().map(|x| x - 1))
+            .collect();
+
+        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
+            return; // Skip validation if no data
+        }
+
+        for msp_pos in &msp_boundaries {
+            if !m6a_positions.contains(msp_pos) {
+                log::warn!(
+                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
+                    msp_pos,
+                    String::from_utf8_lossy(self.record.qname())
+                );
+            }
+        }
     }
 
     //
@@ -252,47 +201,55 @@ impl FiberseqData {
     pub fn write_msp(&self, reference: bool) -> String {
         let (starts, _ends, lengths) = if reference {
             (
-                &self.msp.reference_starts,
-                &self.msp.reference_ends,
-                &self.msp.reference_lengths,
+                self.msp.reference_starts(),
+                self.msp.reference_ends(),
+                self.msp.reference_lengths(),
             )
         } else {
-            (&self.msp.starts, &self.msp.ends, &self.msp.lengths)
+            (
+                self.msp.option_starts(),
+                self.msp.option_ends(),
+                self.msp.option_lengths(),
+            )
         };
-        self.to_bed12(reference, starts, lengths, LINKER_COLOR)
+        self.to_bed12(reference, &starts, &lengths, LINKER_COLOR)
     }
 
     pub fn write_nuc(&self, reference: bool) -> String {
         let (starts, _ends, lengths) = if reference {
             (
-                &self.nuc.reference_starts,
-                &self.nuc.reference_ends,
-                &self.nuc.reference_lengths,
+                self.nuc.reference_starts(),
+                self.nuc.reference_ends(),
+                self.nuc.reference_lengths(),
             )
         } else {
-            (&self.nuc.starts, &self.nuc.ends, &self.nuc.lengths)
+            (
+                self.nuc.option_starts(),
+                self.nuc.option_ends(),
+                self.nuc.option_lengths(),
+            )
         };
-        self.to_bed12(reference, starts, lengths, NUC_COLOR)
+        self.to_bed12(reference, &starts, &lengths, NUC_COLOR)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
         let starts = if reference {
-            &self.m6a.reference_starts
+            self.m6a.reference_starts()
         } else {
-            &self.m6a.starts
+            self.m6a.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
-        self.to_bed12(reference, starts, &lengths, M6A_COLOR)
+        self.to_bed12(reference, &starts, &lengths, M6A_COLOR)
     }
 
     pub fn write_cpg(&self, reference: bool) -> String {
         let starts = if reference {
-            &self.cpg.reference_starts
+            self.cpg.reference_starts()
         } else {
-            &self.cpg.starts
+            self.cpg.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
-        self.to_bed12(reference, starts, &lengths, CPG_COLOR)
+        self.to_bed12(reference, &starts, &lengths, CPG_COLOR)
     }
 
     pub fn to_bed12(
@@ -454,11 +411,11 @@ impl FiberseqData {
             .count() as i64;
 
         // get the info
-        let m6a_count = self.m6a.starts.len();
-        let m6a_qual = self.m6a.qual.iter().map(|a| Some(*a as i64)).collect();
-        let cpg_count = self.cpg.starts.len();
-        let cpg_qual = self.cpg.qual.iter().map(|a| Some(*a as i64)).collect();
-        let fire = self.msp.qual.iter().map(|a| Some(*a as i64)).collect();
+        let m6a_count = self.m6a.annotations.len();
+        let m6a_qual = self.m6a.qual().iter().map(|a| Some(*a as i64)).collect();
+        let cpg_count = self.cpg.annotations.len();
+        let cpg_qual = self.cpg.qual().iter().map(|a| Some(*a as i64)).collect();
+        let fire = self.msp.qual().iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -492,31 +449,32 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = self.nuc.lengths.iter().flatten().sum::<i64>();
-        let total_msp_bp = self.msp.lengths.iter().flatten().sum::<i64>();
+        let total_nuc_bp = self.nuc.lengths().iter().sum::<i64>();
+        let total_msp_bp = self.msp.lengths().iter().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
         ))
         .unwrap();
         // add fiber features
-        for vec in &[
-            &self.nuc.starts,
-            &self.nuc.lengths,
-            &self.nuc.reference_starts,
-            &self.nuc.reference_lengths,
-            &self.msp.starts,
-            &self.msp.lengths,
-            &fire,
-            &self.msp.reference_starts,
-            &self.msp.reference_lengths,
-            &self.m6a.starts,
-            &self.m6a.reference_starts,
-            &m6a_qual,
-            &self.cpg.starts,
-            &self.cpg.reference_starts,
-            &cpg_qual,
-        ] {
+        let vecs = [
+            self.nuc.option_starts(),
+            self.nuc.option_lengths(),
+            self.nuc.reference_starts(),
+            self.nuc.reference_lengths(),
+            self.msp.option_starts(),
+            self.msp.option_lengths(),
+            fire,
+            self.msp.reference_starts(),
+            self.msp.reference_lengths(),
+            self.m6a.option_starts(),
+            self.m6a.reference_starts(),
+            m6a_qual,
+            self.cpg.option_starts(),
+            self.cpg.reference_starts(),
+            cpg_qual,
+        ];
+        for vec in &vecs {
             if vec.is_empty() {
                 rtn.push('.');
                 rtn.push('\t');
