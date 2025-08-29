@@ -455,15 +455,15 @@ pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, St
 pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
     // Create a Header from the HeaderView to access full functionality
     let header = bam::Header::from_template(header_view);
-    
+
     // Use to_hashmap to get structured header data
     let header_hashmap = header.to_hashmap();
-    
+
     let mut header_lines = Vec::new();
-    
+
     // Process header records in a specific order: HD first, then SQ, then others
     let record_order = ["HD", "SQ", "RG", "PG", "CO"];
-    
+
     for record_type in &record_order {
         if let Some(records) = header_hashmap.get(*record_type) {
             for record in records {
@@ -475,7 +475,7 @@ pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
             }
         }
     }
-    
+
     // Add any remaining record types not in the standard order
     for (record_type, records) in &header_hashmap {
         if !record_order.contains(&record_type.as_str()) {
@@ -488,12 +488,12 @@ pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
             }
         }
     }
-    
+
     // Add comments
     for comment in header.comments() {
         header_lines.push(format!("@CO\t{}", comment));
     }
-    
+
     // Join all lines with newlines and add final newline
     let mut result = header_lines.join("\n");
     result.push('\n');
