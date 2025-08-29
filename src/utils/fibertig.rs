@@ -428,22 +428,22 @@ impl FiberTig {
         };
 
         // read the fasta
-        log::info!("Reading FASTA file: {}", opts.reference);
+        log::debug!("Reading FASTA file: {}", opts.reference);
         let fasta_start = std::time::Instant::now();
         let sequences = Self::read_fasta_into_vec(&opts.reference)?;
-        log::info!("FASTA reading took: {:?}", fasta_start.elapsed());
+        log::debug!("FASTA reading took: {:?}", fasta_start.elapsed());
 
         let header_start = std::time::Instant::now();
         let mut header = Self::create_mock_bam_header_from_sequences(&sequences);
-        log::info!("Header creation took: {:?}", header_start.elapsed());
+        log::debug!("Header creation took: {:?}", header_start.elapsed());
         // If BED annotations are provided, read and apply them
         let records = if let Some(ref bed_path) = opts.bed {
-            log::info!("Reading BED annotations from: {}", bed_path);
+            log::debug!("Reading BED annotations from: {}", bed_path);
             let bed_start = std::time::Instant::now();
             let (bed_annotations, bed_header) =
                 Self::read_bed_annotations(bed_path, &HeaderView::from_header(&header))
                     .context("Failed to read BED annotations")?;
-            log::info!("BED reading took: {:?}", bed_start.elapsed());
+            log::debug!("BED reading took: {:?}", bed_start.elapsed());
 
             // Add bed header as comment if present
             if let Some(ref bed_header_line) = bed_header {
@@ -453,7 +453,7 @@ impl FiberTig {
             // Process contigs in parallel using rayon
             use rayon::prelude::*;
 
-            log::info!(
+            log::debug!(
                 "Processing {} contigs with annotations",
                 bed_annotations.len()
             );
@@ -487,20 +487,20 @@ impl FiberTig {
                 .collect();
 
             let flattened_records = records?.into_iter().flatten().collect();
-            log::info!("Record processing took: {:?}", records_start.elapsed());
+            log::debug!("Record processing took: {:?}", records_start.elapsed());
             flattened_records
         } else {
             // Make the records
-            log::info!("Creating mock BAM records (no BED annotations)");
+            log::debug!("Creating mock BAM records (no BED annotations)");
             let mock_start = std::time::Instant::now();
             let mock_records =
                 Self::create_mock_bam_records_from_sequences(&sequences, &header, split_size)?;
-            log::info!("Mock record creation took: {:?}", mock_start.elapsed());
+            log::debug!("Mock record creation took: {:?}", mock_start.elapsed());
             mock_records
         };
 
         // Create the FiberTig instance
-        log::info!("Total FiberTig creation took: {:?}", start_time.elapsed());
+        log::debug!("Total FiberTig creation took: {:?}", start_time.elapsed());
         let fiber_tig = FiberTig {
             header,
             records,
@@ -598,7 +598,7 @@ impl FiberTig {
     /// Write the mock BAM to a file using fibertools BAM writer
     pub fn write_to_bam(&self, opts: &PgInjectOptions) -> Result<()> {
         let write_start = std::time::Instant::now();
-        log::info!("Starting BAM write with {} records", self.records.len());
+        log::debug!("Starting BAM write with {} records", self.records.len());
 
         let program_name = "fibertools-rs";
         let program_id = "ft";
@@ -636,12 +636,12 @@ impl FiberTig {
         for record in &self.records {
             crate::utils::bio_io::write_record(&mut writer, record)?;
         }
-        log::info!(
+        log::debug!(
             "Writing {} records took: {:?}",
             self.records.len(),
             record_write_start.elapsed()
         );
-        log::info!("Total BAM write took: {:?}", write_start.elapsed());
+        log::debug!("Total BAM write took: {:?}", write_start.elapsed());
         Ok(())
     }
 }
