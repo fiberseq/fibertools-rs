@@ -61,6 +61,15 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
     let vg_threads_str = opts.vg_threads.to_string();
     let delimiter_str = opts.delimiter.to_string();
 
+    // Build verbose/quiet arguments to pass to subcommands
+    let mut verbose_args = Vec::new();
+    if opts.global.quiet {
+        verbose_args.push("--quiet".to_string());
+    }
+    for _ in 0..opts.global.verbose {
+        verbose_args.push("--verbose".to_string());
+    }
+
     // Create temporary file for header transfer between first and final commands
     let temp_header_file =
         tempfile::NamedTempFile::new().context("Failed to create temporary header file")?;
@@ -73,22 +82,24 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
             "Running BAM pipeline: pg-pansn --prefix | vg inject | vg surject | pg-pansn --strip"
         );
         // Always use uncompressed for intermediate pipe and write header to temp file
-        cmd!(
-            std::env::current_exe()?,
+        let mut args = vec![
             "pg-pansn",
             &opts.input,
             "--prefix",
             &opts.prefix,
             "--uncompressed",
             "--header-out",
-            &temp_header_path
-        )
+            &temp_header_path,
+        ];
+        args.extend(verbose_args.iter().map(|s| s.as_str()));
+
+        cmd(std::env::current_exe()?, args)
     } else {
         log::info!(
             "Running BED pipeline: pg-inject | vg inject | vg surject | pg-inject --extract"
         );
         // Always use uncompressed for intermediate pipes and write header to temp file
-        let pg_inject_args = vec![
+        let mut pg_inject_args = vec![
             "pg-inject",
             &opts.reference,
             "--prefix",
@@ -101,6 +112,7 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
             "--header-out",
             &temp_header_path,
         ];
+        pg_inject_args.extend(verbose_args.iter().map(|s| s.as_str()));
 
         cmd(std::env::current_exe()?, pg_inject_args)
     };
@@ -135,8 +147,7 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
     // Final command depends on input type - always use uncompressed for final BAM output
     let final_cmd = if opts.bam {
         // For BAM input, use pg-pansn --strip with uncompressed output
-        cmd!(
-            std::env::current_exe()?,
+        let mut args = vec![
             "pg-pansn",
             "-", // Read from stdin
             "--strip",
@@ -146,12 +157,14 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
             &opts.out,
             "--copy-header",
             &temp_header_path,
-            "--uncompressed"
-        )
+            "--uncompressed",
+        ];
+        args.extend(verbose_args.iter().map(|s| s.as_str()));
+
+        cmd(std::env::current_exe()?, args)
     } else {
         // For BED input, use pg-inject --extract (BED output is always uncompressed text)
-        cmd!(
-            std::env::current_exe()?,
+        let mut args = vec![
             "pg-inject",
             "-", // Read from stdin
             "--extract",
@@ -161,8 +174,11 @@ fn run_piped_pipeline(opts: &PgLiftOptions) -> Result<()> {
             "--out",
             &opts.out,
             "--copy-header",
-            &temp_header_path
-        )
+            &temp_header_path,
+        ];
+        args.extend(verbose_args.iter().map(|s| s.as_str()));
+
+        cmd(std::env::current_exe()?, args)
     };
 
     // Execute the complete pipeline
