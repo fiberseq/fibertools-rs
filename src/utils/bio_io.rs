@@ -497,6 +497,7 @@ pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
     // Join all lines with newlines and add final newline
     let mut result = header_lines.join("\n");
     result.push('\n');
+    log::info!("BAM header:\n{}", result);
     result
 }
 
