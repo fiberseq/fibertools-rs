@@ -508,7 +508,7 @@ impl FiberTig {
 
         // Open the BAM file (using the reference field as the input BAM)
         let mut reader = bio_io::bam_reader(&opts.reference);
-        let mut header = Header::from_template(&reader.header());
+        let mut header = Header::from_template(reader.header());
         pg_pansn::apply_pansn_transformations(&mut header, &opts.pansn)?;
         let header_view = HeaderView::from_header(&header);
 
