@@ -439,33 +439,38 @@ impl FiberTig {
                 Self::add_bed_header_comment(&mut header, bed_header_line);
             }
 
-            let mut records = Vec::new();
-            // build the records around the annotations
-            for (contig, annotations) in &bed_annotations {
-                // Determine split points based on annotations
-                let mut split_annotations = Self::approximately_divide_annotations_by_window_size(
-                    annotations.seq_len,
-                    split_size as i64,
-                    annotations,
-                );
+            // Process contigs in parallel using rayon
+            use rayon::prelude::*;
 
-                // Find the sequence for this contig
-                let sequence = sequences
-                    .iter()
-                    .find(|(name, _)| name == contig)
-                    .context(format!("Contig '{contig}' not found in FASTA"))?;
+            let records: Result<Vec<_>> = bed_annotations
+                .par_iter()
+                .map(|(contig, annotations)| {
+                    // Determine split points based on annotations
+                    let mut split_annotations =
+                        Self::approximately_divide_annotations_by_window_size(
+                            annotations.seq_len,
+                            split_size as i64,
+                            annotations,
+                        );
 
-                // Add annotations to records
-                let rs = Self::create_annotated_records_from_splits(
-                    contig,
-                    &sequence.1,
-                    &mut split_annotations,
-                    &HeaderView::from_header(&header),
-                )
-                .context(format!("Failed to create records for contig '{contig}'"))?;
-                records.extend(rs);
-            }
-            records
+                    // Find the sequence for this contig
+                    let sequence = sequences
+                        .iter()
+                        .find(|(name, _)| name == contig)
+                        .with_context(|| format!("Contig '{contig}' not found in FASTA"))?;
+
+                    // Add annotations to records
+                    Self::create_annotated_records_from_splits(
+                        contig,
+                        &sequence.1,
+                        &mut split_annotations,
+                        &HeaderView::from_header(&header),
+                    )
+                    .with_context(|| format!("Failed to create records for contig '{contig}'"))
+                })
+                .collect();
+
+            records?.into_iter().flatten().collect()
         } else {
             // Make the records
             Self::create_mock_bam_records_from_sequences(&sequences, &header, split_size)?
