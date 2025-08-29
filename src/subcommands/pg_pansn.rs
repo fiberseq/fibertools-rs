@@ -144,6 +144,10 @@ pub fn apply_pansn_transformations(
     // Apply panSN prefix or strip operations
     if let Some(ref prefix) = params.prefix {
         log::info!("Adding panSN-spec prefix: {prefix}");
+
+        // Preserve comments before transformation
+        let original_comments: Vec<_> = header.comments().map(|c| c.to_string()).collect();
+
         let mut header_hashmap = header.to_hashmap();
         for (key, value) in header_hashmap.iter_mut() {
             if key.eq("SQ") {
@@ -160,11 +164,20 @@ pub fn apply_pansn_transformations(
             }
         }
         *header = crate::utils::bio_io::header_from_hashmap(header_hashmap);
+
+        // Restore comments after transformation
+        for comment in original_comments {
+            header.push_comment(comment.as_bytes());
+        }
     } else if params.strip {
         log::info!(
             "Stripping panSN-spec with delimiter: {delimiter}",
             delimiter = params.delimiter
         );
+
+        // Preserve comments before transformation
+        let original_comments: Vec<_> = header.comments().map(|c| c.to_string()).collect();
+
         let mut header_hashmap = header.to_hashmap();
         for (key, value) in header_hashmap.iter_mut() {
             if key.eq("SQ") {
@@ -187,6 +200,11 @@ pub fn apply_pansn_transformations(
             }
         }
         *header = crate::utils::bio_io::header_from_hashmap(header_hashmap);
+
+        // Restore comments after transformation
+        for comment in original_comments {
+            header.push_comment(comment.as_bytes());
+        }
     }
 
     // Copy header from source BAM if specified
