@@ -11,7 +11,7 @@ pub struct PgInjectOptions {
     #[clap(short, long, default_value = "-")]
     pub out: String,
     /// Split contigs into multiple BAM records every N base pairs (0 = no splitting)
-    #[clap(short, long, default_value_t = 100_000)]
+    #[clap(short, long, default_value_t = 50_000)]
     pub split_size: usize,
     /// Uncompressed BAM output (default: compressed)
     #[clap(short, long)]
