@@ -92,11 +92,13 @@ impl Fiberdata {
     /// liftover query (fiber) positions to the reference
     pub fn lift_query_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_query_positions(&self.aligned_block_pairs, &positions)
+            .expect("Positions must be sorted before calling liftover")
     }
 
     /// liftover reference positions to the query (fiber)
     pub fn lift_reference_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_reference_positions(&self.aligned_block_pairs, &positions)
+            .expect("Positions must be sorted before calling liftover")
     }
 }
 
