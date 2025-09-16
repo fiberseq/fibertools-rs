@@ -102,8 +102,8 @@ fn liftover_closest(
             let ([q_st, q_en], [r_st, r_en]) = &aligned_block_pairs[block_index];
             // get the previous closest position
             let (best_r_pos, best_diff) = pos_mapping.get_mut(cur_pos).unwrap();
-            // exact match found
-            if cur_pos >= q_st && cur_pos < q_en {
+            // exact match found (including exact end of block)
+            if cur_pos >= q_st && cur_pos <= q_en {
                 let dist_from_start = cur_pos - q_st;
                 *best_diff = 0;
                 *best_r_pos = r_st + dist_from_start;
@@ -118,8 +118,8 @@ fn liftover_closest(
                 }
             }
             // we are past the end of the block
-            else if cur_pos >= q_en {
-                let diff = (q_en - cur_pos).abs();
+            else if cur_pos > q_en {
+                let diff = (cur_pos - q_en).abs();
                 if diff < *best_diff {
                     *best_diff = diff;
                     *best_r_pos = *r_en;
