@@ -270,6 +270,7 @@ def read_center_table(f):
 def _add_fiber_to_data_dict(
     fiber,
     data_dict,
+    min_fire_qual=200,
 ):
     # sub function to add fiber data to a dictionary
     def add_standard_columns():
@@ -289,6 +290,22 @@ def _add_fiber_to_data_dict(
     data_dict["start"].append(fiber.msp.reference_starts)
     data_dict["end"].append(fiber.msp.reference_ends)
     data_dict["qual"].append(fiber.msp.qual)
+
+    # for FIRE (high-quality MSPs)
+    fire_starts = []
+    fire_ends = []
+    fire_quals = []
+    for start, end, qual in zip(fiber.msp.reference_starts, fiber.msp.reference_ends, fiber.msp.qual):
+        if qual >= min_fire_qual:
+            fire_starts.append(start)
+            fire_ends.append(end)
+            fire_quals.append(qual)
+
+    add_standard_columns()
+    data_dict["type"].append("fire")
+    data_dict["start"].append(fire_starts)
+    data_dict["end"].append(fire_ends)
+    data_dict["qual"].append(fire_quals)
 
     # for nuc
     add_standard_columns()

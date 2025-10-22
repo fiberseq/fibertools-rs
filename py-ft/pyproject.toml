@@ -20,6 +20,9 @@ dependencies = [
     "polars",
 ]
 
+[project.scripts]
+fiberplot = "pyft.fiberplot:main"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"

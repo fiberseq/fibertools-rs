@@ -30,3 +30,6 @@ pub mod pg_lift;
 pub mod pg_pansn;
 
 pub mod validate;
+
+//
+pub mod merge_peaks;
