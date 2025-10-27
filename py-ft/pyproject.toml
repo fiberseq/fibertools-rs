@@ -17,7 +17,7 @@ dependencies = [
     "vegafusion[embed]",
     "tqdm",
     "typing-extensions",
-    "polars",
+    "polars>=1.0,<2.0",
 ]
 
 [project.scripts]
