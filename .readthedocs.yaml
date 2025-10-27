@@ -7,12 +7,17 @@ sphinx:
   configuration: py-ft/docs/conf.py
 
 build:
-  os: "ubuntu-20.04"
+  os: "ubuntu-22.04"
   apt_packages:
     - cmake
   tools:
     python: "3.10"
-    rust: "latest"
+  jobs:
+    pre_install:
+      # Install Rust via rustup to get a recent version
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+      - source $HOME/.cargo/env
+      - rustc --version
 
 python:
   install:

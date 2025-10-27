@@ -4,6 +4,7 @@ build = "build.rs"
 categories = ["command-line-utilities"]
 description = "Fiber-seq toolkit in rust"
 edition = "2021"
+rust-version = "1.85"
 homepage = "https://fiberseq.github.io/"
 keywords = ["cli", "bam", "bfx"]
 license = "MIT"
