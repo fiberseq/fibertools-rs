@@ -1,3 +1,4 @@
+use anyhow::Result;
 use itertools::multiunzip;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::collections::HashMap;
@@ -72,18 +73,22 @@ where
 fn liftover_closest(
     positions: &[i64],
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
-) -> Vec<Option<i64>> {
+) -> Result<Vec<Option<i64>>> {
     // skip empty
     if positions.is_empty() {
-        return vec![];
+        return Ok(vec![]);
     }
     if aligned_block_pairs.is_empty() {
-        return positions.iter().map(|_x| None).collect();
+        return Ok(positions.iter().map(|_x| None).collect());
     }
-    assert!(
-        is_sorted(positions),
-        "Positions must be sorted before calling liftover!"
-    );
+    if !is_sorted(positions) {
+        return Err(anyhow::anyhow!(
+            "Positions must be sorted before calling liftover! Array length: {}, first 5: {:?}, last 5: {:?}",
+            positions.len(),
+            &positions[..std::cmp::min(5, positions.len())],
+            &positions[positions.len().saturating_sub(5)..]
+        ));
+    }
 
     // find the closest position for every position
     let mut starting_block = 0;
@@ -97,8 +102,8 @@ fn liftover_closest(
             let ([q_st, q_en], [r_st, r_en]) = &aligned_block_pairs[block_index];
             // get the previous closest position
             let (best_r_pos, best_diff) = pos_mapping.get_mut(cur_pos).unwrap();
-            // exact match found
-            if cur_pos >= q_st && cur_pos < q_en {
+            // exact match found (including exact end of block)
+            if cur_pos >= q_st && cur_pos <= q_en {
                 let dist_from_start = cur_pos - q_st;
                 *best_diff = 0;
                 *best_r_pos = r_st + dist_from_start;
@@ -113,8 +118,8 @@ fn liftover_closest(
                 }
             }
             // we are past the end of the block
-            else if cur_pos >= q_en {
-                let diff = (q_en - cur_pos).abs();
+            else if cur_pos > q_en {
+                let diff = (cur_pos - q_en).abs();
                 if diff < *best_diff {
                     *best_diff = diff;
                     *best_r_pos = *r_en;
@@ -135,14 +140,14 @@ fn liftover_closest(
         }
     }
     assert_eq!(rtn.len(), positions.len());
-    rtn
+    Ok(rtn)
 }
 
 /// find the closest reference positions for a list of query positions
 pub fn lift_reference_positions(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     query_positions: &[i64],
-) -> Vec<Option<i64>> {
+) -> Result<Vec<Option<i64>>> {
     liftover_closest(query_positions, aligned_block_pairs)
 }
 
@@ -150,10 +155,47 @@ pub fn lift_reference_positions(
 pub fn lift_query_positions(
     aligned_block_pairs: &[([i64; 2], [i64; 2])],
     reference_positions: &[i64],
-) -> Vec<Option<i64>> {
+) -> Result<Vec<Option<i64>>> {
     // if lifting to the query, we need to reverse the pairs
     let aligned_block_pairs = aligned_block_pairs.iter().map(|(q, r)| (*r, *q)).collect();
     liftover_closest(reference_positions, &aligned_block_pairs)
+}
+
+/// Helper function to lift positions that may or may not be sorted
+fn lift_positions_with_sort_handling(
+    aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
+    positions: &[i64],
+    lift_reference_to_query: bool,
+) -> Result<Vec<Option<i64>>> {
+    if is_sorted(positions) {
+        // Fast path: positions are sorted, lift normally
+        if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, positions)
+        } else {
+            lift_query_positions(aligned_block_pairs, positions)
+        }
+    } else {
+        // Slow path: positions are unsorted, need to sort positions independently
+        let mut indices: Vec<usize> = (0..positions.len()).collect();
+        indices.sort_by_key(|&i| positions[i]);
+
+        let sorted_positions: Vec<i64> = indices.iter().map(|&i| positions[i]).collect();
+
+        // Lift sorted positions
+        let lifted_positions = if !lift_reference_to_query {
+            lift_reference_positions(aligned_block_pairs, &sorted_positions)?
+        } else {
+            lift_query_positions(aligned_block_pairs, &sorted_positions)?
+        };
+
+        // Restore original order
+        let mut original_positions = vec![None; positions.len()];
+        for (sorted_idx, &original_idx) in indices.iter().enumerate() {
+            original_positions[original_idx] = lifted_positions[sorted_idx];
+        }
+
+        Ok(original_positions)
+    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -162,19 +204,16 @@ fn lift_range(
     starts: &[i64],
     ends: &[i64],
     lift_reference_to_query: bool,
-) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     assert_eq!(starts.len(), ends.len());
-    let (ref_starts, ref_ends) = if !lift_reference_to_query {
-        (
-            lift_reference_positions(aligned_block_pairs, starts),
-            lift_reference_positions(aligned_block_pairs, ends),
-        )
-    } else {
-        (
-            lift_query_positions(aligned_block_pairs, starts),
-            lift_query_positions(aligned_block_pairs, ends),
-        )
-    };
+
+    // Lift starts and ends using the helper function
+    let ref_starts =
+        lift_positions_with_sort_handling(aligned_block_pairs, starts, lift_reference_to_query)?;
+    let ref_ends =
+        lift_positions_with_sort_handling(aligned_block_pairs, ends, lift_reference_to_query)?;
+
+    // Common logic for processing lifted positions
     assert_eq!(ref_starts.len(), ref_ends.len());
     let rtn = ref_starts
         .into_iter()
@@ -190,7 +229,7 @@ fn lift_range(
             _ => (None, None, None),
         })
         .collect::<Vec<_>>();
-    multiunzip(rtn)
+    Ok(multiunzip(rtn))
 }
 
 /// Find the closest range but hopefully better
@@ -199,7 +238,7 @@ pub fn lift_query_range(
     record: &bam::Record,
     starts: &[i64],
     ends: &[i64],
-) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     // get the aligned block pairs
     let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
     lift_range(&aligned_block_pairs, starts, ends, false)
@@ -214,11 +253,12 @@ fn liftover_exact(
     aligned_block_pairs: &Vec<([i64; 2], [i64; 2])>,
     positions: &[i64],
     lift_reference_to_query: bool,
-) -> Vec<Option<i64>> {
-    assert!(
-        is_sorted(positions),
-        "Positions must be sorted before calling liftover!"
-    );
+) -> Result<Vec<Option<i64>>> {
+    if !is_sorted(positions) {
+        return Err(anyhow::anyhow!(
+            "Positions must be sorted before calling liftover!"
+        ));
+    }
 
     // find the shared positions in the reference
     let mut return_positions = vec![];
@@ -262,15 +302,15 @@ fn liftover_exact(
         return_positions.push(None);
     }
     assert_eq!(positions.len(), return_positions.len());
-    return_positions
+    Ok(return_positions)
 }
 
 pub fn lift_reference_positions_exact(
     record: &bam::Record,
     query_positions: &[i64],
-) -> Vec<Option<i64>> {
+) -> Result<Vec<Option<i64>>> {
     if record.is_unmapped() {
-        query_positions.iter().map(|_x| None).collect()
+        Ok(query_positions.iter().map(|_x| None).collect())
     } else {
         let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
         liftover_exact(&aligned_block_pairs, query_positions, false)
@@ -280,9 +320,9 @@ pub fn lift_reference_positions_exact(
 pub fn lift_query_positions_exact(
     record: &bam::Record,
     reference_positions: &[i64],
-) -> Vec<Option<i64>> {
+) -> Result<Vec<Option<i64>>> {
     if record.is_unmapped() {
-        reference_positions.iter().map(|_x| None).collect()
+        Ok(reference_positions.iter().map(|_x| None).collect())
     } else {
         let aligned_block_pairs: Vec<([i64; 2], [i64; 2])> = record.aligned_block_pairs().collect();
         liftover_exact(&aligned_block_pairs, reference_positions, true)
@@ -295,17 +335,17 @@ fn lift_range_exact(
     starts: &[i64],
     ends: &[i64],
     lift_reference_to_query: bool,
-) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     assert_eq!(starts.len(), ends.len());
     let (ref_starts, ref_ends) = if !lift_reference_to_query {
         (
-            lift_reference_positions_exact(record, starts),
-            lift_reference_positions_exact(record, ends),
+            lift_reference_positions_exact(record, starts)?,
+            lift_reference_positions_exact(record, ends)?,
         )
     } else {
         (
-            lift_query_positions_exact(record, starts),
-            lift_query_positions_exact(record, ends),
+            lift_query_positions_exact(record, starts)?,
+            lift_query_positions_exact(record, ends)?,
         )
     };
     assert_eq!(ref_starts.len(), ref_ends.len());
@@ -317,7 +357,7 @@ fn lift_range_exact(
             _ => (None, None, None),
         })
         .collect::<Vec<_>>();
-    multiunzip(rtn)
+    Ok(multiunzip(rtn))
 }
 
 /// Find the exact range in the reference from a query range
@@ -326,7 +366,7 @@ pub fn lift_query_range_exact(
     record: &bam::Record,
     starts: &[i64],
     ends: &[i64],
-) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     lift_range_exact(record, starts, ends, false)
 }
 
@@ -336,6 +376,6 @@ pub fn lift_reference_range_exact(
     record: &bam::Record,
     starts: &[i64],
     ends: &[i64],
-) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>) {
+) -> Result<(Vec<Option<i64>>, Vec<Option<i64>>, Vec<Option<i64>>)> {
     lift_range_exact(record, starts, ends, true)
 }

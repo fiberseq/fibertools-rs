@@ -3,7 +3,7 @@
 /// all calculations are done in total as well as for haplotype 1 and haplotype 2.
 use crate::cli::PileupOptions;
 use crate::fiber::FiberseqData;
-use crate::utils::bamranges;
+use crate::utils::bamannotations;
 use crate::utils::bio_io;
 use crate::*;
 use anyhow::{anyhow, Ok};
@@ -190,13 +190,17 @@ impl<'a> FireTrack<'a> {
     #[inline]
     fn add_range_set(
         array: &mut [i32],
-        ranges: &bamranges::Ranges,
+        ranges: &bamannotations::Ranges,
         cur_offset: i64,
         chrom_start: usize,
     ) {
-        for (_, _, _, _, r) in ranges {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in ranges {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     let re = if rs == re { re + 1 } else { re };
                     for i in rs..re {
                         let pos = i + cur_offset - chrom_start as i64;
@@ -221,18 +225,26 @@ impl<'a> FireTrack<'a> {
         }
         let mut start = i64::MAX;
         let mut end = i64::MIN;
-        for (_, _, _, _, r) in &fiber.msp {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in &fiber.msp {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     start = std::cmp::min(start, rs);
                     end = std::cmp::max(end, re);
                 }
                 _ => continue,
             }
         }
-        for (_, _, _, _, r) in &fiber.nuc {
-            match r {
-                Some((rs, re, _)) => {
+        for annotation in &fiber.nuc {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
                     start = std::cmp::min(start, rs);
                     end = std::cmp::max(end, re);
                 }
@@ -254,8 +266,8 @@ impl<'a> FireTrack<'a> {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
         if self.pileup_opts.fiber_coverage
-            && fiber.msp.reference_starts.is_empty()
-            && fiber.nuc.reference_starts.is_empty()
+            && fiber.msp.reference_starts().is_empty()
+            && fiber.nuc.reference_starts().is_empty()
         {
             return;
         }
@@ -284,13 +296,17 @@ impl<'a> FireTrack<'a> {
         }
 
         // calculate the fire coverage and fire score
-        for (_, _, _, q, r) in &fiber.msp {
-            match r {
-                Some((rs, re, _)) => {
-                    if q < MIN_FIRE_QUAL {
+        for annotation in &fiber.msp {
+            match (
+                annotation.reference_start,
+                annotation.reference_end,
+                annotation.reference_length,
+            ) {
+                (Some(rs), Some(re), Some(_)) => {
+                    if annotation.qual < MIN_FIRE_QUAL {
                         continue;
                     }
-                    let score_update = (1.0 - q as f32 / 255.0).log10() * -50.0;
+                    let score_update = (1.0 - annotation.qual as f32 / 255.0).log10() * -50.0;
                     for i in rs..re {
                         let pos = i + self.cur_offset - self.chrom_start as i64;
                         if pos < 0 || pos >= self.track_len as i64 {
@@ -358,7 +374,7 @@ impl<'a> FireTrack<'a> {
         rolling_max
     }
 
-    pub fn row(&self, i: usize) -> FireRow {
+    pub fn row(&self, i: usize) -> FireRow<'_> {
         FireRow {
             score: &self.scores[i],
             coverage: &self.coverage[i],

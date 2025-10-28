@@ -8,6 +8,7 @@ M6A_COLOR = "#800080"
 M5C_COLOR = "#8B4513"
 NUC_COLOR = "#A9A9A9"
 MSP_COLOR = "#9370db"
+FIRE_COLOR = "#FF0000"  # Red for FIRE elements (matches fibertools-rs)
 
 
 def centered_chart(
@@ -18,7 +19,10 @@ def centered_chart(
     m5c_color=M5C_COLOR,
     nuc_color=NUC_COLOR,
     msp_color=MSP_COLOR,
+    fire_color=FIRE_COLOR,
     auto_sort=True,
+    default_start=None,
+    default_end=None,
 ):
     """Make an altair chart from a dataframe of centered positions
     Args:
@@ -68,6 +72,9 @@ def centered_chart(
     color_5mc = alt.param(value=m5c_color, bind=alt.binding(input="color", name="5mC"))
     color_nuc = alt.param(value=nuc_color, bind=alt.binding(input="color", name="nuc"))
     color_msp = alt.param(value=msp_color, bind=alt.binding(input="color", name="msp"))
+    color_fire = alt.param(
+        value=fire_color, bind=alt.binding(input="color", name="fire")
+    )
     color_fp = alt.param(
         value="green", bind=alt.binding(input="color", name="footprinted")
     )
@@ -75,9 +82,17 @@ def centered_chart(
         value="lightgray", bind=alt.binding(input="color", name="not-footprinted")
     )
 
-    domain = ["5mC", "m6a", "nuc", "msp", "footprinted", "not-footprinted"]
-    range_ = [color_5mc, color_m6a, color_nuc, color_msp, color_fp, color_not_fp]
-    opacity = dict(zip(domain, [1.0, 1.0, 0.05, 0.10, 0.1, 0.01]))
+    domain = ["5mC", "m6a", "nuc", "msp", "fire", "footprinted", "not-footprinted"]
+    range_ = [
+        color_5mc,
+        color_m6a,
+        color_nuc,
+        color_msp,
+        color_fire,
+        color_fp,
+        color_not_fp,
+    ]
+    opacity = dict(zip(domain, [1.0, 1.0, 0.05, 0.10, 0.8, 0.1, 0.01]))
 
     # add opacity column to the dataframe
     dfm = dfm.assign(opacity=dfm["type"].map(opacity))
@@ -99,7 +114,13 @@ def centered_chart(
     bind_range_h = alt.binding_range(min=200, max=1600, name="Chart height: ")
     param_height = alt.param("height", bind=bind_range_h)
 
-    # type_selection = alt.selection_point(fields=["type"], bind="legend")
+    # Add legend selection for toggling visibility (multi-select with all selected by default)
+    type_selection = alt.selection_point(
+        fields=["type"],
+        bind="legend",
+        toggle="true",
+        value=[{"type": t} for t in domain],  # All types selected by default
+    )
 
     base = (
         alt.Chart(dfm)
@@ -108,12 +129,14 @@ def centered_chart(
             x2="end:Q",
             color=alt.Color("type:O").scale(domain=domain, range=range_),
             y=alt.Y("fiber_name:O", sort=None),
-            opacity=alt.Opacity("opacity"),
-            # opacity=alt.condition(type_selection, "opacity", alt.value(0))
+            opacity=alt.condition(
+                type_selection, alt.Opacity("opacity:Q", legend=None), alt.value(0.0)
+            ),
         )
         .transform_filter(
             selection,
         )
+        .add_params(type_selection)
     )
 
     if "footprinted" in dfm["type"].unique():
@@ -121,6 +144,21 @@ def centered_chart(
         chart = base.mark_rect() + footprint_lines.transform_filter(selection)
     else:
         chart = base.mark_rect()
+
+    # Configure legend to show opaque symbols
+    chart = chart.configure_legend(
+        symbolOpacity=1.0,  # Make legend symbols fully opaque
+        symbolStrokeWidth=0,
+    )
+
+    # if there is a default start and end, set the x axis to that range
+    if default_start is not None and default_end is not None:
+        chart = chart.encode(
+            x=alt.X(
+                "start:Q",
+                scale=alt.Scale(domain=(default_start, default_end)),
+            )
+        )
 
     chart = (
         chart.properties(width=width, height=height)
@@ -132,6 +170,7 @@ def centered_chart(
             color_5mc,
             color_nuc,
             color_msp,
+            color_fire,
             color_fp,
             color_not_fp,
         )
@@ -172,15 +211,21 @@ def _auto_sort_centered_chart(dfm):
         z, on=["fiber_name", "centering_position", "centering_strand"], how="left"
     )
 
-    # sort on footprinted, m6a, and msp if they exist
-    sort_cols = ["footprinted", "m6a", "msp"]
+    # sort on footprinted, fire, m6a, and msp if they exist
+    sort_cols = ["footprinted", "fire", "m6a", "msp"]
     # filter sort_cols to only include columns that exist in the dataframe
     sort_cols = [x for x in sort_cols if x in dfm.columns]
     # sort
+    base_ascending = [
+        True,
+        True,
+        True,
+    ]  # for chrom, centering_position, centering_strand
+    sort_ascending = [False] * len(sort_cols)  # descending for all sort columns
     dfm.sort_values(
         ["chrom", "centering_position", "centering_strand"] + sort_cols,
         inplace=True,
-        ascending=[True, True, True, False, False, False],
+        ascending=base_ascending + sort_ascending,
     )
 
     return dfm
@@ -214,7 +259,6 @@ def _add_footprint_lines_to_centered_chart(dfm):
         )
     )
     return footprint_lines
-
 
 
 def extract_chart(
@@ -258,7 +302,7 @@ def extract_chart(
         .dropna()
         .reset_index(drop=True)
         .infer_objects()
-    )  # .query("centered_position_type != '5mC'") 
+    )  # .query("centered_position_type != '5mC'")
 
     # set the colors
     color_m6a = alt.param(value=m6a_color, bind=alt.binding(input="color", name="m6a"))
@@ -277,33 +321,28 @@ def extract_chart(
 
     # convert fiber column to integer
     dfm["height"] = 0.4
-    dfm.loc[dfm.type=="nuc", "height"] = 0.2
-    dfm.loc[dfm.type=="msp", "height"] = 0.3
+    dfm.loc[dfm.type == "nuc", "height"] = 0.2
+    dfm.loc[dfm.type == "msp", "height"] = 0.3
     dfm["y"] = pd.factorize(dfm["fiber"])[0] - dfm["height"]
     dfm["y2"] = pd.factorize(dfm["fiber"])[0] + dfm["height"]
     if max_fibers is not None:
         dfm = dfm.query("y < @max_fibers")
-    
-    
+
     bind_range_w = alt.binding_range(min=200, max=1600, name="Chart width: ")
     param_width = alt.param("width", bind=bind_range_w)
     bind_range_h = alt.binding_range(min=200, max=1600, name="Chart height: ")
     param_height = alt.param("height", bind=bind_range_h)
 
-    base = (
-        alt.Chart(dfm)
-        .encode(
-            x=alt.X(f"{start}:Q", scale=alt.Scale(domain=(500, 2500))),
-            x2=f"{end}:Q",
-            color=alt.Color("type:O").scale(domain=domain, range=range_),
-            y="y:Q",
-            y2="y2:Q",
-            opacity=alt.Opacity("opacity"),
-            # opacity=alt.condition(type_selection, "opacity", alt.value(0))
-        )
+    base = alt.Chart(dfm).encode(
+        x=alt.X(f"{start}:Q", scale=alt.Scale(domain=(500, 2500))),
+        x2=f"{end}:Q",
+        color=alt.Color("type:O").scale(domain=domain, range=range_),
+        y="y:Q",
+        y2="y2:Q",
+        opacity=alt.Opacity("opacity"),
+        # opacity=alt.condition(type_selection, "opacity", alt.value(0))
     )
 
-  
     chart = base.mark_rect()
     chart = (
         chart.properties(width=width, height=height)
@@ -315,10 +354,7 @@ def extract_chart(
             color_nuc,
             color_msp,
         )
-        .interactive(
-            bind_y = False
-        ) 
+        .interactive(bind_y=False)
     )
 
     return chart
-

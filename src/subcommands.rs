@@ -22,5 +22,11 @@ pub mod qc;
 pub mod strip_basemods;
 
 pub mod fiber_hmm;
+/// Create mock BAM from reference FASTA
+pub mod pg_inject;
+/// Lift annotations through a pangenome graph from source to target coordinates
+pub mod pg_lift;
+/// Add or strip panSN-spec prefixes from BAM contig names
+pub mod pg_pansn;
 
 pub mod validate;

@@ -60,6 +60,7 @@ impl CenteredFiberData {
     /// find the query position that corresponds to the central reference position
     pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
         let read_center: Vec<i64> = lift_query_positions_exact(record, &[reference_position])
+            .ok()?
             .into_iter()
             .flatten()
             .collect();
@@ -149,39 +150,39 @@ impl CenteredFiberData {
     fn grab_data(
         &self,
     ) -> (
-        &[Option<i64>],
-        &[u8],
-        &[Option<i64>],
-        &[u8],
-        &[Option<i64>],
-        &[Option<i64>],
-        &[Option<i64>],
-        &[Option<i64>],
-        &[u8],
+        Vec<Option<i64>>,
+        Vec<u8>,
+        Vec<Option<i64>>,
+        Vec<u8>,
+        Vec<Option<i64>>,
+        Vec<Option<i64>>,
+        Vec<Option<i64>>,
+        Vec<Option<i64>>,
+        Vec<u8>,
     ) {
         if self.reference {
             (
-                &self.fiber.m6a.reference_starts,
-                &self.fiber.m6a.qual,
-                &self.fiber.cpg.reference_starts,
-                &self.fiber.cpg.qual,
-                &self.fiber.nuc.reference_starts,
-                &self.fiber.nuc.reference_ends,
-                &self.fiber.msp.reference_starts,
-                &self.fiber.msp.reference_ends,
-                &self.fiber.msp.qual,
+                self.fiber.m6a.reference_starts(),
+                self.fiber.m6a.qual(),
+                self.fiber.cpg.reference_starts(),
+                self.fiber.cpg.qual(),
+                self.fiber.nuc.reference_starts(),
+                self.fiber.nuc.reference_ends(),
+                self.fiber.msp.reference_starts(),
+                self.fiber.msp.reference_ends(),
+                self.fiber.msp.qual(),
             )
         } else {
             (
-                &self.fiber.m6a.starts,
-                &self.fiber.m6a.qual,
-                &self.fiber.cpg.starts,
-                &self.fiber.cpg.qual,
-                &self.fiber.nuc.starts,
-                &self.fiber.nuc.ends,
-                &self.fiber.msp.starts,
-                &self.fiber.msp.ends,
-                &self.fiber.msp.qual,
+                self.fiber.m6a.option_starts(),
+                self.fiber.m6a.qual(),
+                self.fiber.cpg.option_starts(),
+                self.fiber.cpg.qual(),
+                self.fiber.nuc.option_starts(),
+                self.fiber.nuc.option_ends(),
+                self.fiber.msp.option_starts(),
+                self.fiber.msp.option_ends(),
+                self.fiber.msp.qual(),
             )
         }
     }
@@ -191,15 +192,15 @@ impl CenteredFiberData {
         format!(
             "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
-            join_by_str_option(m6a, ","),
-            join_by_str(m6a_qual, ","),
-            join_by_str_option(cpg, ","),
-            join_by_str(cpg_qual, ","),
-            join_by_str_option(nuc_st, ","),
-            join_by_str_option(nuc_en, ","),
-            join_by_str_option(msp_st, ","),
-            join_by_str_option(msp_en, ","),
-            join_by_str(fire, ","),
+            join_by_str_option(&m6a, ","),
+            join_by_str(&m6a_qual, ","),
+            join_by_str_option(&cpg, ","),
+            join_by_str(&cpg_qual, ","),
+            join_by_str_option(&nuc_st, ","),
+            join_by_str_option(&nuc_en, ","),
+            join_by_str_option(&msp_st, ","),
+            join_by_str_option(&msp_en, ","),
+            join_by_str(&fire, ","),
             self.get_sequence(),
         )
     }

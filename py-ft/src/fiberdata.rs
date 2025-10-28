@@ -92,11 +92,13 @@ impl Fiberdata {
     /// liftover query (fiber) positions to the reference
     pub fn lift_query_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_query_positions(&self.aligned_block_pairs, &positions)
+            .expect("Positions must be sorted before calling liftover")
     }
 
     /// liftover reference positions to the query (fiber)
     pub fn lift_reference_positions(&self, positions: Vec<i64>) -> Vec<Option<i64>> {
         bamlift::lift_reference_positions(&self.aligned_block_pairs, &positions)
+            .expect("Positions must be sorted before calling liftover")
     }
 }
 
@@ -134,33 +136,33 @@ impl Fiberdata {
 
         // fiberseq features
         let m6a = Basemods::new(
-            fiber.m6a.starts.clone(),
-            fiber.m6a.reference_starts.clone(),
-            fiber.m6a.qual.clone(),
+            fiber.m6a.starts().into_iter().map(Some).collect(),
+            fiber.m6a.reference_starts(),
+            fiber.m6a.qual(),
         );
         let cpg = Basemods::new(
-            fiber.cpg.starts.clone(),
-            fiber.cpg.reference_starts.clone(),
-            fiber.cpg.qual.clone(),
+            fiber.cpg.starts().into_iter().map(Some).collect(),
+            fiber.cpg.reference_starts(),
+            fiber.cpg.qual(),
         );
 
         let nuc = Ranges {
-            starts: fiber.nuc.starts.clone(),
-            ends: fiber.nuc.ends.clone(),
-            lengths: fiber.nuc.lengths.clone(),
-            qual: fiber.nuc.qual.clone(),
-            reference_starts: fiber.nuc.reference_starts.clone(),
-            reference_ends: fiber.nuc.reference_ends.clone(),
-            reference_lengths: fiber.nuc.reference_lengths.clone(),
+            starts: fiber.nuc.starts().into_iter().map(Some).collect(),
+            ends: fiber.nuc.ends().into_iter().map(Some).collect(),
+            lengths: fiber.nuc.lengths().into_iter().map(Some).collect(),
+            qual: fiber.nuc.qual(),
+            reference_starts: fiber.nuc.reference_starts(),
+            reference_ends: fiber.nuc.reference_ends(),
+            reference_lengths: fiber.nuc.reference_lengths(),
         };
         let msp = Ranges {
-            starts: fiber.msp.starts.clone(),
-            ends: fiber.msp.ends.clone(),
-            lengths: fiber.msp.lengths.clone(),
-            qual: fiber.msp.qual.clone(),
-            reference_starts: fiber.msp.reference_starts.clone(),
-            reference_ends: fiber.msp.reference_ends.clone(),
-            reference_lengths: fiber.msp.reference_lengths.clone(),
+            starts: fiber.msp.starts().into_iter().map(Some).collect(),
+            ends: fiber.msp.ends().into_iter().map(Some).collect(),
+            lengths: fiber.msp.lengths().into_iter().map(Some).collect(),
+            qual: fiber.msp.qual(),
+            reference_starts: fiber.msp.reference_starts(),
+            reference_ends: fiber.msp.reference_ends(),
+            reference_lengths: fiber.msp.reference_lengths(),
         };
 
         let aligned_block_pairs = fiber.record.aligned_block_pairs().collect();

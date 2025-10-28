@@ -101,7 +101,7 @@ where
     #[cfg(feature = "tch")]
     fn get_libtorch_device() -> BurnDevice {
         use burn::backend::libtorch::LibTorchDevice;
-        let device = if tch::utils::has_cuda() {
+        if tch::utils::has_cuda() {
             LibTorchDevice::Cuda(0)
         }
         //else if tch::utils::has_mps() {
@@ -109,8 +109,7 @@ where
         //}
         else {
             LibTorchDevice::Cpu
-        };
-        device
+        }
     }
 
     pub fn forward(&self, opts: &PredictOptions<B>, windows: &[f32], count: usize) -> Vec<f32> {
@@ -166,6 +165,6 @@ mod tests {
             .chunks(2)
             .map(|c| c[0])
             .collect();
-        println!("{:?}", z);
+        println!("{z:?}");
     }
 }

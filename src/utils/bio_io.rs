@@ -5,11 +5,14 @@ use gzp::{Compression, ZBuilder};
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use linear_map::LinearMap;
 use niffler::get_reader;
 use rayon::current_num_threads;
 use regex::Regex;
 use rust_htslib::bam;
+use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::record::Aux;
+use rust_htslib::bam::Header;
 use rust_htslib::bam::Read;
 use std::collections::HashMap;
 use std::env;
@@ -91,6 +94,39 @@ pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
             exit(0);
         } else {
             panic!("Error: {err}");
+        }
+    }
+}
+
+/// write a BAM record, but don't error on broken pipes
+pub fn write_record(writer: &mut bam::Writer, record: &bam::Record) -> anyhow::Result<()> {
+    match writer.write(record) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            // Check for the specific WriteRecord error that indicates broken pipe
+            if matches!(err, rust_htslib::errors::Error::WriteRecord) {
+                let error_msg = err.to_string();
+                if error_msg.contains("failed to write BAM/BCF record (out of disk space?)") {
+                    exit(0);
+                }
+            }
+
+            // Convert to anyhow error first to access the error chain
+            let anyhow_err: anyhow::Error = err.into();
+
+            // Also check for actual BrokenPipe IO errors in the error chain
+            let mut current_err = anyhow_err.source();
+            while let Some(err) = current_err {
+                if let Some(io_err) = err.downcast_ref::<io::Error>() {
+                    if io_err.kind() == io::ErrorKind::BrokenPipe {
+                        exit(0);
+                    }
+                }
+                current_err = err.source();
+            }
+
+            // For all other errors, return them normally
+            Err(anyhow_err)
         }
     }
 }
@@ -234,9 +270,12 @@ impl Iterator for BamChunk<'_> {
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
             let r = r.unwrap();
-            if r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0 {
+            let has_mm_and_ml = r.aux(b"MM").is_ok() && r.aux(b"ML").is_ok();
+            if has_mm_and_ml
+                && (r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0)
+            {
                 log::warn!(
-                    "Skipping read ({}) because it has been hard clipped. This read will be excluded from calculations and any output.",
+                    "Skipping read ({}) because it has been hard clipped and has ML and MM tags. This read will be excluded from calculations and any output.",
                     String::from_utf8_lossy(r.qname())
                 );
                 continue;
@@ -388,6 +427,77 @@ pub fn get_f32_tag(record: &bam::Record, tag: &[u8; 2]) -> Vec<f32> {
     } else {
         vec![]
     }
+}
+
+pub fn header_from_hashmap(hash_header: HashMap<String, Vec<LinearMap<String, String>>>) -> Header {
+    let mut header = Header::new();
+    for (key, values) in hash_header.iter() {
+        for value in values {
+            let mut record = HeaderRecord::new(key.as_bytes());
+            for (tag, val) in value.iter() {
+                record.push_tag(tag.as_bytes(), val);
+            }
+            header.push_record(&record);
+        }
+    }
+    header
+}
+
+/// Convert a BAM header to a string representation including comments
+///
+/// # Arguments
+///
+/// * `header_view` - The BAM HeaderView to convert
+///
+/// # Returns
+///
+/// * String representation of the header including any comments
+pub fn bam_header_to_string(header_view: &bam::HeaderView) -> String {
+    // Create a Header from the HeaderView to access full functionality
+    let header = bam::Header::from_template(header_view);
+
+    // Use to_hashmap to get structured header data
+    let header_hashmap = header.to_hashmap();
+
+    let mut header_lines = Vec::new();
+
+    // Process header records in a specific order: HD first, then SQ, then others
+    let record_order = ["HD", "SQ", "RG", "PG", "CO"];
+
+    for record_type in &record_order {
+        if let Some(records) = header_hashmap.get(*record_type) {
+            for record in records {
+                let mut line = format!("@{}", record_type);
+                for (key, value) in record {
+                    line.push_str(&format!("\t{}:{}", key, value));
+                }
+                header_lines.push(line);
+            }
+        }
+    }
+
+    // Add any remaining record types not in the standard order
+    for (record_type, records) in &header_hashmap {
+        if !record_order.contains(&record_type.as_str()) {
+            for record in records {
+                let mut line = format!("@{}", record_type);
+                for (key, value) in record {
+                    line.push_str(&format!("\t{}:{}", key, value));
+                }
+                header_lines.push(line);
+            }
+        }
+    }
+
+    // Add comments
+    for comment in header.comments() {
+        header_lines.push(format!("@CO\t{}", comment));
+    }
+
+    // Join all lines with newlines and add final newline
+    let mut result = header_lines.join("\n");
+    result.push('\n');
+    result
 }
 
 /// Converts seq to uppercase leaving characters other than a,c,g,t,n unchanged.

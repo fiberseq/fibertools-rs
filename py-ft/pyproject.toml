@@ -13,12 +13,15 @@ name = "pyft"
 requires-python = ">=3.7"
 dependencies = [
     "pandas>=2.0",
-    "altair==5.1",
+    "altair==5.5",
     "vegafusion[embed]",
     "tqdm",
     "typing-extensions",
-    "polars",
+    "polars>=1.0,<2.0",
 ]
+
+[project.scripts]
+fiberplot = "pyft.fiberplot:main"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
