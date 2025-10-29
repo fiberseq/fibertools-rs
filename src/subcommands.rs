@@ -1,5 +1,7 @@
 /// Add nucleosomes to a bam file
 pub mod add_nucleosomes;
+/// Call FIRE peaks using FDR-based peak calling
+pub mod call_peaks;
 /// Center fiberseq information around a reference position
 pub mod center;
 /// Clear HiFi kinetics tags from a bam file

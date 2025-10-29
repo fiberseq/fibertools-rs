@@ -13,14 +13,15 @@ pub static MIN_ML_SCORE: &str = "125";
 #[derive(Debug, Args, Clone)]
 pub struct FiberFilters {
     /// BAM bit flags to filter on, equivalent to `-F` in samtools view
+    /// For call-peaks: defaults to 2304 (filters secondary and supplementary alignments)
+    /// For other commands: defaults to 0 (no filtering)
     #[clap(
         global = true,
         short = 'F',
         long = "filter",
-        default_value = "0",
         help_heading = "BAM-Options"
     )]
-    pub bit_flag: u16,
+    pub bit_flag: Option<u16>,
     /// Filtering expression to use for filtering records
     /// Example: filter to nucleosomes with lengths greater than 150 bp
     ///   -x "len(nuc)>150"
@@ -57,7 +58,7 @@ pub struct FiberFilters {
 impl std::default::Default for FiberFilters {
     fn default() -> Self {
         Self {
-            bit_flag: 0,
+            bit_flag: Some(0),
             min_ml_score: MIN_ML_SCORE.parse().unwrap(),
             filter_expression: None,
             uncompressed: false,
@@ -67,6 +68,11 @@ impl std::default::Default for FiberFilters {
 }
 
 impl FiberFilters {
+    /// Get the bit flag value, using a default if not explicitly set
+    pub fn get_bit_flag(&self) -> u16 {
+        self.bit_flag.unwrap_or(0)
+    }
+
     /// This function accepts an iterator over bam records and filters them based on the bit flag.
     pub fn filter_on_bit_flags<'a, I>(
         &'a self,
@@ -75,12 +81,14 @@ impl FiberFilters {
     where
         I: IntoIterator<Item = Result<bam::Record, rust_htslib::errors::Error>> + 'a,
     {
+        let bit_flag = self.get_bit_flag();
         records
             .into_iter()
             .map(|r| r.expect("htslib is unable to read a record in the input."))
-            .filter(|r| {
+            .filter(move |r| {
                 // filter by bit flag
-                (r.flags() & self.bit_flag) == 0
+                // `move` is needed to capture bit_flag value in the closure
+                (r.flags() & bit_flag) == 0
             })
     }
 }
