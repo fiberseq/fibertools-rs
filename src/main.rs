@@ -132,6 +132,15 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::PgPansn(pg_pansn_opts)) => {
             subcommands::pg_pansn::run_pg_pansn(pg_pansn_opts)?;
         }
+        Some(Commands::CallPeaks(ref mut call_peaks_opts)) => {
+            // Set default bit flag filter for call-peaks to 2304 (secondary + supplementary)
+            // unless the user explicitly set it
+            if call_peaks_opts.input.filters.bit_flag.is_none() {
+                call_peaks_opts.input.filters.bit_flag = Some(2304);
+                log::debug!("Using default bit flag filter 2304 for call-peaks (filtering secondary and supplementary alignments)");
+            }
+            subcommands::call_peaks::run_call_peaks(call_peaks_opts)?;
+        }
         None => {}
     };
     let duration = pg_start.elapsed();

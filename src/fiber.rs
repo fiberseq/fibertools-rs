@@ -510,7 +510,7 @@ impl<'a> FiberseqRecords<'a> {
         let header = bam.header().clone();
         let bam_recs = bam.records();
         let mut bam_chunk = BamChunk::new(bam_recs, None);
-        bam_chunk.set_bit_flag_filter(filters.bit_flag);
+        bam_chunk.set_bit_flag_filter(filters.get_bit_flag());
         let cur_chunk: Vec<FiberseqData> = vec![];
         FiberseqRecords {
             bam_chunk,
