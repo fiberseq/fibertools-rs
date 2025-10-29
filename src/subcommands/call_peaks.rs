@@ -27,7 +27,9 @@ pub struct PileupRecord {
 
 /// Calculate FDR from aggregated FIRE scores
 /// This follows the Python logic in fdr_from_fire_scores()
-fn fdr_from_fire_scores(fire_scores: &[(f64, bool, u64)]) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+fn fdr_from_fire_scores(
+    fire_scores: &[(f64, bool, u64)],
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
     let mut vs = Vec::new(); // shuffled bp
     let mut rs = Vec::new(); // real bp
     let mut ts = Vec::new(); // thresholds
@@ -67,11 +69,16 @@ fn fdr_from_fire_scores(fire_scores: &[(f64, bool, u64)]) -> (Vec<f64>, Vec<f64>
     ts.push(-1.0);
 
     // calculate FDRs
-    let fdrs: Vec<f64> = vs.iter()
+    let fdrs: Vec<f64> = vs
+        .iter()
         .zip(rs.iter())
         .map(|(&v, &r)| {
             let fdr = v / r;
-            if fdr > 1.0 { 1.0 } else { fdr }
+            if fdr > 1.0 {
+                1.0
+            } else {
+                fdr
+            }
         })
         .collect();
 
@@ -83,7 +90,8 @@ fn fdr_from_fire_scores(fire_scores: &[(f64, bool, u64)]) -> (Vec<f64>, Vec<f64>
 fn fdr_table_from_scores(fire_scores: &[(f64, bool, u64)]) -> Vec<FdrEntry> {
     let (thresholds, fdrs, shuffled_bps, real_bps) = fdr_from_fire_scores(fire_scores);
 
-    let mut entries: Vec<FdrEntry> = thresholds.iter()
+    let mut entries: Vec<FdrEntry> = thresholds
+        .iter()
         .zip(fdrs.iter())
         .zip(shuffled_bps.iter())
         .zip(real_bps.iter())
@@ -121,8 +129,16 @@ fn fdr_table_from_scores(fire_scores: &[(f64, bool, u64)]) -> Vec<FdrEntry> {
 
     log::info!("FDR table has {} entries", entries.len());
     if !entries.is_empty() {
-        log::debug!("First FDR entry: threshold={:.2}, FDR={:.4}", entries[0].threshold, entries[0].fdr);
-        log::debug!("Last FDR entry: threshold={:.2}, FDR={:.4}", entries.last().unwrap().threshold, entries.last().unwrap().fdr);
+        log::debug!(
+            "First FDR entry: threshold={:.2}, FDR={:.4}",
+            entries[0].threshold,
+            entries[0].fdr
+        );
+        log::debug!(
+            "Last FDR entry: threshold={:.2}, FDR={:.4}",
+            entries.last().unwrap().threshold,
+            entries.last().unwrap().fdr
+        );
     }
 
     entries
@@ -183,9 +199,7 @@ fn aggregate_pileup_by_score(
 }
 
 /// Make FDR table from real and shuffled pileup data
-fn make_fdr_table(
-    opts: &mut CallPeaksOptions,
-) -> Result<Vec<FdrEntry>> {
+fn make_fdr_table(opts: &mut CallPeaksOptions) -> Result<Vec<FdrEntry>> {
     log::info!("Generating FDR table from pileup data");
 
     // First pass: generate pileup for real data
@@ -197,7 +211,10 @@ fn make_fdr_table(
     // Will use file-based shuffle if provided, otherwise random shuffle
     log::info!("Running pileup on shuffled data...");
     let shuffled_pileup = run_pileup_for_peaks(opts, true)?;
-    log::info!("Shuffled pileup generated {} records", shuffled_pileup.len());
+    log::info!(
+        "Shuffled pileup generated {} records",
+        shuffled_pileup.len()
+    );
 
     // Aggregate by score
     let real_scores = aggregate_pileup_by_score(&real_pileup, opts.max_cov, opts.min_cov);
@@ -214,14 +231,18 @@ fn make_fdr_table(
     fire_scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap()); // descending by score
 
     // Calculate sums for logging
-    let real_mbp: f64 = fire_scores.iter()
+    let real_mbp: f64 = fire_scores
+        .iter()
         .filter(|(_, is_real, _)| *is_real)
         .map(|(_, _, bp)| *bp as f64)
-        .sum::<f64>() / 1_000_000.0;
-    let shuffled_mbp: f64 = fire_scores.iter()
+        .sum::<f64>()
+        / 1_000_000.0;
+    let shuffled_mbp: f64 = fire_scores
+        .iter()
         .filter(|(_, is_real, _)| !*is_real)
         .map(|(_, _, bp)| *bp as f64)
-        .sum::<f64>() / 1_000_000.0;
+        .sum::<f64>()
+        / 1_000_000.0;
     log::info!("Real data: {:.2} Mbp", real_mbp);
     log::info!("Shuffled data: {:.2} Mbp", shuffled_mbp);
 
@@ -229,7 +250,10 @@ fn make_fdr_table(
     let fdr_table = fdr_table_from_scores(&fire_scores);
 
     // Check if we have any thresholds below max_fdr
-    if let Some(min_fdr_entry) = fdr_table.iter().min_by(|a, b| a.fdr.partial_cmp(&b.fdr).unwrap()) {
+    if let Some(min_fdr_entry) = fdr_table
+        .iter()
+        .min_by(|a, b| a.fdr.partial_cmp(&b.fdr).unwrap())
+    {
         if min_fdr_entry.fdr > opts.max_fdr {
             anyhow::bail!(
                 "No FIRE score threshold has an FDR < {}. Check the input Fiber-seq data with the QC pipeline and make sure you are using WGS Fiber-seq data.",
@@ -251,8 +275,8 @@ fn process_chromosome_pileup(
     shuffled_fibers: &Option<crate::subcommands::pileup::ShuffledFibers>,
     shuffled: bool,
 ) -> Result<Vec<PileupRecord>> {
-    use crate::subcommands::pileup::{FireTrack, FireTrackOptions};
     use crate::fiber::FiberseqData;
+    use crate::subcommands::pileup::{FireTrack, FireTrackOptions};
 
     log::debug!("Processing chromosome {} (length: {})", chrom, chrom_len);
 
@@ -277,17 +301,12 @@ fn process_chromosome_pileup(
         cpg: false,
         fiber_coverage: false,
         shuffle: shuffled,
-        random_shuffle: shuffled && shuffled_fibers.is_none(),  // Use random shuffle if no file provided
-        shuffle_seed: Some(42),  // TODO: Could make this a CLI option
+        random_shuffle: shuffled && shuffled_fibers.is_none(), // Use random shuffle if no file provided
+        shuffle_seed: Some(42),                                // TODO: Could make this a CLI option
         rolling_max: None,
     };
 
-    let mut fire_track = FireTrack::new(
-        0,
-        chrom_len as usize,
-        fire_track_opts,
-        shuffled_ref,
-    );
+    let mut fire_track = FireTrack::new(0, chrom_len as usize, fire_track_opts, shuffled_ref);
 
     // Process records
     opts.input
@@ -297,11 +316,8 @@ fn process_chromosome_pileup(
         .into_iter()
         .for_each(|chunk| {
             let chunk: Vec<_> = chunk.collect();
-            let fibers: Vec<FiberseqData> = FiberseqData::from_records(
-                chunk,
-                &opts.input.header_view(),
-                &opts.input.filters,
-            );
+            let fibers: Vec<FiberseqData> =
+                FiberseqData::from_records(chunk, &opts.input.header_view(), &opts.input.filters);
 
             for fiber in fibers {
                 // Skip if shuffled and fiber not in shuffled set
@@ -357,13 +373,13 @@ fn process_chromosome_pileup(
 
 /// Run pileup and yield records per chromosome
 /// Processes each chromosome completely before moving to the next
-fn run_pileup_for_peaks(
-    opts: &mut CallPeaksOptions,
-    shuffled: bool,
-) -> Result<Vec<PileupRecord>> {
+fn run_pileup_for_peaks(opts: &mut CallPeaksOptions, shuffled: bool) -> Result<Vec<PileupRecord>> {
     use crate::subcommands::pileup::ShuffledFibers;
 
-    log::info!("Running pileup for {} data", if shuffled { "shuffled" } else { "real" });
+    log::info!(
+        "Running pileup for {} data",
+        if shuffled { "shuffled" } else { "real" }
+    );
 
     let mut bam = opts.input.indexed_bam_reader();
     let header = opts.input.header_view();
@@ -377,7 +393,7 @@ fn run_pileup_for_peaks(
         }
         None if shuffled => {
             log::info!("Using random shuffling (no shuffle file provided)");
-            None  // Will trigger random_shuffle in FireTrackOptions
+            None // Will trigger random_shuffle in FireTrackOptions
         }
         None => None,
     };
@@ -388,7 +404,10 @@ fn run_pileup_for_peaks(
     for chrom in header.target_names() {
         let chrom_str = String::from_utf8_lossy(chrom).to_string();
         let tid = bam.header().tid(chrom).context("Failed to get target ID")?;
-        let chrom_len = bam.header().target_len(tid).context("Failed to get target length")? as i64;
+        let chrom_len = bam
+            .header()
+            .target_len(tid)
+            .context("Failed to get target length")? as i64;
 
         let chrom_records = process_chromosome_pileup(
             &chrom_str,
@@ -399,7 +418,11 @@ fn run_pileup_for_peaks(
             shuffled,
         )?;
 
-        log::debug!("Chromosome {} yielded {} records", chrom_str, chrom_records.len());
+        log::debug!(
+            "Chromosome {} yielded {} records",
+            chrom_str,
+            chrom_records.len()
+        );
         all_records.extend(chrom_records);
     }
 
@@ -449,8 +472,8 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
 
 /// Write FDR table to TSV file
 fn write_fdr_table(fdr_table: &[FdrEntry], path: &str) -> Result<()> {
-    let mut writer = crate::utils::bio_io::writer(path)
-        .context("Failed to create FDR table output file")?;
+    let mut writer =
+        crate::utils::bio_io::writer(path).context("Failed to create FDR table output file")?;
 
     writeln!(writer, "threshold\tFDR\tshuffled_bp\treal_bp")?;
     for entry in fdr_table {

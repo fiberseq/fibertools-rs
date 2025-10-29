@@ -20,33 +20,17 @@ static WINDOW_SIZE: usize = 1_000_000;
 
 /// Options for FireTrack that don't require the full PileupOptions
 /// This allows FireTrack to be used independently
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FireTrackOptions {
     pub no_nuc: bool,
     pub no_msp: bool,
     pub m6a: bool,
     pub cpg: bool,
     pub fiber_coverage: bool,
-    pub shuffle: bool,  // Track if shuffling is enabled
-    pub random_shuffle: bool,  // If true, generate random positions instead of using ShuffledFibers
-    pub shuffle_seed: Option<u64>,  // Optional seed for reproducible random shuffling
+    pub shuffle: bool,             // Track if shuffling is enabled
+    pub random_shuffle: bool, // If true, generate random positions instead of using ShuffledFibers
+    pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
     pub rolling_max: Option<usize>,
-}
-
-impl Default for FireTrackOptions {
-    fn default() -> Self {
-        Self {
-            no_nuc: false,
-            no_msp: false,
-            m6a: false,
-            cpg: false,
-            fiber_coverage: false,
-            shuffle: false,
-            random_shuffle: false,
-            shuffle_seed: None,
-            rolling_max: None,
-        }
-    }
 }
 
 impl From<&PileupOptions> for FireTrackOptions {
@@ -58,7 +42,7 @@ impl From<&PileupOptions> for FireTrackOptions {
             cpg: opts.cpg,
             fiber_coverage: opts.fiber_coverage,
             shuffle: opts.shuffle.is_some(),
-            random_shuffle: false,  // PileupOptions doesn't have this yet
+            random_shuffle: false, // PileupOptions doesn't have this yet
             shuffle_seed: None,
             rolling_max: opts.rolling_max,
         }
@@ -74,7 +58,7 @@ pub struct FireRow<'a> {
     pub msp_coverage: &'a i32,
     pub cpg_coverage: &'a i32,
     pub m6a_coverage: &'a i32,
-    fire_track_opts: FireTrackOptions,  // Now owned
+    fire_track_opts: FireTrackOptions, // Now owned
 }
 
 impl PartialEq for FireRow<'_> {
@@ -196,10 +180,10 @@ fn generate_random_shuffle_offset(
     chrom_len: usize,
     seed: Option<u64>,
 ) -> Option<i64> {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
-    use rand::{Rng, SeedableRng};
-    use rand::rngs::StdRng;
 
     let fiber_len = fiber.record.reference_end() - fiber.record.reference_start();
     let original_start = fiber.record.reference_start();
@@ -207,7 +191,7 @@ fn generate_random_shuffle_offset(
     // Check if fiber can fit in chromosome
     let max_start = (chrom_len as i64 - fiber_len).max(0);
     if max_start <= 0 {
-        return Some(0);  // Fiber too long, keep at position 0
+        return Some(0); // Fiber too long, keep at position 0
     }
 
     // Create deterministic seed from fiber name + optional seed
@@ -238,7 +222,7 @@ pub struct FireTrack<'a> {
     pub nuc_coverage: Vec<i32>,
     pub cpg_coverage: Vec<i32>,
     pub m6a_coverage: Vec<i32>,
-    fire_track_opts: FireTrackOptions,  // Now owned, not borrowed
+    fire_track_opts: FireTrackOptions, // Now owned, not borrowed
     shuffled_fibers: &'a Option<ShuffledFibers>,
     cur_offset: i64,
 }
@@ -247,7 +231,7 @@ impl<'a> FireTrack<'a> {
     pub fn new(
         chrom_start: usize,
         chrom_end: usize,
-        fire_track_opts: FireTrackOptions,  // Take ownership
+        fire_track_opts: FireTrackOptions, // Take ownership
         shuffled_fibers: &'a Option<ShuffledFibers>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
@@ -372,9 +356,10 @@ impl<'a> FireTrack<'a> {
                     fiber,
                     self.chrom_end,
                     self.fire_track_opts.shuffle_seed,
-                ).unwrap_or(0)
+                )
+                .unwrap_or(0)
             }
-            None => 0,  // No shuffling
+            None => 0, // No shuffling
         };
 
         if self.cur_offset != 0 && self.chrom_start != 0 {
@@ -440,9 +425,7 @@ impl<'a> FireTrack<'a> {
         for i in 0..self.track_len {
             if self.fire_coverage[i] <= 0 {
                 self.scores[i] = -1.0;
-            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE
-                && !self.fire_track_opts.shuffle
-            {
+            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE && !self.fire_track_opts.shuffle {
                 // there is no minimum fire coverage if we are shuffling
                 self.scores[i] = -1.0;
             } else {
@@ -512,8 +495,18 @@ impl<'a> FiberseqPileup<'a> {
         let all_data = FireTrack::new(chrom_start, chrom_end, fire_track_opts.clone(), &None);
         let (hap1_data, hap2_data) = if pileup_opts.haps {
             (
-                Some(FireTrack::new(chrom_start, chrom_end, fire_track_opts.clone(), &None)),
-                Some(FireTrack::new(chrom_start, chrom_end, fire_track_opts.clone(), &None)),
+                Some(FireTrack::new(
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
+                Some(FireTrack::new(
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
             )
         } else {
             (None, None)
