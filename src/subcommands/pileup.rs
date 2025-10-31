@@ -258,7 +258,7 @@ impl<'a> FireTrack<'a> {
     #[inline]
     fn add_range_set(
         array: &mut [i32],
-        ranges: &bamannotations::Ranges,
+        ranges: &bamannotations::FiberAnnotations,
         cur_offset: i64,
         chrom_start: usize,
     ) {

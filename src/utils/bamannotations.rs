@@ -21,8 +21,6 @@ pub struct FiberAnnotations {
     pub reverse: bool,
 }
 
-// Keep Ranges as an alias for backward compatibility
-pub type Ranges = FiberAnnotations;
 
 impl FiberAnnotations {
     /// Create FiberAnnotations from a vector of FiberAnnotation items
@@ -569,5 +567,3 @@ impl<'a> Iterator for FiberAnnotationsIterator<'a> {
     }
 }
 
-// Backward compatibility alias
-pub type RangesIterator<'a> = FiberAnnotationsIterator<'a>;

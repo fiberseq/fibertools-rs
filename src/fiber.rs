@@ -15,10 +15,10 @@ use std::fmt::Write;
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
-    pub msp: Ranges,
-    pub nuc: Ranges,
-    pub m6a: Ranges,
-    pub cpg: Ranges,
+    pub msp: FiberAnnotations,
+    pub nuc: FiberAnnotations,
+    pub m6a: FiberAnnotations,
+    pub cpg: FiberAnnotations,
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
@@ -41,8 +41,8 @@ impl FiberseqData {
         let msp_starts = get_u32_tag(&record, b"as");
         let nuc_length = get_u32_tag(&record, b"nl");
         let msp_length = get_u32_tag(&record, b"al");
-        let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
-        let mut msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
+        let nuc = FiberAnnotations::new(&record, nuc_starts, None, Some(nuc_length));
+        let mut msp = FiberAnnotations::new(&record, msp_starts, None, Some(msp_length));
         let msp_qual = get_u8_tag(&record, b"aq");
         if !msp_qual.is_empty() {
             msp.set_qual(msp_qual);

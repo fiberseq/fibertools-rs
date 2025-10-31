@@ -1,3 +1,7 @@
+// Suppress false positive warning from PyO3 macro expansion
+// See: https://github.com/PyO3/pyo3/issues/3564
+#![allow(non_local_definitions)]
+
 /// A module for using fibertools-rs
 mod fiberdata;
 

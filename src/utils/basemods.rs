@@ -16,7 +16,7 @@ pub struct BaseMod {
     pub modified_base: u8,
     pub strand: char,
     pub modification_type: char,
-    pub ranges: Ranges,
+    pub ranges: FiberAnnotations,
     pub record_is_reverse: bool,
 }
 
@@ -30,7 +30,7 @@ impl BaseMod {
         modified_probabilities_forward: Vec<u8>,
     ) -> Self {
         let tmp = modified_bases_forward.clone();
-        let mut ranges = Ranges::new(record, modified_bases_forward, None, None);
+        let mut ranges = FiberAnnotations::new(record, modified_bases_forward, None, None);
         ranges.set_qual(modified_probabilities_forward);
         let record_is_reverse = record.is_reverse();
         assert_eq!(tmp, ranges.forward_starts(), "forward starts not equal");
@@ -276,25 +276,25 @@ impl BaseMods {
     }
 
     /// combine the forward and reverse m6a data
-    pub fn m6a(&self) -> Ranges {
+    pub fn m6a(&self) -> FiberAnnotations {
         let ranges = self
             .base_mods
             .iter()
             .filter(|x| x.is_m6a())
             .map(|x| &x.ranges)
             .collect();
-        Ranges::merge_ranges(ranges)
+        FiberAnnotations::merge_ranges(ranges)
     }
 
     /// combine the forward and reverse cpd/5mc data
-    pub fn cpg(&self) -> Ranges {
+    pub fn cpg(&self) -> FiberAnnotations {
         let ranges = self
             .base_mods
             .iter()
             .filter(|x| x.is_cpg())
             .map(|x| &x.ranges)
             .collect();
-        Ranges::merge_ranges(ranges)
+        FiberAnnotations::merge_ranges(ranges)
     }
 
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;

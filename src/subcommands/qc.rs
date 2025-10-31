@@ -233,7 +233,7 @@ impl<'a> QcStats<'a> {
 
     fn add_range_lengths(
         hashmap: &mut HashMap<i64, i64>,
-        range: &crate::utils::bamannotations::Ranges,
+        range: &crate::utils::bamannotations::FiberAnnotations,
     ) {
         for r in range.lengths().iter() {
             hashmap.entry(*r).and_modify(|e| *e += 1).or_insert(1);

@@ -140,7 +140,7 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
 
 pub fn apply_filter_to_range(
     parsed: &ParsedExpr,
-    range: &mut bamannotations::Ranges,
+    range: &mut bamannotations::FiberAnnotations,
 ) -> Result<(), anyhow::Error> {
     let starting_len = range.annotations.len();
 
@@ -204,7 +204,7 @@ mod test {
     use super::*;
     use crate::utils::bamannotations;
 
-    fn make_fake_range() -> bamannotations::Ranges {
+    fn make_fake_range() -> bamannotations::FiberAnnotations {
         use bamannotations::{FiberAnnotation, FiberAnnotations};
 
         let annotations = vec![
