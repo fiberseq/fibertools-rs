@@ -18,6 +18,37 @@ const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 static WINDOW_SIZE: usize = 1_000_000;
 
+/// Options for FireTrack that don't require the full PileupOptions
+/// This allows FireTrack to be used independently
+#[derive(Debug, Clone, Default)]
+pub struct FireTrackOptions {
+    pub no_nuc: bool,
+    pub no_msp: bool,
+    pub m6a: bool,
+    pub cpg: bool,
+    pub fiber_coverage: bool,
+    pub shuffle: bool,             // Track if shuffling is enabled
+    pub random_shuffle: bool, // If true, generate random positions instead of using ShuffledFibers
+    pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
+    pub rolling_max: Option<usize>,
+}
+
+impl From<&PileupOptions> for FireTrackOptions {
+    fn from(opts: &PileupOptions) -> Self {
+        Self {
+            no_nuc: opts.no_nuc,
+            no_msp: opts.no_msp,
+            m6a: opts.m6a,
+            cpg: opts.cpg,
+            fiber_coverage: opts.fiber_coverage,
+            shuffle: opts.shuffle.is_some(),
+            random_shuffle: false, // PileupOptions doesn't have this yet
+            shuffle_seed: None,
+            rolling_max: opts.rolling_max,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FireRow<'a> {
     pub coverage: &'a i32,
@@ -27,17 +58,17 @@ pub struct FireRow<'a> {
     pub msp_coverage: &'a i32,
     pub cpg_coverage: &'a i32,
     pub m6a_coverage: &'a i32,
-    pileup_opts: &'a PileupOptions,
+    fire_track_opts: FireTrackOptions, // Now owned
 }
 
 impl PartialEq for FireRow<'_> {
     fn eq(&self, other: &Self) -> bool {
-        let m6a = if self.pileup_opts.m6a {
+        let m6a = if self.fire_track_opts.m6a {
             self.m6a_coverage == other.m6a_coverage
         } else {
             true
         };
-        let cpg = if self.pileup_opts.cpg {
+        let cpg = if self.fire_track_opts.cpg {
             self.cpg_coverage == other.cpg_coverage
         } else {
             true
@@ -59,16 +90,16 @@ impl std::fmt::Display for FireRow<'_> {
             "\t{}\t{}\t{}",
             self.coverage, self.fire_coverage, self.score
         );
-        if !self.pileup_opts.no_nuc {
+        if !self.fire_track_opts.no_nuc {
             rtn += &format!("\t{}", self.nuc_coverage);
         }
-        if !self.pileup_opts.no_msp {
+        if !self.fire_track_opts.no_msp {
             rtn += &format!("\t{}", self.msp_coverage);
         }
-        if self.pileup_opts.m6a {
+        if self.fire_track_opts.m6a {
             rtn += &format!("\t{}", self.m6a_coverage);
         }
-        if self.pileup_opts.cpg {
+        if self.fire_track_opts.cpg {
             rtn += &format!("\t{}", self.cpg_coverage);
         }
         write!(f, "{rtn}")
@@ -142,6 +173,43 @@ impl ShuffledFibers {
     }
 }
 
+/// Generate a random shuffle offset for a fiber using uniform distribution
+/// Uses deterministic PRNG seeded from fiber name + seed for reproducibility
+fn generate_random_shuffle_offset(
+    fiber: &FiberseqData,
+    chrom_len: usize,
+    seed: Option<u64>,
+) -> Option<i64> {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let fiber_len = fiber.record.reference_end() - fiber.record.reference_start();
+    let original_start = fiber.record.reference_start();
+
+    // Check if fiber can fit in chromosome
+    let max_start = (chrom_len as i64 - fiber_len).max(0);
+    if max_start <= 0 {
+        return Some(0); // Fiber too long, keep at position 0
+    }
+
+    // Create deterministic seed from fiber name + optional seed
+    let mut hasher = DefaultHasher::new();
+    fiber.get_qname().hash(&mut hasher);
+    if let Some(s) = seed {
+        s.hash(&mut hasher);
+    }
+    let fiber_seed = hasher.finish();
+
+    // Use StdRng for uniform distribution
+    let mut rng = StdRng::seed_from_u64(fiber_seed);
+    let shuffled_start = rng.gen_range(0..=max_start);
+
+    // Return offset (shuffled_start - original_start)
+    Some(shuffled_start - original_start)
+}
+
 pub struct FireTrack<'a> {
     pub chrom_start: usize,
     pub chrom_end: usize,
@@ -154,7 +222,7 @@ pub struct FireTrack<'a> {
     pub nuc_coverage: Vec<i32>,
     pub cpg_coverage: Vec<i32>,
     pub m6a_coverage: Vec<i32>,
-    pileup_opts: &'a PileupOptions,
+    fire_track_opts: FireTrackOptions, // Now owned, not borrowed
     shuffled_fibers: &'a Option<ShuffledFibers>,
     cur_offset: i64,
 }
@@ -163,7 +231,7 @@ impl<'a> FireTrack<'a> {
     pub fn new(
         chrom_start: usize,
         chrom_end: usize,
-        pileup_opts: &'a PileupOptions,
+        fire_track_opts: FireTrackOptions, // Take ownership
         shuffled_fibers: &'a Option<ShuffledFibers>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
@@ -181,7 +249,7 @@ impl<'a> FireTrack<'a> {
             nuc_coverage: vec![0; track_len],
             cpg_coverage: vec![0; track_len],
             m6a_coverage: vec![0; track_len],
-            pileup_opts,
+            fire_track_opts,
             shuffled_fibers,
             cur_offset: 0,
         }
@@ -217,7 +285,7 @@ impl<'a> FireTrack<'a> {
     }
 
     fn fiber_start_and_end(&self, fiber: &FiberseqData) -> (i64, i64) {
-        if !self.pileup_opts.fiber_coverage {
+        if !self.fire_track_opts.fiber_coverage {
             return (
                 fiber.record.reference_start() + self.cur_offset,
                 fiber.record.reference_end() + self.cur_offset,
@@ -262,10 +330,10 @@ impl<'a> FireTrack<'a> {
 
     /// inline this function
     #[inline]
-    fn update_with_fiber(&mut self, fiber: &FiberseqData) {
+    pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
-        if self.pileup_opts.fiber_coverage
+        if self.fire_track_opts.fiber_coverage
             && fiber.msp.reference_starts().is_empty()
             && fiber.nuc.reference_starts().is_empty()
         {
@@ -273,12 +341,25 @@ impl<'a> FireTrack<'a> {
         }
 
         // find the offset if we are shuffling data
+        // Priority: 1) shuffled_fibers from file, 2) random shuffle, 3) no shuffle
         self.cur_offset = match self.shuffled_fibers {
-            Some(shuffled_fibers) => match shuffled_fibers.get_shuffle_offset(fiber) {
-                Some(offset) => offset,
-                None => return, // skip missing fiber if it is not in the shuffle
-            },
-            None => 0,
+            Some(shuffled_fibers) => {
+                // Use pre-computed shuffle from file
+                match shuffled_fibers.get_shuffle_offset(fiber) {
+                    Some(offset) => offset,
+                    None => return, // skip missing fiber if it is not in the shuffle
+                }
+            }
+            None if self.fire_track_opts.random_shuffle => {
+                // Generate random shuffle offset
+                generate_random_shuffle_offset(
+                    fiber,
+                    self.chrom_end,
+                    self.fire_track_opts.shuffle_seed,
+                )
+                .unwrap_or(0)
+            }
+            None => 0, // No shuffling
         };
 
         if self.cur_offset != 0 && self.chrom_start != 0 {
@@ -322,16 +403,16 @@ impl<'a> FireTrack<'a> {
 
         // add other sets of data to the FireTrack depending on CLI opts
         let mut pairs = vec![];
-        if !self.pileup_opts.no_nuc {
+        if !self.fire_track_opts.no_nuc {
             pairs.push((&mut self.nuc_coverage, &fiber.nuc));
         }
-        if !self.pileup_opts.no_msp {
+        if !self.fire_track_opts.no_msp {
             pairs.push((&mut self.msp_coverage, &fiber.msp));
         }
-        if self.pileup_opts.m6a {
+        if self.fire_track_opts.m6a {
             pairs.push((&mut self.m6a_coverage, &fiber.m6a));
         }
-        if self.pileup_opts.cpg {
+        if self.fire_track_opts.cpg {
             pairs.push((&mut self.cpg_coverage, &fiber.cpg));
         }
 
@@ -344,9 +425,7 @@ impl<'a> FireTrack<'a> {
         for i in 0..self.track_len {
             if self.fire_coverage[i] <= 0 {
                 self.scores[i] = -1.0;
-            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE
-                && self.pileup_opts.shuffle.is_none()
-            {
+            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE && !self.fire_track_opts.shuffle {
                 // there is no minimum fire coverage if we are shuffling
                 self.scores[i] = -1.0;
             } else {
@@ -357,7 +436,7 @@ impl<'a> FireTrack<'a> {
 
     pub fn calculate_rolling_max_score(&mut self) -> Vec<f32> {
         let mut rolling_max = vec![-1.0; self.track_len];
-        let window_size = self.pileup_opts.rolling_max.unwrap();
+        let window_size = self.fire_track_opts.rolling_max.unwrap();
         let look_back = window_size / 2;
         for (i, cur_roll_max) in rolling_max.iter_mut().enumerate().take(self.track_len) {
             let start = i.saturating_sub(look_back);
@@ -383,7 +462,7 @@ impl<'a> FireTrack<'a> {
             nuc_coverage: &self.nuc_coverage[i],
             cpg_coverage: &self.cpg_coverage[i],
             m6a_coverage: &self.m6a_coverage[i],
-            pileup_opts: self.pileup_opts,
+            fire_track_opts: self.fire_track_opts.clone(),
         }
     }
 }
@@ -412,21 +491,34 @@ impl<'a> FiberseqPileup<'a> {
         shuffled_fibers: &'a Option<ShuffledFibers>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
-        let all_data = FireTrack::new(chrom_start, chrom_end, pileup_opts, &None);
+        let fire_track_opts = FireTrackOptions::from(pileup_opts);
+        let all_data = FireTrack::new(chrom_start, chrom_end, fire_track_opts.clone(), &None);
         let (hap1_data, hap2_data) = if pileup_opts.haps {
             (
-                Some(FireTrack::new(chrom_start, chrom_end, pileup_opts, &None)),
-                Some(FireTrack::new(chrom_start, chrom_end, pileup_opts, &None)),
+                Some(FireTrack::new(
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
+                Some(FireTrack::new(
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
             )
         } else {
             (None, None)
         };
 
         let shuffled_data = if shuffled_fibers.is_some() {
+            let mut shuffled_opts = fire_track_opts.clone();
+            shuffled_opts.shuffle = true;
             Some(FireTrack::new(
                 chrom_start,
                 chrom_end,
-                pileup_opts,
+                shuffled_opts,
                 shuffled_fibers,
             ))
         } else {
