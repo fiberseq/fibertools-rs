@@ -18,11 +18,17 @@ pub struct CallPeaksOptions {
 
     /// Maximum coverage threshold for filtering (optional)
     #[clap(long)]
-    pub max_cov: Option<u32>,
+    pub max_cov: Option<i32>,
 
     /// Minimum coverage threshold for filtering (optional)
     #[clap(long)]
-    pub min_cov: Option<u32>,
+    pub min_cov: Option<i32>,
+
+    /// Number of standard deviations from median coverage to use for filtering (default: 5)
+    /// If set, will calculate median +/- (sd_cov * std_dev) and use those as min/max coverage
+    /// This overrides --max-cov and --min-cov if those are not explicitly set
+    #[clap(long, default_value = "5.0")]
+    pub sd_cov: f64,
 
     /// Maximum FDR threshold for peak calling
     #[clap(long, default_value = "0.05")]

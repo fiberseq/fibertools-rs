@@ -21,7 +21,6 @@ use std::fs::File;
 use std::io::{self, stdout, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::time::Instant;
 
 const BUFFER_SIZE: usize = 32 * 1024;
 const COMPRESSION_THREADS: usize = 8;
@@ -223,16 +222,22 @@ pub fn bam_reader(bam: &str) -> bam::Reader {
     }
 }
 // This is a bam chunk reader
-pub struct BamChunk<'a> {
-    pub bam: bam::Records<'a, bam::Reader>,
+pub struct BamChunk<'a, R>
+where
+    R: bam::Read,
+{
+    pub bam: bam::Records<'a, R>,
     pub chunk_size: usize,
     pub pre_chunk_done: u64,
     pub bar: ProgressBar,
     pub bit_flag_filter: u16,
 }
 
-impl<'a> BamChunk<'a> {
-    pub fn new(bam: bam::Records<'a, bam::Reader>, chunk_size: Option<usize>) -> Self {
+impl<'a, R> BamChunk<'a, R>
+where
+    R: bam::Read,
+{
+    pub fn new(bam: bam::Records<'a, R>, chunk_size: Option<usize>) -> Self {
         let chunk_size = std::cmp::min(
             chunk_size.unwrap_or_else(|| current_num_threads() * 100),
             2_500,
@@ -253,7 +258,10 @@ impl<'a> BamChunk<'a> {
 }
 
 // The `Iterator` trait only requires a method to be defined for the `next` element.
-impl Iterator for BamChunk<'_> {
+impl<R> Iterator for BamChunk<'_, R>
+where
+    R: bam::Read,
+{
     // We can refer to this type using Self::Item
     type Item = Vec<bam::Record>;
 
@@ -266,7 +274,6 @@ impl Iterator for BamChunk<'_> {
         // update progress bar with results from previous iteration
         self.bar.inc(self.pre_chunk_done);
 
-        let start = Instant::now();
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
             let r = r.unwrap();
@@ -295,14 +302,6 @@ impl Iterator for BamChunk<'_> {
         if cur_vec.is_empty() {
             None
         } else {
-            let duration = start.elapsed().as_secs_f64();
-            log::debug!(
-                "Read {} bam records at {}.",
-                format!("{:}", cur_vec.len()).bright_magenta().bold(),
-                format!("{:.2?} reads/s", cur_vec.len() as f64 / duration)
-                    .bright_cyan()
-                    .bold(),
-            );
             Some(cur_vec)
         }
     }
