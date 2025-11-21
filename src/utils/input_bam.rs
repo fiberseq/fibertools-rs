@@ -181,6 +181,37 @@ impl InputBam {
             *header = crate::utils::panspec::strip_pan_spec_header(header, &delimiter);
         }
     }
+
+    /// Fetch fibers from a specific region with filters applied
+    /// Returns an iterator of FiberseqData records from the specified region
+    ///
+    /// # Arguments
+    /// * `bam` - Mutable reference to an IndexedReader
+    /// * `chrom` - Chromosome/contig name
+    /// * `start` - Optional start position (0-based)
+    /// * `end` - Optional end position (0-based, exclusive)
+    /// ```
+    pub fn fetch_fibers<'a>(
+        &'a self,
+        bam: &'a mut bam::IndexedReader,
+        chrom: &str,
+        start: Option<i64>,
+        end: Option<i64>,
+    ) -> Result<FiberseqRecords<'a, bam::IndexedReader>, rust_htslib::errors::Error> {
+        // Fetch the region
+        match (start, end) {
+            (Some(s), Some(e)) => bam.fetch((chrom, s, e))?,
+            (None, None) => bam.fetch(chrom.as_bytes())?,
+            _ => panic!("Both start and end must be specified, or neither"),
+        }
+
+        // Create FiberseqRecords iterator from the fetched records
+        let records = bam.records();
+        let header = self.header_view();
+        let fiber_iter = FiberseqRecords::from_rec_iterator(records, header, self.filters.clone());
+
+        Ok(fiber_iter)
+    }
 }
 
 impl std::default::Default for InputBam {
