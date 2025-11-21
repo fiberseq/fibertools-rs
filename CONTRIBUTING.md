@@ -35,4 +35,8 @@ The release page on GitHub will then be updated using `cargo dist`. You can prev
 
 ```bash
 cargo dist plan
+git commit -am "release: 0.2.0"
+git tag "v0.2.0"
+git push
+git push --tags
 ```
