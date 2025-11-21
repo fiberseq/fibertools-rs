@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+### [0.8.1]
+
+Fixed a bug where pg-inject could make fibertigs that were longer than needed at the end of chromosomes.
+
+## [0.8.0]
+
+### 🐛 **Bug Fix: Issue #90**
+
+**Problem**: Nucleosome/MSP coordinates at alignment block boundaries were incorrectly extended into subsequent blocks, causing artificial length inflation.
+
+### 🚀 **New Features: PanGenome Commands**
+
+#### 1. `pg-inject`
+
+Create mock BAM files from reference FASTA with perfectly aligned sequences while injecting annotation information from BED files.
+
+#### 3. `pg-pansn`
+
+Add/strip panSN-spec prefixes from BAM contig names
+
+- Full panSN specification compliance
+- Bidirectional prefix management
+
+#### 2. `pg-lift`
+
+Lift annotations through pangenome graphs from source to target coordinates
+
+- Coordinate transformation across pangenome references
+- Maintains annotation integrity during lifting
+- Uses `vg` + `pg-pansn` + `pg-lift` under the hood.
+
+### 📦 **New Core Architecture**
+
+#### Major New Modules
+
+- **`fibertig.rs`** (647 lines) - Core pangenome annotation framework
+- **`bamannotations.rs`** (573 lines) - BED annotation handling & coordinate mapping
+- **`panspec.rs`** (63 lines) - PanSN specification support
+
+#### Enhanced Modules
+
+- **`bamlift.rs`** - Improved coordinate lifting with better error handling
+- **`bio_io.rs`** - Enhanced I/O capabilities (+114 lines)
+- **`fiber.rs`** - Major cleanup and simplification (-218 lines)
+
+#### Removed Legacy Code
+
+- **`bamranges.rs`** (355 lines removed) - Replaced with more efficient implementations
+
+#### Python (py-ft) Enhancements
+
+- fiberplot - Standalone CLI tool for generating Altair HTML visualizations
+- Updated dependencies and improved compatibility across the Python package
+
 ## [0.7.0] - 2025-07-10
 
 ### 🚀 Features
