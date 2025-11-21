@@ -220,8 +220,9 @@ impl FiberTig {
 
         // If we have any remaining annotations after the last split, add them
         if !current_annotations.is_empty() {
+            current_target_end = std::cmp::min(seq_len, current_target_end);
             split_to_annotations.push((
-                (current_start, seq_len),
+                (current_start, current_target_end),
                 FiberAnnotations::from_annotations(
                     current_annotations,
                     seq_len,
