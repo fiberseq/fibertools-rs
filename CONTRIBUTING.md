@@ -29,14 +29,24 @@ To cut a release, run:
 cargo release {release type}
 ```
 
+or
+
+```bash
+git commit -am "release: 0.2.0"
+git tag "v0.2.0"
+```
+
 Where release type is one of: major, minor, patch.
 
 The release page on GitHub will then be updated using `cargo dist`. You can preview this with:
 
 ```bash
 cargo dist plan
-git commit -am "release: 0.2.0"
-git tag "v0.2.0"
+```
+
+and then run:
+
+```bash
 git push
 git push --tags
 ```
