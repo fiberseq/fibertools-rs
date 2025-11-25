@@ -31,6 +31,7 @@ pub struct FireTrackOptions {
     pub random_shuffle: bool, // If true, generate random positions instead of using ShuffledFibers
     pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
     pub rolling_max: Option<usize>,
+    pub track_fire_elements: bool, // If true, store individual FIRE element positions per base
 }
 
 impl From<&PileupOptions> for FireTrackOptions {
@@ -45,6 +46,7 @@ impl From<&PileupOptions> for FireTrackOptions {
             random_shuffle: false, // PileupOptions doesn't have this yet
             shuffle_seed: None,
             rolling_max: opts.rolling_max,
+            track_fire_elements: false, // Default to false for pileup command
         }
     }
 }
@@ -106,6 +108,7 @@ impl std::fmt::Display for FireRow<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct ShuffledFibers {
     pub shuffled_fiber_starts: HashMap<(String, String, i64), i64>,
 }
@@ -210,6 +213,15 @@ fn generate_random_shuffle_offset(
     Some(shuffled_start - original_start)
 }
 
+/// Represents a single FIRE element (MSP) with its genomic coordinates and unique ID
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FireElement {
+    pub start: i64,
+    pub end: i64,
+    pub id: usize, // Unique ID for this FIRE element (for tracking in merging)
+}
+
+#[derive(Debug)]
 pub struct FireTrack<'a> {
     pub chrom: String,
     pub chrom_start: usize,
@@ -229,6 +241,11 @@ pub struct FireTrack<'a> {
     // Store fiber information for later shuffle generation
     // Key: (fiber_name, original_start), Value: fiber_length
     fibers_seen: HashMap<(String, i64), i64>,
+    // Optional: Store individual FIRE elements per position
+    // fire_elements[position] = Vec of FireElements overlapping that position
+    pub fire_elements: Option<Vec<Vec<FireElement>>>,
+    // Counter for assigning unique IDs to FIRE elements
+    next_fire_id: usize,
 }
 
 impl<'a> FireTrack<'a> {
@@ -242,6 +259,14 @@ impl<'a> FireTrack<'a> {
         let track_len = chrom_end - chrom_start + 1;
         let raw_scores = vec![-1.0; track_len];
         let scores = vec![-1.0; track_len];
+
+        // Initialize fire_elements only if tracking is enabled
+        let fire_elements = if fire_track_opts.track_fire_elements {
+            Some(vec![Vec::new(); track_len])
+        } else {
+            None
+        };
+
         Self {
             chrom,
             chrom_start,
@@ -259,6 +284,8 @@ impl<'a> FireTrack<'a> {
             shuffled_fibers,
             cur_offset: 0,
             fibers_seen: HashMap::new(),
+            fire_elements,
+            next_fire_id: 0,
         }
     }
 
@@ -404,6 +431,22 @@ impl<'a> FireTrack<'a> {
                         continue;
                     }
                     let score_update = (1.0 - annotation.qual as f32 / 255.0).log10() * -50.0;
+
+                    // If tracking FIRE elements, create a FireElement for this MSP
+                    let fire_element = if self.fire_track_opts.track_fire_elements {
+                        let elem_start = rs + self.cur_offset;
+                        let elem_end = re + self.cur_offset;
+                        let fire_id = self.next_fire_id;
+                        self.next_fire_id += 1;
+                        Some(FireElement {
+                            start: elem_start,
+                            end: elem_end,
+                            id: fire_id,
+                        })
+                    } else {
+                        None
+                    };
+
                     for i in rs..re {
                         let pos = i + self.cur_offset - self.chrom_start as i64;
                         if pos < 0 || pos >= self.track_len as i64 {
@@ -411,6 +454,11 @@ impl<'a> FireTrack<'a> {
                         }
                         self.fire_coverage[pos as usize] += 1;
                         self.raw_scores[pos as usize] += score_update;
+
+                        // Store the FIRE element at this position if tracking is enabled
+                        if let (Some(fire_elements), Some(elem)) = (&mut self.fire_elements, fire_element) {
+                            fire_elements[pos as usize].push(elem);
+                        }
                     }
                 }
                 _ => continue,
@@ -635,6 +683,7 @@ impl From<&PileupOptions> for FiberseqPileupOptions {
     }
 }
 
+#[derive(Debug)]
 pub struct FiberseqPileup<'a> {
     pub all_data: FireTrack<'a>,
     pub hap1_data: Option<FireTrack<'a>>,

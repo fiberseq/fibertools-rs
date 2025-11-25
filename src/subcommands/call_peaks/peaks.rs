@@ -1,5 +1,5 @@
 use super::fdr::FdrEntry;
-use super::pileup::chrom_names_and_lengths;
+use super::chrom_names_and_lengths;
 use crate::cli::CallPeaksOptions;
 use crate::subcommands::pileup::{FiberseqPileup, FiberseqPileupOptions, FireTrackOptions};
 use crate::utils::bio_io;
@@ -7,20 +7,26 @@ use anyhow::Result;
 use std::io::Write;
 
 /// A peak representing a local maximum in FIRE scores
-#[derive(Debug, Clone)]
-pub struct Peak {
+#[derive(Debug)]
+pub struct Peak<'a> {
     pub chrom: String,
     /// Start position of the local maximum region (0-based, inclusive)
+    /// This is the median start position of underlying FIRE elements
     pub start: usize,
     /// End position of the local maximum region (0-based, exclusive)
+    /// This is the median end position of underlying FIRE elements
     pub end: usize,
     /// FIRE score at this position
     pub score: f32,
     /// FDR value at this position
     pub fdr: f64,
+    /// Index in the pileup track where the peak was called (for retrieving FIRE elements)
+    pub peak_index: usize,
+    /// Reference to the pileup track containing FIRE elements
+    pub pileup: &'a FiberseqPileup<'a>,
 }
 
-impl std::fmt::Display for Peak {
+impl<'a> std::fmt::Display for Peak<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // BED6 format: chrom start end name score strand
         write!(
@@ -31,11 +37,11 @@ impl std::fmt::Display for Peak {
     }
 }
 
-impl Peak {
+impl<'a> Peak<'a> {
     /// Find local maxima from a pileup
     /// For consecutive positions with identical rolling max scores, save the entire region
     /// Only keeps peaks with FDR <= 0.05
-    pub fn from_pileup(pileup: &FiberseqPileup, fdr_table: &[FdrEntry]) -> Vec<Self> {
+    pub fn from_pileup(pileup: &'a FiberseqPileup<'a>, fdr_table: &[FdrEntry]) -> Vec<Self> {
         let mut peaks = Vec::new();
 
         let scores = &pileup.all_data.scores;
@@ -84,7 +90,8 @@ impl Peak {
 
     /// Create a peak from a region of consecutive maxima if FDR <= 0.05
     /// Returns None if the peak doesn't meet the FDR threshold
-    fn create_peak_if_significant(pileup: &FiberseqPileup, positions: &[usize], fdr_table: &[FdrEntry]) -> Option<Self> {
+    /// Peak boundaries are determined by the median start/end of underlying FIRE elements
+    fn create_peak_if_significant(pileup: &'a FiberseqPileup<'a>, positions: &[usize], fdr_table: &[FdrEntry]) -> Option<Self> {
         if positions.is_empty() {
             return None;
         }
@@ -97,9 +104,38 @@ impl Peak {
 
         // Only keep peaks with FDR <= 0.05
         if fdr <= 0.05 {
-            // Convert pileup-relative positions to genomic coordinates
-            let start = pileup.chrom_start + positions[0];
-            let end = pileup.chrom_start + positions[positions.len() - 1] + 1; // +1 for exclusive end
+            // Collect all FIRE elements from the local max region
+            let (start, end) = if let Some(ref fire_elements_vec) = pileup.all_data.fire_elements {
+                let mut starts = Vec::new();
+                let mut ends = Vec::new();
+
+                // Collect FIRE elements from all positions in the local max region
+                for &pos in positions {
+                    for fire_elem in &fire_elements_vec[pos] {
+                        starts.push(fire_elem.start);
+                        ends.push(fire_elem.end);
+                    }
+                }
+
+                if starts.is_empty() {
+                    // Fallback: no FIRE elements found, use the local max region boundaries
+                    let start = pileup.chrom_start + positions[0];
+                    let end = pileup.chrom_start + positions[positions.len() - 1] + 1;
+                    (start, end)
+                } else {
+                    // Calculate median start and end from FIRE elements
+                    starts.sort_unstable();
+                    ends.sort_unstable();
+                    let median_start = starts[starts.len() / 2] as usize;
+                    let median_end = ends[ends.len() / 2] as usize;
+                    (median_start, median_end)
+                }
+            } else {
+                // Fallback: FIRE element tracking not enabled
+                let start = pileup.chrom_start + positions[0];
+                let end = pileup.chrom_start + positions[positions.len() - 1] + 1;
+                (start, end)
+            };
 
             Some(Self {
                 chrom: pileup.chrom.clone(),
@@ -107,6 +143,8 @@ impl Peak {
                 end,
                 score,
                 fdr,
+                peak_index: middle_pos,
+                pileup,
             })
         } else {
             None
@@ -186,6 +224,7 @@ pub fn call_peaks_with_fdr(
                 random_shuffle: false,
                 shuffle_seed: None,
                 rolling_max: Some(opts.window_size),
+                track_fire_elements: true, // Enable FIRE element tracking for peak calling
             },
             rolling_max: Some(opts.window_size),
             haps: false,
