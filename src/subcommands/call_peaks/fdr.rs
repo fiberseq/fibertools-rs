@@ -294,3 +294,58 @@ pub fn write_fdr_table(fdr_table: &[FdrEntry], path: &str) -> Result<()> {
 
     Ok(())
 }
+
+/// Read FDR table from TSV file
+pub fn read_fdr_table(path: &str) -> Result<Vec<FdrEntry>> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader};
+
+    let file = File::open(path).context("Failed to open FDR table file")?;
+    let reader = BufReader::new(file);
+    let mut entries = Vec::new();
+
+    for (line_num, line) in reader.lines().enumerate() {
+        let line = line.context("Failed to read line from FDR table")?;
+
+        // Skip header line
+        if line_num == 0 {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() != 4 {
+            anyhow::bail!(
+                "Invalid FDR table format at line {}: expected 4 columns, found {}",
+                line_num + 1,
+                parts.len()
+            );
+        }
+
+        let threshold = parts[0]
+            .parse::<f64>()
+            .context(format!("Failed to parse threshold at line {}", line_num + 1))?;
+        let fdr = parts[1]
+            .parse::<f64>()
+            .context(format!("Failed to parse FDR at line {}", line_num + 1))?;
+        let shuffled_bp = parts[2]
+            .parse::<f64>()
+            .context(format!("Failed to parse shuffled_bp at line {}", line_num + 1))?;
+        let real_bp = parts[3]
+            .parse::<f64>()
+            .context(format!("Failed to parse real_bp at line {}", line_num + 1))?;
+
+        entries.push(FdrEntry {
+            threshold,
+            fdr,
+            shuffled_bp,
+            real_bp,
+        });
+    }
+
+    log::info!("Loaded {} FDR table entries from {}", entries.len(), path);
+
+    // Sort by threshold (should already be sorted, but ensure it)
+    entries.sort_by(|a, b| a.threshold.partial_cmp(&b.threshold).unwrap());
+
+    Ok(entries)
+}

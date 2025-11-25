@@ -2,7 +2,7 @@ mod fdr;
 mod peaks;
 mod pileup;
 
-pub use fdr::{make_fdr_table, write_fdr_table, FdrEntry, PileupRecord};
+pub use fdr::{make_fdr_table, read_fdr_table, write_fdr_table, FdrEntry, PileupRecord};
 pub use peaks::call_peaks_with_fdr;
 pub use pileup::{chrom_names_and_lengths, fibers_from_chromosome, process_chromosome_pileup_both};
 
@@ -28,8 +28,7 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
     // Generate or load FDR table
     let fdr_table = if let Some(ref fdr_table_path) = opts.fdr_table {
         log::info!("Loading FDR table from: {}", fdr_table_path);
-        // TODO: load from file
-        Vec::new()
+        read_fdr_table(fdr_table_path)?
     } else {
         // Generate pileup for both real and shuffled data
         log::info!("Running pileup for real and shuffled data...");

@@ -647,7 +647,8 @@ pub struct FiberseqPileup<'a> {
     has_data: bool,
     pileup_opts: FiberseqPileupOptions,
     shuffled_fibers: &'a Option<ShuffledFibers>,
-    rolling_max: Option<Vec<f32>>,
+    pub rolling_max: Option<Vec<f32>>,
+    pub fdr_scores: Option<Vec<f64>>,
 }
 
 impl<'a> FiberseqPileup<'a> {
@@ -715,11 +716,47 @@ impl<'a> FiberseqPileup<'a> {
             pileup_opts,
             shuffled_fibers,
             rolling_max: None,
+            fdr_scores: None,
         }
     }
 
     pub fn has_data(&self) -> bool {
         self.has_data
+    }
+
+    /// Calculate and store FDR scores for each position based on the FDR table
+    pub fn calculate_fdr_scores(&mut self, fdr_table: &[crate::subcommands::call_peaks::FdrEntry]) {
+        let mut fdr_scores = vec![1.0; self.track_len];
+
+        if fdr_table.is_empty() {
+            self.fdr_scores = Some(fdr_scores);
+            return;
+        }
+
+        for (i, &score) in self.all_data.scores.iter().enumerate() {
+            if score < 0.0 {
+                // No coverage, FDR = 1.0 (already set)
+                continue;
+            }
+
+            // Binary search to find the FDR for this score
+            let search_result = fdr_table.binary_search_by(|entry| {
+                entry.threshold.partial_cmp(&(score as f64)).unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            fdr_scores[i] = match search_result {
+                Result::Ok(idx) => fdr_table[idx].fdr,
+                Result::Err(idx) => {
+                    if idx == 0 {
+                        fdr_table[0].fdr
+                    } else {
+                        fdr_table[idx - 1].fdr
+                    }
+                }
+            };
+        }
+
+        self.fdr_scores = Some(fdr_scores);
     }
 
     /// Add fibers from an iterator
