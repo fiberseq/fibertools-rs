@@ -42,13 +42,17 @@ pub struct CallPeaksOptions {
     #[clap(long, default_value = "200")]
     pub window_size: usize,
 
-    /// Minimum fraction of overlapping FIRE elements for merging peaks
+    /// Minimum fraction of overlapping FIRE elements for merging peaks (Phase 2)
     #[clap(long, default_value = "0.5")]
     pub min_frac_overlap: f64,
 
-    /// Minimum reciprocal overlap for merging peaks
+    /// Minimum reciprocal overlap for merging peaks (Phase 3)
     #[clap(long, default_value = "0.75")]
     pub min_reciprocal_overlap: f64,
+
+    /// High reciprocal overlap threshold for initial merging (Phase 1)
+    #[clap(long, default_value = "0.90")]
+    pub high_reciprocal_overlap: f64,
 
     /// Maximum number of grouping iterations for merging
     #[clap(long, default_value = "10")]
