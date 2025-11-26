@@ -307,12 +307,18 @@ pub fn fdr_table(
     bam: &mut rust_htslib::bam::IndexedReader,
     header: &rust_htslib::bam::HeaderView,
 ) -> Result<Vec<FdrEntry>> {
-    use super::{chrom_names_and_lengths, process_chromosome_pileup_both};
+    use super::{chrom_names_and_lengths, chromosome_has_fibers, process_chromosome_pileup_both};
 
     let mut fdr_builder = IncrementalFdrBuilder::new();
 
     // Process each chromosome and add to the builder
     for (chrom_str, chrom_len) in chrom_names_and_lengths(header)? {
+        // Skip chromosomes with no fibers
+        if !chromosome_has_fibers(&chrom_str, bam, opts)? {
+            log::info!("Skipping chromosome {} (no fibers)", chrom_str);
+            continue;
+        }
+
         log::info!("Processing chromosome {} for FDR calculation...", chrom_str);
 
         // Process the fibers to generate pileup records (streaming - no all_fibers Vec!)

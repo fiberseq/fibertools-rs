@@ -85,13 +85,32 @@ pub fn chrom_names_and_lengths(
     Ok(chroms)
 }
 
+/// Check if a chromosome has any fibers
+///
+/// # Arguments
+/// * `chrom` - Chromosome name
+/// * `bam` - Indexed BAM reader
+/// * `opts` - Call peaks options (for filtering)
+///
+/// # Returns
+/// True if the chromosome has at least one fiber, false otherwise
+fn chromosome_has_fibers(
+    chrom: &str,
+    bam: &mut rust_htslib::bam::IndexedReader,
+    opts: &CallPeaksOptions,
+) -> Result<bool> {
+    // Check if there's at least one fiber
+    let has_fibers = opts.input.fetch_fibers(bam, chrom, None, None)?.next().is_some();
+    Ok(has_fibers)
+}
+
 /// Process a single chromosome and return PileupRecords for both real and shuffled
 /// Returns (real_records, shuffled_records) processed at the same positions
 ///
 /// # Arguments
 /// * `chrom` - Chromosome name
 /// * `chrom_len` - Chromosome length
-/// * `all_fibers` - Pre-loaded fibers from the chromosome
+/// * `bam` - Indexed BAM reader
 /// * `opts` - Call peaks options
 fn process_chromosome_pileup_both(
     chrom: &str,

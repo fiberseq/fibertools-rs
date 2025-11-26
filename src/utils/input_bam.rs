@@ -13,8 +13,7 @@ pub static MIN_ML_SCORE: &str = "125";
 #[derive(Debug, Args, Clone)]
 pub struct FiberFilters {
     /// BAM bit flags to filter on, equivalent to `-F` in samtools view
-    /// For call-peaks: defaults to 2304 (filters secondary and supplementary alignments)
-    /// For other commands: defaults to 0 (no filtering)
+    /// Defaults to 0 (no filtering)
     #[clap(
         global = true,
         short = 'F',

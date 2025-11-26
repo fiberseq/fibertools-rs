@@ -50,7 +50,6 @@ rayon = "1.10"
 linear-map = "1.2.0"
 regex = "1.9.1"
 rust-htslib = "0.46"
-rust-lapper = "1.2.0"
 
 
 serde = { version = "1.0.104", features = ["derive"], optional = false }
@@ -69,7 +68,6 @@ burn = { version = "0.18.0", optional = true, features = [
 num = "0.4.3"
 rand = "0.8.5"
 noodles = { version = "0.100.0", features = ["fasta", "bed"] }
-polars = { version = "0.51.0", features = ["csv", "decompress", "lazy"] }
 
 [build-dependencies]
 burn-import = { version = "0.18.0", default-features = false, features = [
@@ -118,3 +116,7 @@ codegen-units = 1
 debug = false
 lto = true
 panic = "abort"
+
+[profile.profiling]
+inherits = "release"
+debug = true

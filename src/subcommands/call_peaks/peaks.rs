@@ -604,6 +604,12 @@ pub fn call_peaks(
     let mut total_peaks_after_merge = 0;
 
     for (chrom, chrom_len) in chrom_names_and_lengths(header)? {
+        // Skip chromosomes with no fibers
+        if !super::chromosome_has_fibers(&chrom, bam, opts)? {
+            log::info!("Skipping chromosome {} (no fibers)", chrom);
+            continue;
+        }
+
         log::info!(
             "Finding peaks on chromosome {} with length {}",
             chrom,

@@ -155,9 +155,6 @@ pub enum Commands {
     #[clap(name = "pg-pansn")]
     PgPansn(PgPansnOptions),
     /// Call FIRE peaks using FDR-based peak calling on pileup data
-    ///
-    /// Note: By default, filters secondary (256) and supplementary (2048) alignments (-F 2304).
-    /// Override with -F 0 to include all alignments.
     #[clap(name = "call-peaks", visible_aliases = &["peaks", "call"])]
     CallPeaks(CallPeaksOptions),
     /// Make command line completions
