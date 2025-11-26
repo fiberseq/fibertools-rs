@@ -1,7 +1,9 @@
 mod fdr;
 mod peaks;
 
-pub use fdr::{fdr_table, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder, PileupRecord};
+pub use fdr::{
+    fdr_table, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder, PileupRecord,
+};
 pub use peaks::call_peaks;
 
 use crate::cli::CallPeaksOptions;
@@ -82,30 +84,6 @@ pub fn chrom_names_and_lengths(
         chroms.push((chrom_str, chrom_len));
     }
     Ok(chroms)
-}
-
-/// Read all fibers from a chromosome
-///
-/// # Arguments
-/// * `chrom` - Chromosome name
-/// * `chrom_len` - Chromosome length
-/// * `bam` - Indexed BAM reader
-/// * `opts` - Call peaks options (for filtering)
-///
-/// # Returns
-/// Vector of FiberseqData for all fibers in the chromosome
-pub fn fibers_from_chromosome(
-    chrom: &str,
-    bam: &mut rust_htslib::bam::IndexedReader,
-    opts: &CallPeaksOptions,
-) -> Result<Vec<FiberseqData>> {
-    log::debug!("Reading fibers from chromosome {}", chrom);
-
-    // Use the new fetch_fibers method from InputBam - returns an iterator
-    let all_fibers: Vec<FiberseqData> = opts.input.fetch_fibers(bam, chrom, None, None)?.collect();
-
-    log::debug!("Read {} fibers from chromosome {}", all_fibers.len(), chrom);
-    Ok(all_fibers)
 }
 
 /// Process a single chromosome and return PileupRecords for both real and shuffled
