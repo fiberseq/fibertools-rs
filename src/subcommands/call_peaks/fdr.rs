@@ -329,7 +329,10 @@ pub fn fdr_table(
         // Add to builder (this aggregates scores and drops the full records)
         fdr_builder.add_chromosome_data(real_chrom, shuffled_chrom);
 
-        // Memory is freed here as real_chrom and shuffled_chrom go out of scope
+        // Explicitly drop all_fibers to free memory immediately
+        drop(all_fibers);
+
+        log::debug!("  Chromosome {} processing complete, memory freed", chrom_str);
     }
 
     // Build the final FDR table
