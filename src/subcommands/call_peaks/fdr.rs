@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use crate::cli::CallPeaksOptions;
-use crate::fiber::FiberseqData;
 
 /// FDR table entry mapping FIRE scores to FDR values
 #[derive(Debug, Clone)]
@@ -316,34 +315,19 @@ pub fn fdr_table(
     for (chrom_str, chrom_len) in chrom_names_and_lengths(header)? {
         log::info!("Processing chromosome {} for FDR calculation...", chrom_str);
 
-        // Read all fibers from the chromosome
-        let all_fibers: Vec<FiberseqData> = opts
-            .input
-            .fetch_fibers(bam, &chrom_str, None, None)?
-            .collect();
-
-        // Process the fibers to generate pileup records
+        // Process the fibers to generate pileup records (streaming - no all_fibers Vec!)
         let (real_chrom, shuffled_chrom) =
-            process_chromosome_pileup_both(&chrom_str, chrom_len, &all_fibers, opts)?;
+            process_chromosome_pileup_both(&chrom_str, chrom_len, bam, opts)?;
 
-        // Calculate memory usage
-        let all_fibers_mb = (std::mem::size_of_val(all_fibers.as_slice()) as f64) / 1_000_000.0;
-        let real_mb = (std::mem::size_of_val(real_chrom.as_slice()) as f64) / 1_000_000.0;
-        let shuffled_mb = (std::mem::size_of_val(shuffled_chrom.as_slice()) as f64) / 1_000_000.0;
+        log::debug!(
+            "  {}: real_records={}, shuffled_records={}",
+            chrom_str,
+            real_chrom.len(),
+            shuffled_chrom.len(),
+        );
 
         // Add to builder (this aggregates scores and drops the full records)
         fdr_builder.add_chromosome_data(&real_chrom, &shuffled_chrom);
-
-        log::debug!(
-            "  {}: fibers={} (~{:.1}MB), real_records={} (~{:.1}MB), shuffled_records={} (~{:.1}MB)",
-            all_fibers.len(),
-            chrom_str,
-            all_fibers_mb,
-            real_chrom.len(),
-            real_mb,
-            shuffled_chrom.len(),
-            shuffled_mb,
-        );
     }
 
     // Build the final FDR table

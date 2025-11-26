@@ -7,7 +7,6 @@ pub use fdr::{
 pub use peaks::call_peaks;
 
 use crate::cli::CallPeaksOptions;
-use crate::fiber::FiberseqData;
 use crate::subcommands::pileup::{FireTrack, FireTrackOptions};
 use anyhow::{Context, Result};
 
@@ -97,13 +96,9 @@ pub fn chrom_names_and_lengths(
 fn process_chromosome_pileup_both(
     chrom: &str,
     chrom_len: i64,
-    all_fibers: &[FiberseqData],
+    bam: &mut rust_htslib::bam::IndexedReader,
     opts: &CallPeaksOptions,
 ) -> Result<(Vec<PileupRecord>, Vec<PileupRecord>)> {
-    if all_fibers.is_empty() {
-        return Ok((Vec::new(), Vec::new()));
-    }
-
     log::info!("Processing chromosome {} (length: {})", chrom, chrom_len);
 
     // Create fire track options - to calculate FIRE scores
@@ -123,10 +118,11 @@ fn process_chromosome_pileup_both(
     };
     let mut real_track = FireTrack::new(chrom.to_string(), 0, chrom_len as usize, real_opts, &None);
 
-    // Process all fibers and update real track
+    // Process all fibers and update real track (first pass - streaming)
     // Note: FireTrack will automatically store fiber info in fibers_seen
-    for fiber in all_fibers {
-        real_track.update_with_fiber(fiber);
+    log::debug!("  First pass: building real track and collecting fiber positions");
+    for fiber in opts.input.fetch_fibers(bam, chrom, None, None)? {
+        real_track.update_with_fiber(&fiber);
     }
 
     // Calculate scores for real fibers
@@ -185,9 +181,10 @@ fn process_chromosome_pileup_both(
         &generated_shuffle,
     );
 
-    // Process the same fibers for shuffled track
-    for fiber in all_fibers {
-        shuffled_track.update_with_fiber(fiber);
+    // Process the same fibers for shuffled track (second pass - streaming)
+    log::debug!("  Second pass: building shuffled track");
+    for fiber in opts.input.fetch_fibers(bam, chrom, None, None)? {
+        shuffled_track.update_with_fiber(&fiber);
     }
 
     // Calculate scores for shuffled track
