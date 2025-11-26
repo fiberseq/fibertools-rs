@@ -1,7 +1,7 @@
 mod fdr;
 mod peaks;
 
-pub use fdr::{make_fdr_table, read_fdr_table, write_fdr_table, FdrEntry, PileupRecord};
+pub use fdr::{fdr_table, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder, PileupRecord};
 pub use peaks::call_peaks;
 
 use crate::cli::CallPeaksOptions;
@@ -41,12 +41,9 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
             log::info!("Loading FDR table from: {}", fdr_table_path);
             read_fdr_table(fdr_table_path)?
         } else {
-            // Generate pileup for both real and shuffled data
-            log::info!("Running pileup for real and shuffled data...");
-            let (real_pileup, shuffled_pileup) = generate_pileups(opts, &mut bam, &header)?;
-
-            // Generate FDR table from pileup data
-            make_fdr_table(real_pileup, shuffled_pileup, opts.max_fdr)?
+            // Generate pileup incrementally to avoid OOM
+            log::info!("Running pileup for real and shuffled data (incremental mode)...");
+            fdr_table(opts, &mut bam, &header)?
         }
     };
 
@@ -97,7 +94,7 @@ pub fn chrom_names_and_lengths(
 ///
 /// # Returns
 /// Vector of FiberseqData for all fibers in the chromosome
-fn fibers_from_chromosome(
+pub fn fibers_from_chromosome(
     chrom: &str,
     bam: &mut rust_htslib::bam::IndexedReader,
     opts: &CallPeaksOptions,
@@ -109,37 +106,6 @@ fn fibers_from_chromosome(
 
     log::debug!("Read {} fibers from chromosome {}", all_fibers.len(), chrom);
     Ok(all_fibers)
-}
-
-/// Generate pileups for all chromosomes
-fn generate_pileups(
-    opts: &mut CallPeaksOptions,
-    bam: &mut rust_htslib::bam::IndexedReader,
-    header: &rust_htslib::bam::HeaderView,
-) -> Result<(Vec<PileupRecord>, Vec<PileupRecord>)> {
-    let mut real_pileup = Vec::new();
-    let mut shuffled_pileup = Vec::new();
-
-    // Process each chromosome
-    for (chrom_str, chrom_len) in chrom_names_and_lengths(header)? {
-        // Read all fibers from the chromosome
-        let all_fibers = fibers_from_chromosome(&chrom_str, bam, opts)?;
-
-        // Process the fibers to generate pileup records
-        let (real_chrom, shuffled_chrom) =
-            process_chromosome_pileup_both(&chrom_str, chrom_len, &all_fibers, opts)?;
-
-        log::debug!(
-            "Chromosome {}: {} real records, {} shuffled records",
-            chrom_str,
-            real_chrom.len(),
-            shuffled_chrom.len()
-        );
-        real_pileup.extend(real_chrom);
-        shuffled_pileup.extend(shuffled_chrom);
-    }
-
-    Ok((real_pileup, shuffled_pileup))
 }
 
 /// Process a single chromosome and return PileupRecords for both real and shuffled

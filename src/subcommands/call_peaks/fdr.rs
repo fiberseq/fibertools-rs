@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::io::Write;
 
+use crate::cli::CallPeaksOptions;
+
 /// FDR table entry mapping FIRE scores to FDR values
 #[derive(Debug, Clone)]
 pub struct FdrEntry {
@@ -173,109 +175,165 @@ where
     *entries = result;
 }
 
-/// Aggregate pileup data by FIRE score
-/// Returns HashMap mapping score to total base pairs
-/// Uses full float precision for grouping (matching Python behavior)
-fn aggregate_pileup_by_score(
-    pileup_records: &[PileupRecord],
-) -> HashMap<ordered_float::NotNan<f64>, u64> {
-    use ordered_float::NotNan;
-
-    let mut score_counts: HashMap<NotNan<f64>, u64> = HashMap::new();
-
-    for record in pileup_records {
-        let bp = record.end - record.start;
-        // Use full precision, don't round yet (matches Python line 178)
-        if let Ok(score_key) = NotNan::new(record.score) {
-            *score_counts.entry(score_key).or_insert(0) += bp;
-        }
-    }
-
-    score_counts
+/// Incremental FDR builder that aggregates scores without keeping full pileup data
+pub struct IncrementalFdrBuilder {
+    real_scores: HashMap<ordered_float::NotNan<f64>, u64>,
+    shuffled_scores: HashMap<ordered_float::NotNan<f64>, u64>,
+    real_record_count: usize,
+    shuffled_record_count: usize,
 }
 
-/// Make FDR table from real and shuffled pileup data
-pub fn make_fdr_table(
-    real_pileup: Vec<PileupRecord>,
-    shuffled_pileup: Vec<PileupRecord>,
-    max_fdr: f64,
-) -> Result<Vec<FdrEntry>> {
-    log::info!("Generating FDR table from pileup data");
-    log::info!("Real pileup generated {} records", real_pileup.len());
-    log::info!(
-        "Shuffled pileup generated {} records",
-        shuffled_pileup.len()
-    );
-
-    // Aggregate by score
-    let real_scores = aggregate_pileup_by_score(&real_pileup);
-    let shuffled_scores = aggregate_pileup_by_score(&shuffled_pileup);
-
-    // Combine and sort by score descending
-    let mut fire_scores: Vec<(f64, bool, u64)> = Vec::new();
-    for (score_notnan, bp) in real_scores {
-        fire_scores.push((score_notnan.into_inner(), true, bp));
-    }
-    for (score_notnan, bp) in shuffled_scores {
-        fire_scores.push((score_notnan.into_inner(), false, bp));
-    }
-    fire_scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap()); // descending by score
-
-    // Calculate sums for logging
-    let real_mbp: f64 = fire_scores
-        .iter()
-        .filter(|(_, is_real, _)| *is_real)
-        .map(|(_, _, bp)| *bp as f64)
-        .sum::<f64>()
-        / 1_000_000.0;
-    let shuffled_mbp: f64 = fire_scores
-        .iter()
-        .filter(|(_, is_real, _)| !*is_real)
-        .map(|(_, _, bp)| *bp as f64)
-        .sum::<f64>()
-        / 1_000_000.0;
-    log::info!("Real data: {:.2} Mbp", real_mbp);
-    log::info!("Shuffled data: {:.2} Mbp", shuffled_mbp);
-
-    // Debug: Count how many entries have negative scores
-    let neg_score_count = fire_scores
-        .iter()
-        .filter(|(score, _, _)| *score < 0.0)
-        .count();
-    let neg_score_real_bp: u64 = fire_scores
-        .iter()
-        .filter(|(score, is_real, _)| *score < 0.0 && *is_real)
-        .map(|(_, _, bp)| *bp)
-        .sum();
-    let neg_score_shuffled_bp: u64 = fire_scores
-        .iter()
-        .filter(|(score, is_real, _)| *score < 0.0 && !*is_real)
-        .map(|(_, _, bp)| *bp)
-        .sum();
-    log::debug!(
-        "Negative scores: {} entries, real_bp={}, shuffled_bp={}",
-        neg_score_count,
-        neg_score_real_bp,
-        neg_score_shuffled_bp
-    );
-
-    // Create FDR table
-    let fdr_table = fdr_table_from_scores(&fire_scores);
-
-    // Check if we have any thresholds below max_fdr
-    if let Some(min_fdr_entry) = fdr_table
-        .iter()
-        .min_by(|a, b| a.fdr.partial_cmp(&b.fdr).unwrap())
-    {
-        if min_fdr_entry.fdr > max_fdr {
-            anyhow::bail!(
-                "No FIRE score threshold has an FDR < {}. Check the input Fiber-seq data with the QC pipeline and make sure you are using WGS Fiber-seq data.",
-                max_fdr
-            );
+impl IncrementalFdrBuilder {
+    /// Create a new incremental FDR builder
+    pub fn new() -> Self {
+        Self {
+            real_scores: HashMap::new(),
+            shuffled_scores: HashMap::new(),
+            real_record_count: 0,
+            shuffled_record_count: 0,
         }
     }
 
-    Ok(fdr_table)
+    /// Add pileup data from one chromosome
+    pub fn add_chromosome_data(
+        &mut self,
+        real_pileup: Vec<PileupRecord>,
+        shuffled_pileup: Vec<PileupRecord>,
+    ) {
+        use ordered_float::NotNan;
+
+        // Update counts for logging
+        self.real_record_count += real_pileup.len();
+        self.shuffled_record_count += shuffled_pileup.len();
+
+        // Aggregate real scores
+        for record in real_pileup {
+            let bp = record.end - record.start;
+            if let Ok(score_key) = NotNan::new(record.score) {
+                *self.real_scores.entry(score_key).or_insert(0) += bp;
+            }
+        }
+
+        // Aggregate shuffled scores
+        for record in shuffled_pileup {
+            let bp = record.end - record.start;
+            if let Ok(score_key) = NotNan::new(record.score) {
+                *self.shuffled_scores.entry(score_key).or_insert(0) += bp;
+            }
+        }
+    }
+
+    /// Finalize and build the FDR table
+    pub fn build(self, max_fdr: f64) -> Result<Vec<FdrEntry>> {
+        log::info!("Generating FDR table from accumulated score data");
+        log::info!("Real pileup: {} total records", self.real_record_count);
+        log::info!("Shuffled pileup: {} total records", self.shuffled_record_count);
+
+        // Combine and sort by score descending
+        let mut fire_scores: Vec<(f64, bool, u64)> = Vec::new();
+        for (score_notnan, bp) in self.real_scores {
+            fire_scores.push((score_notnan.into_inner(), true, bp));
+        }
+        for (score_notnan, bp) in self.shuffled_scores {
+            fire_scores.push((score_notnan.into_inner(), false, bp));
+        }
+        fire_scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap()); // descending by score
+
+        // Calculate sums for logging
+        let real_mbp: f64 = fire_scores
+            .iter()
+            .filter(|(_, is_real, _)| *is_real)
+            .map(|(_, _, bp)| *bp as f64)
+            .sum::<f64>()
+            / 1_000_000.0;
+        let shuffled_mbp: f64 = fire_scores
+            .iter()
+            .filter(|(_, is_real, _)| !*is_real)
+            .map(|(_, _, bp)| *bp as f64)
+            .sum::<f64>()
+            / 1_000_000.0;
+        log::info!("Real data: {:.2} Mbp", real_mbp);
+        log::info!("Shuffled data: {:.2} Mbp", shuffled_mbp);
+
+        // Debug: Count how many entries have negative scores
+        let neg_score_count = fire_scores
+            .iter()
+            .filter(|(score, _, _)| *score < 0.0)
+            .count();
+        let neg_score_real_bp: u64 = fire_scores
+            .iter()
+            .filter(|(score, is_real, _)| *score < 0.0 && *is_real)
+            .map(|(_, _, bp)| *bp)
+            .sum();
+        let neg_score_shuffled_bp: u64 = fire_scores
+            .iter()
+            .filter(|(score, is_real, _)| *score < 0.0 && !*is_real)
+            .map(|(_, _, bp)| *bp)
+            .sum();
+        log::debug!(
+            "Negative scores: {} entries, real_bp={}, shuffled_bp={}",
+            neg_score_count,
+            neg_score_real_bp,
+            neg_score_shuffled_bp
+        );
+
+        // Create FDR table
+        let fdr_table = fdr_table_from_scores(&fire_scores);
+
+        // Check if we have any thresholds below max_fdr
+        if let Some(min_fdr_entry) = fdr_table
+            .iter()
+            .min_by(|a, b| a.fdr.partial_cmp(&b.fdr).unwrap())
+        {
+            if min_fdr_entry.fdr > max_fdr {
+                anyhow::bail!(
+                    "No FIRE score threshold has an FDR < {}. Check the input Fiber-seq data with the QC pipeline and make sure you are using WGS Fiber-seq data.",
+                    max_fdr
+                );
+            }
+        }
+
+        Ok(fdr_table)
+    }
+}
+
+/// Generate FDR table incrementally, processing one chromosome at a time
+/// This avoids keeping all pileup records in memory at once
+pub fn fdr_table(
+    opts: &mut CallPeaksOptions,
+    bam: &mut rust_htslib::bam::IndexedReader,
+    header: &rust_htslib::bam::HeaderView,
+) -> Result<Vec<FdrEntry>> {
+    use super::{chrom_names_and_lengths, fibers_from_chromosome, process_chromosome_pileup_both};
+
+    let mut fdr_builder = IncrementalFdrBuilder::new();
+
+    // Process each chromosome and add to the builder
+    for (chrom_str, chrom_len) in chrom_names_and_lengths(header)? {
+        log::info!("Processing chromosome {} for FDR calculation...", chrom_str);
+
+        // Read all fibers from the chromosome
+        let all_fibers = fibers_from_chromosome(&chrom_str, bam, opts)?;
+
+        // Process the fibers to generate pileup records
+        let (real_chrom, shuffled_chrom) =
+            process_chromosome_pileup_both(&chrom_str, chrom_len, &all_fibers, opts)?;
+
+        log::debug!(
+            "  Chromosome {}: {} real records, {} shuffled records",
+            chrom_str,
+            real_chrom.len(),
+            shuffled_chrom.len()
+        );
+
+        // Add to builder (this aggregates scores and drops the full records)
+        fdr_builder.add_chromosome_data(real_chrom, shuffled_chrom);
+
+        // Memory is freed here as real_chrom and shuffled_chrom go out of scope
+    }
+
+    // Build the final FDR table
+    fdr_builder.build(opts.max_fdr)
 }
 
 /// Write FDR table to TSV file
