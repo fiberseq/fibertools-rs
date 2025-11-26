@@ -321,15 +321,17 @@ pub fn read_fdr_table(path: &str) -> Result<Vec<FdrEntry>> {
             );
         }
 
-        let threshold = parts[0]
-            .parse::<f64>()
-            .context(format!("Failed to parse threshold at line {}", line_num + 1))?;
+        let threshold = parts[0].parse::<f64>().context(format!(
+            "Failed to parse threshold at line {}",
+            line_num + 1
+        ))?;
         let fdr = parts[1]
             .parse::<f64>()
             .context(format!("Failed to parse FDR at line {}", line_num + 1))?;
-        let shuffled_bp = parts[2]
-            .parse::<f64>()
-            .context(format!("Failed to parse shuffled_bp at line {}", line_num + 1))?;
+        let shuffled_bp = parts[2].parse::<f64>().context(format!(
+            "Failed to parse shuffled_bp at line {}",
+            line_num + 1
+        ))?;
         let real_bp = parts[3]
             .parse::<f64>()
             .context(format!("Failed to parse real_bp at line {}", line_num + 1))?;

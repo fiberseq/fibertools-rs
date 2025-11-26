@@ -30,9 +30,15 @@ pub struct CallPeaksOptions {
     #[clap(long, default_value = "5.0")]
     pub sd_cov: f64,
 
-    /// Maximum FDR threshold for peak calling
+    /// Maximum FDR threshold for peak calling (ignored if --min-fire-frac is set)
     #[clap(long, default_value = "0.05")]
     pub max_fdr: f64,
+
+    /// Minimum fraction of fibers with FIREs required to call a peak
+    /// If set, skips FDR calculation and uses this threshold instead
+    /// For example, 0.5 means at least 50% of fibers must have a FIRE at the peak position
+    #[clap(long)]
+    pub min_fire_frac: Option<f64>,
 
     /// Minimum fraction of accessible bases in peak
     #[clap(long, default_value = "0.0")]

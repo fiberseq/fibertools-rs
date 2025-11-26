@@ -456,7 +456,9 @@ impl<'a> FireTrack<'a> {
                         self.raw_scores[pos as usize] += score_update;
 
                         // Store the FIRE element at this position if tracking is enabled
-                        if let (Some(fire_elements), Some(elem)) = (&mut self.fire_elements, fire_element) {
+                        if let (Some(fire_elements), Some(elem)) =
+                            (&mut self.fire_elements, fire_element)
+                        {
                             fire_elements[pos as usize].push(elem);
                         }
                     }
@@ -790,7 +792,10 @@ impl<'a> FiberseqPileup<'a> {
 
             // Binary search to find the FDR for this score
             let search_result = fdr_table.binary_search_by(|entry| {
-                entry.threshold.partial_cmp(&(score as f64)).unwrap_or(std::cmp::Ordering::Equal)
+                entry
+                    .threshold
+                    .partial_cmp(&(score as f64))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
 
             fdr_scores[i] = match search_result {

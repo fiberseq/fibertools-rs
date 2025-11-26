@@ -2,7 +2,7 @@ mod fdr;
 mod peaks;
 
 pub use fdr::{make_fdr_table, read_fdr_table, write_fdr_table, FdrEntry, PileupRecord};
-pub use peaks::call_peaks_with_fdr;
+pub use peaks::call_peaks;
 
 use crate::cli::CallPeaksOptions;
 use crate::fiber::FiberseqData;
@@ -13,39 +13,53 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
     log::info!("Starting FIRE peak calling");
     log::info!("  Input BAM: {}", opts.input.bam);
     log::info!("  Output: {}", opts.out);
-    log::info!("  Max FDR: {}", opts.max_fdr);
+
+    if let Some(min_frac) = opts.min_fire_frac {
+        log::info!("  Using FIRE fraction mode: min_fire_frac = {}", min_frac);
+    } else {
+        log::info!("  Max FDR: {}", opts.max_fdr);
+    }
     log::info!("  Window size: {}", opts.window_size);
 
     let mut bam = opts.input.indexed_bam_reader();
     let header = opts.input.header_view();
 
-    if let Some(ref shuffled) = opts.shuffled {
-        log::info!("  Shuffled positions file: {}", shuffled);
+    // Generate or load FDR table (skip if using FIRE fraction mode)
+    let fdr_table = if opts.min_fire_frac.is_some() {
+        // FIRE fraction mode: use empty FDR table (won't be used for filtering)
+        log::info!("  Skipping FDR calculation (using FIRE fraction threshold)");
+        Vec::new()
     } else {
-        log::info!("  Using random shuffling for FDR calculation");
-    }
+        // FDR mode: generate or load FDR table
+        if let Some(ref shuffled) = opts.shuffled {
+            log::info!("  Shuffled positions file: {}", shuffled);
+        } else {
+            log::info!("  Using random shuffling for FDR calculation");
+        }
 
-    // Generate or load FDR table
-    let fdr_table = if let Some(ref fdr_table_path) = opts.fdr_table {
-        log::info!("Loading FDR table from: {}", fdr_table_path);
-        read_fdr_table(fdr_table_path)?
-    } else {
-        // Generate pileup for both real and shuffled data
-        log::info!("Running pileup for real and shuffled data...");
-        let (real_pileup, shuffled_pileup) = generate_pileups(opts, &mut bam, &header)?;
+        if let Some(ref fdr_table_path) = opts.fdr_table {
+            log::info!("Loading FDR table from: {}", fdr_table_path);
+            read_fdr_table(fdr_table_path)?
+        } else {
+            // Generate pileup for both real and shuffled data
+            log::info!("Running pileup for real and shuffled data...");
+            let (real_pileup, shuffled_pileup) = generate_pileups(opts, &mut bam, &header)?;
 
-        // Generate FDR table from pileup data
-        make_fdr_table(real_pileup, shuffled_pileup, opts.max_fdr)?
+            // Generate FDR table from pileup data
+            make_fdr_table(real_pileup, shuffled_pileup, opts.max_fdr)?
+        }
     };
 
-    // Write FDR table if requested
+    // Write FDR table if requested (and if we generated one)
     if let Some(ref fdr_out) = opts.fdr_table_out {
-        log::info!("Writing FDR table to: {}", fdr_out);
-        write_fdr_table(&fdr_table, fdr_out)?;
+        if !fdr_table.is_empty() {
+            log::info!("Writing FDR table to: {}", fdr_out);
+            write_fdr_table(&fdr_table, fdr_out)?;
+        }
     }
 
-    // Call peaks using the FDR table
-    call_peaks_with_fdr(opts, &mut bam, &header, &fdr_table)?;
+    // Call peaks using the FDR table (or FIRE fraction)
+    call_peaks(opts, &mut bam, &header, &fdr_table)?;
 
     log::info!("FIRE peak calling completed");
     Ok(())
