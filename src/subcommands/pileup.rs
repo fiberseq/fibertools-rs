@@ -289,7 +289,7 @@ impl<'a> FireTrack<'a> {
         }
     }
 
-    #[inline]
+    //#[inline]
     fn add_range_set(
         array: &mut [i32],
         ranges: &bamannotations::Ranges,
@@ -362,8 +362,6 @@ impl<'a> FireTrack<'a> {
         (start + self.cur_offset, end + self.cur_offset)
     }
 
-    /// inline this function
-    #[inline]
     pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage

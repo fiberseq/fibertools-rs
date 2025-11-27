@@ -40,6 +40,12 @@ pub struct CallPeaksOptions {
     #[clap(long)]
     pub min_fire_frac: Option<f64>,
 
+    /// Minimum fraction of fibers with FIREs required as an additional filter (applied WITH FDR)
+    /// Unlike --min-fire-frac, this is applied in addition to FDR filtering, not instead of it
+    /// For example, 0.3 means at least 30% of fibers must have a FIRE AND FDR must be <= max_fdr
+    #[clap(long, default_value = "0.1")]
+    pub min_fire_frac_filter: f64,
+
     /// Minimum fraction of accessible bases in peak
     #[clap(long, default_value = "0.0")]
     pub min_frac_accessible: f64,

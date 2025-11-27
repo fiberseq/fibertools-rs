@@ -99,6 +99,7 @@ impl<'a> Peak<'a> {
         fdr_table: &[FdrEntry],
         max_fdr: f64,
         min_fire_frac: Option<f64>,
+        min_fire_frac_filter: f64,
         min_cov: i32,
         max_cov: i32,
     ) -> Vec<Self> {
@@ -123,6 +124,7 @@ impl<'a> Peak<'a> {
                         fdr_table,
                         max_fdr,
                         min_fire_frac,
+                        min_fire_frac_filter,
                         min_cov,
                         max_cov,
                     ) {
@@ -146,6 +148,7 @@ impl<'a> Peak<'a> {
                         fdr_table,
                         max_fdr,
                         min_fire_frac,
+                        min_fire_frac_filter,
                         min_cov,
                         max_cov,
                     ) {
@@ -164,6 +167,7 @@ impl<'a> Peak<'a> {
                 fdr_table,
                 max_fdr,
                 min_fire_frac,
+                min_fire_frac_filter,
                 min_cov,
                 max_cov,
             ) {
@@ -184,6 +188,7 @@ impl<'a> Peak<'a> {
         fdr_table: &[FdrEntry],
         max_fdr: f64,
         min_fire_frac: Option<f64>,
+        min_fire_frac_filter: f64,
         min_cov: i32,
         max_cov: i32,
     ) -> Option<Self> {
@@ -196,16 +201,20 @@ impl<'a> Peak<'a> {
         let middle_pos = positions[middle_idx];
         let score = pileup.all_data.scores[middle_pos];
 
+        // Calculate coverage metrics
+        let coverage = pileup.all_data.coverage[middle_pos] as f64;
+        let fire_cov = pileup.all_data.fire_coverage[middle_pos] as f64;
+        let fire_frac = fire_cov / coverage;
+
         // Determine if peak passes threshold based on filtering mode
         let passes_threshold = if let Some(min_frac) = min_fire_frac {
             // FIRE fraction mode: check if fraction of fibers with FIREs >= threshold
-            let coverage = pileup.all_data.coverage[middle_pos] as f64;
-            let fire_cov = pileup.all_data.fire_coverage[middle_pos] as f64;
-            fire_cov / coverage >= min_frac
+            // (skips FDR calculation entirely)
+            fire_frac >= min_frac
         } else {
-            // FDR mode: check if FDR <= threshold
+            // FDR mode: check if FDR <= threshold AND fire_frac >= min_fire_frac_filter
             let fdr = Self::lookup_fdr(score, fdr_table);
-            fdr <= max_fdr
+            fdr <= max_fdr && fire_frac >= min_fire_frac_filter
         };
 
         // Calculate FDR for display purposes (even in FIRE fraction mode)
@@ -606,7 +615,7 @@ pub fn call_peaks(
     for (chrom, chrom_len) in chrom_names_and_lengths(header)? {
         // Skip chromosomes with no fibers
         if !super::chromosome_has_fibers(&chrom, bam, opts)? {
-            log::info!("Skipping chromosome {} (no fibers)", chrom);
+            log::debug!("Skipping chromosome {} (no fibers)", chrom);
             continue;
         }
 
@@ -657,6 +666,7 @@ pub fn call_peaks(
             fdr_table,
             opts.max_fdr,
             opts.min_fire_frac,
+            opts.min_fire_frac_filter,
             min_cov,
             max_cov,
         );

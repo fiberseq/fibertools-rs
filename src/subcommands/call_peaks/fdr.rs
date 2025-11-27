@@ -315,7 +315,7 @@ pub fn fdr_table(
     for (chrom_str, chrom_len) in chrom_names_and_lengths(header)? {
         // Skip chromosomes with no fibers
         if !chromosome_has_fibers(&chrom_str, bam, opts)? {
-            log::info!("Skipping chromosome {} (no fibers)", chrom_str);
+            log::debug!("Skipping chromosome {} (no fibers)", chrom_str);
             continue;
         }
 
