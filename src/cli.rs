@@ -4,6 +4,7 @@ use clap_complete::{generate, Generator, Shell};
 use std::{fmt::Debug, io};
 
 // Reference the modules for the subcommands
+mod benchmark_opts;
 mod call_peaks_opts;
 mod center_opts;
 mod clear_kinetics_opts;
@@ -24,6 +25,7 @@ mod strip_basemods_opts;
 mod validate_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
+pub use benchmark_opts::*;
 pub use call_peaks_opts::*;
 pub use center_opts::*;
 pub use clear_kinetics_opts::*;
@@ -157,6 +159,9 @@ pub enum Commands {
     /// Call FIRE peaks using FDR-based peak calling on pileup data
     #[clap(name = "call-peaks", visible_aliases = &["peaks", "call"])]
     CallPeaks(CallPeaksOptions),
+    /// Benchmark fiber iterator performance (hidden command for testing)
+    #[clap(hide = true)]
+    Benchmark(BenchmarkOptions),
     /// Make command line completions
     #[clap(hide = true)]
     Completions(CompletionOptions),

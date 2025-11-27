@@ -9,6 +9,16 @@ use anyhow::Result;
 use std::collections::HashSet;
 use std::io::Write;
 
+/// Filtering thresholds for peak calling
+#[derive(Debug, Clone, Copy)]
+struct PeakThresholds {
+    max_fdr: f64,
+    min_fire_frac: Option<f64>,
+    min_fire_frac_filter: f64,
+    min_cov: i32,
+    max_cov: i32,
+}
+
 /// A peak representing a local maximum in FIRE scores
 #[derive(Debug)]
 pub struct Peak<'a> {
@@ -111,6 +121,15 @@ impl<'a> Peak<'a> {
             .as_ref()
             .expect("Rolling max scores should be calculated");
 
+        // Create thresholds struct
+        let thresholds = PeakThresholds {
+            max_fdr,
+            min_fire_frac,
+            min_fire_frac_filter,
+            min_cov,
+            max_cov,
+        };
+
         let mut consecutive_maxima = Vec::new();
 
         for i in 0..scores.len() {
@@ -122,11 +141,7 @@ impl<'a> Peak<'a> {
                         pileup,
                         consecutive_maxima.as_slice(),
                         fdr_table,
-                        max_fdr,
-                        min_fire_frac,
-                        min_fire_frac_filter,
-                        min_cov,
-                        max_cov,
+                        &thresholds,
                     ) {
                         peaks.push(peak);
                     }
@@ -146,11 +161,7 @@ impl<'a> Peak<'a> {
                         pileup,
                         consecutive_maxima.as_slice(),
                         fdr_table,
-                        max_fdr,
-                        min_fire_frac,
-                        min_fire_frac_filter,
-                        min_cov,
-                        max_cov,
+                        &thresholds,
                     ) {
                         peaks.push(peak);
                     }
@@ -165,11 +176,7 @@ impl<'a> Peak<'a> {
                 pileup,
                 consecutive_maxima.as_slice(),
                 fdr_table,
-                max_fdr,
-                min_fire_frac,
-                min_fire_frac_filter,
-                min_cov,
-                max_cov,
+                &thresholds,
             ) {
                 peaks.push(peak);
             }
@@ -186,11 +193,7 @@ impl<'a> Peak<'a> {
         pileup: &'a FiberseqPileup<'a>,
         positions: &[usize],
         fdr_table: &[FdrEntry],
-        max_fdr: f64,
-        min_fire_frac: Option<f64>,
-        min_fire_frac_filter: f64,
-        min_cov: i32,
-        max_cov: i32,
+        thresholds: &PeakThresholds,
     ) -> Option<Self> {
         if positions.is_empty() {
             return None;
@@ -207,14 +210,14 @@ impl<'a> Peak<'a> {
         let fire_frac = fire_cov / coverage;
 
         // Determine if peak passes threshold based on filtering mode
-        let passes_threshold = if let Some(min_frac) = min_fire_frac {
+        let passes_threshold = if let Some(min_frac) = thresholds.min_fire_frac {
             // FIRE fraction mode: check if fraction of fibers with FIREs >= threshold
             // (skips FDR calculation entirely)
             fire_frac >= min_frac
         } else {
             // FDR mode: check if FDR <= threshold AND fire_frac >= min_fire_frac_filter
             let fdr = Self::lookup_fdr(score, fdr_table);
-            fdr <= max_fdr && fire_frac >= min_fire_frac_filter
+            fdr <= thresholds.max_fdr && fire_frac >= thresholds.min_fire_frac_filter
         };
 
         // Calculate FDR for display purposes (even in FIRE fraction mode)
@@ -222,7 +225,7 @@ impl<'a> Peak<'a> {
 
         // Check if coverage passes thresholds
         let coverage = pileup.all_data.coverage[middle_pos];
-        let pass_coverage = coverage >= min_cov && coverage <= max_cov;
+        let pass_coverage = coverage >= thresholds.min_cov && coverage <= thresholds.max_cov;
 
         // Only keep peaks that pass the threshold
         if passes_threshold {

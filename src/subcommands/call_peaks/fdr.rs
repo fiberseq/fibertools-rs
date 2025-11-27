@@ -183,6 +183,12 @@ pub struct IncrementalFdrBuilder {
     shuffled_record_count: usize,
 }
 
+impl Default for IncrementalFdrBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IncrementalFdrBuilder {
     /// Create a new incremental FDR builder
     pub fn new() -> Self {

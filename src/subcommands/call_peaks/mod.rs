@@ -100,7 +100,11 @@ fn chromosome_has_fibers(
     opts: &CallPeaksOptions,
 ) -> Result<bool> {
     // Check if there's at least one fiber
-    let has_fibers = opts.input.fetch_fibers(bam, chrom, None, None)?.next().is_some();
+    let has_fibers = opts
+        .input
+        .fetch_fibers(bam, chrom, None, None)?
+        .next()
+        .is_some();
     Ok(has_fibers)
 }
 
