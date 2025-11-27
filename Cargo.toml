@@ -112,7 +112,7 @@ incremental = true
 
 [profile.release]
 strip = "debuginfo"
-codegen-units = 1
+codegen-units = 16
 debug = false
 lto = true
 panic = "abort"
@@ -120,3 +120,5 @@ panic = "abort"
 [profile.profiling]
 inherits = "release"
 debug = true
+codegen-units = 16
+lto = "thin"
