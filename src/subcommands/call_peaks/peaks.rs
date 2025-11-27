@@ -508,7 +508,7 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     let initial_count = peaks.len();
 
     // Phase 1: High reciprocal overlap
-    log::info!(
+    log::debug!(
         "  Phase 1: Merging peaks with reciprocal overlap >= {}",
         opts.high_reciprocal_overlap
     );
@@ -528,7 +528,7 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     }
 
     // Phase 2: FIRE element overlap
-    log::info!(
+    log::debug!(
         "  Phase 2: Merging peaks with FIRE element overlap >= {}",
         opts.min_frac_overlap
     );
@@ -548,7 +548,7 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     }
 
     // Phase 3: High reciprocal overlap again
-    log::info!(
+    log::debug!(
         "  Phase 3: Merging peaks with reciprocal overlap >= {}",
         opts.min_reciprocal_overlap
     );
@@ -568,7 +568,7 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     }
 
     let final_count = peaks.len();
-    log::info!(
+    log::debug!(
         "  Merged {} peaks into {} peaks",
         initial_count,
         final_count
@@ -622,7 +622,7 @@ pub fn call_peaks(
             continue;
         }
 
-        log::info!(
+        log::debug!(
             "Finding peaks on chromosome {} with length {}",
             chrom,
             chrom_len
@@ -674,31 +674,21 @@ pub fn call_peaks(
             max_cov,
         );
 
-        if let Some(min_frac) = opts.min_fire_frac {
-            log::info!(
-                "Found {} significant peaks (FIRE fraction >= {}) on chromosome {}",
-                peaks.len(),
-                min_frac,
-                chrom
-            );
-        } else {
-            log::info!(
-                "Found {} significant peaks (FDR <= {}) on chromosome {}",
-                peaks.len(),
-                opts.max_fdr,
-                chrom
-            );
-        }
-        total_peaks_before_merge += peaks.len();
+        let peaks_before = peaks.len();
+        total_peaks_before_merge += peaks_before;
 
         // Merge peaks for this chromosome
         let merged_peaks = merge_peaks_iterative(peaks, opts);
-        log::info!(
-            "After merging: {} peaks on chromosome {}",
-            merged_peaks.len(),
-            chrom
-        );
         total_peaks_after_merge += merged_peaks.len();
+
+        // Summary info statement per chromosome
+        log::info!(
+            "Peaks: {} ({} Mbp) - found: {}, merged: {}",
+            chrom,
+            chrom_len / 1_000_000,
+            peaks_before,
+            merged_peaks.len(),
+        );
 
         // Write merged peaks for this chromosome
         for peak in &merged_peaks {

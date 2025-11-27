@@ -232,8 +232,8 @@ impl IncrementalFdrBuilder {
     /// Finalize and build the FDR table
     pub fn build(self, max_fdr: f64) -> Result<Vec<FdrEntry>> {
         log::info!("Generating FDR table from accumulated score data");
-        log::info!("Real pileup: {} total records", self.real_record_count);
-        log::info!(
+        log::debug!("Real pileup: {} total records", self.real_record_count);
+        log::debug!(
             "Shuffled pileup: {} total records",
             self.shuffled_record_count
         );
@@ -261,8 +261,8 @@ impl IncrementalFdrBuilder {
             .map(|(_, _, bp)| *bp as f64)
             .sum::<f64>()
             / 1_000_000.0;
-        log::info!("Real data: {:.2} Mbp", real_mbp);
-        log::info!("Shuffled data: {:.2} Mbp", shuffled_mbp);
+        log::debug!("Real data: {:.2} Mbp", real_mbp);
+        log::debug!("Shuffled data: {:.2} Mbp", shuffled_mbp);
 
         // Debug: Count how many entries have negative scores
         let neg_score_count = fire_scores
@@ -325,21 +325,21 @@ pub fn fdr_table(
             continue;
         }
 
-        log::info!("Processing chromosome {} for FDR calculation...", chrom_str);
-
         // Process the fibers to generate pileup records (streaming - no all_fibers Vec!)
         let (real_chrom, shuffled_chrom) =
             process_chromosome_pileup_both(&chrom_str, chrom_len, bam, opts)?;
 
-        log::debug!(
-            "  {}: real_records={}, shuffled_records={}",
+        // Add to builder (this aggregates scores and drops the full records)
+        fdr_builder.add_chromosome_data(&real_chrom, &shuffled_chrom);
+
+        // Summary info statement per chromosome
+        log::info!(
+            "FDR: {} ({} Mbp) - real: {} records, shuffled: {} records",
             chrom_str,
+            chrom_len / 1_000_000,
             real_chrom.len(),
             shuffled_chrom.len(),
         );
-
-        // Add to builder (this aggregates scores and drops the full records)
-        fdr_builder.add_chromosome_data(&real_chrom, &shuffled_chrom);
     }
 
     // Build the final FDR table

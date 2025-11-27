@@ -122,7 +122,7 @@ fn process_chromosome_pileup_both(
     bam: &mut rust_htslib::bam::IndexedReader,
     opts: &CallPeaksOptions,
 ) -> Result<(Vec<PileupRecord>, Vec<PileupRecord>)> {
-    log::info!("Processing chromosome {} (length: {})", chrom, chrom_len);
+    log::debug!("Processing chromosome {} (length: {})", chrom, chrom_len);
 
     // Create fire track options - to calculate FIRE scores
     // Note: Python uses --no-msp --no-nuc flags in shuffled_pileup_chromosome rule
@@ -164,7 +164,7 @@ fn process_chromosome_pileup_both(
         .max_cov
         .unwrap_or_else(|| (median + opts.sd_cov * std_dev).round() as i32);
 
-    log::info!(
+    log::debug!(
         "  Coverage: median={:.1}, std_dev={:.1} ({:.1} SDs), range=[{}, {}]",
         median,
         std_dev,
@@ -215,7 +215,7 @@ fn process_chromosome_pileup_both(
 
     // Log median coverage statistics for shuffled
     let (shuffled_median, shuffled_pos_cov) = shuffled_track.median_coverage();
-    log::info!(
+    log::debug!(
         "  Shuffled: median_cov={:.1}, pos_with_cov={}",
         shuffled_median,
         shuffled_pos_cov

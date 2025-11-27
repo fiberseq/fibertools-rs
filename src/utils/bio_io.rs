@@ -2,7 +2,7 @@ use anyhow::Result;
 use colored::Colorize;
 use gzp::deflate::Bgzf; //, Gzip, Mgzip, RawDeflate};
 use gzp::{Compression, ZBuilder};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use linear_map::LinearMap;
@@ -44,9 +44,14 @@ pub fn no_length_progress_bar() -> ProgressBar {
         .unwrap();
     let bar = ProgressBar::new(0);
     bar.set_style(style);
+
+    // Start hidden - will be shown on first tick/update
+    bar.set_draw_target(ProgressDrawTarget::hidden());
+
     let finish = indicatif::ProgressFinish::AndLeave;
     bar.with_finish(finish)
 }
+
 
 /*
 STANDARD FILE IO
@@ -272,7 +277,13 @@ where
     // the type without having to update the function signatures.
     fn next(&mut self) -> Option<Self::Item> {
         // update progress bar with results from previous iteration
-        self.bar.inc(self.pre_chunk_done);
+        if self.pre_chunk_done > 0 {
+            // Make progress bar visible on first actual update
+            if self.bar.is_hidden() {
+                self.bar.set_draw_target(ProgressDrawTarget::stderr());
+            }
+            self.bar.inc(self.pre_chunk_done);
+        }
 
         let mut cur_vec = vec![];
         for r in self.bam.by_ref().take(self.chunk_size) {
@@ -294,10 +305,11 @@ where
             cur_vec.push(r);
         }
 
+
         // extend progress bar
         self.pre_chunk_done = cur_vec.len() as u64;
         self.bar.inc_length(self.pre_chunk_done);
-
+        
         // return
         if cur_vec.is_empty() {
             None
