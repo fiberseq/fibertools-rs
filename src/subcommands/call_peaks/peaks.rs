@@ -649,7 +649,8 @@ pub fn call_peaks(
         };
 
         // Process fibers to build the track
-        let mut pileup = FiberseqPileup::new(&chrom, 0, chrom_len as usize, pileup_opts, &None);
+        let mut pileup =
+            FiberseqPileup::new(&chrom, 0, chrom_len as usize, pileup_opts, &None, None);
         let fibers = opts.input.fetch_fibers(bam, &chrom, None, None)?;
         pileup.add_fibers(fibers);
 

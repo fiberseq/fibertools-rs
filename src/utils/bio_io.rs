@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{self, stdout, BufReader, BufWriter, Write};
+use std::io::{self, stdout, BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
@@ -51,7 +51,6 @@ pub fn no_length_progress_bar() -> ProgressBar {
     let finish = indicatif::ProgressFinish::AndLeave;
     bar.with_finish(finish)
 }
-
 
 /*
 STANDARD FILE IO
@@ -305,11 +304,10 @@ where
             cur_vec.push(r);
         }
 
-
         // extend progress bar
         self.pre_chunk_done = cur_vec.len() as u64;
         self.bar.inc_length(self.pre_chunk_done);
-        
+
         // return
         if cur_vec.is_empty() {
             None
@@ -543,4 +541,87 @@ pub fn convert_seq_uppercase(mut seq: Vec<u8>) -> Vec<u8> {
         }
     }
     seq
+}
+
+/// A BED record with all fields preserved
+#[derive(Debug, Clone)]
+pub struct BedRecord {
+    pub chrom: String,
+    pub start: i64,
+    pub end: i64,
+    pub name: Option<String>,
+    pub extra_fields: Vec<String>, // Store all remaining fields (from column 4 onwards, or from 5 if name exists)
+}
+
+impl BedRecord {
+    /// Get the name or a default region string
+    pub fn get_name_or_default(&self) -> String {
+        self.name
+            .clone()
+            .unwrap_or_else(|| format!("{}:{}-{}", self.chrom, self.start, self.end))
+    }
+
+    /// Reconstruct the original BED line (without the name column if it's separate)
+    pub fn to_bed_line(&self) -> String {
+        let mut fields = vec![
+            self.chrom.clone(),
+            self.start.to_string(),
+            self.end.to_string(),
+        ];
+        if let Some(name) = &self.name {
+            fields.push(name.clone());
+        }
+        fields.extend(self.extra_fields.clone());
+        fields.join("\t")
+    }
+}
+
+/// Read BED file and parse regions with optional name column
+/// Returns a vector of BedRecord structs containing chrom, start, end, name, and extra fields
+pub fn read_bed_regions(bed_path: &str) -> Result<Vec<BedRecord>> {
+    let reader = buffer_from(bed_path)?;
+    let mut regions = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with('#') || line.trim().is_empty() {
+            continue;
+        }
+        let tokens: Vec<&str> = line.split('\t').collect();
+        if tokens.len() < 3 {
+            return Err(anyhow::anyhow!(
+                "BED file must have at least 3 columns (chrom, start, end)"
+            ));
+        }
+
+        let chrom = tokens[0].to_string();
+        let start = tokens[1]
+            .parse::<i64>()
+            .map_err(|_| anyhow::anyhow!("Invalid start position: {}", tokens[1]))?;
+        let end = tokens[2]
+            .parse::<i64>()
+            .map_err(|_| anyhow::anyhow!("Invalid end position: {}", tokens[2]))?;
+
+        let (name, extra_start_idx) = if tokens.len() >= 4 && !tokens[3].is_empty() {
+            (Some(tokens[3].to_string()), 4)
+        } else {
+            (None, 3)
+        };
+
+        let extra_fields: Vec<String> = tokens[extra_start_idx..]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        regions.push(BedRecord {
+            chrom,
+            start,
+            end,
+            name,
+            extra_fields,
+        });
+    }
+
+    log::debug!("Read {} regions from BED file: {}", regions.len(), bed_path);
+    Ok(regions)
 }

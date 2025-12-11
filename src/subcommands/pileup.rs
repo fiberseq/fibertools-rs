@@ -698,6 +698,7 @@ pub struct FiberseqPileup<'a> {
     shuffled_fibers: &'a Option<ShuffledFibers>,
     pub rolling_max: Option<Vec<f32>>,
     pub fdr_scores: Option<Vec<f64>>,
+    pub region_name: Option<String>,
 }
 
 impl<'a> FiberseqPileup<'a> {
@@ -707,6 +708,7 @@ impl<'a> FiberseqPileup<'a> {
         chrom_end: usize,
         pileup_opts: FiberseqPileupOptions,
         shuffled_fibers: &'a Option<ShuffledFibers>,
+        region_name: Option<String>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
         let fire_track_opts = pileup_opts.fire_track_opts.clone();
@@ -766,6 +768,7 @@ impl<'a> FiberseqPileup<'a> {
             shuffled_fibers,
             rolling_max: None,
             fdr_scores: None,
+            region_name,
         }
     }
 
@@ -846,7 +849,7 @@ impl<'a> FiberseqPileup<'a> {
         self.calculate_scores();
     }
 
-    pub fn header(pileup_opts: &PileupOptions) -> String {
+    pub fn header(pileup_opts: &PileupOptions, include_name: bool) -> String {
         let mut header = format!("{}\t{}\t{}", "#chrom", "start", "end");
 
         let mut suffixes = vec![""];
@@ -878,6 +881,10 @@ impl<'a> FiberseqPileup<'a> {
         }
         if pileup_opts.rolling_max.is_some() {
             header += "\trolling_max";
+        }
+        // Add name column at the end to minimize breaking downstream tools
+        if include_name {
+            header += "\tname";
         }
         header += "\n";
         header
@@ -994,6 +1001,10 @@ impl<'a> FiberseqPileup<'a> {
                         self.rolling_max.as_ref().unwrap()[write_start_index]
                     );
                 }
+                // Add name column at the end to minimize breaking downstream tools
+                if let Some(name) = &self.region_name {
+                    line += &format!("\t{}", name);
+                }
                 // don't write empty lines unless keep_zeros is set
                 let mut cov = self.all_data.coverage[write_start_index];
                 if let Some(shuffled_data) = &self.shuffled_data {
@@ -1041,6 +1052,7 @@ fn run_rgn(
     out: &mut Box<dyn Write>,
     pileup_opts: &PileupOptions,
     shuffled_fibers: &Option<ShuffledFibers>,
+    region_name: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let tid = bam.header().tid(chrom.as_bytes()).unwrap();
     let chrom_len = bam.header().target_len(tid).unwrap() as i64;
@@ -1075,6 +1087,7 @@ fn run_rgn(
             chrom_end as usize,
             pileup_opts.into(),
             shuffled_fibers,
+            region_name.clone(),
         );
         pileup.add_fibers(fiber_iter);
 
@@ -1094,18 +1107,47 @@ pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error
     let header = pileup_opts.input.header_view();
 
     let mut out = bio_io::writer(&pileup_opts.out)?;
-    // add the header
-    out.write_all(FiberseqPileup::header(pileup_opts).as_bytes())?;
 
     let shuffled_fibers = match &pileup_opts.shuffle {
         Some(file_path) => Some(ShuffledFibers::new(file_path)?),
         None => None,
     };
 
-    match &pileup_opts.rgn {
-        // if a region is specified, only process that region
-        Some(rgn) => {
-            let (rgn, chrom) = region_parser(rgn);
+    // Handle regions based on source (BED file, command-line args, or all chromosomes)
+    // We process regions immediately rather than collecting them because FetchDefinition has lifetime constraints
+    if let Some(bed_path) = &pileup_opts.bed {
+        // Parse BED file
+        let bed_records = bio_io::read_bed_regions(bed_path)?;
+        let include_name = bed_records.iter().any(|r| r.name.is_some());
+
+        // add the header
+        out.write_all(FiberseqPileup::header(pileup_opts, include_name).as_bytes())?;
+
+        // Process each BED record immediately
+        for rec in bed_records {
+            let fetch_def = FetchDefinition::RegionString(rec.chrom.as_bytes(), rec.start, rec.end);
+            // If any record has a name, use "." for records without names to keep column count consistent
+            let region_name = if include_name {
+                Some(rec.name.unwrap_or_else(|| ".".to_string()))
+            } else {
+                None
+            };
+            run_rgn(
+                &rec.chrom,
+                fetch_def,
+                &mut bam,
+                &mut out,
+                pileup_opts,
+                &shuffled_fibers,
+                region_name,
+            )?;
+        }
+    } else if !pileup_opts.rgn.is_empty() {
+        // Use command-line regions
+        out.write_all(FiberseqPileup::header(pileup_opts, false).as_bytes())?;
+
+        for rgn_str in &pileup_opts.rgn {
+            let (rgn, chrom) = region_parser(rgn_str);
             run_rgn(
                 &chrom,
                 rgn,
@@ -1113,22 +1155,27 @@ pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error
                 &mut out,
                 pileup_opts,
                 &shuffled_fibers,
+                None,
             )?;
         }
-        // if no region is specified, process all regions
-        None => {
-            for chrom in header.target_names() {
-                let rgn = FetchDefinition::String(chrom);
-                run_rgn(
-                    &String::from_utf8_lossy(chrom),
-                    rgn,
-                    &mut bam,
-                    &mut out,
-                    pileup_opts,
-                    &shuffled_fibers,
-                )?;
-            }
+    } else {
+        // Process all chromosomes
+        out.write_all(FiberseqPileup::header(pileup_opts, false).as_bytes())?;
+
+        for chrom in header.target_names() {
+            let chrom_str = String::from_utf8_lossy(chrom).to_string();
+            let rgn = FetchDefinition::String(chrom);
+            run_rgn(
+                &chrom_str,
+                rgn,
+                &mut bam,
+                &mut out,
+                pileup_opts,
+                &shuffled_fibers,
+                None,
+            )?;
         }
     }
+
     Ok(())
 }
