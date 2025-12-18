@@ -10,13 +10,13 @@ Integration of this spec or a similar one into the SAM/BAM/CRAM is needed to sta
 
 The molecular annotation format uses four related tags:
 
-- **MA:Z:** - Annotation start positions (required, u32 arrays separated by annotation type prefixes)
+- **MA:Z:** - Read length followed by annotation start positions (required; first value is read length, then u32 arrays separated by annotation type prefixes)
 - **AL:B:I** - Annotation Lengths (required, u32 array)
 - **AQ:B:C** - Annotation Quality scores (optional, u8 array; only present if any annotation type specifies P or Q)
 - **AN:Z:** - Annotation Names (optional labels for individual annotations)
 
 ```
-MA:Z:annotation_type1+P:start1,start2;annotation_type2-:start1
+MA:Z:read_length;annotation_type1+P:start1,start2;annotation_type2-:start1
 AL:B:I,len1,len2,len3
 AQ:B:C,qual1,qual2,qual3
 AN:Z:name1,name2,name3
@@ -25,8 +25,16 @@ AN:Z:name1,name2,name3
 Regex for MA tag:
 
 ```
-^(([a-zA-Z0-9_]+)[+-.][PQ]?:((\d+)(,\d+)*);?)+$
+^\d+;(([a-zA-Z0-9_]+)[+-.][PQ]?:((\d+)(,\d+)*);?)+$
 ```
+
+### Read Length
+
+The first value in the MA tag is the length of the read at the time the annotation was made. This is important because:
+
+- The read sequence may be modified after annotation (e.g., adapter trimming, quality trimming)
+- Storing the original read length allows tools to detect and handle such modifications
+- It enables validation that annotation coordinates are within bounds
 
 ### Molecular Coordinates
 
@@ -41,11 +49,11 @@ All coordinates in the MA tag are "molecular coordinates" meaning:
 
 **MA tag delimiters:**
 
-| Delimiter | Purpose                                  | Example                        |
-| --------- | ---------------------------------------- | ------------------------------ |
-| `;`       | Separates different annotation types     | `msp+P:...;nuc-:...;fire.:...` |
-| `:`       | Separates annotation type name from data | `msp+P:100,200`                |
-| `,`       | Separates start positions                | `100,200,300`                  |
+| Delimiter | Purpose                                  | Example                             |
+| --------- | ---------------------------------------- | ----------------------------------- |
+| `;`       | Separates different annotation types     | `1000;msp+P:...;nuc-:...;fire.:...` |
+| `:`       | Separates annotation type name from data | `msp+P:100,200`                     |
+| `,`       | Separates start positions                | `100,200,300`                       |
 
 **AL, AQ, AN tag delimiters:**
 
@@ -86,7 +94,7 @@ Strand information is relative to the sequenced molecule and follows the same co
 This shows CTCF annotations on both the forward strand (start 0 length 4) and reverse strand (start 5 length 3).
 
 ```
-MA:Z:ctcf+:0;ctcf-:5
+MA:Z:10;ctcf+Q:0;ctcf-Q:5
 AL:B:I,4,3
 AQ:B:C,200,180
 
@@ -99,12 +107,12 @@ Reverse:  -----###--
 
 Each annotation is represented across the four tags with corresponding values:
 
-1. **MA tag** - Start position in molecular coordinates (0-based, u32 arrays with annotation type prefixes)
+1. **MA tag** - Read length (first value) followed by start positions in molecular coordinates (0-based, u32 arrays with annotation type prefixes)
 2. **AL tag** - Length of the annotation in base pairs (u32)
 3. **AQ tag** - Quality score (0-255, u8; only for annotations with P or Q specified)
 4. **AN tag** - Optional name/label for the annotation (string)
 
-The values in AL and AN tags correspond positionally to all annotations defined in the MA tag. The AQ tag only contains values for annotations whose type specifies `P` or `Q`; annotations without a quality indicator are skipped. For example, if the MA tag contains `msp+P:100,200;nuc+:150`, the AQ tag would contain only 2 values (for the two MSP annotations), while AL would contain 3 values (for all annotations).
+The values in AL and AN tags correspond positionally to all annotations defined in the MA tag. The AQ tag only contains values for annotations whose type specifies `P` or `Q`; annotations without a quality indicator are skipped. For example, if the MA tag contains `1000;msp+P:100,200;nuc+:150`, the AQ tag would contain only 2 values (for the two MSP annotations), while AL would contain 3 values (for all annotations).
 
 **Note:** When using the AN tag, if some annotations have names and others don't, use an empty string to represent missing names. This maintains positional correspondence across all tags.
 
@@ -139,10 +147,11 @@ The format supports arbitrary annotation type names, allowing for:
 ### Single Annotation Type (No Quality)
 
 ```
-MA:Z:msp+:100,200
+MA:Z:1000;msp+:100,200
 AL:B:I,50,60
 ```
 
+- Read length: 1000 bp
 - Two MSP annotations on the forward strand (no quality scores)
 - First MSP: start position 100, length 50
 - Second MSP: start position 200, length 60
@@ -151,11 +160,12 @@ AL:B:I,50,60
 ### Single Annotation Type (Linear Quality)
 
 ```
-MA:Z:msp+Q:100,200
+MA:Z:1000;msp+Q:100,200
 AL:B:I,50,60
 AQ:B:C,255,200
 ```
 
+- Read length: 1000 bp
 - Two MSP annotations on the forward strand with linear quality scores
 - First MSP: start position 100, length 50, quality 255
 - Second MSP: start position 200, length 60, quality 200
@@ -163,11 +173,12 @@ AQ:B:C,255,200
 ### Single Annotation Type with Phred Quality
 
 ```
-MA:Z:msp+P:100,200
+MA:Z:1000;msp+P:100,200
 AL:B:I,50,60
 AQ:B:C,40,30
 ```
 
+- Read length: 1000 bp
 - Two MSP annotations on the forward strand with phred-scaled quality scores
 - First MSP: start position 100, length 50, phred quality 40
 - Second MSP: start position 200, length 60, phred quality 30
@@ -175,11 +186,12 @@ AQ:B:C,40,30
 ### Multiple Annotation Types with Mixed Quality
 
 ```
-MA:Z:msp+P:100,200;nuc+:150,300;fire.Q:500
+MA:Z:1000;msp+P:100,200;nuc+:150,300;fire.Q:500
 AL:B:I,50,60,103,100,75
 AQ:B:C,40,35,200
 ```
 
+- Read length: 1000 bp
 - 2 MSP annotations (forward strand, phred quality): positions 100 and 200, lengths 50 and 60, phred qualities 40 and 35
 - 2 nucleosome annotations (forward strand, no quality): positions 150 and 300, lengths 103 and 100
 - 1 FIRE annotation (no strand, linear quality): position 500, length 75, quality 200
@@ -188,12 +200,13 @@ AQ:B:C,40,35,200
 ### With Partial Names
 
 ```
-MA:Z:msp+P:100,200;nuc+:150,300
+MA:Z:1000;msp+P:100,200;nuc+:150,300
 AL:B:I,50,60,103,100
 AQ:B:C,40,35
 AN:Z:msp1,,,nuc2
 ```
 
+- Read length: 1000 bp
 - 2 MSP annotations with phred quality, 2 nucleosome annotations without quality
 - AQ tag only contains 2 values (for the MSP annotations)
 - Only the first MSP and second nucleosome have names
