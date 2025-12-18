@@ -12,7 +12,7 @@ The molecular annotation format uses four related tags:
 
 - **MA:Z:** - Annotation start positions (required, u32 arrays separated by annotation type prefixes)
 - **AL:B:I** - Annotation Lengths (required, u32 array)
-- **AQ:B:C** - Annotation Quality scores (required, u8 array)
+- **AQ:B:C** - Annotation Quality scores (optional, u8 array; only present if any annotation type specifies P or Q)
 - **AN:Z:** - Annotation Names (optional labels for individual annotations)
 
 ```
@@ -66,11 +66,12 @@ The annotation type name is an alphanumeric string (including underscores) that 
 **Quality type indicator (optional):**
 
 - **`P`**: Quality scores are phred-scaled
-- **`Q`**: Quality scores are linearly scaled (like ML tag, default if omitted)
+- **`Q`**: Quality scores are linearly scaled (like ML tag)
+- **(omitted)**: No quality scores for this annotation type
 
 e.g., `msp+P`, `nuc-`, `fire.Q`
 
-When the quality type indicator is omitted, the quality scores are interpreted as normal quality values (Q).
+When the quality type indicator is omitted, no quality values are stored for that annotation type in the AQ tag. This means the AQ tag only contains values for annotations that have `P` or `Q` specified.
 
 #### Strand Convention
 
@@ -100,10 +101,10 @@ Each annotation is represented across the four tags with corresponding values:
 
 1. **MA tag** - Start position in molecular coordinates (0-based, u32 arrays with annotation type prefixes)
 2. **AL tag** - Length of the annotation in base pairs (u32)
-3. **AQ tag** - Quality score (0-255, u8)
+3. **AQ tag** - Quality score (0-255, u8; only for annotations with P or Q specified)
 4. **AN tag** - Optional name/label for the annotation (string)
 
-The values in AL, AQ, and AN tags correspond positionally to the annotations defined in the MA tag. For example, the first start position in the MA tag corresponds to the first length in AL, the first quality in AQ, and the first name in AN.
+The values in AL and AN tags correspond positionally to all annotations defined in the MA tag. The AQ tag only contains values for annotations whose type specifies `P` or `Q`; annotations without a quality indicator are skipped. For example, if the MA tag contains `msp+P:100,200;nuc+:150`, the AQ tag would contain only 2 values (for the two MSP annotations), while AL would contain 3 values (for all annotations).
 
 **Note:** When using the AN tag, if some annotations have names and others don't, use an empty string to represent missing names. This maintains positional correspondence across all tags.
 
@@ -135,15 +136,27 @@ The format supports arbitrary annotation type names, allowing for:
 
 ## Examples
 
-### Single Annotation Type
+### Single Annotation Type (No Quality)
 
 ```
 MA:Z:msp+:100,200
 AL:B:I,50,60
+```
+
+- Two MSP annotations on the forward strand (no quality scores)
+- First MSP: start position 100, length 50
+- Second MSP: start position 200, length 60
+- No AQ tag since no quality indicator was specified
+
+### Single Annotation Type (Linear Quality)
+
+```
+MA:Z:msp+Q:100,200
+AL:B:I,50,60
 AQ:B:C,255,200
 ```
 
-- Two MSP annotations on the forward strand (quality type Q by default)
+- Two MSP annotations on the forward strand with linear quality scores
 - First MSP: start position 100, length 50, quality 255
 - Second MSP: start position 200, length 60, quality 200
 
@@ -159,36 +172,29 @@ AQ:B:C,40,30
 - First MSP: start position 100, length 50, phred quality 40
 - Second MSP: start position 200, length 60, phred quality 30
 
-### Multiple Annotation Types
+### Multiple Annotation Types with Mixed Quality
 
 ```
-MA:Z:msp+:100,200;nuc+:150,300
-AL:B:I,50,60,103,100
-AQ:B:C,255,200,0,0
+MA:Z:msp+P:100,200;nuc+:150,300;fire.Q:500
+AL:B:I,50,60,103,100,75
+AQ:B:C,40,35,200
 ```
 
-- 2 MSP annotations (forward strand, normal quality)
-- 2 nucleosome annotations (forward strand, normal quality)
-
-### Multiple Annotation Types with Mixed Quality Types
-
-```
-MA:Z:msp+P:100,200;nuc+:150,300
-AL:B:I,50,60,103,100
-AQ:B:C,40,35,255,200
-```
-
-- 2 MSP annotations (forward strand, phred quality)
-- 2 nucleosome annotations (forward strand, normal quality)
+- 2 MSP annotations (forward strand, phred quality): positions 100 and 200, lengths 50 and 60, phred qualities 40 and 35
+- 2 nucleosome annotations (forward strand, no quality): positions 150 and 300, lengths 103 and 100
+- 1 FIRE annotation (no strand, linear quality): position 500, length 75, quality 200
+- AQ tag contains 3 values: 2 for MSP (phred) + 1 for FIRE (linear); nucleosome annotations have no quality values
 
 ### With Partial Names
 
 ```
-MA:Z:msp+:100,200;nuc+:150,300
+MA:Z:msp+P:100,200;nuc+:150,300
 AL:B:I,50,60,103,100
-AQ:B:C,255,200,0,0
+AQ:B:C,40,35
 AN:Z:msp1,,,nuc2
 ```
 
+- 2 MSP annotations with phred quality, 2 nucleosome annotations without quality
+- AQ tag only contains 2 values (for the MSP annotations)
 - Only the first MSP and second nucleosome have names
-- Unnamed annotations are represented with an empty string to maintain positional correspondence
+- Unnamed annotations use empty strings to maintain positional correspondence in AN
