@@ -40,8 +40,8 @@ The first value in the MA tag is the length of the read at the time the annotati
 
 All coordinates in the MA tag are "molecular coordinates" meaning:
 
-- **0-based positions**: Start positions use 0-based indexing (first base of the read is position 0)
-- **Half-open intervals**: The annotated region spans [start, start+length), where start is inclusive and end is exclusive
+- **1-based positions**: Start positions use 1-based indexing (first base of the read is position 1), consistent with SAM format
+- **Closed intervals**: The annotated region spans [start, start+length-1], where both start and end are inclusive
 - **Read orientation**: Coordinates are always in the orientation of the sequenced molecule, counting from the left
 - **Alignment independent**: For reverse-strand alignments, coordinates do not change; they reflect the original molecule orientation
 
@@ -89,16 +89,16 @@ Strand information is relative to the sequenced molecule and follows the same co
 - **For reverse-strand annotations (`-`)**: The annotation feature is on the reverse/Crick strand of the DNA molecule; however, coordinates still start from the left of the read sequence on the forward strand.
 - **Strand is independent of alignment**: The strand indicator describes the biology of the feature, not the alignment orientation. If a read aligns to the reverse strand of a reference, the MA tag strand indicators remain unchanged.
 
-**Example of strand-specific annotations** on a read of length 10 (where `#` marks the annotated region, `-` marks unannotated positions, and coordinates are 0-based):
+**Example of strand-specific annotations** on a read of length 10 (where `#` marks the annotated region, `-` marks unannotated positions, and coordinates are 1-based):
 
-This shows CTCF annotations on both the forward strand (start 0 length 4) and reverse strand (start 5 length 3).
+This shows CTCF annotations on both the forward strand (start 1 length 4) and reverse strand (start 6 length 3).
 
 ```
-MA:Z:10;ctcf+Q:0;ctcf-Q:5
+MA:Z:10;ctcf+Q:1;ctcf-Q:6
 AL:B:I,4,3
 AQ:B:C,200,180
 
-Position: 0123456789
+Position: 1234567890
 Forward:  ####------
 Reverse:  -----###--
 ```
@@ -107,7 +107,7 @@ Reverse:  -----###--
 
 Each annotation is represented across the four tags with corresponding values:
 
-1. **MA tag** - Read length (first value) followed by start positions in molecular coordinates (0-based, u32 arrays with annotation type prefixes)
+1. **MA tag** - Read length (first value) followed by start positions in molecular coordinates (1-based, u32 arrays with annotation type prefixes)
 2. **AL tag** - Length of the annotation in base pairs (u32)
 3. **AQ tag** - Quality score (0-255, u8; only for annotations with P or Q specified)
 4. **AN tag** - Optional name/label for the annotation (string)
