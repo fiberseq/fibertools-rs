@@ -1054,8 +1054,14 @@ fn run_rgn(
     shuffled_fibers: &Option<ShuffledFibers>,
     region_name: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let tid = bam.header().tid(chrom.as_bytes()).unwrap();
-    let chrom_len = bam.header().target_len(tid).unwrap() as i64;
+    let tid = bam.header().tid(chrom.as_bytes()).ok_or(anyhow::anyhow!(
+        "Chromosome {} not found in BAM header",
+        chrom
+    ))?;
+    let chrom_len = bam.header().target_len(tid).ok_or(anyhow::anyhow!(
+        "Chromosome {} length not found in BAM header",
+        chrom
+    ))? as i64;
 
     let window_size = if shuffled_fibers.is_some() {
         (chrom_len + 1) as usize
