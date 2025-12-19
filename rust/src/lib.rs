@@ -5,18 +5,47 @@
 //!
 //! # Example
 //! ```
-//! use molecular_annotation::{MolecularAnnotations, Strand, QualityType};
+//! use molecular_annotation::{MolecularAnnotations, Strand, QualityType, Encoding};
 //!
 //! // Build annotations programmatically
 //! let mut annotations = MolecularAnnotations::new(1000);
+//!
+//! // Add MSP annotations with phred quality scores
 //! annotations
 //!     .add_annotation_type("msp", Strand::Forward, QualityType::Phred)
 //!     .add(100, 50, Some(40), None)
 //!     .add(200, 60, Some(35), None);
 //!
-//! // Serialize to tag strings
-//! let ma_string = annotations.to_ma_string();
+//! // Add nucleosome annotations without quality scores
+//! annotations
+//!     .add_annotation_type("nuc", Strand::Forward, QualityType::None)
+//!     .add(150, 147, None, None)
+//!     .add(350, 147, None, None);
+//!
+//! // Add FIRE annotation with linear quality
+//! annotations
+//!     .add_annotation_type("fire", Strand::Unknown, QualityType::Linear)
+//!     .add(500, 75, Some(200), Some("enhancer1".to_string()));
+//!
+//! // Serialize with inline encoding (start-length pairs in MA string)
+//! annotations.set_encoding(Encoding::Inline);
+//! let ma_inline = annotations.to_ma_string();
+//! assert_eq!(ma_inline, "1000;msp+P:100-50,200-60;nuc+:150-147,350-147;fire.Q:500-75");
+//!
+//! // Serialize with separate encoding (starts in MA, lengths in AL array)
+//! annotations.set_encoding(Encoding::Separate);
+//! let ma_separate = annotations.to_ma_string();
 //! let al_array = annotations.to_al_array();
+//! assert_eq!(ma_separate, "1000;msp+P:100,200;nuc+:150,350;fire.Q:500");
+//! assert_eq!(al_array, vec![50, 60, 147, 147, 75]);
+//!
+//! // AQ tag: quality scores (only for types with P or Q)
+//! let aq_array = annotations.to_aq_array();
+//! assert_eq!(aq_array, Some(vec![40, 35, 200]));
+//!
+//! // AN tag: names (empty for annotations without names)
+//! let an_string = annotations.to_an_string();
+//! assert_eq!(an_string, Some(",,,,enhancer1".to_string()));
 //! ```
 
 use std::fmt;
@@ -84,6 +113,34 @@ impl FromStr for Strand {
             "-" => Ok(Strand::Reverse),
             "." => Ok(Strand::Unknown),
             _ => Err(ParseError::InvalidFormat(format!("Invalid strand: {}", s))),
+        }
+    }
+}
+
+/// Encoding format for the MA tag
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Encoding {
+    /// Lengths inline in MA string: "1000;msp+:100-50,200-60"
+    /// No separate AL array needed
+    Inline,
+    /// Lengths in separate AL array: MA="1000;msp+:100,200" AL=[50,60]
+    Separate,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for Encoding {
+    fn default() -> Self {
+        #[cfg(feature = "inline-lengths")]
+        {
+            Encoding::Inline
+        }
+        #[cfg(all(feature = "separate-lengths", not(feature = "inline-lengths")))]
+        {
+            Encoding::Separate
+        }
+        #[cfg(not(any(feature = "inline-lengths", feature = "separate-lengths")))]
+        {
+            Encoding::Inline
         }
     }
 }
@@ -187,6 +244,13 @@ impl AnnotationType {
         }
     }
 
+    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.Q")
+    pub fn type_signature(&self) -> String {
+        format!("{}{}{}", self.name, self.strand, self.quality_type)
+    }
+}
+
+impl AnnotationType {
     /// Add an annotation to this type
     pub fn add(
         &mut self,
@@ -198,11 +262,6 @@ impl AnnotationType {
         self.annotations.push(Annotation::new(start, length, quality, name));
         self
     }
-
-    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.Q")
-    pub fn type_signature(&self) -> String {
-        format!("{}{}{}", self.name, self.strand, self.quality_type)
-    }
 }
 
 /// Container for all molecular annotations on a read
@@ -212,6 +271,8 @@ pub struct MolecularAnnotations {
     pub read_length: u32,
     /// All annotation types on this read
     pub annotation_types: Vec<AnnotationType>,
+    /// Encoding format for serialization
+    encoding: Encoding,
 }
 
 impl MolecularAnnotations {
@@ -220,28 +281,13 @@ impl MolecularAnnotations {
         Self {
             read_length,
             annotation_types: Vec::new(),
+            encoding: Encoding::default(),
         }
     }
 
-    /// Add a new annotation type and return a mutable reference to it
-    pub fn add_annotation_type(
-        &mut self,
-        name: &str,
-        strand: Strand,
-        quality_type: QualityType,
-    ) -> &mut AnnotationType {
-        self.annotation_types.push(AnnotationType::new(name, strand, quality_type));
-        self.annotation_types.last_mut().unwrap()
-    }
-
-    /// Get an annotation type by name
-    pub fn get_type(&self, name: &str) -> Option<&AnnotationType> {
-        self.annotation_types.iter().find(|t| t.name == name)
-    }
-
-    /// Get a mutable reference to an annotation type by name
-    pub fn get_type_mut(&mut self, name: &str) -> Option<&mut AnnotationType> {
-        self.annotation_types.iter_mut().find(|t| t.name == name)
+    /// Get the current encoding format
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
 
     /// Returns the total number of annotations across all types
@@ -249,11 +295,76 @@ impl MolecularAnnotations {
         self.annotation_types.iter().map(|t| t.annotations.len()).sum()
     }
 
-    /// Iterate over all annotations across all types
-    pub fn iter_all_annotations(&self) -> impl Iterator<Item = (&AnnotationType, &Annotation)> {
+    /// Generate the MA:Z tag string
+    pub fn to_ma_string(&self) -> String {
+        let mut parts = vec![self.read_length.to_string()];
+
+        for annot_type in &self.annotation_types {
+            let positions: Vec<String> = match self.encoding {
+                Encoding::Inline => annot_type
+                    .annotations
+                    .iter()
+                    .map(|a| format!("{}-{}", a.start, a.length))
+                    .collect(),
+                Encoding::Separate => annot_type
+                    .annotations
+                    .iter()
+                    .map(|a| a.start.to_string())
+                    .collect(),
+            };
+
+            parts.push(format!("{}:{}", annot_type.type_signature(), positions.join(",")));
+        }
+
+        parts.join(";")
+    }
+
+    /// Generate the AL:B:I array
+    pub fn to_al_array(&self) -> Vec<u32> {
         self.annotation_types
             .iter()
-            .flat_map(|t| t.annotations.iter().map(move |a| (t, a)))
+            .flat_map(|t| t.annotations.iter().map(|a| a.length))
+            .collect()
+    }
+
+    /// Generate the AQ:B:C array (None if no annotations have quality)
+    pub fn to_aq_array(&self) -> Option<Vec<u8>> {
+        let qualities: Vec<u8> = self
+            .annotation_types
+            .iter()
+            .filter(|t| t.quality_type.has_quality())
+            .flat_map(|t| t.annotations.iter().filter_map(|a| a.quality))
+            .collect();
+
+        if qualities.is_empty() {
+            None
+        } else {
+            Some(qualities)
+        }
+    }
+
+    /// Generate the AN:Z tag string (None if no annotations have names)
+    pub fn to_an_string(&self) -> Option<String> {
+        let has_any_names = self
+            .annotation_types
+            .iter()
+            .any(|t| t.annotations.iter().any(|a| a.name.is_some()));
+
+        if !has_any_names {
+            return None;
+        }
+
+        let names: Vec<String> = self
+            .annotation_types
+            .iter()
+            .flat_map(|t| {
+                t.annotations.iter().map(|a| {
+                    a.name.as_deref().unwrap_or("").to_string()
+                })
+            })
+            .collect();
+
+        Some(names.join(","))
     }
 
     /// Parse from tag values
@@ -309,26 +420,41 @@ impl MolecularAnnotations {
             // Format: name[+-.]P?Q?
             let (name, strand, quality_type) = parse_type_info(type_info)?;
 
-            // Parse positions
-            let positions: Vec<u32> = positions_str
+            // Parse positions (and optionally lengths if inline format)
+            // Detect format: "100-50,200-60" (inline) vs "100,200" (separate)
+            let position_length_pairs: Vec<(u32, Option<u32>)> = positions_str
                 .split(',')
                 .filter(|s| !s.is_empty())
-                .map(|s| s.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid position: {}", s))))
-                .collect::<Result<Vec<_>, _>>()?;
+                .map(|s| {
+                    if let Some((start_str, len_str)) = s.split_once('-') {
+                        let start = start_str.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid start: {}", start_str)))?;
+                        let len = len_str.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid length: {}", len_str)))?;
+                        Ok((start, Some(len)))
+                    } else {
+                        let start = s.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid position: {}", s)))?;
+                        Ok((start, None))
+                    }
+                })
+                .collect::<Result<Vec<_>, ParseError>>()?;
 
             // Create annotations
             let mut annot_type = AnnotationType::new(name, strand, quality_type);
 
-            for pos in positions {
-                // Get length from AL array
-                if al_idx >= al.len() {
-                    return Err(ParseError::MismatchedArrayLengths {
-                        expected: al_idx + 1,
-                        got: al.len(),
-                    });
-                }
-                let length = al[al_idx];
-                al_idx += 1;
+            for (pos, inline_length) in position_length_pairs {
+                // Get length: from inline format or from AL array
+                let length = if let Some(len) = inline_length {
+                    len
+                } else {
+                    if al_idx >= al.len() {
+                        return Err(ParseError::MismatchedArrayLengths {
+                            expected: al_idx + 1,
+                            got: al.len(),
+                        });
+                    }
+                    let len = al[al_idx];
+                    al_idx += 1;
+                    len
+                };
 
                 // Get quality if this type has quality scores
                 let quality = if quality_type.has_quality() {
@@ -367,80 +493,56 @@ impl MolecularAnnotations {
             annotation_types.push(annot_type);
         }
 
-        // Validate that we consumed all AL values
-        if al_idx != al.len() {
+        // Validate that we consumed all AL values (only if using separate format)
+        if al_idx > 0 && al_idx != al.len() {
             return Err(ParseError::MismatchedArrayLengths {
                 expected: al_idx,
                 got: al.len(),
             });
         }
 
-        Ok(Self { read_length, annotation_types })
+        // Detect encoding from input format
+        let detected_encoding = if al_idx == 0 && !annotation_types.is_empty() {
+            Encoding::Inline
+        } else {
+            Encoding::Separate
+        };
+
+        Ok(Self { read_length, annotation_types, encoding: detected_encoding })
     }
 
-    /// Generate the MA:Z tag string
-    pub fn to_ma_string(&self) -> String {
-        let mut parts = vec![self.read_length.to_string()];
-
-        for annot_type in &self.annotation_types {
-            let positions: Vec<String> = annot_type
-                .annotations
-                .iter()
-                .map(|a| a.start.to_string())
-                .collect();
-
-            parts.push(format!("{}:{}", annot_type.type_signature(), positions.join(",")));
-        }
-
-        parts.join(";")
+    /// Set the encoding format for serialization (returns &mut Self for chaining)
+    pub fn set_encoding(&mut self, encoding: Encoding) -> &mut Self {
+        self.encoding = encoding;
+        self
     }
 
-    /// Generate the AL:B:I array
-    pub fn to_al_array(&self) -> Vec<u32> {
+    /// Add a new annotation type and return a mutable reference to it
+    pub fn add_annotation_type(
+        &mut self,
+        name: &str,
+        strand: Strand,
+        quality_type: QualityType,
+    ) -> &mut AnnotationType {
+        self.annotation_types.push(AnnotationType::new(name.to_string(), strand, quality_type));
+        self.annotation_types.last_mut().unwrap()
+    }
+
+    /// Get an annotation type by name
+    pub fn get_type(&self, name: &str) -> Option<&AnnotationType> {
+        self.annotation_types.iter().find(|t| t.name == name)
+    }
+
+    /// Get a mutable reference to an annotation type by name
+    pub fn get_type_mut(&mut self, name: &str) -> Option<&mut AnnotationType> {
+        self.annotation_types.iter_mut().find(|t| t.name == name)
+    }
+
+    /// Iterate over all annotations across all types
+    pub fn iter_all_annotations(&self) -> impl Iterator<Item = (&AnnotationType, &Annotation)> {
         self.annotation_types
             .iter()
-            .flat_map(|t| t.annotations.iter().map(|a| a.length))
-            .collect()
-    }
-
-    /// Generate the AQ:B:C array (None if no annotations have quality)
-    pub fn to_aq_array(&self) -> Option<Vec<u8>> {
-        let qualities: Vec<u8> = self
-            .annotation_types
-            .iter()
-            .filter(|t| t.quality_type.has_quality())
-            .flat_map(|t| t.annotations.iter().filter_map(|a| a.quality))
-            .collect();
-
-        if qualities.is_empty() {
-            None
-        } else {
-            Some(qualities)
-        }
-    }
-
-    /// Generate the AN:Z tag string (None if no annotations have names)
-    pub fn to_an_string(&self) -> Option<String> {
-        let has_any_names = self
-            .annotation_types
-            .iter()
-            .any(|t| t.annotations.iter().any(|a| a.name.is_some()));
-
-        if !has_any_names {
-            return None;
-        }
-
-        let names: Vec<String> = self
-            .annotation_types
-            .iter()
-            .flat_map(|t| {
-                t.annotations.iter().map(|a| {
-                    a.name.as_ref().map(|n| n.as_str()).unwrap_or("").to_string()
-                })
-            })
-            .collect();
-
-        Some(names.join(","))
+            .flat_map(|t| t.annotations.iter().map(move |a| (t, a)))
     }
 }
 
@@ -468,6 +570,93 @@ fn parse_type_info(s: &str) -> Result<(String, Strand, QualityType), ParseError>
     let quality_type = QualityType::from_str(quality_str)?;
 
     Ok((name.to_string(), strand, quality_type))
+}
+
+// Feature-gated htslib integration
+#[cfg(feature = "htslib")]
+mod htslib_impl {
+    use super::*;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    impl MolecularAnnotations {
+        /// Read molecular annotations from a BAM record
+        ///
+        /// Extracts MA:Z, AL:B:I, AQ:B:C (optional), and AN:Z (optional) tags
+        /// from the record and parses them into a MolecularAnnotations struct.
+        pub fn from_record(record: &Record) -> Result<Self, ParseError> {
+            // Get MA tag (required)
+            let ma = match record.aux(b"MA") {
+                Ok(Aux::String(s)) => s,
+                Ok(_) => return Err(ParseError::InvalidFormat("MA tag is not a string".to_string())),
+                Err(_) => return Err(ParseError::InvalidFormat("Missing MA tag".to_string())),
+            };
+
+            // Get AL tag (required)
+            let al: Vec<u32> = match record.aux(b"AL") {
+                Ok(Aux::ArrayU32(arr)) => arr.iter().collect(),
+                Ok(Aux::ArrayI32(arr)) => arr.iter().map(|v| v as u32).collect(),
+                Ok(_) => return Err(ParseError::InvalidFormat("AL tag is not an integer array".to_string())),
+                Err(_) => return Err(ParseError::InvalidFormat("Missing AL tag".to_string())),
+            };
+
+            // Get AQ tag (optional)
+            let aq: Option<Vec<u8>> = match record.aux(b"AQ") {
+                Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
+                Ok(_) => return Err(ParseError::InvalidFormat("AQ tag is not a u8 array".to_string())),
+                Err(_) => None,
+            };
+
+            // Get AN tag (optional)
+            let an: Option<&str> = match record.aux(b"AN") {
+                Ok(Aux::String(s)) => Some(s),
+                Ok(_) => return Err(ParseError::InvalidFormat("AN tag is not a string".to_string())),
+                Err(_) => None,
+            };
+
+            Self::from_tags(ma, &al, aq.as_deref(), an)
+        }
+
+        /// Write molecular annotations to a BAM record
+        ///
+        /// Adds MA:Z, AL:B:I, and optionally AQ:B:C and AN:Z tags to the record.
+        /// Note: This will overwrite any existing tags with the same names.
+        pub fn write_to_record(&self, record: &mut Record) -> Result<(), ParseError> {
+            // Remove existing tags if present
+            record.remove_aux(b"MA").ok();
+            record.remove_aux(b"AL").ok();
+            record.remove_aux(b"AQ").ok();
+            record.remove_aux(b"AN").ok();
+
+            // Write MA tag
+            let ma_string = self.to_ma_string();
+            record
+                .push_aux(b"MA", Aux::String(&ma_string))
+                .map_err(|e| ParseError::InvalidFormat(format!("Failed to write MA tag: {}", e)))?;
+
+            // Write AL tag
+            let al_array = self.to_al_array();
+            record
+                .push_aux(b"AL", Aux::ArrayU32((&al_array).into()))
+                .map_err(|e| ParseError::InvalidFormat(format!("Failed to write AL tag: {}", e)))?;
+
+            // Write AQ tag if present
+            if let Some(aq_array) = self.to_aq_array() {
+                record
+                    .push_aux(b"AQ", Aux::ArrayU8((&aq_array).into()))
+                    .map_err(|e| ParseError::InvalidFormat(format!("Failed to write AQ tag: {}", e)))?;
+            }
+
+            // Write AN tag if present
+            if let Some(an_string) = self.to_an_string() {
+                record
+                    .push_aux(b"AN", Aux::String(&an_string))
+                    .map_err(|e| ParseError::InvalidFormat(format!("Failed to write AN tag: {}", e)))?;
+            }
+
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -534,8 +723,21 @@ mod tests {
     }
 
     #[test]
-    fn test_to_ma_string() {
+    fn test_to_ma_string_inline() {
         let mut annotations = MolecularAnnotations::new(1000);
+        annotations.set_encoding(Encoding::Inline);
+        annotations
+            .add_annotation_type("msp", Strand::Forward, QualityType::Phred)
+            .add(100, 50, Some(40), None)
+            .add(200, 60, Some(35), None);
+
+        assert_eq!(annotations.to_ma_string(), "1000;msp+P:100-50,200-60");
+    }
+
+    #[test]
+    fn test_to_ma_string_separate() {
+        let mut annotations = MolecularAnnotations::new(1000);
+        annotations.set_encoding(Encoding::Separate);
         annotations
             .add_annotation_type("msp", Strand::Forward, QualityType::Phred)
             .add(100, 50, Some(40), None)

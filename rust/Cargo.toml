@@ -3,7 +3,15 @@ name = "molecular-annotation"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["inline-lengths"]
+# Encoding format for MA tag - only one should be enabled
+inline-lengths = []   # MA contains start-length pairs: "1000;msp+:100-50,200-60"
+separate-lengths = [] # MA contains starts only, lengths in AL array: "1000;msp+:100,200"
+htslib = ["dep:rust-htslib"]
+
 [dependencies]
+rust-htslib = { version = "0.47", optional = true }
 
 [dev-dependencies]
 rust-htslib = "0.47"
