@@ -8,10 +8,19 @@ version = "0.1.0"
 description = "Python bindings for molecular annotation tags in SAM/BAM/CRAM files"
 readme = "README.md"
 requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Mitchell Vollger", email = "mrvollger@gmail.com"},
+]
+keywords = ["bioinformatics", "genomics", "SAM", "BAM", "CRAM", "molecular", "annotation"]
 dependencies = [
     "pysam>=0.20",
 ]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
@@ -20,7 +29,24 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/fiberseq/Molecular-annotation-spec"
+Repository = "https://github.com/fiberseq/Molecular-annotation-spec"
+Documentation = "https://github.com/fiberseq/Molecular-annotation-spec#readme"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+python-source = "."
+module-name = "molecular_annotation._molecular_annotation"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

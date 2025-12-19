@@ -1,6 +1,6 @@
 """Utility functions for working with pysam AlignedSegment records."""
 
-from _molecular_annotation import MolecularAnnotations
+from molecular_annotation._molecular_annotation import MolecularAnnotations
 
 
 def from_record(record) -> MolecularAnnotations:
