@@ -6,7 +6,7 @@ use crate::subcommands::pileup::{
 };
 use crate::utils::bio_io;
 use anyhow::Result;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 
 /// Filtering thresholds for peak calling
@@ -328,6 +328,21 @@ impl<'a> Peak<'a> {
         fire_ids
     }
 
+    /// Get FIRE elements at the peak index position as a map of id -> (start, end)
+    pub fn get_fire_elements(&self) -> HashMap<usize, (i64, i64)> {
+        let mut fire_elements = HashMap::new();
+
+        if let Some(ref fire_elements_vec) = self.pileup.all_data.fire_elements {
+            if self.peak_index < fire_elements_vec.len() {
+                for fire_elem in &fire_elements_vec[self.peak_index] {
+                    fire_elements.insert(fire_elem.id, (fire_elem.start, fire_elem.end));
+                }
+            }
+        }
+
+        fire_elements
+    }
+
     /// Calculate the fraction of shared FIRE elements between two peaks
     /// Returns the fraction relative to the smaller peak's FIRE element count
     pub fn fire_overlap_fraction(&self, other: &Peak) -> f64 {
@@ -405,7 +420,7 @@ impl<'a> Peak<'a> {
 
 /// Merge a group of peaks into a single peak
 /// Takes the peak with the highest score as representative (higher score = better)
-/// and extends boundaries to cover all peaks in the group
+/// and calculates boundaries as the median of all unique FIRE elements across merged peaks
 fn merge_peak_group<'a>(peaks: &[&Peak<'a>]) -> Peak<'a> {
     assert!(!peaks.is_empty(), "Cannot merge empty peak group");
 
@@ -415,9 +430,25 @@ fn merge_peak_group<'a>(peaks: &[&Peak<'a>]) -> Peak<'a> {
         .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
         .unwrap();
 
-    // Calculate merged boundaries
-    let merged_start = peaks.iter().map(|p| p.start).min().unwrap();
-    let merged_end = peaks.iter().map(|p| p.end).max().unwrap();
+    // Collect all unique FIRE elements from all peaks being merged
+    let mut all_fire_elements: HashMap<usize, (i64, i64)> = HashMap::new();
+    for peak in peaks {
+        all_fire_elements.extend(peak.get_fire_elements());
+    }
+
+    // Calculate median start and end from all unique FIRE elements
+    let (merged_start, merged_end) = if all_fire_elements.is_empty() {
+        // Fallback to best peak boundaries if no FIRE elements
+        (best_peak.start, best_peak.end)
+    } else {
+        let mut starts: Vec<i64> = all_fire_elements.values().map(|(s, _)| *s).collect();
+        let mut ends: Vec<i64> = all_fire_elements.values().map(|(_, e)| *e).collect();
+        starts.sort_unstable();
+        ends.sort_unstable();
+        let median_start = starts[starts.len() / 2] as usize;
+        let median_end = ends[ends.len() / 2] as usize;
+        (median_start, median_end)
+    };
 
     Peak {
         chrom: best_peak.chrom.clone(),
