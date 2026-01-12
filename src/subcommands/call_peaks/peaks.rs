@@ -404,15 +404,15 @@ impl<'a> Peak<'a> {
 }
 
 /// Merge a group of peaks into a single peak
-/// Takes the peak with the best (lowest) FDR as representative
+/// Takes the peak with the highest score as representative (higher score = better)
 /// and extends boundaries to cover all peaks in the group
 fn merge_peak_group<'a>(peaks: &[&Peak<'a>]) -> Peak<'a> {
     assert!(!peaks.is_empty(), "Cannot merge empty peak group");
 
-    // Find the peak with the best (lowest) FDR
+    // Find the peak with the highest score (which corresponds to the best/lowest FDR)
     let best_peak = peaks
         .iter()
-        .min_by(|a, b| a.fdr.partial_cmp(&b.fdr).unwrap())
+        .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
         .unwrap();
 
     // Calculate merged boundaries
@@ -646,6 +646,7 @@ pub fn call_peaks(
             haps: false,
             per_base: false,
             keep_zeros: false,
+            min_fire_coverage: Some(opts.min_fire_coverage),
         };
 
         // Process fibers to build the track

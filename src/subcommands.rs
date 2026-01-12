@@ -16,6 +16,8 @@ pub mod extract;
 /// add fire data
 pub mod fire;
 pub mod footprint;
+/// create mock BAM with FIRE elements
+pub mod mock_fire;
 /// make a fire track from a bam file
 pub mod pileup;
 /// m6A prediction

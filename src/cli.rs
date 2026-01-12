@@ -14,6 +14,7 @@ mod extract_opts;
 mod fiber_hmm;
 mod fire_opts;
 mod footprint_opts;
+mod mock_fire_opts;
 mod nucleosome_opts;
 mod pg_inject_opts;
 mod pg_lift_opts;
@@ -35,6 +36,7 @@ pub use extract_opts::*;
 pub use fiber_hmm::*;
 pub use fire_opts::*;
 pub use footprint_opts::*;
+pub use mock_fire_opts::*;
 pub use nucleosome_opts::*;
 pub use pg_inject_opts::*;
 pub use pg_lift_opts::*;
@@ -159,6 +161,10 @@ pub enum Commands {
     /// Call FIRE peaks using FDR-based peak calling on pileup data
     #[clap(name = "call-peaks", visible_aliases = &["peaks", "call"])]
     CallPeaks(CallPeaksOptions),
+    /// Create a mock BAM file with FIRE elements from a BED file.
+    /// Each interval in the BED becomes a FIRE element. The 4th column groups intervals into the same mock read.
+    #[clap(name = "mock-fire")]
+    MockFire(MockFireOptions),
     /// Benchmark fiber iterator performance (hidden command for testing)
     #[clap(hide = true)]
     Benchmark(BenchmarkOptions),

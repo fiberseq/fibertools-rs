@@ -85,4 +85,8 @@ pub struct CallPeaksOptions {
     /// Include haplotype-specific calls
     #[clap(long)]
     pub haps: bool,
+
+    /// Minimum FIRE coverage required to calculate a score (default: 4)
+    #[clap(long, default_value = "4", hide = true)]
+    pub min_fire_coverage: i32,
 }

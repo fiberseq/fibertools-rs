@@ -428,7 +428,9 @@ impl<'a> FireTrack<'a> {
                     if annotation.qual < MIN_FIRE_QUAL {
                         continue;
                     }
-                    let score_update = (1.0 - annotation.qual as f32 / 255.0).log10() * -50.0;
+                    // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
+                    let capped_qual = annotation.qual.min(253) as f32;
+                    let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
 
                     // If tracking FIRE elements, create a FireElement for this MSP
                     let fire_element = if self.fire_track_opts.track_fire_elements {
@@ -669,6 +671,8 @@ pub struct FiberseqPileupOptions {
     pub per_base: bool,
     /// Keep zero coverage regions
     pub keep_zeros: bool,
+    /// Minimum FIRE coverage required to calculate a score (default: 4)
+    pub min_fire_coverage: Option<i32>,
 }
 
 impl From<&PileupOptions> for FiberseqPileupOptions {
@@ -679,6 +683,7 @@ impl From<&PileupOptions> for FiberseqPileupOptions {
             haps: opts.haps,
             per_base: opts.per_base,
             keep_zeros: opts.keep_zeros,
+            min_fire_coverage: None, // Use default
         }
     }
 }
@@ -891,20 +896,21 @@ impl<'a> FiberseqPileup<'a> {
     }
 
     fn calculate_scores(&mut self) {
-        self.all_data.calculate_scores(None);
+        self.all_data
+            .calculate_scores(self.pileup_opts.min_fire_coverage);
         // calculate rolling max
         if self.pileup_opts.rolling_max.is_some() {
             self.rolling_max = Some(self.all_data.calculate_rolling_max_score());
         }
         // scores for other tracks
         if let Some(hap1_data) = &mut self.hap1_data {
-            hap1_data.calculate_scores(None);
+            hap1_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
         if let Some(hap2_data) = &mut self.hap2_data {
-            hap2_data.calculate_scores(None);
+            hap2_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
         if let Some(shuffled_data) = &mut self.shuffled_data {
-            shuffled_data.calculate_scores(None);
+            shuffled_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
     }
 
