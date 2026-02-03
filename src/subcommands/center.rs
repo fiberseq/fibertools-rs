@@ -123,11 +123,18 @@ impl CenteredFiberData {
         };
 
         if self.center_position.strand == '-' {
+            // Convert end to inclusive before negation to correctly
+            // handle half-open interval [start, end) under negation.
+            // Negating [a, b) should give [-b+1, -a+1), not [-b, -a).
+            // This matches the logic in apply_offset_helper().
+            c_query_end -= 1;
             c_query_start = -c_query_start;
             c_query_end = -c_query_end;
             if c_query_start > c_query_end {
                 std::mem::swap(&mut c_query_start, &mut c_query_end);
             }
+            // Convert end back to exclusive
+            c_query_end += 1;
         }
         format!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
@@ -224,7 +231,7 @@ impl CenteredFiberData {
     }
     pub fn header() -> String {
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_m6a_positions",
             "m6a_qual",
@@ -234,6 +241,7 @@ impl CenteredFiberData {
             "centered_nuc_ends",
             "centered_msp_starts",
             "centered_msp_ends",
+            "fire_qual",
             "query_sequence"
         )
     }
