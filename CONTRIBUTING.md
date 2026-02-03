@@ -50,3 +50,15 @@ and then run:
 git push
 git push --tags
 ```
+
+### Re-triggering a failed release
+
+If the release workflow fails, fix the issue (e.g. update `cargo-dist-version` in `dist-workspace.toml`, then run `dist generate-ci`), commit, push to main, and re-tag:
+
+```bash
+gh release delete v0.X.Y --yes
+git push origin :refs/tags/v0.X.Y
+git tag -d v0.X.Y
+git tag v0.X.Y
+git push origin v0.X.Y --force
+```
