@@ -18,11 +18,11 @@ use rust_htslib::bam::{self, Read};
 use std::env;
 use std::path::Path;
 
-/// Helper to extract u32 array from BAM aux tag
-fn get_u32_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u32>> {
+/// Helper to extract i64 array from BAM aux tag
+fn get_i64_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<i64>> {
     match record.aux(tag) {
-        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as u32).collect()),
-        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().collect()),
+        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as i64).collect()),
+        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().map(|v| v as i64).collect()),
         _ => None,
     }
 }
@@ -37,23 +37,24 @@ fn get_u8_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
 
 /// Convert fiber-seq tags (ns/nl for nucleosomes, as/al/aq for MSPs) to MolecularAnnotations
 fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAnnotations> {
-    let read_length = record.seq_len() as u32;
+    let read_length = record.seq_len() as i64;
     let mut annotations = MolecularAnnotations::new(read_length);
 
     // Get nucleosome annotations (ns = starts, nl = lengths)
-    if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
+    // fiber-seq tags are 0-based, and our API expects 0-based
+    if let (Some(ns), Some(nl)) = (get_i64_array(record, b"ns"), get_i64_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
                 annotations.add_annotation_type("nuc", Strand::Forward, QualityType::None);
             for (start, length) in ns.iter().zip(nl.iter()) {
-                // Convert from 0-based to 1-based
-                nuc_type.add(*start + 1, *length, None, None);
+                // API uses 0-based internally, converts to 1-based when writing MA tag
+                nuc_type.add(*start, *length, None, None);
             }
         }
     }
 
     // Get MSP/accessible annotations (as = starts, al = lengths, aq = qualities)
-    if let (Some(a_starts), Some(al)) = (get_u32_array(record, b"as"), get_u32_array(record, b"al"))
+    if let (Some(a_starts), Some(al)) = (get_i64_array(record, b"as"), get_i64_array(record, b"al"))
     {
         let aq = get_u8_array(record, b"aq");
 
@@ -76,8 +77,8 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
                 } else {
                     None
                 };
-                // Convert from 0-based to 1-based
-                msp_type.add(*start + 1, *length, quality, None);
+                // API uses 0-based internally, converts to 1-based when writing MA tag
+                msp_type.add(*start, *length, quality, None);
             }
         }
     }
@@ -147,7 +148,7 @@ fn main() {
             // M2/AL tags: alternative separate format for compression comparison
             annotations.set_encoding(Encoding::Separate);
             let m2_string = annotations.to_ma_string();
-            let al_array = annotations.to_al_array();
+            let al_array: Vec<u32> = annotations.to_al_array().iter().map(|&v| v as u32).collect();
             record
                 .push_aux(b"M2", Aux::String(&m2_string))
                 .expect("Failed to write M2 tag");

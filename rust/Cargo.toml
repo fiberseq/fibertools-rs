@@ -2,6 +2,8 @@
 name = "molecular-annotation"
 version = "0.1.0"
 edition = "2021"
+description = "Library for molecular annotations in SAM/BAM files"
+license = "MIT"
 
 [features]
 default = ["inline-lengths"]
