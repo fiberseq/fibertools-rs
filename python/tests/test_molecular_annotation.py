@@ -16,22 +16,24 @@ class TestMolecularAnnotations:
     def test_add_annotations_basic(self):
         """Test adding annotations without quality."""
         annotations = MolecularAnnotations(1000)
+        # API uses 0-based coordinates, MA string uses 1-based per spec
         annotations.add_annotations("nuc", "+", "", starts=[100, 250], lengths=[147, 147])
 
         assert annotations.total_annotation_count() == 2
-        assert annotations.to_ma_string() == "1000;nuc+:100-147,250-147"
+        assert annotations.to_ma_string() == "1000;nuc+:101-147,251-147"
         assert annotations.to_al_array() == [147, 147]
         assert annotations.to_aq_array() is None
 
     def test_add_annotations_with_quality(self):
         """Test adding annotations with Phred quality scores."""
         annotations = MolecularAnnotations(1000)
+        # API uses 0-based coordinates, MA string uses 1-based per spec
         annotations.add_annotations(
             "msp", "+", "P", starts=[100, 200], lengths=[50, 60], qualities=[40, 35]
         )
 
         assert annotations.total_annotation_count() == 2
-        assert annotations.to_ma_string() == "1000;msp+P:100-50,200-60"
+        assert annotations.to_ma_string() == "1000;msp+P:101-50,201-60"
         assert annotations.to_al_array() == [50, 60]
         assert annotations.to_aq_array() == [40, 35]
 
@@ -42,7 +44,7 @@ class TestMolecularAnnotations:
             "fire", ".", "Q", starts=[500], lengths=[75], qualities=[200]
         )
 
-        assert annotations.to_ma_string() == "1000;fire.Q:500-75"
+        assert annotations.to_ma_string() == "1000;fire.Q:501-75"
         assert annotations.to_aq_array() == [200]
 
     def test_add_annotations_with_names(self):
@@ -69,7 +71,7 @@ class TestMolecularAnnotations:
         annotations.add_annotations("nuc", "+", "", starts=[150, 400], lengths=[147, 147])
 
         assert annotations.total_annotation_count() == 4
-        assert annotations.to_ma_string() == "1000;msp+P:100-50,200-60;nuc+:150-147,400-147"
+        assert annotations.to_ma_string() == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
         assert annotations.to_al_array() == [50, 60, 147, 147]
         assert annotations.to_aq_array() == [40, 35]
 
@@ -80,7 +82,7 @@ class TestMolecularAnnotations:
         annotations.add_annotations("nuc", "+", "", starts=[300], lengths=[147])
 
         assert annotations.total_annotation_count() == 2
-        assert annotations.to_ma_string() == "1000;nuc+:100-147,300-147"
+        assert annotations.to_ma_string() == "1000;nuc+:101-147,301-147"
 
     def test_strand_variants(self):
         """Test different strand orientations."""
@@ -255,8 +257,8 @@ class TestPysamIntegration:
 
         write_to_record(annotations, record)
 
-        # Verify tags were written
-        assert record.get_tag("MA") == "1000;msp+P:100-50,200-60;nuc+:150-147,400-147"
+        # Verify tags were written (MA tag uses 1-based coordinates per spec)
+        assert record.get_tag("MA") == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
         assert list(record.get_tag("AQ")) == [40, 35]
 
         # Read them back

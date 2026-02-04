@@ -18,11 +18,11 @@ use rust_htslib::bam::{self, Read};
 use std::env;
 use std::path::Path;
 
-/// Helper to extract i64 array from BAM aux tag
-fn get_i64_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<i64>> {
+/// Helper to extract u32 array from BAM aux tag
+fn get_u32_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u32>> {
     match record.aux(tag) {
-        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as i64).collect()),
-        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().map(|v| v as i64).collect()),
+        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as u32).collect()),
+        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().collect()),
         _ => None,
     }
 }
@@ -37,12 +37,12 @@ fn get_u8_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
 
 /// Convert fiber-seq tags (ns/nl for nucleosomes, as/al/aq for MSPs) to MolecularAnnotations
 fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAnnotations> {
-    let read_length = record.seq_len() as i64;
+    let read_length = record.seq_len() as u32;
     let mut annotations = MolecularAnnotations::new(read_length);
 
     // Get nucleosome annotations (ns = starts, nl = lengths)
     // fiber-seq tags are 0-based, and our API expects 0-based
-    if let (Some(ns), Some(nl)) = (get_i64_array(record, b"ns"), get_i64_array(record, b"nl")) {
+    if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
                 annotations.add_annotation_type("nuc", Strand::Forward, QualityType::None);
@@ -54,7 +54,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
     }
 
     // Get MSP/accessible annotations (as = starts, al = lengths, aq = qualities)
-    if let (Some(a_starts), Some(al)) = (get_i64_array(record, b"as"), get_i64_array(record, b"al"))
+    if let (Some(a_starts), Some(al)) = (get_u32_array(record, b"as"), get_u32_array(record, b"al"))
     {
         let aq = get_u8_array(record, b"aq");
 
@@ -148,7 +148,7 @@ fn main() {
             // M2/AL tags: alternative separate format for compression comparison
             annotations.set_encoding(Encoding::Separate);
             let m2_string = annotations.to_ma_string();
-            let al_array: Vec<u32> = annotations.to_al_array().iter().map(|&v| v as u32).collect();
+            let al_array: Vec<u32> = annotations.to_al_array();
             record
                 .push_aux(b"M2", Aux::String(&m2_string))
                 .expect("Failed to write M2 tag");
