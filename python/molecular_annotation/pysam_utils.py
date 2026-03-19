@@ -21,13 +21,13 @@ def from_record(
     """Read molecular annotations from a pysam AlignedSegment record.
 
     Extracts alignment information (aligned blocks, strand) and optionally
-    parses MA/AL/AQ/AN tags.
+    parses MA/AQ/AN tags.
 
     All coordinates are 0-based half-open [start, end).
 
     Args:
         record: A pysam AlignedSegment object
-        parse_tags: If True (default), parse MA/AL/AQ/AN tags from the record.
+        parse_tags: If True (default), parse MA/AQ/AN tags from the record.
             If False, only extract alignment info (for building annotations manually).
 
     Returns:
@@ -43,12 +43,6 @@ def from_record(
         # Get MA tag (required when parsing tags)
         ma = record.get_tag("MA")
 
-        # Get AL tag (optional - empty if inline format)
-        try:
-            al = list(record.get_tag("AL"))
-        except KeyError:
-            al = []
-
         # Get AQ tag (optional)
         try:
             aq = list(record.get_tag("AQ"))
@@ -61,7 +55,7 @@ def from_record(
         except KeyError:
             an = None
 
-        annot = MolecularAnnotations.from_tags(ma, al, aq=aq, an=an)
+        annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse
     else:
         # Create empty annotations with just read length
@@ -138,8 +132,8 @@ def _extract_aligned_blocks(
 def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment") -> None:
     """Write molecular annotations to a pysam AlignedSegment record.
 
-    Sets MA:Z tag, and optionally AL:B:I, AQ:B:C, and AN:Z tags depending
-    on the encoding format and whether quality/names are present.
+    Sets MA:Z tag, and optionally AQ:B:C and AN:Z tags depending
+    on whether quality/names are present.
 
     This is the inverse of `from_record()`.
 
@@ -160,14 +154,10 @@ def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment")
         >>> # Write back to record
         >>> to_record(annot, record)
     """
-    ma, al, aq, an = annotations.to_tags()
+    ma, aq, an = annotations.to_tags()
 
     # Set MA tag (always)
     record.set_tag("MA", ma)
-
-    # Set AL tag (only for separate encoding, will be non-empty)
-    if al:
-        record.set_tag("AL", al)
 
     # Set AQ tag if present
     if aq is not None:

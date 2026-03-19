@@ -45,3 +45,6 @@ Thumbs.db
 
 # Maturin
 *.whl
+
+# UniFFI generated bindings
+java/generated/

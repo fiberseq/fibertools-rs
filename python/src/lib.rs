@@ -41,7 +41,7 @@ use pyo3::prelude::*;
 // Use fully qualified path to avoid name collision with the pymodule
 use ::molecular_annotation::{
     MolecularAnnotations as RustMolecularAnnotations,
-    QualityType as RustQualityType,
+    QualitySpec as RustQualitySpec,
     Strand as RustStrand,
 };
 
@@ -66,16 +66,12 @@ fn parse_strand(strand: &str) -> PyResult<RustStrand> {
     }
 }
 
-/// Helper function to parse quality type string
-fn parse_quality_type(quality_type: &str) -> PyResult<RustQualityType> {
-    match quality_type {
-        "P" => Ok(RustQualityType::Phred),
-        "Q" => Ok(RustQualityType::Linear),
-        "" => Ok(RustQualityType::None),
-        _ => Err(pyo3::exceptions::PyValueError::new_err(
-            format!("Invalid quality_type '{}', must be 'P', 'Q', or ''", quality_type)
-        )),
-    }
+/// Helper function to parse quality spec string (e.g., "P", "PQ", "PQQP", "")
+fn parse_quality_spec(quality_spec: &str) -> PyResult<RustQualitySpec> {
+    quality_spec.parse()
+        .map_err(|e: ::molecular_annotation::ParseError| {
+            pyo3::exceptions::PyValueError::new_err(e.to_string())
+        })
 }
 
 #[pymethods]
@@ -94,14 +90,13 @@ impl MolecularAnnotations {
         }
     }
 
-    /// Parse annotations from MA/AL/AQ/AN tag values.
+    /// Parse annotations from MA/AQ/AN tag values.
     ///
     /// The MA tag uses **1-based closed** coordinates per spec. This method converts
     /// to **0-based half-open** internally (MA position `100` → internal `start=99`).
     ///
     /// Args:
     ///     ma: The MA:Z tag value (e.g., "1000;msp+P:100-50"). Positions are 1-based.
-    ///     al: The AL:B:I array values (empty list for inline format)
     ///     aq: Optional AQ:B:C array values for quality scores
     ///     an: Optional AN:Z tag value for annotation names
     ///
@@ -111,14 +106,13 @@ impl MolecularAnnotations {
     /// Raises:
     ///     ValueError: If the tag format is invalid.
     #[staticmethod]
-    #[pyo3(signature = (ma, al, aq=None, an=None))]
+    #[pyo3(signature = (ma, aq=None, an=None))]
     pub fn from_tags(
         ma: &str,
-        al: Vec<u32>,
         aq: Option<Vec<u8>>,
         an: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = RustMolecularAnnotations::from_tags(ma, &al, aq.as_deref(), an)
+        let inner = RustMolecularAnnotations::from_tags(ma, &[], aq.as_deref(), an)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -160,59 +154,12 @@ impl MolecularAnnotations {
         self.inner.annotation_types.iter().map(|t| t.name.clone()).collect()
     }
 
-    /// Get the current encoding format.
-    ///
-    /// Returns:
-    ///     "inline" or "separate"
-    #[getter]
-    pub fn encoding(&self) -> String {
-        match self.inner.encoding() {
-            ::molecular_annotation::Encoding::Inline => "inline".to_string(),
-            ::molecular_annotation::Encoding::Separate => "separate".to_string(),
-        }
-    }
-
-    /// Set the encoding format for serialization.
-    ///
-    /// Args:
-    ///     encoding: Either "inline" or "separate"
-    ///         - "inline": Lengths are included in MA string (e.g., "100-50,200-60")
-    ///         - "separate": Lengths are in separate AL array (e.g., MA="100,200" AL=[50,60])
-    ///
-    /// Raises:
-    ///     ValueError: If encoding is not "inline" or "separate"
-    ///
-    /// Example:
-    ///     >>> annot.set_encoding("separate")
-    ///     >>> ma = annot.to_ma_string()  # "1000;msp+P:100,200"
-    ///     >>> al = annot.to_al_array()   # [50, 60]
-    pub fn set_encoding(&mut self, encoding: &str) -> PyResult<()> {
-        match encoding {
-            "inline" => {
-                self.inner.set_encoding(::molecular_annotation::Encoding::Inline);
-                Ok(())
-            }
-            "separate" => {
-                self.inner.set_encoding(::molecular_annotation::Encoding::Separate);
-                Ok(())
-            }
-            _ => Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Invalid encoding '{}', must be 'inline' or 'separate'", encoding)
-            ))
-        }
-    }
-
     /// Generate the MA:Z tag string.
     ///
     /// Converts internal **0-based half-open** coordinates to **1-based closed**
     /// per the MA tag spec (internal `start=99` → MA tag `100`).
     pub fn to_ma_string(&self) -> String {
         self.inner.to_ma_string()
-    }
-
-    /// Generate the AL:B:I array (annotation lengths).
-    pub fn to_al_array(&self) -> Vec<u32> {
-        self.inner.to_al_array()
     }
 
     /// Generate the AQ:B:C array (quality scores).
@@ -236,21 +183,20 @@ impl MolecularAnnotations {
     /// This is the recommended method for serializing annotations to BAM tags.
     ///
     /// Returns:
-    ///     Tuple of (ma, al, aq, an) where:
+    ///     Tuple of (ma, aq, an) where:
     ///     - ma: The MA:Z tag string (always present)
-    ///     - al: The AL:B:I list (lengths, empty if using inline encoding)
     ///     - aq: The AQ:B:C list (qualities, None if no annotations have quality)
     ///     - an: The AN:Z tag string (names, None if no annotations have names)
     ///
     /// Example:
     ///     >>> annot = MolecularAnnotations(1000)
     ///     >>> annot.add_annotations("msp", "+", "P", [99], lengths=[50], qualities=[40])
-    ///     >>> ma, al, aq, an = annot.to_tags()
+    ///     >>> ma, aq, an = annot.to_tags()
     ///     >>> print(ma)  # "1000;msp+P:100-50" (1-based in tag)
-    ///     >>> print(al)  # [] (inline encoding doesn't need AL)
     ///     >>> print(aq)  # [40]
-    pub fn to_tags(&self) -> (String, Vec<u32>, Option<Vec<u8>>, Option<String>) {
-        self.inner.to_tags()
+    pub fn to_tags(&self) -> (String, Option<Vec<u8>>, Option<String>) {
+        let (ma, _al, aq, an) = self.inner.to_tags();
+        (ma, aq, an)
     }
 
     /// Add annotations of a given type.
@@ -260,29 +206,35 @@ impl MolecularAnnotations {
     /// Args:
     ///     type_name: Name of the annotation type (e.g., "msp", "nuc", "fire")
     ///     strand: Strand orientation: "+" (forward), "-" (reverse), or "." (unknown)
-    ///     quality_type: Quality score type: "P" (Phred), "Q" (Linear), or "" (none)
+    ///     quality_spec: Quality specification string. Each character is "P" (Phred) or
+    ///         "Q" (Linear). The length determines how many quality values per annotation.
+    ///         Examples: "P" (one phred), "PQ" (two: phred + linear), "" (none).
     ///     starts: 0-based start positions
     ///     ends: 0-based end positions (exclusive). Mutually exclusive with lengths.
     ///     lengths: Annotation lengths in bp. Mutually exclusive with ends.
-    ///     qualities: Optional quality scores (0-255)
+    ///     qualities: Optional flat quality array (0-255). Length must be
+    ///         len(starts) * len(quality_spec). For example, with quality_spec="PQ"
+    ///         and 2 annotations, provide 4 values: [a1_P, a1_Q, a2_P, a2_Q].
     ///     names: Optional names/labels for annotations
     ///
     /// Raises:
     ///     ValueError: If array lengths don't match, both ends and lengths are provided,
-    ///         neither ends nor lengths are provided, or strand/quality_type is invalid.
+    ///         neither ends nor lengths are provided, or strand/quality_spec is invalid.
     ///
     /// Example:
     ///     >>> annot = MolecularAnnotations(1000)
-    ///     >>> # Using ends (Pythonic style)
+    ///     >>> # Single quality per annotation
     ///     >>> annot.add_annotations("msp", "+", "P", [100, 200], ends=[150, 260], qualities=[40, 35])
-    ///     >>> # Using lengths (Rust style)
+    ///     >>> # Multiple qualities per annotation
+    ///     >>> annot.add_annotations("ctcf", "+", "PQ", [100, 200], lengths=[50, 60], qualities=[40, 255, 30, 200])
+    ///     >>> # No quality
     ///     >>> annot.add_annotations("nuc", "+", "", [100, 200], lengths=[50, 60])
-    #[pyo3(signature = (type_name, strand, quality_type, starts, ends=None, lengths=None, qualities=None, names=None))]
+    #[pyo3(signature = (type_name, strand, quality_spec, starts, ends=None, lengths=None, qualities=None, names=None))]
     pub fn add_annotations(
         &mut self,
         type_name: &str,
         strand: &str,
-        quality_type: &str,
+        quality_spec: &str,
         starts: Vec<u32>,
         ends: Option<Vec<u32>>,
         lengths: Option<Vec<u32>>,
@@ -340,12 +292,17 @@ impl MolecularAnnotations {
         };
 
         let strand = parse_strand(strand)?;
-        let qt = parse_quality_type(quality_type)?;
+        let qs = parse_quality_spec(quality_spec)?;
+        let num_q = qs.num_qualities();
 
         if let Some(ref q) = qualities {
-            if q.len() != starts.len() {
+            let expected = starts.len() * num_q;
+            if q.len() != expected {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    format!("qualities must have same length as starts ({} vs {})", q.len(), starts.len())
+                    format!(
+                        "qualities must have length {} (= {} annotations x {} quality values), got {}",
+                        expected, starts.len(), num_q, q.len()
+                    )
                 ));
             }
         }
@@ -360,26 +317,33 @@ impl MolecularAnnotations {
 
         // Find or create the annotation type
         let at = if let Some(existing) = self.inner.get_type_mut(type_name) {
-            // Verify strand and quality type match
-            if existing.strand != strand || existing.quality_type != qt {
+            // Verify strand and quality spec match
+            if existing.strand != strand || existing.quality_spec != qs {
                 return Err(pyo3::exceptions::PyValueError::new_err(
                     format!(
                         "Annotation type '{}' already exists with different configuration: \
                         existing='{}{}', attempted='{}{}'",
-                        type_name, existing.strand, existing.quality_type, strand, qt
+                        type_name, existing.strand, existing.quality_spec, strand, qs
                     )
                 ));
             }
             existing
         } else {
-            self.inner.add_annotation_type(type_name, strand, qt)
+            self.inner.add_annotation_type(type_name, strand, qs)
         };
 
         // Add all annotations
         for i in 0..starts.len() {
-            let quality = qualities.as_ref().map(|q| q[i]);
+            let q = if num_q > 0 {
+                qualities
+                    .as_ref()
+                    .map(|qs| qs[i * num_q..(i + 1) * num_q].to_vec())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
             let name = names.as_ref().map(|n| n[i].clone());
-            at.add(starts[i], computed_lengths[i], quality, name);
+            at.add(starts[i], computed_lengths[i], q, name);
         }
 
         Ok(())
@@ -538,13 +502,13 @@ impl MolecularAnnotations {
     /// All coordinates are 0-based half-open [start, end).
     ///
     /// Returns:
-    ///     List of (type_name, strand, quality_type, query_start, query_end,
-    ///      forward_start, forward_end, ref_start, ref_end, quality, name)
+    ///     List of (type_name, strand, quality_spec, query_start, query_end,
+    ///      forward_start, forward_end, ref_start, ref_end, qualities, name)
     ///
     /// Example:
     ///     >>> for info in annot.iter_full():
-    ///     ...     type_name, strand, qt, qs, qe, fs, fe, rs, re, qual, name = info
-    ///     ...     print(f"{type_name}: [{qs}, {qe}) -> ref [{rs}, {re})")
+    ///     ...     type_name, strand, qs_str, qs, qe, fs, fe, rs, re, quals, name = info
+    ///     ...     print(f"{type_name}: [{qs}, {qe}) quals={quals}")
     pub fn iter_full(
         &self,
     ) -> Vec<(
@@ -557,7 +521,7 @@ impl MolecularAnnotations {
         u32,
         Option<u32>,
         Option<u32>,
-        Option<u8>,
+        Vec<u8>,
         Option<String>,
     )> {
         self.inner
@@ -566,14 +530,14 @@ impl MolecularAnnotations {
                 (
                     info.type_name.to_string(),
                     info.strand.as_char().to_string(),
-                    info.quality_type.as_char().map(|c| c.to_string()).unwrap_or_default(),
+                    info.quality_spec.to_string(),
                     info.query_start,
                     info.query_end,
                     info.forward_start,
                     info.forward_end,
                     info.ref_start,
                     info.ref_end,
-                    info.quality,
+                    info.qualities.to_vec(),
                     info.name.map(|s| s.to_string()),
                 )
             })
@@ -589,12 +553,12 @@ impl MolecularAnnotations {
     ///
     /// Returns:
     ///     List of (query_start, query_end, forward_start, forward_end,
-    ///      ref_start, ref_end, quality, name). None if type doesn't exist.
+    ///      ref_start, ref_end, qualities, name). None if type doesn't exist.
     ///
     /// Example:
     ///     >>> if (items := annot.iter_type("msp")) is not None:
-    ///     ...     for qs, qe, fs, fe, rs, re, qual, name in items:
-    ///     ...         print(f"[{qs}, {qe}) -> ref [{rs}, {re})")
+    ///     ...     for qs, qe, fs, fe, rs, re, quals, name in items:
+    ///     ...         print(f"[{qs}, {qe}) quals={quals}")
     pub fn iter_type(
         &self,
         type_name: &str,
@@ -605,7 +569,7 @@ impl MolecularAnnotations {
         u32,
         Option<u32>,
         Option<u32>,
-        Option<u8>,
+        Vec<u8>,
         Option<String>,
     )>> {
         self.inner
@@ -619,7 +583,7 @@ impl MolecularAnnotations {
                         info.forward_end,
                         info.ref_start,
                         info.ref_end,
-                        info.quality,
+                        info.qualities.to_vec(),
                         info.name.map(|s| s.to_string()),
                     )
                 })
@@ -629,11 +593,10 @@ impl MolecularAnnotations {
 
     fn __repr__(&self) -> String {
         format!(
-            "MolecularAnnotations(read_length={}, annotation_types={}, is_reverse={}, encoding={:?})",
+            "MolecularAnnotations(read_length={}, annotation_types={}, is_reverse={})",
             self.inner.read_length,
             self.inner.annotation_types.len(),
             self.inner.is_reverse_aligned(),
-            self.inner.encoding()
         )
     }
 }

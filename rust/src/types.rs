@@ -3,7 +3,8 @@
 //! This module contains the core types used throughout the library:
 //! - [`Strand`] - Strand orientation (+, -, .)
 //! - [`Encoding`] - MA tag encoding format (inline vs separate)
-//! - [`QualityType`] - Quality score type (Phred, Linear, None)
+//! - [`QualityScaling`] - Scaling type for a single quality value (Phred or Linear)
+//! - [`QualitySpec`] - Quality specification for an annotation type (zero or more scaling types)
 //! - [`Annotation`] - A single molecular annotation
 //! - [`AnnotationType`] - A group of annotations of the same type
 //! - [`AnnotationInfo`] - Full annotation information for iteration
@@ -30,8 +31,8 @@ pub struct AnnotationInfo<'a> {
     pub type_name: &'a str,
     /// Strand orientation of this annotation type
     pub strand: Strand,
-    /// Quality score type for this annotation type
-    pub quality_type: QualityType,
+    /// Quality specification for this annotation type
+    pub quality_spec: &'a QualitySpec,
     /// Query start in BAM orientation (0-based)
     pub query_start: u32,
     /// Query end in BAM orientation (0-based, exclusive)
@@ -44,8 +45,8 @@ pub struct AnnotationInfo<'a> {
     pub ref_start: Option<u32>,
     /// Reference end position (0-based, exclusive), None if outside aligned region
     pub ref_end: Option<u32>,
-    /// Quality score (0-255), if this annotation type has quality
-    pub quality: Option<u8>,
+    /// Quality scores for this annotation (one per quality spec character)
+    pub qualities: &'a [u8],
     /// Optional name/label for this annotation
     pub name: Option<&'a str>,
 }
@@ -162,52 +163,109 @@ impl Default for Encoding {
     }
 }
 
-/// Quality score type for annotations
+/// Scaling type for a single quality value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum QualityType {
-    /// Phred-scaled quality scores (P)
+pub enum QualityScaling {
+    /// Phred-scaled quality score (P)
     Phred,
-    /// Linear quality scores 0-255 (Q)
+    /// Linear quality score 0-255 (Q)
     Linear,
-    /// No quality scores for this annotation type
-    None,
 }
 
-impl QualityType {
-    /// Returns the character representation, or None if no quality
-    pub fn as_char(&self) -> Option<char> {
+impl QualityScaling {
+    /// Returns the character representation
+    pub fn as_char(&self) -> char {
         match self {
-            QualityType::Phred => Some('P'),
-            QualityType::Linear => Some('Q'),
-            QualityType::None => None,
+            QualityScaling::Phred => 'P',
+            QualityScaling::Linear => 'Q',
         }
-    }
-
-    /// Returns true if this quality type stores values
-    pub fn has_quality(&self) -> bool {
-        !matches!(self, QualityType::None)
     }
 }
 
-impl fmt::Display for QualityType {
+impl fmt::Display for QualityScaling {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.as_char() {
-            Some(c) => write!(f, "{}", c),
-            None => Ok(()),
-        }
+        write!(f, "{}", self.as_char())
     }
 }
 
-impl FromStr for QualityType {
+/// Quality specification for an annotation type.
+///
+/// Defines the number and scaling type of quality values per annotation.
+/// Empty means no quality values. The length determines how many quality
+/// values each annotation in the type contributes to the AQ array.
+///
+/// # Examples
+/// - `QualitySpec::none()` - no quality values
+/// - `"P".parse::<QualitySpec>()` - one phred-scaled value per annotation
+/// - `QualitySpec::from_str("PQ")` - two values per annotation (phred, then linear)
+/// - `QualitySpec::from_str("PQQP")` - four values per annotation
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct QualitySpec(Vec<QualityScaling>);
+
+impl QualitySpec {
+    /// Create a quality spec from a list of scaling types.
+    ///
+    /// # Example
+    /// ```
+    /// use molecular_annotation::{QualitySpec, QualityScaling};
+    /// let spec = QualitySpec::new(vec![
+    ///     QualityScaling::Phred,
+    ///     QualityScaling::Linear,
+    ///     QualityScaling::Linear,
+    ///     QualityScaling::Phred,
+    /// ]);
+    /// assert_eq!(spec.num_qualities(), 4);
+    /// assert_eq!(spec.to_string(), "PQQP");
+    /// ```
+    pub fn new(scalings: Vec<QualityScaling>) -> Self {
+        Self(scalings)
+    }
+
+    /// No quality values.
+    pub fn none() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Number of quality values per annotation.
+    pub fn num_qualities(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns true if this spec has any quality values.
+    pub fn has_quality(&self) -> bool {
+        !self.0.is_empty()
+    }
+
+    /// Access the individual scaling types.
+    pub fn scalings(&self) -> &[QualityScaling] {
+        &self.0
+    }
+}
+
+impl fmt::Display for QualitySpec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for s in &self.0 {
+            write!(f, "{}", s.as_char())?;
+        }
+        Ok(())
+    }
+}
+
+impl FromStr for QualitySpec {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "P" => Ok(QualityType::Phred),
-            "Q" => Ok(QualityType::Linear),
-            "" => Ok(QualityType::None),
-            _ => Err(ParseError::InvalidFormat(format!("Invalid quality type: {}", s))),
+        let mut scalings = Vec::with_capacity(s.len());
+        for c in s.chars() {
+            match c {
+                'P' => scalings.push(QualityScaling::Phred),
+                'Q' => scalings.push(QualityScaling::Linear),
+                _ => return Err(ParseError::InvalidFormat(
+                    format!("Invalid quality spec character '{}' in '{}'", c, s),
+                )),
+            }
         }
+        Ok(Self(scalings))
     }
 }
 
@@ -220,8 +278,8 @@ pub struct Annotation {
     pub start: u32,
     /// Length in base pairs (end = start + length)
     pub length: u32,
-    /// Quality score (0-255), only present if the annotation type has quality
-    pub quality: Option<u8>,
+    /// Quality scores (one per quality spec character, empty if type has no quality)
+    pub qualities: Vec<u8>,
     /// Optional name/label for this annotation
     pub name: Option<String>,
 }
@@ -234,14 +292,14 @@ impl Annotation {
     /// # Panics
     /// Panics in debug mode if:
     /// - `start + length` would overflow u32
-    pub fn new(start: u32, length: u32, quality: Option<u8>, name: Option<String>) -> Self {
+    pub fn new(start: u32, length: u32, qualities: Vec<u8>, name: Option<String>) -> Self {
         debug_assert!(
             start.checked_add(length).is_some(),
             "Annotation coordinate overflow: start={} + length={} exceeds u32",
             start,
             length
         );
-        Self { start, length, quality, name }
+        Self { start, length, qualities, name }
     }
 
     /// Returns the end position (0-based, exclusive).
@@ -290,39 +348,40 @@ pub struct AnnotationType {
     pub name: String,
     /// Strand orientation
     pub strand: Strand,
-    /// Quality score type
-    pub quality_type: QualityType,
+    /// Quality specification (number and scaling of quality values per annotation)
+    pub quality_spec: QualitySpec,
     /// Individual annotations of this type
     pub annotations: Vec<Annotation>,
 }
 
 impl AnnotationType {
     /// Create a new annotation type
-    pub fn new(name: impl Into<String>, strand: Strand, quality_type: QualityType) -> Self {
+    pub fn new(name: impl Into<String>, strand: Strand, quality_spec: QualitySpec) -> Self {
         Self {
             name: name.into(),
             strand,
-            quality_type,
+            quality_spec,
             annotations: Vec::new(),
         }
     }
 
-    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.Q")
+    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.PQ")
     pub fn type_signature(&self) -> String {
-        format!("{}{}{}", self.name, self.strand, self.quality_type)
+        format!("{}{}{}", self.name, self.strand, self.quality_spec)
     }
 
     /// Add an annotation to this type.
     ///
     /// Accepts 0-based half-open [start, start+length) coordinates.
+    /// `qualities` should have length equal to `quality_spec.num_qualities()`.
     pub fn add(
         &mut self,
         start: u32,
         length: u32,
-        quality: Option<u8>,
+        qualities: Vec<u8>,
         name: Option<String>,
     ) -> &mut Self {
-        self.annotations.push(Annotation::new(start, length, quality, name));
+        self.annotations.push(Annotation::new(start, length, qualities, name));
         self
     }
 }

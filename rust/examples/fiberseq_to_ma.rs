@@ -12,7 +12,7 @@
 //! Or with a custom input file:
 //!   cargo run --example fiberseq_to_ma -- path/to/file.cram
 
-use molecular_annotation::{Encoding, MolecularAnnotations, QualityType, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
 use std::env;
@@ -45,10 +45,10 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
     if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
-                annotations.add_annotation_type("nuc", Strand::Forward, QualityType::None);
+                annotations.add_annotation_type("nuc", Strand::Forward, QualitySpec::none());
             for (start, length) in ns.iter().zip(nl.iter()) {
                 // API uses 0-based internally, converts to 1-based when writing MA tag
-                nuc_type.add(*start, *length, None, None);
+                nuc_type.add(*start, *length, vec![], None);
             }
         }
     }
@@ -59,26 +59,29 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
         let aq = get_u8_array(record, b"aq");
 
         if a_starts.len() == al.len() {
-            // Determine quality type based on whether aq exists and has non-zero values
+            // Determine quality spec based on whether aq exists and has non-zero values
             let has_quality = aq
                 .as_ref()
                 .map(|q| q.iter().any(|&v| v > 0))
                 .unwrap_or(false);
-            let quality_type = if has_quality {
-                QualityType::Linear
+            let quality_spec = if has_quality {
+                "Q".parse().unwrap()
             } else {
-                QualityType::None
+                QualitySpec::none()
             };
 
-            let msp_type = annotations.add_annotation_type("msp", Strand::Forward, quality_type);
+            let msp_type = annotations.add_annotation_type("msp", Strand::Forward, quality_spec);
             for (i, (start, length)) in a_starts.iter().zip(al.iter()).enumerate() {
-                let quality = if has_quality {
-                    aq.as_ref().and_then(|q| q.get(i).copied())
+                let qualities = if has_quality {
+                    aq.as_ref()
+                        .and_then(|q| q.get(i).copied())
+                        .map(|q| vec![q])
+                        .unwrap_or_default()
                 } else {
-                    None
+                    vec![]
                 };
                 // API uses 0-based internally, converts to 1-based when writing MA tag
-                msp_type.add(*start, *length, quality, None);
+                msp_type.add(*start, *length, qualities, None);
             }
         }
     }
