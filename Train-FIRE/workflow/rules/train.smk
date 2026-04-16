@@ -17,9 +17,10 @@ rule train_model:
     params:
         outdir=lambda wc: f"results/experiments/{wc.exp}",
         p=lambda wc: exp_train_params(wc.exp),
+        script=workflow.source_path("../scripts/train-fire-model.py"),
     shell:
         r"""
-        python workflow/scripts/train-fire-model.py \
+        python {params.script} \
           {input.training} \
           --outdir {params.outdir} \
           --threads {threads} \
@@ -52,9 +53,10 @@ rule compare_models:
         mem_mb=get_mem_mb,
     params:
         exps=EXPERIMENTS,
+        script=workflow.source_path("../scripts/compare_models.py"),
     shell:
         r"""
-        python workflow/scripts/compare_models.py \
+        python {params.script} \
           --root results/experiments \
           --experiments {params.exps} \
           --out-pdf {output.pdf} \

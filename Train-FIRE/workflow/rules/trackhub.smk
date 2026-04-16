@@ -18,9 +18,10 @@ rule build_trackhub:
         email=config["trackhub"]["email"],
         genome=GENOME,
         models=MODELS,
+        script=workflow.source_path("../scripts/make_trackhub.py"),
     shell:
         r"""
-        python workflow/scripts/make_trackhub.py \
+        python {params.script} \
           --hub-dir results/trackhub \
           --name "{params.name}" \
           --short-label "{params.short}" \
