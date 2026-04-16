@@ -139,14 +139,16 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
                 use_label_encoder=False,
                 eval_metric="auc",
                 seed=RANDOM_SEED,
-                n_jobs=args.threads,
+                n_jobs=args.inner_jobs,
             ),
             param_grid=grid,
             cv=5,
             scoring="roc_auc",
             verbose=2,
+            n_jobs=args.outer_jobs,
         )
     else:
+        # no grid search -> give all threads to XGBoost
         xgb_model = XGBClassifier(
             use_label_encoder=False,
             eval_metric="auc",
@@ -157,7 +159,7 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
             colsample_bytree=args.colsample_bytree_grid[0],
             scale_pos_weight=scale_pos_weight,
             seed=RANDOM_SEED,
-            n_jobs=args.threads,
+            n_jobs=args.outer_jobs * args.inner_jobs,
         )
 
     train_psms = mokapot.read_pin(train_df)
@@ -211,7 +213,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("training_data")
     ap.add_argument("--outdir", required=True)
-    ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument(
+        "--outer-jobs",
+        type=int,
+        default=1,
+        help="joblib workers for GridSearchCV (one process per fold/grid-point fit).",
+    )
+    ap.add_argument(
+        "--inner-jobs",
+        type=int,
+        default=8,
+        help="XGBoost n_jobs (OpenMP threads per single fit).",
+    )
     ap.add_argument("--train-fdr", type=float, default=0.05)
     ap.add_argument("--test-fdr", type=float, default=0.05)
     ap.add_argument("--subset-max-train", type=int, default=2_000_000)
@@ -260,6 +273,8 @@ def main():
             test_fdr=args.test_fdr,
             direction=args.direction,
             grid_search=bool(args.grid_search),
+            outer_jobs=int(args.outer_jobs),
+            inner_jobs=int(args.inner_jobs),
         )
     )
     if args.grid_search and hasattr(model.estimator, "best_params_"):

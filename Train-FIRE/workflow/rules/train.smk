@@ -11,19 +11,23 @@ rule train_model:
         metrics="results/experiments/{exp}/metrics.json",
     conda:
         "../envs/env.yml"
-    threads: 16
+    threads: 96
     resources:
         mem_mb=get_mem_mb,
     params:
         outdir=lambda wc: f"results/experiments/{wc.exp}",
         p=lambda wc: exp_train_params(wc.exp),
         script=workflow.source_path("../scripts/train-fire-model.py"),
+        outer_jobs=12,
+        inner_jobs=8,
     shell:
         r"""
+        export OMP_NUM_THREADS={params.inner_jobs}
         python {params.script} \
           {input.training} \
           --outdir {params.outdir} \
-          --threads {threads} \
+          --outer-jobs {params.outer_jobs} \
+          --inner-jobs {params.inner_jobs} \
           --train-fdr {params.p[train_fdr]} \
           --test-fdr {params.p[test_fdr]} \
           --subset-max-train {params.p[subset_max_train]} \
