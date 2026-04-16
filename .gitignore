@@ -3,6 +3,9 @@ target/**
 *.code-workspace
 tmp*
 temp*
+# The `temp*` glob above matches `templates/` too; keep the Train-FIRE workflow templates dir tracked.
+!Train-FIRE/workflow/templates/
+!Train-FIRE/workflow/templates/**
 dists/**
 .vscode/
 .test/small_unaligned_fiberseq.bam
