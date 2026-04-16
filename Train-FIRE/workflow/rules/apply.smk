@@ -89,7 +89,7 @@ rule base_to_bigbed:
     input:
         bed="results/models/{model}/fire-fibers.bed.gz",
         sizes="results/shared/chrom.sizes",
-        bed_as="workflow/templates/bed12_filter.as",
+        bed_as=workflow.source_path("../templates/bed12_filter.as"),
     output:
         bb="results/models/{model}/fire-fibers.bb",
         bed=temp("results/models/{model}/fire-fibers.bed"),
@@ -111,7 +111,7 @@ rule decorator_to_bigbed:
     input:
         bed="results/models/{model}/fire-fiber-decorators.bed.gz",
         sizes="results/shared/chrom.sizes",
-        dec_as="workflow/templates/decoration.as",
+        dec_as=workflow.source_path("../templates/decoration.as"),
     output:
         bb="results/models/{model}/fire-fiber-decorators.bb",
         bed=temp("results/models/{model}/fire-fiber-decorators.bed"),
