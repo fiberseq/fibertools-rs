@@ -8,10 +8,7 @@ version = "0.1.0"
 
 [tasks]
 fmt = "ruff format . && taplo format pixi.toml && snakefmt workflow/"
-test = { cmd = [
-    "snakemake",
-    "-n",
-] }
+test = { cmd = ["snakemake", "-n"] }
 snakemake = { cmd = "cd $INIT_CWD && snakemake -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
 
 
