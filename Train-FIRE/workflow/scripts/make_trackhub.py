@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 # Author: Mitchell R. Vollger
 """
-Assemble a UCSC Track Hub with one decorator track per experiment.
+Assemble a UCSC Track Hub with one decorator track per model.
 
-Each experiment contributes a base bigBed 12+ track ("fire-fibers") plus
-a decorator overlay ("fire-fiber-decorators"). Default visibility: squish.
+Each model contributes a base bigBed 12+ track ("fire-fibers") plus a decorator
+overlay ("fire-fiber-decorators"). Default visibility: squish.
+
+The special model name "baseline" corresponds to the FIRE calls already baked
+into the input CRAM (i.e. no retraining) and is always rendered first with a
+distinct color so it's easy to spot next to the trained models.
 
 Layout:
   <hub-dir>/
@@ -14,14 +18,15 @@ Layout:
     chrom.sizes
     <genome>/
       trackDb.txt
-      bb/<exp>.fire-fibers.bb
-      bb/<exp>.fire-fiber-decorators.bb
+      bb/<model>.fire-fibers.bb
+      bb/<model>.fire-fiber-decorators.bb
 """
 import argparse
 import shutil
 from pathlib import Path
 
 
+BASELINE_COLOR = "0,0,0"
 PALETTE = [
     (166, 54, 3), (217, 95, 14), (54, 144, 192), (34, 94, 168),
     (5, 112, 176), (35, 139, 69), (116, 196, 118), (49, 130, 189),
@@ -33,18 +38,34 @@ def color(i):
     return ",".join(str(c) for c in PALETTE[i % len(PALETTE)])
 
 
-TRACK_TEMPLATE = """track {exp}
-shortLabel {exp}
-longLabel FIRE fibers, model={exp}
+TRACK_TEMPLATE = """track {model}
+shortLabel {short_label}
+longLabel {long_label}
 type bigBed 12 +
 itemRgb on
 visibility squish
 color {color}
-bigDataUrl bb/{exp}.fire-fibers.bb
-decorator.default.bigDataUrl bb/{exp}.fire-fiber-decorators.bb
+bigDataUrl bb/{model}.fire-fibers.bb
+decorator.default.bigDataUrl bb/{model}.fire-fiber-decorators.bb
 decorator.default.filterValues.keywords 5mC,m6A,NUC,LINKER,FIRE
 decorator.default.filterValuesDefault.keywords LINKER,FIRE
 """
+
+
+def render_block(model, is_baseline, palette_idx):
+    if is_baseline:
+        return TRACK_TEMPLATE.format(
+            model=model,
+            short_label="baseline (input CRAM)",
+            long_label="FIRE fibers from the model baked into the input CRAM (no retraining)",
+            color=BASELINE_COLOR,
+        )
+    return TRACK_TEMPLATE.format(
+        model=model,
+        short_label=model,
+        long_label=f"FIRE fibers, trained model={model}",
+        color=color(palette_idx),
+    )
 
 
 def main():
@@ -57,8 +78,13 @@ def main():
     ap.add_argument("--long-label", required=True)
     ap.add_argument("--email", required=True)
     ap.add_argument("--genome", required=True)
-    ap.add_argument("--experiments", nargs="+", required=True)
-    ap.add_argument("--results-root", required=True)
+    ap.add_argument(
+        "--models",
+        nargs="+",
+        required=True,
+        help="Model names to include. 'baseline' is treated specially.",
+    )
+    ap.add_argument("--results-root", required=True, help="e.g. results/models")
     ap.add_argument("--chrom-sizes", required=True, help="2-col chrom.sizes file")
     args = ap.parse_args()
 
@@ -80,14 +106,21 @@ def main():
         f"trackDb {args.genome}/trackDb.txt\n"
     )
 
+    # Always render baseline first so it sits at the top of the trackhub.
+    ordered = (["baseline"] if "baseline" in args.models else []) + [
+        m for m in args.models if m != "baseline"
+    ]
+
     root = Path(args.results_root)
     blocks = []
-    for i, exp in enumerate(args.experiments):
+    palette_idx = 0
+    for model in ordered:
         for name in ("fire-fibers.bb", "fire-fiber-decorators.bb"):
-            src = root / exp / name
-            dst = gdir / "bb" / f"{exp}.{name}"
-            shutil.copyfile(src, dst)
-        blocks.append(TRACK_TEMPLATE.format(exp=exp, color=color(i)))
+            shutil.copyfile(root / model / name, gdir / "bb" / f"{model}.{name}")
+        is_baseline = model == "baseline"
+        blocks.append(render_block(model, is_baseline, palette_idx))
+        if not is_baseline:
+            palette_idx += 1
 
     (gdir / "trackDb.txt").write_text("\n".join(blocks))
     # convenience copy at top level (snakemake output path expects it here)

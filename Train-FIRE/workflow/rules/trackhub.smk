@@ -1,9 +1,7 @@
 rule build_trackhub:
     input:
-        base=expand("results/experiments/{exp}/fire-fibers.bb", exp=EXPERIMENTS),
-        dec=expand(
-            "results/experiments/{exp}/fire-fiber-decorators.bb", exp=EXPERIMENTS
-        ),
+        base=expand("results/models/{model}/fire-fibers.bb", model=MODELS),
+        dec=expand("results/models/{model}/fire-fiber-decorators.bb", model=MODELS),
         sizes="results/shared/chrom.sizes",
     output:
         hub="results/trackhub/hub.txt",
@@ -19,7 +17,7 @@ rule build_trackhub:
         long=config["trackhub"]["long_label"],
         email=config["trackhub"]["email"],
         genome=GENOME,
-        exps=EXPERIMENTS,
+        models=MODELS,
     shell:
         r"""
         python workflow/scripts/make_trackhub.py \
@@ -29,7 +27,7 @@ rule build_trackhub:
           --long-label "{params.long}" \
           --email "{params.email}" \
           --genome {params.genome} \
-          --experiments {params.exps} \
-          --results-root results/experiments \
+          --models {params.models} \
+          --results-root results/models \
           --chrom-sizes {input.sizes}
         """

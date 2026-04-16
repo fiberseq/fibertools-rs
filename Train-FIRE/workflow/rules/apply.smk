@@ -46,14 +46,26 @@ rule apply_fire_bam:
         """
 
 
+def fire_bam_for_decorate(wildcards):
+    """
+    Source BAM for ft track-decorators:
+      - baseline         -> the pre-annotated input CRAM subset to test_region
+                            (FIRE calls from whatever model was baked into the input)
+      - per-experiment   -> apply_fire_bam output with the freshly trained model
+    """
+    if wildcards.model == "baseline":
+        return "results/shared/test_region.bam"
+    return f"results/experiments/{wildcards.model}/fire.bam"
+
+
 rule decorate_fibers:
-    """Produce the base bed12 track + decorator overlay via `ft track-decorators` for one model."""
+    """Produce the base bed12 track + decorator overlay via `ft track-decorators`."""
     input:
-        bam="results/experiments/{exp}/fire.bam",
+        bam=fire_bam_for_decorate,
     output:
-        base="results/experiments/{exp}/fire-fibers.bed.gz",
-        dec="results/experiments/{exp}/fire-fiber-decorators.bed.gz",
-        base_unsorted=temp("results/experiments/{exp}/fire-fibers.unsorted.bed"),
+        base="results/models/{model}/fire-fibers.bed.gz",
+        dec="results/models/{model}/fire-fiber-decorators.bed.gz",
+        base_unsorted=temp("results/models/{model}/fire-fibers.unsorted.bed"),
     conda:
         "../envs/env.yml"
     threads: 8
@@ -75,12 +87,12 @@ rule decorate_fibers:
 rule base_to_bigbed:
     """bigBed 12+ for the FIRE-fibers base track."""
     input:
-        bed="results/experiments/{exp}/fire-fibers.bed.gz",
+        bed="results/models/{model}/fire-fibers.bed.gz",
         sizes="results/shared/chrom.sizes",
         bed_as="workflow/templates/bed12_filter.as",
     output:
-        bb="results/experiments/{exp}/fire-fibers.bb",
-        bed=temp("results/experiments/{exp}/fire-fibers.bed"),
+        bb="results/models/{model}/fire-fibers.bb",
+        bed=temp("results/models/{model}/fire-fibers.bed"),
     conda:
         "../envs/env.yml"
     threads: 4
@@ -97,12 +109,12 @@ rule base_to_bigbed:
 rule decorator_to_bigbed:
     """bigBed 12+ decorator overlay track."""
     input:
-        bed="results/experiments/{exp}/fire-fiber-decorators.bed.gz",
+        bed="results/models/{model}/fire-fiber-decorators.bed.gz",
         sizes="results/shared/chrom.sizes",
         dec_as="workflow/templates/decoration.as",
     output:
-        bb="results/experiments/{exp}/fire-fiber-decorators.bb",
-        bed=temp("results/experiments/{exp}/fire-fiber-decorators.bed"),
+        bb="results/models/{model}/fire-fiber-decorators.bb",
+        bed=temp("results/models/{model}/fire-fiber-decorators.bed"),
     conda:
         "../envs/env.yml"
     threads: 4

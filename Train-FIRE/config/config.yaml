@@ -67,8 +67,9 @@ trackhub:
 # ------------------------------------------------------------------
 experiments:
 
-  fire_v01_peaks_mix:
-    positive_beds:
+  # Baseline: train_defaults (moderate grid search over n_estimators/max_depth/etc.)
+  default_grid:
+    positive_beds: &POSITIVES
       - path: resources/mixed-positives/GM12878-fire-v0.1-peaks-20-percent.bed.gz
       - path: resources/mixed-positives/GM12878_DHS.bed.gz
       - path: resources/mixed-positives/hotspots_ENCFF452DZE.bed.gz
@@ -76,6 +77,43 @@ experiments:
       - path: resources/mixed-positives/peaks_CTCF_ENCFF951PEM.bed.gz
       - path: resources/mixed-positives/peaks_ENCFF073ORT.bed.gz
       - path: resources/mixed-positives/peaks_ENCFF598KWZ.bed.gz
-    negative_exclude_beds:
+    negative_exclude_beds: &NEG_EXCL
       - path: resources/mixed-positives/ATAC.bed.gz
       - path: resources/mixed-positives/GM12878-fire-v0.1-peaks.bed.gz
+
+  # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
+  # Useful reference for how much the grid search is buying.
+  shallow_fixed:
+    positive_beds: *POSITIVES
+    negative_exclude_beds: *NEG_EXCL
+    train:
+      grid_search: false
+      n_estimators: [100]
+      max_depth: [6]
+      min_child_weight_fracs: [0.01]
+      colsample_bytree: [1.0]
+      gamma: [1]
+
+  # Higher-capacity grid: deeper trees + more boosters.
+  # Risk is overfitting; compare to default_grid to see if capacity helps.
+  deep_wide_grid:
+    positive_beds: *POSITIVES
+    negative_exclude_beds: *NEG_EXCL
+    train:
+      n_estimators: [400, 600]
+      max_depth: [15, 21]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+
+  # Strong-regularization grid: higher gamma + bigger leaf hessian,
+  # smaller column sample. Tests the overfitting hypothesis.
+  strong_reg_grid:
+    positive_beds: *POSITIVES
+    negative_exclude_beds: *NEG_EXCL
+    train:
+      n_estimators: [200, 300]
+      max_depth: [9]
+      min_child_weight_fracs: [0.005, 0.02]
+      colsample_bytree: [0.5, 0.75]
+      gamma: [5, 10]

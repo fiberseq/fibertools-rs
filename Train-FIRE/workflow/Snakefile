@@ -7,10 +7,12 @@ configfile: "config/config.yaml"
 
 
 EXPERIMENTS = list(config["experiments"].keys())
+MODELS = ["baseline"] + EXPERIMENTS
 
 
 wildcard_constraints:
     exp="|".join(EXPERIMENTS),
+    model="|".join(MODELS),
 
 
 include: "rules/common.smk"
@@ -26,8 +28,8 @@ rule all:
     input:
         expand("results/experiments/{exp}/FIRE.gbdt.json", exp=EXPERIMENTS),
         expand("results/experiments/{exp}/FIRE.FDR.pdf", exp=EXPERIMENTS),
-        expand("results/experiments/{exp}/fire-fibers.bb", exp=EXPERIMENTS),
-        expand("results/experiments/{exp}/fire-fiber-decorators.bb", exp=EXPERIMENTS),
+        expand("results/models/{model}/fire-fibers.bb", model=MODELS),
+        expand("results/models/{model}/fire-fiber-decorators.bb", model=MODELS),
         "results/comparison/fdr_overlay.pdf",
         "results/comparison/metrics.tsv",
         "results/trackhub/hub.txt",
