@@ -27,3 +27,5 @@ local-test-files/
 pg-test-data/
 .snakemake/
 .claude/
+results/*
+temp/*
