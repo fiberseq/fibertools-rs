@@ -1,0 +1,46 @@
+from snakemake.utils import min_version
+
+min_version("9.17")
+
+
+configfile: "config/config.yaml"
+
+
+EXPERIMENTS = list(config["experiments"].keys())
+
+
+wildcard_constraints:
+    exp="|".join(EXPERIMENTS),
+
+
+include: "rules/common.smk"
+include: "rules/resources.smk"
+include: "rules/regions.smk"
+include: "rules/features.smk"
+include: "rules/train.smk"
+include: "rules/apply.smk"
+include: "rules/trackhub.smk"
+
+
+rule all:
+    input:
+        expand("results/experiments/{exp}/FIRE.gbdt.json", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/FIRE.FDR.pdf", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/fire-fibers.bb", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/fire-fiber-decorators.bb", exp=EXPERIMENTS),
+        "results/comparison/fdr_overlay.pdf",
+        "results/comparison/metrics.tsv",
+        "results/trackhub/hub.txt",
+        "results/trackhub/trackDb.txt",
+
+
+rule train_only:
+    input:
+        expand("results/experiments/{exp}/FIRE.gbdt.json", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/FIRE.FDR.pdf", exp=EXPERIMENTS),
+        "results/comparison/fdr_overlay.pdf",
+
+
+rule clean:
+    shell:
+        "rm -rf results"

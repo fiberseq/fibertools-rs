@@ -1,0 +1,81 @@
+# Shared inputs for FIRE model training sweep
+# Paths are resolved relative to the Train-FIRE/ directory unless absolute.
+
+reference:
+  # Auto-fetched by rule fetch_reference from the UCSC goldenPath server.
+  # Override with a local path (and drop the rule's output) if you already have it.
+  fai: resources/ref/hg38.analysisSet.fa.fai
+  fasta: resources/ref/hg38.analysisSet.fa
+  genome: hg38
+
+# Input CRAM/BAM used for training feature extraction.
+# May be a local path OR an s3://... URL. For s3, set `s3_endpoint` below
+# and the pipeline will download the file once to results/shared/input.cram.
+training_bam: s3://stergachis/public/FIRE/broadly-consented/GM12878/GM12878-fire-v0.1-filtered.cram
+s3_endpoint: https://s3.kopah.uw.edu
+sample_rate: 0.10
+
+# Held-out region for model application + trackhub visualization.
+# This chromosome is ALSO injected into the exclusion bed so no training
+# data is drawn from it.
+test_region: chr19
+# Optional separate BAM/CRAM for visualization (defaults to training_bam)
+test_bam: null
+
+# Site budget and peak merging
+n_sites: 100000
+merge_distance: 147
+
+# Regions always excluded from training (gaps, SDs, etc.)
+exclude_beds:
+  - resources/exclude/hg38.gap.bed.gz
+  - resources/exclude/SDs.merged.hg38.bed.gz
+
+# Chromosome name regex used to drop alt/random/MT/sex chroms from training
+exclude_chroms_regex: "_|chrEBV|chrMT|chrX|chrY|chrM"
+
+# Defaults applied to every experiment unless overridden in its own `train:` block
+train_defaults:
+  min_msp_length_for_positive_fire_call: 85
+  min_msp_length_for_negative_fire_call: 85
+  train_fdr: 0.05
+  test_fdr: 0.05
+  subset_max_train: 2000000
+  direction: msp_len_times_m6a_fc
+  grid_search: true
+  n_estimators: [200, 300]
+  max_depth: [9, 15]
+  min_child_weight_fracs: [0.001, 0.005]
+  colsample_bytree: [0.5, 1.0]
+  gamma: [1]
+
+# Trackhub metadata
+trackhub:
+  name: fire-models
+  short_label: "FIRE model sweep"
+  long_label: "FIRE model sweep across training configurations"
+  email: mrvollger@genetics.utah.edu
+
+# ------------------------------------------------------------------
+# Experiments. Each is a distinct training config.
+# Feature extraction is shared across experiments (union of their regions).
+#
+# positive_beds:         used for +1 labels
+# negative_exclude_beds: NOT used as positives, but their regions are
+#                        also excluded when sampling negatives so we
+#                        don't place negatives on top of likely signal
+# ------------------------------------------------------------------
+experiments:
+
+  fire_v01_peaks_mix:
+    positive_beds:
+      - path: resources/mixed-positives/GM12878-fire-v0.1-peaks-20-percent.bed.gz
+      - path: resources/mixed-positives/GM12878_DHS.bed.gz
+      - path: resources/mixed-positives/hotspots_ENCFF452DZE.bed.gz
+      - path: resources/mixed-positives/hotspots_ENCFF828AUX.bed.gz
+      - path: resources/mixed-positives/peaks_CTCF_ENCFF951PEM.bed.gz
+      - path: resources/mixed-positives/peaks_ENCFF073ORT.bed.gz
+      - path: resources/mixed-positives/peaks_ENCFF598KWZ.bed.gz
+    negative_exclude_beds:
+      - path: resources/mixed-positives/ATAC.bed.gz
+      - path: resources/mixed-positives/GM12878-fire-v0.1-peaks.bed.gz

@@ -12,7 +12,7 @@ readme = "README.md"
 repository = "https://github.com/fiberseq/fibertools-rs"
 version = "0.8.1"
 # exclude py-ft and test data from cargo publish since they are too large
-exclude = ["py-ft/", "tests/data/"]
+exclude = ["py-ft/", "tests/data/", "Train-FIRE/"]
 
 [workspace]
 exclude = ["py-ft"]

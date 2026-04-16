@@ -1,0 +1,25 @@
+[workspace]
+authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
+channels = ["conda-forge", "bioconda"]
+description = "FIRE model training sweep + trackhub"
+name = "Train-FIRE"
+platforms = ["osx-64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+fmt = "ruff format . && taplo format pixi.toml && snakefmt workflow/"
+test = { cmd = [
+    "snakemake",
+    "-n",
+] }
+snakemake = { cmd = "cd $INIT_CWD && snakemake -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
+
+
+[dependencies]
+conda = "*"
+snakemake = "==9.17.1"
+snakefmt = "*"
+ruff = "*"
+taplo = "*"
+snakemake-executor-plugin-slurm = "*"
+snakemake-logger-plugin-snkmt = "*"
