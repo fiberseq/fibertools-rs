@@ -20,6 +20,7 @@ rule build_exclude:
             awk -v OFS='\t' '$1 == "{params.test_region}" {{print $1,0,$2}}' {input.fai} \
         ) \
         | cut -f1-3 \
+        | awk 'NR==FNR{{v[$1]; next}} ($1 in v)' {input.fai} - \
         | bedtools sort -g {input.fai} \
         | bedtools merge \
         | bgzip > {output.bed}
@@ -45,6 +46,7 @@ rule build_positives:
     shell:
         r"""
         ( {params.sources} ) \
+          | awk 'NR==FNR{{v[$1]; next}} ($1 in v)' {input.fai} - \
           | bedtools sort -g {input.fai} \
           | bedtools merge -d {params.merge_dist} \
           | (shuf | head -n {params.n_sites} || true) \
@@ -74,6 +76,7 @@ rule build_neg_mask:
         r"""
         zcat -f {input.beds} \
           | cut -f1-3 \
+          | awk 'NR==FNR{{v[$1]; next}} ($1 in v)' {input.fai} - \
           | bedtools sort -g {input.fai} \
           | bedtools merge -d {params.merge_dist} \
           | bedtools subtract -a - -b {input.exclude} \
