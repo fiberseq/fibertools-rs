@@ -79,7 +79,7 @@ rule extract_features:
         min_msp=TRAIN_DEFAULTS["min_msp_length_for_positive_fire_call"],
     shell:
         r"""
-        ft fire -t {threads} -m {params.min_msp} -f {input.bam} \
+        ft fire -t {threads} --min-msp-length-for-positive-fire-call {params.min_msp} -f {input.bam} \
           | awk 'NR == 1 || ($3 > $2 && $3 - $2 < 10000)' \
           | bgzip -@ 8 > {output.feats}
         """
