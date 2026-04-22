@@ -7,12 +7,14 @@ configfile: "config/config.yaml"
 
 
 EXPERIMENTS = list(config["experiments"].keys())
+REGION_SET_NAMES = list(config.get("region_sets", {}).keys())
 MODELS = ["baseline"] + EXPERIMENTS
 
 
 wildcard_constraints:
     exp="|".join(EXPERIMENTS),
     model="|".join(MODELS),
+    rs="|".join(REGION_SET_NAMES) if REGION_SET_NAMES else "NEVER_MATCHES_ANYTHING",
 
 
 include: "rules/common.smk"

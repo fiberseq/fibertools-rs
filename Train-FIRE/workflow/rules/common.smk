@@ -59,17 +59,20 @@ EXCLUDE_BEDS = [_expand(p) for p in config["exclude_beds"]]
 TRAIN_DEFAULTS = config["train_defaults"]
 
 
-def exp_cfg(exp):
-    return config["experiments"][exp]
+REGION_SETS = config.get("region_sets", {})
 
 
-def exp_positive_specs(exp):
+def rs_cfg(rs):
+    return REGION_SETS[rs]
+
+
+def rs_positive_specs(rs):
     """
-    Return list of (path, awk_filter_or_None) for an experiment's positive beds.
+    Return list of (path, awk_filter_or_None) for a region_set's positive beds.
     Accepts either bare strings or {path:, awk_filter:} dicts in config.
     """
     out = []
-    for item in exp_cfg(exp)["positive_beds"]:
+    for item in rs_cfg(rs)["positive_beds"]:
         if isinstance(item, str):
             out.append((_expand(item), None))
         else:
@@ -77,18 +80,18 @@ def exp_positive_specs(exp):
     return out
 
 
-def exp_positive_paths(exp):
-    return [p for p, _ in exp_positive_specs(exp)]
+def rs_positive_paths(rs):
+    return [p for p, _ in rs_positive_specs(rs)]
 
 
-def positive_source_cmds(exp):
+def positive_source_cmds(rs):
     """
     Bash snippet that concatenates every positive bed, applying any
     per-source awk_filter, and emits 3-column output. Uses `zcat -f`
     so both gzipped and plain-text beds work transparently.
     """
     parts = []
-    for path, awkf in exp_positive_specs(exp):
+    for path, awkf in rs_positive_specs(rs):
         q = shlex.quote(path)
         if awkf:
             parts.append(f"zcat -f {q} | awk {shlex.quote(awkf)} | cut -f1-3")
@@ -97,17 +100,31 @@ def positive_source_cmds(exp):
     return "; ".join(parts)
 
 
-def exp_negative_exclude_paths(exp):
+def rs_negative_exclude_paths(rs):
     """Extra beds whose regions are excluded from negative sampling but not used as positives."""
     out = []
-    for item in exp_cfg(exp).get("negative_exclude_beds", []) or []:
+    for item in rs_cfg(rs).get("negative_exclude_beds", []) or []:
         out.append(_expand(item) if isinstance(item, str) else _expand(item["path"]))
     return out
 
 
-def exp_neg_mask_paths(exp):
+def rs_neg_mask_paths(rs):
     """Union of positives + negative_exclude_beds used to keep negatives off signal."""
-    return exp_positive_paths(exp) + exp_negative_exclude_paths(exp)
+    return rs_positive_paths(rs) + rs_negative_exclude_paths(rs)
+
+
+def exp_cfg(exp):
+    return config["experiments"][exp]
+
+
+def exp_region_set(exp):
+    """Name of the region_set this experiment draws positives/negatives from."""
+    rs = exp_cfg(exp).get("region_set")
+    if not rs:
+        raise ValueError(f"experiment '{exp}' is missing required field 'region_set'")
+    if rs not in REGION_SETS:
+        raise ValueError(f"experiment '{exp}' references undefined region_set '{rs}'")
+    return rs
 
 
 def exp_train_params(exp):
@@ -117,10 +134,10 @@ def exp_train_params(exp):
     return params
 
 
-def all_exp_region_files():
-    """Union of regions across experiments (positives + negatives) needed for feature extraction."""
+def all_rs_region_files():
+    """Union of regions across region_sets (positives + negatives) needed for feature extraction."""
     paths = []
-    for exp in config["experiments"].keys():
-        paths.append(f"results/experiments/{exp}/positives.bed.gz")
-        paths.append(f"results/experiments/{exp}/negatives.bed.gz")
+    for rs in REGION_SETS.keys():
+        paths.append(f"results/region_sets/{rs}/positives.bed.gz")
+        paths.append(f"results/region_sets/{rs}/negatives.bed.gz")
     return paths

@@ -65,19 +65,19 @@ trackhub:
   email: mrvollger@genetics.utah.edu
 
 # ------------------------------------------------------------------
-# Experiments. Each is a distinct training config.
-# Feature extraction is shared across experiments (union of their regions).
+# Region sets. A `region_set` is the (positives, negative_exclude_beds)
+# input pair. Every experiment references one by name, and the whole
+# regions + training-data pipeline runs ONCE per region_set (not per
+# experiment) so we don't redo identical bedtools work.
 #
 # positive_beds:         used for +1 labels
 # negative_exclude_beds: NOT used as positives, but their regions are
 #                        also excluded when sampling negatives so we
 #                        don't place negatives on top of likely signal
 # ------------------------------------------------------------------
-experiments:
-
-  # Baseline: train_defaults (moderate grid search over n_estimators/max_depth/etc.)
-  default_grid:
-    positive_beds: &POSITIVES
+region_sets:
+  default:
+    positive_beds:
       - path: resources/mixed-positives/GM12878-fire-v0.1-peaks-20-percent.bed.gz
       - path: resources/mixed-positives/GM12878_DHS.bed.gz
       - path: resources/mixed-positives/hotspots_ENCFF452DZE.bed.gz
@@ -85,15 +85,26 @@ experiments:
       - path: resources/mixed-positives/peaks_CTCF_ENCFF951PEM.bed.gz
       - path: resources/mixed-positives/peaks_ENCFF073ORT.bed.gz
       - path: resources/mixed-positives/peaks_ENCFF598KWZ.bed.gz
-    negative_exclude_beds: &NEG_EXCL
+    negative_exclude_beds:
       - path: resources/mixed-positives/ATAC.bed.gz
       - path: resources/mixed-positives/GM12878-fire-v0.1-peaks.bed.gz
+
+
+# ------------------------------------------------------------------
+# Experiments. Each is a distinct training config.
+# `region_set:` names an entry above. Experiments that share a
+# region_set share positives/negatives/features/training-data.
+# ------------------------------------------------------------------
+experiments:
+
+  # Baseline: train_defaults (moderate grid search over n_estimators/max_depth/etc.)
+  default_grid:
+    region_set: default
 
   # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
   # Useful reference for how much the grid search is buying.
   shallow_fixed:
-    positive_beds: *POSITIVES
-    negative_exclude_beds: *NEG_EXCL
+    region_set: default
     train:
       grid_search: false
       n_estimators: [100]
@@ -105,8 +116,7 @@ experiments:
   # Higher-capacity grid: deeper trees + more boosters.
   # Risk is overfitting; compare to default_grid to see if capacity helps.
   deep_wide_grid:
-    positive_beds: *POSITIVES
-    negative_exclude_beds: *NEG_EXCL
+    region_set: default
     train:
       n_estimators: [400, 600]
       max_depth: [15, 21]
@@ -117,8 +127,7 @@ experiments:
   # Strong-regularization grid: higher gamma + bigger leaf hessian,
   # smaller column sample. Tests the overfitting hypothesis.
   strong_reg_grid:
-    positive_beds: *POSITIVES
-    negative_exclude_beds: *NEG_EXCL
+    region_set: default
     train:
       n_estimators: [200, 300]
       max_depth: [9]
@@ -129,8 +138,7 @@ experiments:
   # Slow-learn grid: low eta with a large n_estimators cap, early stopping
   # picks the actual tree count per fold.
   slow_learn_es:
-    positive_beds: *POSITIVES
-    negative_exclude_beds: *NEG_EXCL
+    region_set: default
     train:
       n_estimators: [2000]
       max_depth: [9, 15]
@@ -143,8 +151,7 @@ experiments:
   # Keep all training data (no balance downsample) and give mokapot more
   # refit iterations. scale_pos_weight handles class imbalance inside XGBoost.
   full_data_long_mokapot:
-    positive_beds: *POSITIVES
-    negative_exclude_beds: *NEG_EXCL
+    region_set: default
     train:
       n_estimators: [2000]
       max_depth: [9, 15]

@@ -1,7 +1,7 @@
 rule train_model:
-    """Train one FIRE model on one experiment's training-data.bed.gz."""
+    """Train one FIRE model on its region_set's training-data.bed.gz."""
     input:
-        training="results/experiments/{exp}/training-data.bed.gz",
+        training=lambda wc: f"results/region_sets/{exp_region_set(wc.exp)}/training-data.bed.gz",
     output:
         gbdt="results/experiments/{exp}/FIRE.gbdt.json",
         xgb="results/experiments/{exp}/FIRE.xgb.json",

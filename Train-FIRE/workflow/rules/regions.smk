@@ -28,13 +28,13 @@ rule build_exclude:
 
 
 rule build_positives:
-    """Union experiment's positive beds (with optional awk_filter), merge, subsample to n_sites, subtract exclude."""
+    """Union region_set's positive beds (with optional awk_filter), merge, subsample to n_sites, subtract exclude."""
     input:
-        beds=lambda wc: exp_positive_paths(wc.exp),
+        beds=lambda wc: rs_positive_paths(wc.rs),
         exclude="results/shared/exclude.bed.gz",
         fai=FAI,
     output:
-        bed="results/experiments/{exp}/positives.bed.gz",
+        bed="results/region_sets/{rs}/positives.bed.gz",
     conda:
         "../envs/env.yml"
     resources:
@@ -42,7 +42,7 @@ rule build_positives:
     params:
         n_sites=N_SITES,
         merge_dist=MERGE_DIST,
-        sources=lambda wc: positive_source_cmds(wc.exp),
+        sources=lambda wc: positive_source_cmds(wc.rs),
     shell:
         r"""
         ( {params.sources} ) \
@@ -53,7 +53,7 @@ rule build_positives:
           | bedtools sort -g {input.fai} \
           | bedtools subtract -a - -b {input.exclude} \
           | bgzip > {output.bed}
-        printf "[{wildcards.exp}] positives: " >&2
+        printf "[{wildcards.rs}] positives: " >&2
         zcat -f {output.bed} | wc -l >&2
         """
 
@@ -61,11 +61,11 @@ rule build_positives:
 rule build_neg_mask:
     """Union of positives + negative_exclude_beds; negatives will be kept off these regions."""
     input:
-        beds=lambda wc: exp_neg_mask_paths(wc.exp),
+        beds=lambda wc: rs_neg_mask_paths(wc.rs),
         exclude="results/shared/exclude.bed.gz",
         fai=FAI,
     output:
-        bed="results/experiments/{exp}/neg_mask.bed.gz",
+        bed="results/region_sets/{rs}/neg_mask.bed.gz",
     conda:
         "../envs/env.yml"
     resources:
@@ -87,11 +87,11 @@ rule build_neg_mask:
 rule build_complement_negatives:
     """Everything not in the negative-exclusion mask, minus exclude."""
     input:
-        mask="results/experiments/{exp}/neg_mask.bed.gz",
+        mask="results/region_sets/{rs}/neg_mask.bed.gz",
         exclude="results/shared/exclude.bed.gz",
         fai=FAI,
     output:
-        bed="results/experiments/{exp}/complement_negatives.bed.gz",
+        bed="results/region_sets/{rs}/complement_negatives.bed.gz",
     conda:
         "../envs/env.yml"
     resources:
@@ -107,12 +107,12 @@ rule build_complement_negatives:
 rule build_negatives:
     """Shuffle positives into the complement so negatives length-match positives on the same chromosome."""
     input:
-        positives="results/experiments/{exp}/positives.bed.gz",
-        mask="results/experiments/{exp}/neg_mask.bed.gz",
-        complement="results/experiments/{exp}/complement_negatives.bed.gz",
+        positives="results/region_sets/{rs}/positives.bed.gz",
+        mask="results/region_sets/{rs}/neg_mask.bed.gz",
+        complement="results/region_sets/{rs}/complement_negatives.bed.gz",
         fai=FAI,
     output:
-        bed="results/experiments/{exp}/negatives.bed.gz",
+        bed="results/region_sets/{rs}/negatives.bed.gz",
     conda:
         "../envs/env.yml"
     resources:
@@ -126,6 +126,6 @@ rule build_negatives:
             -chrom -seed 42 -g {input.fai} \
           | sort -k1,1 -k2,2n \
           | bgzip > {output.bed}
-        printf "[{wildcards.exp}] negatives: " >&2
+        printf "[{wildcards.rs}] negatives: " >&2
         zcat -f {output.bed} | wc -l >&2
         """

@@ -24,9 +24,9 @@ rule sample_bam:
 
 
 rule union_regions:
-    """Concat every experiment's positives + negatives so we extract features from the BAM exactly once."""
+    """Concat every region_set's positives + negatives so we extract features from the BAM exactly once."""
     input:
-        beds=all_exp_region_files(),
+        beds=all_rs_region_files(),
         fai=FAI,
     output:
         bed="results/shared/union_regions.bed.gz",
@@ -89,11 +89,11 @@ rule build_training_data:
     """Label features: +1 if row overlaps positives (f>=0.25); -1 if overlaps negatives and no unfiltered positive."""
     input:
         feats="results/shared/features.tsv.gz",
-        positives="results/experiments/{exp}/positives.bed.gz",
-        negatives="results/experiments/{exp}/negatives.bed.gz",
-        mask="results/experiments/{exp}/neg_mask.bed.gz",
+        positives="results/region_sets/{rs}/positives.bed.gz",
+        negatives="results/region_sets/{rs}/negatives.bed.gz",
+        mask="results/region_sets/{rs}/neg_mask.bed.gz",
     output:
-        bed="results/experiments/{exp}/training-data.bed.gz",
+        bed="results/region_sets/{rs}/training-data.bed.gz",
     conda:
         "../envs/env.yml"
     resources:
@@ -109,6 +109,6 @@ rule build_training_data:
             | bedtools intersect -v -a - -b {input.mask} \
             | sed 's/$/\t-1/' | awk '/^chr/'
         ) | bgzip -@ 8 > {output.bed}
-        echo "[{wildcards.exp}] training label counts:" >&2
+        echo "[{wildcards.rs}] training label counts:" >&2
         zcat -f {output.bed} | tail -n +2 | awk -F'\t' '{{print $NF}}' | sort | uniq -c >&2
         """
