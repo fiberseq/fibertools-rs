@@ -31,4 +31,6 @@ pg-test-data/
 .snakemake/
 .claude/
 results/*
-temp/*
+Train-FIRE/results/* 
+Train-FIRE/pixi.toml
+temp/** 
