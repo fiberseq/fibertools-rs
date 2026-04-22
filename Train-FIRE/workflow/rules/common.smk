@@ -64,9 +64,8 @@ def features_shards(wildcards):
     chroms_file = checkpoints.build_chrom_list.get(**wildcards).output.chroms
     with open(chroms_file) as fh:
         chroms = [line.strip() for line in fh if line.strip()]
-    return expand(
-        "results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=chroms
-    )
+    return expand("results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=chroms)
+
 
 TRAIN_DEFAULTS = config["train_defaults"]
 

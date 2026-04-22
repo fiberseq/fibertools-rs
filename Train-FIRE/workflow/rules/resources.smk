@@ -14,18 +14,18 @@ rule chrom_sizes:
 
 checkpoint build_chrom_list:
     """Snapshot the chrom set so extract_features can scatter per-chrom. The
-    FAI is a rule output (fetch_reference), so the chrom list can't be
-    resolved at Snakefile parse time — checkpoint defers until runtime."""
+FAI is a rule output (fetch_reference), so the chrom list can't be
+resolved at Snakefile parse time — checkpoint defers until runtime."""
     input:
         fai=FAI,
     output:
         chroms="results/shared/chroms.txt",
-    params:
-        exclude_re=EXCLUDE_CHROMS_RE,
     conda:
         "../envs/env.yml"
     resources:
         mem_mb=get_mem_mb,
+    params:
+        exclude_re=EXCLUDE_CHROMS_RE,
     shell:
         r"""
         cut -f1 {input.fai} | grep -Ev {params.exclude_re:q} > {output.chroms}
