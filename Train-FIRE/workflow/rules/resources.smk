@@ -13,11 +13,12 @@ rule chrom_sizes:
 
 
 checkpoint build_chrom_list:
-    """Snapshot the chrom set so extract_features can scatter per-chrom. The
-FAI is a rule output (fetch_reference), so the chrom list can't be
-resolved at Snakefile parse time — checkpoint defers until runtime."""
+    """Snapshot the chroms that actually have reads in regions.bam so
+extract_features can scatter per-chrom. Deriving from idxstats (vs the FAI)
+avoids launching empty jobs for chroms with no training-region coverage."""
     input:
-        fai=FAI,
+        bam="results/shared/regions.bam",
+        csi="results/shared/regions.bam.csi",
     output:
         chroms="results/shared/chroms.txt",
     conda:
@@ -28,7 +29,9 @@ resolved at Snakefile parse time — checkpoint defers until runtime."""
         exclude_re=EXCLUDE_CHROMS_RE,
     shell:
         r"""
-        cut -f1 {input.fai} | grep -Ev {params.exclude_re:q} > {output.chroms}
+        samtools idxstats {input.bam} \
+          | awk '$1 != "*" && $3 > 0 {{ print $1 }}' \
+          | grep -Ev {params.exclude_re:q} > {output.chroms}
         """
 
 
