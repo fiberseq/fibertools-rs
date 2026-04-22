@@ -39,13 +39,15 @@ np.random.seed(RANDOM_SEED)
 
 
 def parse_list(s: str, cast=float) -> List:
-    """Parse a CLI-supplied list like '[0.5, 1]' or '0.5,1' into [cast(x), ...]."""
+    """Parse a CLI-supplied list like '[0.5, 1]', '0.5,1', or '0.5 1' into [cast(x), ...]."""
     if s is None:
         return []
     s = s.strip()
     if s.startswith("["):
         return [cast(x) for x in ast.literal_eval(s)]
-    return [cast(x) for x in s.split(",") if x.strip() != ""]
+    if "," in s:
+        return [cast(x) for x in s.split(",") if x.strip() != ""]
+    return [cast(x) for x in s.split() if x.strip() != ""]
 
 
 def convert_to_gbdt(input_model: str, output_file: str) -> int:
