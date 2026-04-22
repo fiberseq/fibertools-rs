@@ -45,8 +45,10 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
                 first = false;
             }
             let chunk: Vec<FiberseqData> = chunk.collect();
-            let feats: Vec<FireFeats> =
-                chunk.iter().map(|r| FireFeats::new(r, fire_opts)).collect();
+            let feats: Vec<FireFeats> = chunk
+                .par_iter()
+                .map(|r| FireFeats::new(r, fire_opts))
+                .collect();
             feats.iter().for_each(|f| {
                 f.dump_fire_feats(&mut out_buffer).unwrap();
             });
@@ -72,25 +74,20 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
                 let n_msps = rec.msp.annotations.len();
                 if fire_opts.skip_no_m6a || fire_opts.min_msp > 0 || fire_opts.min_ave_msp_size > 0
                 {
-                    // skip reads with no m6a calls
-                    if fire_opts.skip_no_m6a && rec.m6a.annotations.is_empty() {
+                    // skip no calls
+                    if rec.m6a.annotations.is_empty() || n_msps == 0 {
                         skip_because_no_m6a += 1;
                         continue;
                     }
+                    //let max_msp_len = *rec.msp.lengths.iter().flatten().max().unwrap_or(&0);
                     if n_msps < fire_opts.min_msp {
                         skip_because_num_msp += 1;
                         continue;
                     }
-                    if fire_opts.min_ave_msp_size > 0 {
-                        if n_msps == 0 {
-                            skip_because_ave_msp_length += 1;
-                            continue;
-                        }
-                        let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
-                        if ave_msp_size < fire_opts.min_ave_msp_size {
-                            skip_because_ave_msp_length += 1;
-                            continue;
-                        }
+                    let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
+                    if ave_msp_size < fire_opts.min_ave_msp_size {
+                        skip_because_ave_msp_length += 1;
+                        continue;
                     }
                 }
                 out.write(&rec.record)?;
