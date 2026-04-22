@@ -106,7 +106,10 @@ empty shards (chroms with no reads) contribute nothing."""
         mem_mb=get_mem_mb,
     shell:
         r"""
-        for f in {input.shards}; do bgzip -dc "$f"; done \
+        for f in {input.shards}; do
+            [ -s "$f" ] || continue
+            bgzip -dc "$f"
+        done \
           | awk 'NR == 1 {{ hdr=$0; print; next }} $0 != hdr {{ print }}' \
           | bgzip -@ {threads} > {output.feats}
         """
