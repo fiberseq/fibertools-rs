@@ -103,10 +103,10 @@ rule build_training_data:
         (
           zcat -f {input.feats} | head -n 1 | sed 's/$/\tLabel/'
           bedtools intersect -f 0.25 -u -a {input.feats} -b {input.positives} \
-            | sed 's/$/\t1/' | grep '^chr'
+            | sed 's/$/\t1/' | awk '/^chr/'
           bedtools intersect -f 0.25 -u -a {input.feats} -b {input.negatives} \
             | bedtools intersect -v -a - -b {input.mask} \
-            | sed 's/$/\t-1/' | grep '^chr'
+            | sed 's/$/\t-1/' | awk '/^chr/'
         ) | bgzip -@ 8 > {output.bed}
         echo "[{wildcards.exp}] training label counts:" >&2
         zcat -f {output.bed} | tail -n +2 | awk -F'\t' '{{print $NF}}' | sort | uniq -c >&2
