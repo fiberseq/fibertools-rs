@@ -44,7 +44,8 @@ rule train_model:
           --early-stopping-rounds {params.p[early_stopping_rounds]} \
           --early-stopping-val-frac {params.p[early_stopping_val_frac]} \
           --mokapot-max-iter {params.p[mokapot_max_iter]} \
-          $( [ "{params.p[balance_train]}" = "True" ] && echo --balance-train || echo --no-balance-train )
+          $( [ "{params.p[balance_train]}" = "True" ] && echo --balance-train || echo --no-balance-train ) \
+          $( [ "{params.p[mokapot_override]}" = "True" ] && echo --mokapot-override )
         """
 
 

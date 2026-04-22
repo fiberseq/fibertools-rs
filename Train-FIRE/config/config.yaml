@@ -56,6 +56,7 @@ train_defaults:
   early_stopping_val_frac: 0.15     # fraction of train held out for the ES val set
   balance_train: true               # downsample majority class in train; set false to let scale_pos_weight handle imbalance
   mokapot_max_iter: 15              # number of mokapot iterative refit rounds
+  mokapot_override: false           # if true, downgrade "model performs worse than direction" from error to warning
 
 # Trackhub metadata
 trackhub:
@@ -102,7 +103,9 @@ experiments:
     region_set: default
 
   # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
-  # Useful reference for how much the grid search is buying.
+  # Useful reference for how much the grid search is buying. This config is
+  # weak enough that XGBoost may not beat the `direction` feature alone, so
+  # we allow mokapot's "model performs worse" check to be a warning here.
   shallow_fixed:
     region_set: default
     train:
@@ -112,6 +115,7 @@ experiments:
       min_child_weight_fracs: [0.01]
       colsample_bytree: [1.0]
       gamma: [1]
+      mokapot_override: true
 
   # Higher-capacity grid: deeper trees + more boosters.
   # Risk is overfitting; compare to default_grid to see if capacity helps.
