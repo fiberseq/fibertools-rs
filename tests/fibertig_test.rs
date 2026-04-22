@@ -450,3 +450,136 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
 
     Ok(())
 }
+
+// Build a minimal mapped record with fs/fl/fa tags in forward/contig order,
+// then optionally flip it to reverse-strand to simulate what an aligner would emit.
+fn build_tagged_record(
+    seq_len: u32,
+    fs: &[u32],
+    fl: &[u32],
+    fa: &str,
+    reverse: bool,
+) -> rust_htslib::bam::Record {
+    use rust_htslib::bam::record::{Aux, Cigar, CigarString};
+    use rust_htslib::bam::Record;
+
+    let seq: Vec<u8> = vec![b'A'; seq_len as usize];
+    let qual: Vec<u8> = vec![255u8; seq_len as usize];
+    let cigar = CigarString(vec![Cigar::Equal(seq_len)]);
+
+    let mut record = Record::new();
+    record.set(b"read1", Some(&cigar), &seq, &qual);
+    record.set_tid(0);
+    record.set_pos(0);
+    record.set_mapq(60);
+    if reverse {
+        record.set_reverse();
+    }
+
+    record
+        .push_aux(b"fs", Aux::ArrayU32((&fs.to_vec()).into()))
+        .unwrap();
+    record
+        .push_aux(b"fl", Aux::ArrayU32((&fl.to_vec()).into()))
+        .unwrap();
+    record.push_aux(b"fa", Aux::String(fa)).unwrap();
+
+    record
+}
+
+#[test]
+fn test_from_bam_tags_fa_pairing_forward_strand() -> Result<()> {
+    // Forward-strand sanity: no flip happens, extras must pair with the same-index peaks.
+    // Four non-overlapping peaks with distinguishable sizes and distinguishable fa values.
+    let seq_len: u32 = 10_000;
+    let fs: Vec<u32> = vec![100, 1_000, 3_000, 6_000];
+    let fl: Vec<u32> = vec![100, 300, 500, 700];
+    let fa = "peakA|peakB|peakC|peakD";
+
+    let record = build_tagged_record(seq_len, &fs, &fl, fa, false);
+
+    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
+        .expect("tags should parse");
+
+    assert_eq!(anns.annotations.len(), 4);
+    assert!(!anns.reverse);
+
+    // Pure-match CIGAR at pos 0, forward: ref coords == query coords == fs/fl
+    let expected = [
+        (100_i64, 200_i64, "peakA"),
+        (1_000, 1_300, "peakB"),
+        (3_000, 3_500, "peakC"),
+        (6_000, 6_700, "peakD"),
+    ];
+    for (ann, (exp_start, exp_end, exp_tag)) in anns.annotations.iter().zip(expected.iter()) {
+        assert_eq!(ann.reference_start, Some(*exp_start));
+        assert_eq!(ann.reference_end, Some(*exp_end));
+        assert_eq!(
+            ann.extra_columns.as_ref().map(|c| c.join(";")),
+            Some((*exp_tag).to_string()),
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_from_bam_tags_fa_pairing_reverse_strand_multi_peak() -> Result<()> {
+    // Reverse-strand regression test for the fa-swap bug. Five peaks with distinguishable
+    // sizes ensures that any off-by-one pairing error (pairwise swap, full reversal, etc.)
+    // is caught. Last two peaks OVERLAP in forward/contig coords, matching the original
+    // reported symptom where adjacent overlapping peaks had extras swapped.
+    let seq_len: u32 = 10_000;
+    let fs: Vec<u32> = vec![100, 1_000, 3_000, 6_000, 6_500];
+    let fl: Vec<u32> = vec![100, 300, 500, 700, 900];
+    let fa = "peakA|peakB|peakC|peakD|peakE";
+
+    let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
+
+    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
+        .expect("tags should parse");
+
+    assert_eq!(anns.annotations.len(), 5);
+    assert!(anns.reverse);
+
+    // On reverse-strand with pure-match CIGAR at pos 0:
+    //   forward peak [s, s+l) --> ref peak [seq_len - (s+l), seq_len - s)
+    // Peaks in ascending ref-start order after flip:
+    //   peakE forward [6500, 7400)  -> ref [2600, 3500), len 900
+    //   peakD forward [6000, 6700)  -> ref [3300, 4000), len 700
+    //   peakC forward [3000, 3500)  -> ref [6500, 7000), len 500
+    //   peakB forward [1000, 1300)  -> ref [8700, 9000), len 300
+    //   peakA forward [100, 200)    -> ref [9800, 9900), len 100
+    let expected = [
+        (2_600_i64, 3_500_i64, 900_i64, "peakE"),
+        (3_300, 4_000, 700, "peakD"),
+        (6_500, 7_000, 500, "peakC"),
+        (8_700, 9_000, 300, "peakB"),
+        (9_800, 9_900, 100, "peakA"),
+    ];
+    for (i, (ann, (exp_start, exp_end, exp_len, exp_tag))) in
+        anns.annotations.iter().zip(expected.iter()).enumerate()
+    {
+        assert_eq!(
+            ann.reference_start,
+            Some(*exp_start),
+            "ref_start mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.reference_end,
+            Some(*exp_end),
+            "ref_end mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.reference_length,
+            Some(*exp_len),
+            "ref_length mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.extra_columns.as_ref().map(|c| c.join(";")),
+            Some((*exp_tag).to_string()),
+            "fa-extras pairing wrong at index {i} (size {exp_len}): got {:?}",
+            ann.extra_columns,
+        );
+    }
+    Ok(())
+}
