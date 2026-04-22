@@ -66,58 +66,51 @@ rule regions_bam:
         """
 
 
-rule extract_features:
-    """Scatter ft fire -f by chromosome to work around the single BAM reader
-    bottleneck inside a single ft process. Each chrom streams through its own
-    samtools view | ft fire -f - pipeline; outputs are concatenated."""
+rule extract_features_chrom:
+    """Run ft fire -f on a single chromosome's reads. Scattering across chroms
+    lets Snakemake schedule parallel jobs and avoids the single BAM reader
+    bottleneck of one ft fire process streaming the whole BAM."""
     input:
         bam="results/shared/regions.bam",
         csi="results/shared/regions.bam.csi",
-        regions="results/shared/union_regions.bed.gz",
     output:
-        feats="results/shared/features.tsv.gz",
+        tsv=temp("results/shared/features_per_chrom/{chrom}.tsv.gz"),
     conda:
         "../envs/env.yml"
-    threads: 32
+    threads: 4
     resources:
         mem_mb=get_mem_mb,
     params:
         min_msp=TRAIN_DEFAULTS["min_msp_length_for_positive_fire_call"],
     shell:
         r"""
-        tmpdir=$(mktemp -d)
-        trap 'rm -rf "$tmpdir"' EXIT
+        samtools view -@ 1 -u {input.bam} {wildcards.chrom} \
+          | ft fire -t {threads} --min-msp-length-for-positive-fire-call {params.min_msp} -f - \
+          | awk 'NR == 1 || ($3 > $2 && $3 - $2 < 10000)' \
+          | bgzip -@ 2 > {output.tsv}
+        """
 
-        # Split the thread budget: outer = parallel chrom jobs, inner = ft threads.
-        outer=$(( {threads} / 4 ))
-        [ $outer -lt 1 ] && outer=1
-        inner=4
 
-        # Only scatter over chroms that actually appear in union_regions.
-        zcat -f {input.regions} | cut -f1 | sort -u > "$tmpdir/chroms.txt"
-
-        process_chrom() {{
-            chrom="$1"
-            samtools view -@ 1 -u "$BAM" "$chrom" \
-              | ft fire -t "$INNER" --min-msp-length-for-positive-fire-call "$MIN_MSP" -f - \
-              | awk 'NR == 1 || ($3 > $2 && $3 - $2 < 10000)' \
-              > "$TMP/$chrom.tsv"
-        }}
-        export -f process_chrom
-        export BAM={input.bam} MIN_MSP={params.min_msp} TMP="$tmpdir" INNER="$inner"
-
-        xargs -a "$tmpdir/chroms.txt" -n1 -P "$outer" -I CHR bash -c 'process_chrom CHR'
-
-        # Concat: take header from the first non-empty shard; rows from all.
-        first=1
-        for f in "$tmpdir"/*.tsv; do
-            [ -s "$f" ] || continue
-            if [ $first -eq 1 ]; then
-                head -n 1 "$f"
-                first=0
-            fi
-            tail -n +2 "$f"
-        done | bgzip -@ 8 > {output.feats}
+rule extract_features:
+    """Gather the per-chrom feature tables into one. awk enforces a single
+    header line so repeated headers from per-chrom shards are deduped, and
+    empty shards (chroms with no reads) contribute nothing."""
+    input:
+        shards=expand(
+            "results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=CHROMS
+        ),
+    output:
+        feats="results/shared/features.tsv.gz",
+    conda:
+        "../envs/env.yml"
+    threads: 4
+    resources:
+        mem_mb=get_mem_mb,
+    shell:
+        r"""
+        for f in {input.shards}; do bgzip -dc "$f"; done \
+          | awk 'NR == 1 {{ hdr=$0; print; next }} $0 != hdr {{ print }}' \
+          | bgzip -@ {threads} > {output.feats}
         """
 
 
