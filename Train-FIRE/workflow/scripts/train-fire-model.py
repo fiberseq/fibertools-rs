@@ -213,7 +213,23 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
     model.fit(train_psms)
     test_psms = mokapot.read_pin(test_df)
     scores = model.predict(test_psms)
-    test_conf = test_psms.assign_confidence(scores)
+    try:
+        test_conf = test_psms.assign_confidence(scores)
+    except IndexError:
+        # triqler's qvality spline (called inside assign_confidence) fails with
+        # `gamma[-3]` when there are <3 unique score bins. Weak models can
+        # collapse their output onto a handful of values. Break ties with
+        # sub-nanoscale deterministic jitter so the spline has enough bins.
+        if not args.mokapot_override:
+            raise
+        logging.warning(
+            "assign_confidence hit triqler IndexError; retrying with jittered scores"
+        )
+        rng = np.random.default_rng(RANDOM_SEED)
+        scores = np.asarray(scores, dtype=float) + rng.uniform(
+            -1e-12, 1e-12, size=len(scores)
+        )
+        test_conf = test_psms.assign_confidence(scores)
     return model, test_conf
 
 
