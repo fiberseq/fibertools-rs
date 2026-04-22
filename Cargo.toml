@@ -10,7 +10,7 @@ license = "MIT"
 name = "fibertools-rs"
 readme = "README.md"
 repository = "https://github.com/fiberseq/fibertools-rs"
-version = "0.8.1"
+version = "0.8.2"
 # exclude py-ft and test data from cargo publish since they are too large
 exclude = ["py-ft/", "tests/data/", "Train-FIRE/"]
 

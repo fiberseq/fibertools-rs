@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### [0.8.2]
+
+#### Bug Fixes
+
+- **`ft center`: fix off-by-one in `centered_query_start`/`centered_query_end` for minus strand reads.** The half-open interval negation was incorrect, causing m6a positions to index into the wrong base when slicing `query_sequence[-centered_query_end:]` on minus strand reads. Plus strand and `subset_sequence` were unaffected.
+- **`ft center`: add missing `fire_qual` column to wide format header.** The header had 21 columns but data rows had 22, causing column misalignment when parsing.
+
 ### [0.8.1]
 
 Fixed a bug where pg-inject could make fibertigs that were longer than needed at the end of chromosomes.
