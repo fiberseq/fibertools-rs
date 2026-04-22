@@ -3,7 +3,14 @@ from snakemake.utils import min_version
 min_version("9.17")
 
 
-configfile: "config/config.yaml"
+# Config is always supplied at the CLI via `--configfile`, so a test run
+# with `--configfile .tests/config.yaml` fully replaces experiments +
+# region_sets instead of deep-merging with the production config.
+if not config:
+    raise WorkflowError(
+        "no config loaded — pass --configfile config/config.yaml "
+        "(or --configfile .tests/config.yaml for the smoke test)"
+    )
 
 
 EXPERIMENTS = list(config["experiments"].keys())
