@@ -39,8 +39,10 @@ train_defaults:
   subset_max_train: 5000
   direction: msp_len_times_m6a_fc
   grid_search: false
-  n_estimators: [20]
-  max_depth: [4]
+  # A little depth + a few dozen trees is needed for mokapot's confidence
+  # spline to see >=3 unique score bins on the tiny smoke dataset.
+  n_estimators: [50]
+  max_depth: [6]
   min_child_weight_fracs: [0.01]
   colsample_bytree: [1.0]
   gamma: [1]
