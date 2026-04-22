@@ -439,8 +439,14 @@ impl FiberAnnotations {
                     Some(lengths), // use lengths from fl tag
                 );
 
-                // Add extra columns to the annotations if present
-                if let Some(ann_vals) = annotation_values {
+                // Add extra columns to the annotations if present.
+                // FiberAnnotations::new already reversed starts/lengths on reverse-strand reads
+                // (fs/fl are flipped+array-reversed into aligned order), so fa must be reversed
+                // too to keep extras paired with their original peak.
+                if let Some(mut ann_vals) = annotation_values {
+                    if record.is_reverse() {
+                        ann_vals.reverse();
+                    }
                     for (i, annotation) in fiber_annotations.annotations.iter_mut().enumerate() {
                         if i < ann_vals.len() && !ann_vals[i].is_empty() {
                             annotation.extra_columns =

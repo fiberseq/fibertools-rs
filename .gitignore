@@ -34,3 +34,6 @@ results/*
 Train-FIRE/results/* 
 Train-FIRE/pixi.toml
 temp/** 
+scripts/*
+pixi.lock
+Train-FIRE/GM12878-fire-v0.1-filtered.cram.crai
