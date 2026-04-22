@@ -23,7 +23,7 @@ test_region: chr19
 test_bam: null
 
 # Site budget and peak merging
-n_sites: 100000
+n_sites: 500000
 merge_distance: 147
 
 # Regions always excluded from training (gaps, SDs, etc.)
