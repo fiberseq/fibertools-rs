@@ -46,7 +46,7 @@ rule union_regions:
 
 rule regions_bam:
     """Subset the sampled BAM to reads overlapping any training region. Indexes
-    the output so extract_features can scatter samtools views by chromosome."""
+the output so extract_features can scatter samtools views by chromosome."""
     input:
         bam="results/shared/sample.bam",
         regions="results/shared/union_regions.bed.gz",
@@ -68,8 +68,8 @@ rule regions_bam:
 
 rule extract_features_chrom:
     """Run ft fire -f on a single chromosome's reads. Scattering across chroms
-    lets Snakemake schedule parallel jobs and avoids the single BAM reader
-    bottleneck of one ft fire process streaming the whole BAM."""
+lets Snakemake schedule parallel jobs and avoids the single BAM reader
+bottleneck of one ft fire process streaming the whole BAM."""
     input:
         bam="results/shared/regions.bam",
         csi="results/shared/regions.bam.csi",
@@ -93,12 +93,10 @@ rule extract_features_chrom:
 
 rule extract_features:
     """Gather the per-chrom feature tables into one. awk enforces a single
-    header line so repeated headers from per-chrom shards are deduped, and
-    empty shards (chroms with no reads) contribute nothing."""
+header line so repeated headers from per-chrom shards are deduped, and
+empty shards (chroms with no reads) contribute nothing."""
     input:
-        shards=expand(
-            "results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=CHROMS
-        ),
+        shards=expand("results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=CHROMS),
     output:
         feats="results/shared/features.tsv.gz",
     conda:

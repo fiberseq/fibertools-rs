@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 """Aggregate per-experiment FIRE.conf.json + metrics.json into one plot and TSV."""
+
 import argparse
 import json
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd

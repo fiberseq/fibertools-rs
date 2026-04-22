@@ -58,20 +58,15 @@ EXCLUDE_CHROMS_RE = config["exclude_chroms_regex"]
 EXCLUDE_BEDS = [_expand(p) for p in config["exclude_beds"]]
 
 
-def load_fai_chroms(fai_path, exclude_re):
-    """Return list of chromosomes from FAI, dropping those matching exclude_re."""
-    pattern = re.compile(exclude_re) if exclude_re else None
-    chroms = []
-    with open(fai_path) as fh:
-        for line in fh:
-            c = line.split("\t", 1)[0]
-            if pattern and pattern.search(c):
-                continue
-            chroms.append(c)
-    return chroms
-
-
-CHROMS = load_fai_chroms(FAI, EXCLUDE_CHROMS_RE)
+def features_shards(wildcards):
+    """Resolve per-chrom feature shards at DAG-eval time so we can read the
+    chrom list from the FAI even when fetch_reference produces it."""
+    chroms_file = checkpoints.build_chrom_list.get(**wildcards).output.chroms
+    with open(chroms_file) as fh:
+        chroms = [line.strip() for line in fh if line.strip()]
+    return expand(
+        "results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=chroms
+    )
 
 TRAIN_DEFAULTS = config["train_defaults"]
 

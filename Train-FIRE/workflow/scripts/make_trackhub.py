@@ -13,6 +13,7 @@ Flat layout (avoids double-nesting with hubCheck):
     bb/<model>.fire-fibers.bb
     bb/<model>.fire-fiber-decorators.bb
 """
+
 import argparse
 import shutil
 from pathlib import Path
@@ -20,9 +21,16 @@ from pathlib import Path
 
 BASELINE_COLOR = "0,0,0"
 PALETTE = [
-    (166, 54, 3), (217, 95, 14), (54, 144, 192), (34, 94, 168),
-    (5, 112, 176), (35, 139, 69), (116, 196, 118), (49, 130, 189),
-    (140, 81, 10), (128, 0, 128),
+    (166, 54, 3),
+    (217, 95, 14),
+    (54, 144, 192),
+    (34, 94, 168),
+    (5, 112, 176),
+    (35, 139, 69),
+    (116, 196, 118),
+    (49, 130, 189),
+    (140, 81, 10),
+    (128, 0, 128),
 ]
 
 
@@ -87,10 +95,7 @@ def main():
         f"genomesFile genomes.txt\n"
         f"email {args.email}\n"
     )
-    (hub / "genomes.txt").write_text(
-        f"genome {args.genome}\n"
-        f"trackDb trackDb.txt\n"
-    )
+    (hub / "genomes.txt").write_text(f"genome {args.genome}\ntrackDb trackDb.txt\n")
 
     ordered = (["baseline"] if "baseline" in args.models else []) + [
         m for m in args.models if m != "baseline"

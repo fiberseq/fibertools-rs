@@ -55,8 +55,8 @@ rule train_only:
 
 rule data_only:
     """Pipeline smoke target: runs everything up to and including the
-    per-region_set training-data.bed.gz. Skips XGBoost/mokapot training, which
-    requires real multi-locus features to produce a usable model."""
+per-region_set training-data.bed.gz. Skips XGBoost/mokapot training, which
+requires real multi-locus features to produce a usable model."""
     input:
         expand("results/region_sets/{rs}/training-data.bed.gz", rs=REGION_SET_NAMES),
 

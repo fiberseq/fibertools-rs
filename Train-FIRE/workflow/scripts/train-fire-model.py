@@ -11,6 +11,7 @@ Train a FIRE XGBoost classifier via mokapot and emit:
 Adapted from Train-FIRE/train-fire-model.py with CLI-driven hyperparameters
 and a configurable output directory so multiple experiments can run in parallel.
 """
+
 from __future__ import print_function
 
 import argparse
@@ -22,6 +23,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mokapot
@@ -50,7 +52,8 @@ class XGBEarlyStop(XGBClassifier):
     def fit(self, X, y, **kwargs):
         stratify = y if len(np.unique(y)) > 1 else None
         Xt, Xv, yt, yv = train_test_split(
-            X, y,
+            X,
+            y,
             test_size=self.val_frac,
             stratify=stratify,
             random_state=RANDOM_SEED,
@@ -209,7 +212,9 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
 
 def balance_df(df):
     min_count = df["Label"].value_counts().min()
-    return df.groupby("Label", group_keys=False).sample(n=min_count).reset_index(drop=True)
+    return (
+        df.groupby("Label", group_keys=False).sample(n=min_count).reset_index(drop=True)
+    )
 
 
 def read_features(infile, args):
@@ -221,8 +226,12 @@ def read_features(infile, args):
     assert "Label" in df.columns
     logging.info(f"Label counts raw: {df.Label.value_counts().to_dict()}")
 
-    df = df[(df.msp_len >= args.min_msp_length_for_positive_fire_call) | (df.Label == -1)]
-    df = df[(df.msp_len >= args.min_msp_length_for_negative_fire_call) | (df.Label == 1)]
+    df = df[
+        (df.msp_len >= args.min_msp_length_for_positive_fire_call) | (df.Label == -1)
+    ]
+    df = df[
+        (df.msp_len >= args.min_msp_length_for_negative_fire_call) | (df.Label == 1)
+    ]
     df = df.groupby(["fiber", "Label"]).sample(n=1).reset_index(drop=True)
 
     for col in df.columns:
@@ -234,9 +243,12 @@ def read_features(infile, args):
     train = df[r < 0.80]
     test = df[r >= 0.80]
     train = train[
-        (train.msp_len >= args.min_msp_length_for_positive_fire_call) | (train.Label == 1)
+        (train.msp_len >= args.min_msp_length_for_positive_fire_call)
+        | (train.Label == 1)
     ]
-    train_out = balance_df(train) if args.balance_train else train.reset_index(drop=True)
+    train_out = (
+        balance_df(train) if args.balance_train else train.reset_index(drop=True)
+    )
     return train_out, balance_df(test)
 
 
@@ -269,12 +281,20 @@ def main():
     ap.add_argument("--colsample-bytree-grid", default="[0.5, 1.0]")
     ap.add_argument("--gamma-grid", default="[1]")
     ap.add_argument("--learning-rate-grid", default="[0.3]")
-    ap.add_argument("--early-stopping-rounds", type=int, default=0,
-                    help="0 disables. >0 holds out --early-stopping-val-frac for early stopping.")
+    ap.add_argument(
+        "--early-stopping-rounds",
+        type=int,
+        default=0,
+        help="0 disables. >0 holds out --early-stopping-val-frac for early stopping.",
+    )
     ap.add_argument("--early-stopping-val-frac", type=float, default=0.15)
     ap.add_argument("--mokapot-max-iter", type=int, default=15)
-    ap.add_argument("--balance-train", action=argparse.BooleanOptionalAction, default=True,
-                    help="Downsample majority class in the training set. --no-balance-train keeps all rows.")
+    ap.add_argument(
+        "--balance-train",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Downsample majority class in the training set. --no-balance-train keeps all rows.",
+    )
     args = ap.parse_args()
 
     args.n_estimators_grid = parse_list(args.n_estimators_grid, int)

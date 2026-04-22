@@ -14,7 +14,16 @@ dry-run = { cmd = ["snakemake", "--configfile", "config/config.yaml", "-n"] }
 # ~chr19:9.09-9.11Mb (negatives, no overlap with any peak/gap/SD).
 # Runs regions -> features -> training-data -> xgboost+mokapot end-to-end.
 # First invocation materializes the conda env.
-test = { cmd = ["snakemake", "--configfile", ".tests/config.yaml", "-j", "4", "--use-conda", "--rerun-incomplete", "train_only"] }
+test = { cmd = [
+  "snakemake",
+  "--configfile",
+  ".tests/config.yaml",
+  "-j",
+  "4",
+  "--use-conda",
+  "--rerun-incomplete",
+  "train_only",
+] }
 test-clean = "rm -rf results .snakemake"
 # Primary production entrypoint (also lets users `cd` into the project root).
 snakemake = { cmd = "cd $INIT_CWD && snakemake --configfile $PIXI_PROJECT_ROOT/config/config.yaml -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
