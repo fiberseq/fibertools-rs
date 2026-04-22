@@ -100,8 +100,9 @@ rule build_training_data:
         mem_mb=get_mem_mb,
     shell:
         r"""
+        header=$(zcat -f {input.feats} | head -n 1 || true)
         (
-          zcat -f {input.feats} | head -n 1 | sed 's/$/\tLabel/'
+          printf '%s\tLabel\n' "$header"
           bedtools intersect -f 0.25 -u -a {input.feats} -b {input.positives} \
             | sed 's/$/\t1/' | awk '/^chr/'
           bedtools intersect -f 0.25 -u -a {input.feats} -b {input.negatives} \
