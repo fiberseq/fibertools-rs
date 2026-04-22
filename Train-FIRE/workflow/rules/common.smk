@@ -53,6 +53,7 @@ def aln_input(src):
 
 TEST_REGION = str(config["test_region"])
 N_SITES = int(config["n_sites"])
+NEG_MULTIPLIER = int(config.get("neg_multiplier", 1))
 MERGE_DIST = int(config["merge_distance"])
 EXCLUDE_CHROMS_RE = config["exclude_chroms_regex"]
 EXCLUDE_BEDS = [_expand(p) for p in config["exclude_beds"]]

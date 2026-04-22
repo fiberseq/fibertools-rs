@@ -105,7 +105,10 @@ rule build_complement_negatives:
 
 
 rule build_negatives:
-    """Shuffle positives into the complement so negatives length-match positives on the same chromosome."""
+    """Shuffle positives into the complement so negatives length-match positives on the same chromosome.
+    Runs the shuffle neg_multiplier times with distinct seeds so the decoy pool is K x positives, giving
+    mokapot's FDR estimator and triqler's spline a richer null distribution. Seeds' outputs are concatenated
+    without merging so the final count is ~K x positives."""
     input:
         positives="results/region_sets/{rs}/positives.bed.gz",
         mask="results/region_sets/{rs}/neg_mask.bed.gz",
@@ -117,13 +120,17 @@ rule build_negatives:
         "../envs/env.yml"
     resources:
         mem_mb=get_mem_mb,
+    params:
+        neg_multiplier=NEG_MULTIPLIER,
     shell:
         r"""
-        bedtools shuffle \
-            -excl {input.mask} \
-            -incl {input.complement} \
-            -i {input.positives} \
-            -chrom -seed 42 -g {input.fai} \
+        for seed in $(seq 42 $((42 + {params.neg_multiplier} - 1))); do
+            bedtools shuffle \
+                -excl {input.mask} \
+                -incl {input.complement} \
+                -i {input.positives} \
+                -chrom -seed "$seed" -g {input.fai}
+        done \
           | sort -k1,1 -k2,2n \
           | bgzip > {output.bed}
         printf "[{wildcards.rs}] negatives: " >&2
