@@ -106,6 +106,11 @@ experiments:
   default_grid:
     region_set: default
 
+  default_grid_unbalanced:
+    region_set: default
+    train:
+      balance_train: false
+
   # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
   # Useful reference for how much the grid search is buying. This config is
   # weak enough that XGBoost may not beat the `direction` feature alone, so
@@ -132,6 +137,16 @@ experiments:
       colsample_bytree: [0.5, 1.0]
       gamma: [1]
 
+  deep_wide_grid_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [400, 600]
+      max_depth: [15, 21]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      balance_train: false
+
   # Strong-regularization grid: higher gamma + bigger leaf hessian,
   # smaller column sample. Tests the overfitting hypothesis.
   strong_reg_grid:
@@ -142,6 +157,16 @@ experiments:
       min_child_weight_fracs: [0.005, 0.02]
       colsample_bytree: [0.5, 0.75]
       gamma: [5, 10]
+
+  strong_reg_grid_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [200, 300]
+      max_depth: [9]
+      min_child_weight_fracs: [0.005, 0.02]
+      colsample_bytree: [0.5, 0.75]
+      gamma: [5, 10]
+      balance_train: false
 
   # Slow-learn grid: low eta with a large n_estimators cap, early stopping
   # picks the actual tree count per fold.
@@ -155,6 +180,18 @@ experiments:
       gamma: [1]
       learning_rate: [0.05, 0.1]
       early_stopping_rounds: 50
+
+  slow_learn_es_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05, 0.1]
+      early_stopping_rounds: 50
+      balance_train: false
 
   # Keep all training data (no balance downsample) and give mokapot more
   # refit iterations. scale_pos_weight handles class imbalance inside XGBoost.
