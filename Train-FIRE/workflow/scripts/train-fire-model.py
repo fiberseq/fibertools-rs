@@ -49,6 +49,13 @@ class XGBEarlyStop(XGBClassifier):
         super().__init__(**kwargs)
         self.val_frac = val_frac
 
+    def get_xgb_params(self):
+        # val_frac is a wrapper hyperparam, not an XGBoost booster param.
+        # Strip it so XGBoost doesn't warn "Parameters ... are not used".
+        params = super().get_xgb_params()
+        params.pop("val_frac", None)
+        return params
+
     def fit(self, X, y, **kwargs):
         stratify = y if len(np.unique(y)) > 1 else None
         Xt, Xv, yt, yv = train_test_split(
@@ -145,7 +152,6 @@ def save_model(model, test_conf, outdir: Path, max_fdr: float) -> dict:
 def _make_xgb(args, scale_pos_weight, n_jobs, **fixed):
     """Build a single XGB estimator, wrapping with early-stopping if enabled."""
     common = dict(
-        use_label_encoder=False,
         eval_metric="auc",
         scale_pos_weight=scale_pos_weight,
         seed=RANDOM_SEED,
