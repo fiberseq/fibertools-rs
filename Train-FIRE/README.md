@@ -33,25 +33,31 @@ pixi run snakemake -j 32 train_only   # train+compare, skip trackhub
 
 ## Adding an experiment
 
-Edit [config/config.yaml](config/config.yaml) under `experiments:`. Each
-experiment picks its own positives, negative strategy (`shuffle` or
-`complement`), and optional `train:` overrides for the XGBoost grid search.
+Experiments reference a named **region_set** (positives + negative-exclude
+beds) defined under `region_sets:`. Every experiment sharing a region_set
+shares the regions/features/training-data pipeline — only the XGBoost
+training step runs per-experiment.
 
 ```yaml
-experiments:
-  my_new_model:
+region_sets:
+  my_regions:
     positive_beds:
       - path: resources/mixed-positives/ATAC.bed.gz
         awk_filter: "$5 >= 1500"
       - path: resources/mixed-positives/peaks_CTCF_ENCFF951PEM.bed.gz
-    negative_strategy: shuffle
+    negative_exclude_beds:
+      - path: resources/mixed-positives/GM12878-fire-v0.1-peaks.bed.gz
+
+experiments:
+  my_new_model:
+    region_set: my_regions
     train:
       n_estimators: [300]
       max_depth: [12]
 ```
 
 Feature extraction is shared: `ft fire -f` runs once over the union of every
-experiment's positive + negative regions, and each experiment labels that
+region_set's positive + negative regions, and each region_set labels that
 shared table via `bedtools intersect`.
 
 ## Test region
