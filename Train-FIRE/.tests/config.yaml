@@ -30,8 +30,10 @@ exclude_beds:
 exclude_chroms_regex: "^chrEBV$"
 
 train_defaults:
-  min_msp_length_for_positive_fire_call: 85
-  min_msp_length_for_negative_fire_call: 85
+  # Lower the MSP length cutoff so the tiny NAPA read set yields enough
+  # rows for mokapot's qvality spline (needs >=3 unique score bins).
+  min_msp_length_for_positive_fire_call: 25
+  min_msp_length_for_negative_fire_call: 25
   # Smoke test has only ~100 PSMs; mokapot can't find any at 0.05 FDR. Use
   # loose thresholds to exercise the pipeline end-to-end, not train a real model.
   train_fdr: 0.5
