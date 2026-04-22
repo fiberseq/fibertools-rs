@@ -7,7 +7,7 @@ visualizing them together in a single UCSC track hub.
 ## Layout
 
 ```
-config/config.yaml                shared inputs + experiment list
+config/config.yaml                shared inputs + region_sets + experiment list
 workflow/Snakefile                entrypoint
 workflow/rules/*.smk              region building, features, training, hub
 workflow/scripts/*.py             training + aggregation + hub assembly
@@ -15,7 +15,8 @@ workflow/envs/env.yml             conda env for every rule
 workflow/profiles/default/*.yaml  snakemake profile
 resources/mixed-positives/        input peak BEDs
 results/shared/                   shared sampled BAM + feature table
-results/experiments/<exp>/        per-experiment models + FIRE calls
+results/region_sets/<rs>/         positives/negatives/training-data (shared across experiments)
+results/experiments/<exp>/        per-experiment trained models + FIRE calls
 results/trackhub/                 UCSC track hub (hub.txt / trackDb.txt / bb/)
 results/comparison/               FDR overlay plot + metrics TSV
 ```
