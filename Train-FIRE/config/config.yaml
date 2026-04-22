@@ -110,6 +110,7 @@ experiments:
     region_set: default
     train:
       balance_train: false
+      train_fdr: 0.20
 
   # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
   # Useful reference for how much the grid search is buying. This config is
@@ -146,6 +147,7 @@ experiments:
       colsample_bytree: [0.5, 1.0]
       gamma: [1]
       balance_train: false
+      train_fdr: 0.20
 
   # Strong-regularization grid: higher gamma + bigger leaf hessian,
   # smaller column sample. Tests the overfitting hypothesis.
@@ -167,6 +169,7 @@ experiments:
       colsample_bytree: [0.5, 0.75]
       gamma: [5, 10]
       balance_train: false
+      train_fdr: 0.20
 
   # Slow-learn grid: low eta with a large n_estimators cap, early stopping
   # picks the actual tree count per fold.
@@ -192,6 +195,7 @@ experiments:
       learning_rate: [0.05, 0.1]
       early_stopping_rounds: 50
       balance_train: false
+      train_fdr: 0.20
 
   # Keep all training data (no balance downsample) and give mokapot more
   # refit iterations. scale_pos_weight handles class imbalance inside XGBoost.
@@ -207,3 +211,4 @@ experiments:
       early_stopping_rounds: 50
       balance_train: false
       mokapot_max_iter: 30
+      train_fdr: 0.20
