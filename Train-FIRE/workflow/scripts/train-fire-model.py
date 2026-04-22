@@ -208,6 +208,7 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
         subset_max_train=args.subset_max_train,
         direction=args.direction,
         max_iter=args.mokapot_max_iter,
+        override=args.mokapot_override,
     )
     model.fit(train_psms)
     test_psms = mokapot.read_pin(test_df)
