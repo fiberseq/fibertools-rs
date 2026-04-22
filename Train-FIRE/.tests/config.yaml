@@ -1,0 +1,79 @@
+# Tiny smoke-test config. Trains a toy XGBoost model end-to-end from a
+# 1.3MB BAM (~154 chr19 reads with m6A tags) and a synthetic fai so the
+# whole pipeline — regions, features, training, comparison — runs in
+# well under a minute with no network access.
+
+reference:
+  fai: .tests/data/ref.fa.fai
+  fasta: .tests/data/ref.fa
+  genome: hg38
+
+# Local BAM — no s3 streaming.
+training_bam: .tests/data/sample.bam
+s3_endpoint: null
+# `-s 0.99` keeps ~99% of reads; -s 1.0 would be parsed as seed=1, frac=0.
+sample_rate: 0.99
+
+# test_region held out of training. Not present in the test BAM, so the
+# apply/trackhub steps won't find reads and should be skipped via train_only.
+test_region: chr1
+test_bam: null
+
+n_sites: 10
+merge_distance: 147
+
+exclude_beds:
+  - .tests/data/exclude.bed.gz
+
+# No alt/random/MT/sex chroms exist in the test fai, so the regex can be
+# anything that doesn't match 'chr19'.
+exclude_chroms_regex: "^chrEBV$"
+
+train_defaults:
+  min_msp_length_for_positive_fire_call: 85
+  min_msp_length_for_negative_fire_call: 85
+  # Smoke test has only ~100 PSMs; mokapot can't find any at 0.05 FDR. Use
+  # loose thresholds to exercise the pipeline end-to-end, not train a real model.
+  train_fdr: 0.5
+  test_fdr: 0.5
+  subset_max_train: 5000
+  direction: msp_len_times_m6a_fc
+  grid_search: false
+  n_estimators: [20]
+  max_depth: [4]
+  min_child_weight_fracs: [0.01]
+  colsample_bytree: [1.0]
+  gamma: [1]
+  learning_rate: [0.3]
+  early_stopping_rounds: 0
+  early_stopping_val_frac: 0.15
+  balance_train: true
+  mokapot_max_iter: 3
+
+trackhub:
+  name: test-hub
+  short_label: "test"
+  long_label: "smoke test"
+  email: test@example.com
+
+region_sets:
+  smoke:
+    positive_beds:
+      - path: .tests/data/positives.bed.gz
+    negative_exclude_beds: []
+
+experiments:
+  smoke_fixed:
+    region_set: smoke
+
+  # Second experiment so the test also exercises early stopping + the new
+  # balance_train/mokapot_max_iter knobs.
+  smoke_es:
+    region_set: smoke
+    train:
+      n_estimators: [100]
+      learning_rate: [0.1]
+      early_stopping_rounds: 10
+      early_stopping_val_frac: 0.2
+      balance_train: false
+      mokapot_max_iter: 5

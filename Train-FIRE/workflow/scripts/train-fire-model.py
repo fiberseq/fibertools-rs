@@ -77,7 +77,11 @@ def convert_to_gbdt(input_model: str, output_file: str) -> int:
     booster = xgb.Booster()
     booster.load_model(input_model)
     config = json.loads(booster.save_config())
-    base_score = float(config["learner"]["learner_model_param"]["base_score"])
+    # XGBoost >=2 serializes base_score as a bracketed vector string like
+    # '[4.2412016E-1]'; older versions gave a bare float. Handle both.
+    raw = config["learner"]["learner_model_param"]["base_score"]
+    parsed = json.loads(raw) if isinstance(raw, str) and raw.startswith("[") else raw
+    base_score = float(parsed[0] if isinstance(parsed, list) else parsed)
     tmp_file = output_file + ".mid"
     booster.dump_model(tmp_file, dump_format="json")
     with open(output_file, "w") as out:
