@@ -350,6 +350,7 @@ def main():
             early_stopping_val_frac=float(args.early_stopping_val_frac),
             mokapot_max_iter=int(args.mokapot_max_iter),
             balance_train=bool(args.balance_train),
+            mokapot_override=bool(args.mokapot_override),
             learning_rate_grid=args.learning_rate_grid,
         )
     )
