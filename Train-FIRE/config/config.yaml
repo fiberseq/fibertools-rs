@@ -40,7 +40,7 @@ train_defaults:
   min_msp_length_for_negative_fire_call: 85
   train_fdr: 0.05
   test_fdr: 0.05
-  subset_max_train: 2000000
+  subset_max_train: 10000000
   direction: msp_len_times_m6a_fc
   grid_search: true
   n_estimators: [200, 300]
