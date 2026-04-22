@@ -180,8 +180,8 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
 
 
 def balance_df(df):
-    counts = df.Label.value_counts()
-    return df.groupby("Label").apply(lambda g: g.sample(min(counts))).reset_index(drop=True)
+    min_count = df["Label"].value_counts().min()
+    return df.groupby("Label", group_keys=False).sample(n=min_count).reset_index(drop=True)
 
 
 def read_features(infile, args):
