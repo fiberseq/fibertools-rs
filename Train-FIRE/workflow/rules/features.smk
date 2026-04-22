@@ -96,7 +96,7 @@ rule extract_features:
 header line so repeated headers from per-chrom shards are deduped, and
 empty shards (chroms with no reads) contribute nothing."""
     input:
-        shards=expand("results/shared/features_per_chrom/{chrom}.tsv.gz", chrom=CHROMS),
+        shards=features_shards,
     output:
         feats="results/shared/features.tsv.gz",
     conda:
