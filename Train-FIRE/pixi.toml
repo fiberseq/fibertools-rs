@@ -8,14 +8,14 @@ version = "0.1.0"
 
 [tasks]
 fmt = "ruff format . && taplo format pixi.toml && snakefmt workflow/"
-dry-run = { cmd = ["snakemake", "-n"] }
+dry-run = { cmd = ["snakemake", "--configfile", "config/config.yaml", "-n"] }
 # Real end-to-end smoke test on the tiny .tests/ dataset. Trains two toy
 # models (fixed + early-stopping) from ~150 chr19 reads. Runs in under a
-# minute with no network access. Requires `--use-conda` once to materialize
-# the env.
+# minute with no network access. First invocation materializes the conda env.
 test = { cmd = ["snakemake", "--configfile", ".tests/config.yaml", "-j", "4", "--use-conda", "--rerun-incomplete", "train_only"] }
-test-clean = "rm -rf results"
-snakemake = { cmd = "cd $INIT_CWD && snakemake -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
+test-clean = "rm -rf results .snakemake"
+# Primary production entrypoint (also lets users `cd` into the project root).
+snakemake = { cmd = "cd $INIT_CWD && snakemake --configfile $PIXI_PROJECT_ROOT/config/config.yaml -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
 
 
 [dependencies]
