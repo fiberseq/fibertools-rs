@@ -301,6 +301,11 @@ def main():
         default=True,
         help="Downsample majority class in the training set. --no-balance-train keeps all rows.",
     )
+    ap.add_argument(
+        "--mokapot-override",
+        action="store_true",
+        help="Downgrade mokapot's 'model performs worse than direction' from error to warning.",
+    )
     args = ap.parse_args()
 
     args.n_estimators_grid = parse_list(args.n_estimators_grid, int)
