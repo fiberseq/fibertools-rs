@@ -45,12 +45,14 @@ rule union_regions:
 
 
 rule regions_bam:
-    """Subset the sampled BAM to reads overlapping any training region."""
+    """Subset the sampled BAM to reads overlapping any training region. Indexes
+    the output so extract_features can scatter samtools views by chromosome."""
     input:
         bam="results/shared/sample.bam",
         regions="results/shared/union_regions.bed.gz",
     output:
         bam="results/shared/regions.bam",
+        csi="results/shared/regions.bam.csi",
     conda:
         "../envs/env.yml"
     threads: 16
@@ -60,14 +62,18 @@ rule regions_bam:
         r"""
         samtools view -@ {threads} -b -M \
             -L <(zcat -f {input.regions}) \
-            {input.bam} -o {output.bam}
+            {input.bam} -o {output.bam} --write-index
         """
 
 
 rule extract_features:
-    """Run ft fire -f once to produce the shared MSP feature table."""
+    """Scatter ft fire -f by chromosome to work around the single BAM reader
+    bottleneck inside a single ft process. Each chrom streams through its own
+    samtools view | ft fire -f - pipeline; outputs are concatenated."""
     input:
         bam="results/shared/regions.bam",
+        csi="results/shared/regions.bam.csi",
+        regions="results/shared/union_regions.bed.gz",
     output:
         feats="results/shared/features.tsv.gz",
     conda:
@@ -79,9 +85,39 @@ rule extract_features:
         min_msp=TRAIN_DEFAULTS["min_msp_length_for_positive_fire_call"],
     shell:
         r"""
-        ft fire -t {threads} --min-msp-length-for-positive-fire-call {params.min_msp} -f {input.bam} \
-          | awk 'NR == 1 || ($3 > $2 && $3 - $2 < 10000)' \
-          | bgzip -@ 8 > {output.feats}
+        tmpdir=$(mktemp -d)
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        # Split the thread budget: outer = parallel chrom jobs, inner = ft threads.
+        outer=$(( {threads} / 4 ))
+        [ $outer -lt 1 ] && outer=1
+        inner=4
+
+        # Only scatter over chroms that actually appear in union_regions.
+        zcat -f {input.regions} | cut -f1 | sort -u > "$tmpdir/chroms.txt"
+
+        process_chrom() {{
+            chrom="$1"
+            samtools view -@ 1 -u "$BAM" "$chrom" \
+              | ft fire -t "$INNER" --min-msp-length-for-positive-fire-call "$MIN_MSP" -f - \
+              | awk 'NR == 1 || ($3 > $2 && $3 - $2 < 10000)' \
+              > "$TMP/$chrom.tsv"
+        }}
+        export -f process_chrom
+        export BAM={input.bam} MIN_MSP={params.min_msp} TMP="$tmpdir" INNER="$inner"
+
+        xargs -a "$tmpdir/chroms.txt" -n1 -P "$outer" -I CHR bash -c 'process_chrom CHR'
+
+        # Concat: take header from the first non-empty shard; rows from all.
+        first=1
+        for f in "$tmpdir"/*.tsv; do
+            [ -s "$f" ] || continue
+            if [ $first -eq 1 ]; then
+                head -n 1 "$f"
+                first=0
+            fi
+            tail -n +2 "$f"
+        done | bgzip -@ 8 > {output.feats}
         """
 
 

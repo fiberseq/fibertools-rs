@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 
 
@@ -55,6 +56,22 @@ N_SITES = int(config["n_sites"])
 MERGE_DIST = int(config["merge_distance"])
 EXCLUDE_CHROMS_RE = config["exclude_chroms_regex"]
 EXCLUDE_BEDS = [_expand(p) for p in config["exclude_beds"]]
+
+
+def load_fai_chroms(fai_path, exclude_re):
+    """Return list of chromosomes from FAI, dropping those matching exclude_re."""
+    pattern = re.compile(exclude_re) if exclude_re else None
+    chroms = []
+    with open(fai_path) as fh:
+        for line in fh:
+            c = line.split("\t", 1)[0]
+            if pattern and pattern.search(c):
+                continue
+            chroms.append(c)
+    return chroms
+
+
+CHROMS = load_fai_chroms(FAI, EXCLUDE_CHROMS_RE)
 
 TRAIN_DEFAULTS = config["train_defaults"]
 

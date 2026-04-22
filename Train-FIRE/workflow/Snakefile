@@ -22,6 +22,7 @@ wildcard_constraints:
     exp="|".join(EXPERIMENTS),
     model="|".join(MODELS),
     rs="|".join(REGION_SET_NAMES) if REGION_SET_NAMES else "NEVER_MATCHES_ANYTHING",
+    chrom=r"[A-Za-z0-9_.-]+",
 
 
 include: "rules/common.smk"

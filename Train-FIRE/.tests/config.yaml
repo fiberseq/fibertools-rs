@@ -70,14 +70,16 @@ experiments:
   smoke_fixed:
     region_set: smoke
 
-  # Second experiment so the test also exercises early stopping + the new
-  # balance_train/mokapot_max_iter knobs.
+  # Second experiment: same shape as smoke_fixed but with early-stopping +
+  # mokapot_max_iter knobs on. Keeps balance_train=true so pos/neg signal
+  # isn't perfectly separable and mokapot's triqler spline has enough
+  # unique score bins to converge.
   smoke_es:
     region_set: smoke
     train:
       n_estimators: [100]
-      learning_rate: [0.1]
-      early_stopping_rounds: 10
-      early_stopping_val_frac: 0.2
-      balance_train: false
+      max_depth: [6]
+      learning_rate: [0.2]
+      early_stopping_rounds: 20
+      early_stopping_val_frac: 0.15
       mokapot_max_iter: 5
