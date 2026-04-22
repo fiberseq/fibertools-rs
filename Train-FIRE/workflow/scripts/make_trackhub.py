@@ -4,22 +4,14 @@
 """
 Assemble a UCSC Track Hub with one decorator track per model.
 
-Each model contributes a base bigBed 12+ track ("fire-fibers") plus a decorator
-overlay ("fire-fiber-decorators"). Default visibility: squish.
-
-The special model name "baseline" corresponds to the FIRE calls already baked
-into the input CRAM (i.e. no retraining) and is always rendered first with a
-distinct color so it's easy to spot next to the trained models.
-
-Layout:
+Flat layout (avoids double-nesting with hubCheck):
   <hub-dir>/
     hub.txt
     genomes.txt
+    trackDb.txt
     chrom.sizes
-    <genome>/
-      trackDb.txt
-      bb/<model>.fire-fibers.bb
-      bb/<model>.fire-fiber-decorators.bb
+    bb/<model>.fire-fibers.bb
+    bb/<model>.fire-fiber-decorators.bb
 """
 import argparse
 import shutil
@@ -78,19 +70,13 @@ def main():
     ap.add_argument("--long-label", required=True)
     ap.add_argument("--email", required=True)
     ap.add_argument("--genome", required=True)
-    ap.add_argument(
-        "--models",
-        nargs="+",
-        required=True,
-        help="Model names to include. 'baseline' is treated specially.",
-    )
-    ap.add_argument("--results-root", required=True, help="e.g. results/models")
-    ap.add_argument("--chrom-sizes", required=True, help="2-col chrom.sizes file")
+    ap.add_argument("--models", nargs="+", required=True)
+    ap.add_argument("--results-root", required=True)
+    ap.add_argument("--chrom-sizes", required=True)
     args = ap.parse_args()
 
     hub = Path(args.hub_dir)
-    gdir = hub / args.genome
-    (gdir / "bb").mkdir(parents=True, exist_ok=True)
+    (hub / "bb").mkdir(parents=True, exist_ok=True)
 
     shutil.copyfile(args.chrom_sizes, hub / "chrom.sizes")
 
@@ -103,10 +89,9 @@ def main():
     )
     (hub / "genomes.txt").write_text(
         f"genome {args.genome}\n"
-        f"trackDb {args.genome}/trackDb.txt\n"
+        f"trackDb trackDb.txt\n"
     )
 
-    # Always render baseline first so it sits at the top of the trackhub.
     ordered = (["baseline"] if "baseline" in args.models else []) + [
         m for m in args.models if m != "baseline"
     ]
@@ -116,15 +101,13 @@ def main():
     palette_idx = 0
     for model in ordered:
         for name in ("fire-fibers.bb", "fire-fiber-decorators.bb"):
-            shutil.copyfile(root / model / name, gdir / "bb" / f"{model}.{name}")
+            shutil.copyfile(root / model / name, hub / "bb" / f"{model}.{name}")
         is_baseline = model == "baseline"
         blocks.append(render_block(model, is_baseline, palette_idx))
         if not is_baseline:
             palette_idx += 1
 
-    (gdir / "trackDb.txt").write_text("\n".join(blocks))
-    # convenience copy at top level (snakemake output path expects it here)
-    shutil.copyfile(gdir / "trackDb.txt", hub / "trackDb.txt")
+    (hub / "trackDb.txt").write_text("\n".join(blocks))
 
 
 if __name__ == "__main__":

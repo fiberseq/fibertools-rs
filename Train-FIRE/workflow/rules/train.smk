@@ -4,7 +4,7 @@ rule train_model:
         training="results/experiments/{exp}/training-data.bed.gz",
     output:
         gbdt="results/experiments/{exp}/FIRE.gbdt.json",
-        xgb="results/experiments/{exp}/FIRE.xgb.bin",
+        xgb="results/experiments/{exp}/FIRE.xgb.json",
         conf="results/experiments/{exp}/FIRE.conf.json",
         fdr_pdf="results/experiments/{exp}/FIRE.FDR.pdf",
         feat_pdf="results/experiments/{exp}/FIRE.feature.importance.pdf",
@@ -39,7 +39,12 @@ rule train_model:
           --max-depth-grid "{params.p[max_depth]}" \
           --min-child-weight-fracs "{params.p[min_child_weight_fracs]}" \
           --colsample-bytree-grid "{params.p[colsample_bytree]}" \
-          --gamma-grid "{params.p[gamma]}"
+          --gamma-grid "{params.p[gamma]}" \
+          --learning-rate-grid "{params.p[learning_rate]}" \
+          --early-stopping-rounds {params.p[early_stopping_rounds]} \
+          --early-stopping-val-frac {params.p[early_stopping_val_frac]} \
+          --mokapot-max-iter {params.p[mokapot_max_iter]} \
+          $( [ "{params.p[balance_train]}" = "True" ] && echo --balance-train || echo --no-balance-train )
         """
 
 

@@ -48,6 +48,14 @@ train_defaults:
   min_child_weight_fracs: [0.001, 0.005]
   colsample_bytree: [0.5, 1.0]
   gamma: [1]
+  # Lower eta + more trees + early stopping generally improves model quality.
+  # Defaults preserve legacy behavior (eta=0.3, no early stopping, balanced train,
+  # mokapot max_iter=15). Override per-experiment to opt in.
+  learning_rate: [0.3]
+  early_stopping_rounds: 0          # >0 enables early stopping against a held-out val split
+  early_stopping_val_frac: 0.15     # fraction of train held out for the ES val set
+  balance_train: true               # downsample majority class in train; set false to let scale_pos_weight handle imbalance
+  mokapot_max_iter: 15              # number of mokapot iterative refit rounds
 
 # Trackhub metadata
 trackhub:
@@ -117,3 +125,33 @@ experiments:
       min_child_weight_fracs: [0.005, 0.02]
       colsample_bytree: [0.5, 0.75]
       gamma: [5, 10]
+
+  # Slow-learn grid: low eta with a large n_estimators cap, early stopping
+  # picks the actual tree count per fold.
+  slow_learn_es:
+    positive_beds: *POSITIVES
+    negative_exclude_beds: *NEG_EXCL
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05, 0.1]
+      early_stopping_rounds: 50
+
+  # Keep all training data (no balance downsample) and give mokapot more
+  # refit iterations. scale_pos_weight handles class imbalance inside XGBoost.
+  full_data_long_mokapot:
+    positive_beds: *POSITIVES
+    negative_exclude_beds: *NEG_EXCL
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05]
+      early_stopping_rounds: 50
+      balance_train: false
+      mokapot_max_iter: 30

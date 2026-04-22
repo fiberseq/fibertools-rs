@@ -18,8 +18,6 @@ import ast
 import json
 import logging
 import os
-import struct
-import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -30,12 +28,36 @@ import mokapot
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, train_test_split
 from xgboost import XGBClassifier
 
 
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
+
+
+class XGBEarlyStop(XGBClassifier):
+    """XGBClassifier that holds out an internal validation split for early stopping.
+
+    mokapot calls estimator.fit(X, y) without an eval_set, and GridSearchCV
+    clones the estimator per fold, so we carve the val split off inside fit().
+    """
+
+    def __init__(self, *, val_frac=0.15, **kwargs):
+        super().__init__(**kwargs)
+        self.val_frac = val_frac
+
+    def fit(self, X, y, **kwargs):
+        stratify = y if len(np.unique(y)) > 1 else None
+        Xt, Xv, yt, yv = train_test_split(
+            X, y,
+            test_size=self.val_frac,
+            stratify=stratify,
+            random_state=RANDOM_SEED,
+        )
+        kwargs.pop("eval_set", None)
+        kwargs.pop("verbose", None)
+        return super().fit(Xt, yt, eval_set=[(Xv, yv)], verbose=False, **kwargs)
 
 
 def parse_list(s: str, cast=float) -> List:
@@ -51,29 +73,17 @@ def parse_list(s: str, cast=float) -> List:
 
 
 def convert_to_gbdt(input_model: str, output_file: str) -> int:
-    model = xgb.Booster()
-    model.load_model(input_model)
-    tmp_file = output_file + ".gbdt_rs.mid"
-    try:
-        with open(input_model, "rb") as f:
-            model_format = struct.unpack("cccc", f.read(4))
-            model_format = b"".join(model_format)
-            if model_format == b"bs64":
-                raise RuntimeError("bs64 model format not supported")
-            elif model_format != b"binf":
-                f.seek(0)
-            base_score = struct.unpack("f", f.read(4))[0]
-    except Exception as e:
-        logging.error(f"Reading base_score failed: {e}")
-        return 1
-
-    if os.path.exists(tmp_file):
-        os.remove(tmp_file)
-    model.dump_model(tmp_file, dump_format="json")
-    with open(output_file, "w") as f:
-        f.write(repr(base_score) + "\n")
-        with open(tmp_file) as f2:
-            f.write(f2.read())
+    """Convert an xgboost model to the JSON format fibertools-rs reads (base_score + tree dump)."""
+    booster = xgb.Booster()
+    booster.load_model(input_model)
+    config = json.loads(booster.save_config())
+    base_score = float(config["learner"]["learner_model_param"]["base_score"])
+    tmp_file = output_file + ".mid"
+    booster.dump_model(tmp_file, dump_format="json")
+    with open(output_file, "w") as out:
+        out.write(repr(base_score) + "\n")
+        with open(tmp_file) as f:
+            out.write(f.read())
     os.remove(tmp_file)
     return 0
 
@@ -97,8 +107,8 @@ def save_model(model, test_conf, outdir: Path, max_fdr: float) -> dict:
         .reset_index(drop=True)
     )
 
-    model.estimator.save_model(str(outdir / "FIRE.xgb.bin"))
-    convert_to_gbdt(str(outdir / "FIRE.xgb.bin"), str(outdir / "FIRE.gbdt.json"))
+    model.estimator.save_model(str(outdir / "FIRE.xgb.json"))
+    convert_to_gbdt(str(outdir / "FIRE.xgb.json"), str(outdir / "FIRE.gbdt.json"))
     (outdir / "FIRE.conf.json").write_text(simple.to_json(orient="split", index=False))
 
     model.estimator.get_booster().feature_names = model.features
@@ -125,6 +135,25 @@ def save_model(model, test_conf, outdir: Path, max_fdr: float) -> dict:
     }
 
 
+def _make_xgb(args, scale_pos_weight, n_jobs, **fixed):
+    """Build a single XGB estimator, wrapping with early-stopping if enabled."""
+    common = dict(
+        use_label_encoder=False,
+        eval_metric="auc",
+        scale_pos_weight=scale_pos_weight,
+        seed=RANDOM_SEED,
+        n_jobs=n_jobs,
+    )
+    common.update(fixed)
+    if args.early_stopping_rounds > 0:
+        return XGBEarlyStop(
+            val_frac=args.early_stopping_val_frac,
+            early_stopping_rounds=args.early_stopping_rounds,
+            **common,
+        )
+    return XGBClassifier(**common)
+
+
 def train_classifier(train_df, test_df, args, scale_pos_weight):
     if args.grid_search:
         mcw = (len(train_df) * np.array(args.min_child_weight_fracs)).astype(int)
@@ -135,14 +164,10 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
             "min_child_weight": mcw.tolist(),
             "colsample_bytree": args.colsample_bytree_grid,
             "gamma": args.gamma_grid,
+            "learning_rate": args.learning_rate_grid,
         }
         xgb_model = GridSearchCV(
-            XGBClassifier(
-                use_label_encoder=False,
-                eval_metric="auc",
-                seed=RANDOM_SEED,
-                n_jobs=args.inner_jobs,
-            ),
+            _make_xgb(args, scale_pos_weight, n_jobs=args.inner_jobs),
             param_grid=grid,
             cv=5,
             scoring="roc_auc",
@@ -151,17 +176,16 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
         )
     else:
         # no grid search -> give all threads to XGBoost
-        xgb_model = XGBClassifier(
-            use_label_encoder=False,
-            eval_metric="auc",
+        xgb_model = _make_xgb(
+            args,
+            scale_pos_weight,
+            n_jobs=args.outer_jobs * args.inner_jobs,
             n_estimators=args.n_estimators_grid[0],
             max_depth=args.max_depth_grid[0],
             min_child_weight=int(len(train_df) * args.min_child_weight_fracs[0]),
             gamma=args.gamma_grid[0],
             colsample_bytree=args.colsample_bytree_grid[0],
-            scale_pos_weight=scale_pos_weight,
-            seed=RANDOM_SEED,
-            n_jobs=args.outer_jobs * args.inner_jobs,
+            learning_rate=args.learning_rate_grid[0],
         )
 
     train_psms = mokapot.read_pin(train_df)
@@ -170,7 +194,7 @@ def train_classifier(train_df, test_df, args, scale_pos_weight):
         train_fdr=args.train_fdr,
         subset_max_train=args.subset_max_train,
         direction=args.direction,
-        max_iter=15,
+        max_iter=args.mokapot_max_iter,
     )
     model.fit(train_psms)
     test_psms = mokapot.read_pin(test_df)
@@ -208,7 +232,8 @@ def read_features(infile, args):
     train = train[
         (train.msp_len >= args.min_msp_length_for_positive_fire_call) | (train.Label == 1)
     ]
-    return balance_df(train), balance_df(test)
+    train_out = balance_df(train) if args.balance_train else train.reset_index(drop=True)
+    return train_out, balance_df(test)
 
 
 def main():
@@ -239,6 +264,13 @@ def main():
     ap.add_argument("--min-child-weight-fracs", default="[0.001, 0.005]")
     ap.add_argument("--colsample-bytree-grid", default="[0.5, 1.0]")
     ap.add_argument("--gamma-grid", default="[1]")
+    ap.add_argument("--learning-rate-grid", default="[0.3]")
+    ap.add_argument("--early-stopping-rounds", type=int, default=0,
+                    help="0 disables. >0 holds out --early-stopping-val-frac for early stopping.")
+    ap.add_argument("--early-stopping-val-frac", type=float, default=0.15)
+    ap.add_argument("--mokapot-max-iter", type=int, default=15)
+    ap.add_argument("--balance-train", action=argparse.BooleanOptionalAction, default=True,
+                    help="Downsample majority class in the training set. --no-balance-train keeps all rows.")
     args = ap.parse_args()
 
     args.n_estimators_grid = parse_list(args.n_estimators_grid, int)
@@ -246,6 +278,7 @@ def main():
     args.min_child_weight_fracs = parse_list(args.min_child_weight_fracs, float)
     args.colsample_bytree_grid = parse_list(args.colsample_bytree_grid, float)
     args.gamma_grid = parse_list(args.gamma_grid, float)
+    args.learning_rate_grid = parse_list(args.learning_rate_grid, float)
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -277,6 +310,11 @@ def main():
             grid_search=bool(args.grid_search),
             outer_jobs=int(args.outer_jobs),
             inner_jobs=int(args.inner_jobs),
+            early_stopping_rounds=int(args.early_stopping_rounds),
+            early_stopping_val_frac=float(args.early_stopping_val_frac),
+            mokapot_max_iter=int(args.mokapot_max_iter),
+            balance_train=bool(args.balance_train),
+            learning_rate_grid=args.learning_rate_grid,
         )
     )
     if args.grid_search and hasattr(model.estimator, "best_params_"):
