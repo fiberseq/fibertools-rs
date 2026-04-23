@@ -44,9 +44,22 @@ impl FiberAnnotations {
     /// starts and ends are [) intervals.
     pub fn new(
         record: &bam::Record,
+        forward_starts: Vec<i64>,
+        forward_ends: Option<Vec<i64>>,
+        lengths: Option<Vec<i64>>,
+    ) -> Self {
+        Self::new_with_extras(record, forward_starts, forward_ends, lengths, None)
+    }
+
+    /// Same as [`FiberAnnotations::new`], but also accepts forward-order
+    /// `extras` that get carried through the flip and sort so each
+    /// annotation keeps its original extra_columns.
+    pub fn new_with_extras(
+        record: &bam::Record,
         mut forward_starts: Vec<i64>,
         forward_ends: Option<Vec<i64>>,
         mut lengths: Option<Vec<i64>>,
+        mut forward_extras: Option<Vec<Option<Vec<String>>>>,
     ) -> Self {
         let mut single_bp_liftover = false;
         // assume ends == starts if not provided
@@ -72,6 +85,13 @@ impl FiberAnnotations {
         // get positions and lengths in reference orientation
         Self::positions_on_aligned_sequence(&mut forward_starts, is_reverse, seq_len);
         Self::positions_on_aligned_sequence(&mut forward_ends_inclusive, is_reverse, seq_len);
+        // Mirror the array reversal that positions_on_aligned_sequence applied
+        // so extras stay paired with their original peak.
+        if is_reverse {
+            if let Some(ref mut e) = forward_extras {
+                e.reverse();
+            }
+        }
         let mut starts = forward_starts;
         let mut ends = forward_ends_inclusive;
 
@@ -106,6 +126,22 @@ impl FiberAnnotations {
             panic!("Failed to lift query range: {}", e);
         });
 
+        // Normalize extras into a Vec matching the other parallel vectors so
+        // it can be zipped in and move with the annotation through the sort.
+        let extras_iter: Vec<Option<Vec<String>>> = match forward_extras {
+            Some(e) => {
+                assert_eq!(
+                    e.len(),
+                    starts.len(),
+                    "extras length ({}) must match annotation count ({})",
+                    e.len(),
+                    starts.len(),
+                );
+                e
+            }
+            None => vec![None; starts.len()],
+        };
+
         // create annotations from parallel vectors
         let mut annotations: Vec<FiberAnnotation> = starts
             .into_iter()
@@ -114,21 +150,26 @@ impl FiberAnnotations {
             .zip(reference_starts)
             .zip(reference_ends)
             .zip(reference_lengths)
+            .zip(extras_iter)
             .map(
-                |(((((start, end), length), ref_start), ref_end), ref_length)| FiberAnnotation {
-                    start,
-                    end,
-                    length: length.unwrap_or(end - start),
-                    qual: 0,
-                    reference_start: ref_start,
-                    reference_end: ref_end,
-                    reference_length: ref_length,
-                    extra_columns: None,
+                |((((((start, end), length), ref_start), ref_end), ref_length), extra)| {
+                    FiberAnnotation {
+                        start,
+                        end,
+                        length: length.unwrap_or(end - start),
+                        qual: 0,
+                        reference_start: ref_start,
+                        reference_end: ref_end,
+                        reference_length: ref_length,
+                        extra_columns: extra,
+                    }
                 },
             )
             .collect();
 
-        // Sort annotations by start position to ensure they are always in order
+        // Sort annotations by start position to ensure they are always in
+        // order. `sort_by_key` is stable, so extras stay paired with their
+        // annotation even when multiple peaks share a start.
         annotations.sort_by_key(|a| a.start);
 
         // return object
@@ -418,42 +459,47 @@ impl FiberAnnotations {
                 let forward_starts: Vec<i64> = start_values.iter().map(|&x| x as i64).collect();
                 let lengths: Vec<i64> = length_values.iter().map(|&x| x as i64).collect();
 
-                // Get annotation tag for extra columns if specified
-                let annotation_values = if let Some(ann_tag) = annotation_tag {
-                    if let Ok(rust_htslib::bam::record::Aux::String(ann_string)) =
-                        record.aux(ann_tag)
-                    {
-                        Some(ann_string.split('|').collect::<Vec<_>>())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+                // Get annotation tag for extra columns if specified. Convert
+                // directly to the forward-order shape `FiberAnnotations` expects
+                // so extras travel through the flip+sort paired with their peak.
+                let forward_extras: Option<Vec<Option<Vec<String>>>> = match annotation_tag {
+                    Some(ann_tag) => match record.aux(ann_tag) {
+                        Ok(rust_htslib::bam::record::Aux::String(ann_string)) => {
+                            let parts: Vec<Option<Vec<String>>> = ann_string
+                                .split('|')
+                                .map(|s| {
+                                    if s.is_empty() {
+                                        None
+                                    } else {
+                                        Some(s.split(';').map(|t| t.to_string()).collect())
+                                    }
+                                })
+                                .collect();
+                            if parts.len() != forward_starts.len() {
+                                return Err(anyhow::anyhow!(
+                                    "Mismatched {} ({}) and {} ({}) array lengths",
+                                    String::from_utf8_lossy(
+                                        annotation_tag.expect("ann_tag is Some here")
+                                    ),
+                                    parts.len(),
+                                    String::from_utf8_lossy(start_tag),
+                                    forward_starts.len(),
+                                ));
+                            }
+                            Some(parts)
+                        }
+                        _ => None,
+                    },
+                    None => None,
                 };
 
-                // Use the existing FiberAnnotations::new method
-                let mut fiber_annotations = FiberAnnotations::new(
+                let fiber_annotations = FiberAnnotations::new_with_extras(
                     record,
                     forward_starts,
                     None,          // no ends provided
                     Some(lengths), // use lengths from fl tag
+                    forward_extras,
                 );
-
-                // Add extra columns to the annotations if present.
-                // FiberAnnotations::new already reversed starts/lengths on reverse-strand reads
-                // (fs/fl are flipped+array-reversed into aligned order), so fa must be reversed
-                // too to keep extras paired with their original peak.
-                if let Some(mut ann_vals) = annotation_values {
-                    if record.is_reverse() {
-                        ann_vals.reverse();
-                    }
-                    for (i, annotation) in fiber_annotations.annotations.iter_mut().enumerate() {
-                        if i < ann_vals.len() && !ann_vals[i].is_empty() {
-                            annotation.extra_columns =
-                                Some(ann_vals[i].split(';').map(|s| s.to_string()).collect());
-                        }
-                    }
-                }
 
                 Ok(Some(fiber_annotations))
             } else {
