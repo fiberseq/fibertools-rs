@@ -549,17 +549,23 @@ where
     type Item = FiberseqData;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // if we are out of data check for another chunk in the bam
-        if self.cur_chunk.is_empty() {
-            match self.bam_chunk.next() {
-                Some(recs) => {
-                    self.cur_chunk = FiberseqData::from_records(recs, &self.header, &self.filters);
-                    // we will be popping from this list so we want to remove the first element first, not the last
-                    self.cur_chunk.reverse();
+        loop {
+            // if we are out of data check for another chunk in the bam
+            if self.cur_chunk.is_empty() {
+                match self.bam_chunk.next() {
+                    Some(recs) => {
+                        self.cur_chunk =
+                            FiberseqData::from_records(recs, &self.header, &self.filters);
+                        // we will be popping from this list so we want to remove the first element first, not the last
+                        self.cur_chunk.reverse();
+                    }
+                    None => return None,
                 }
-                None => return None,
+            }
+            let rec = self.cur_chunk.pop()?;
+            if self.filters.passes_fire_filter(&rec) {
+                return Some(rec);
             }
         }
-        self.cur_chunk.pop()
     }
 }

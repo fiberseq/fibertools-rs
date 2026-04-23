@@ -32,10 +32,6 @@ pub struct FireTrackOptions {
     pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
     pub rolling_max: Option<usize>,
     pub track_fire_elements: bool, // If true, store individual FIRE element positions per base
-    /// FIRE fiber-level filters. When any is active the fiber is dropped from
-    /// every count (coverage, fire_coverage, msp/nuc/m6a/cpg) so that pileup
-    /// output reflects "what FIRE peak-calling would see" by default.
-    pub fire_filters: crate::utils::fire::FireFiberFilters,
 }
 
 impl From<&PileupOptions> for FireTrackOptions {
@@ -51,7 +47,6 @@ impl From<&PileupOptions> for FireTrackOptions {
             shuffle_seed: None,
             rolling_max: opts.rolling_max,
             track_fire_elements: false, // Default to false for pileup command
-            fire_filters: opts.fire_filters(),
         }
     }
 }
@@ -368,13 +363,6 @@ impl<'a> FireTrack<'a> {
     }
 
     pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
-        // FIRE-style fiber-level filters: drop the entire fiber from every
-        // pileup count (coverage denominator included) if it would not have
-        // survived FIRE peak-calling's filters.
-        if !self.fire_track_opts.fire_filters.passes(fiber) {
-            return;
-        }
-
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
         if self.fire_track_opts.fiber_coverage

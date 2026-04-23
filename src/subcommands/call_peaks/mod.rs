@@ -138,7 +138,6 @@ fn process_chromosome_pileup_both(
         shuffle_seed: None,
         rolling_max: None,
         track_fire_elements: false, // No tracking needed for FDR calculation
-        fire_filters: opts.fire_filters(),
     };
     let mut real_track = FireTrack::new(chrom.to_string(), 0, chrom_len as usize, real_opts, &None);
 
@@ -196,7 +195,6 @@ fn process_chromosome_pileup_both(
         shuffle_seed: None,
         rolling_max: None,
         track_fire_elements: false, // No tracking needed for FDR calculation
-        fire_filters: opts.fire_filters(),
     };
     let mut shuffled_track = FireTrack::new(
         chrom.to_string(),

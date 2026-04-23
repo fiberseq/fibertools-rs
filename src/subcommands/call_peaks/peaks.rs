@@ -672,7 +672,6 @@ pub fn call_peaks(
                 shuffle_seed: None,
                 rolling_max: Some(opts.window_size),
                 track_fire_elements: true, // Enable FIRE element tracking for peak calling
-                fire_filters: opts.fire_filters(),
             },
             rolling_max: Some(opts.window_size),
             haps: false,

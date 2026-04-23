@@ -52,6 +52,43 @@ pub struct FiberFilters {
         hide = true
     )]
     pub strip_starting_basemods: i64,
+    /// Convenience: apply the FIRE peak-calling pipeline's fiber-level filters
+    /// (`--skip-no-m6a`, `--min-msp 10`, `--min-ave-msp-size 10`). Individual
+    /// filter flags still override when both are set. Requires MSP/m6A
+    /// annotations on the input BAM, so it is a no-op for commands that run
+    /// before those annotations exist.
+    #[clap(global = true, long, help_heading = "FIRE-Filter")]
+    pub fire_filter: bool,
+    /// Drop fibers with no m6A calls. Off by default;
+    /// `--fire-filter` turns this on unless explicitly set to `false`.
+    /// Use `--skip-no-m6a=false` to override when `--fire-filter` is set.
+    #[clap(
+        global = true,
+        long,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        require_equals = true,
+        help_heading = "FIRE-Filter"
+    )]
+    pub skip_no_m6a: Option<bool>,
+    /// Drop fibers with fewer than `N` MSP calls.
+    /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
+    #[clap(
+        global = true,
+        long,
+        env = "MIN_MSP",
+        help_heading = "FIRE-Filter"
+    )]
+    pub min_msp: Option<usize>,
+    /// Drop fibers whose average MSP size is below `N`.
+    /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
+    #[clap(
+        global = true,
+        long,
+        env = "MIN_AVE_MSP_SIZE",
+        help_heading = "FIRE-Filter"
+    )]
+    pub min_ave_msp_size: Option<i64>,
 }
 
 impl std::default::Default for FiberFilters {
@@ -62,6 +99,10 @@ impl std::default::Default for FiberFilters {
             filter_expression: None,
             uncompressed: false,
             strip_starting_basemods: 0,
+            fire_filter: false,
+            skip_no_m6a: None,
+            min_msp: None,
+            min_ave_msp_size: None,
         }
     }
 }
@@ -70,6 +111,51 @@ impl FiberFilters {
     /// Get the bit flag value, using a default if not explicitly set
     pub fn get_bit_flag(&self) -> u16 {
         self.bit_flag.unwrap_or(0)
+    }
+
+    /// Resolved `--skip-no-m6a`, using `--fire-filter` as the fallback.
+    pub fn resolved_skip_no_m6a(&self) -> bool {
+        self.skip_no_m6a.unwrap_or(self.fire_filter)
+    }
+
+    /// Resolved `--min-msp`, using `--fire-filter` (10) as the fallback.
+    pub fn resolved_min_msp(&self) -> usize {
+        self.min_msp
+            .unwrap_or(if self.fire_filter { 10 } else { 0 })
+    }
+
+    /// Resolved `--min-ave-msp-size`, using `--fire-filter` (10) as the fallback.
+    pub fn resolved_min_ave_msp_size(&self) -> i64 {
+        self.min_ave_msp_size
+            .unwrap_or(if self.fire_filter { 10 } else { 0 })
+    }
+
+    /// True if any FIRE fiber-level filter is active.
+    pub fn fire_filter_active(&self) -> bool {
+        self.resolved_skip_no_m6a()
+            || self.resolved_min_msp() > 0
+            || self.resolved_min_ave_msp_size() > 0
+    }
+
+    /// True if `rec` passes the FIRE fiber-level filters (skip_no_m6a,
+    /// min_msp, min_ave_msp_size). Called by `FiberseqRecords::next` so
+    /// every downstream consumer sees only filtered fibers.
+    pub fn passes_fire_filter(&self, rec: &crate::fiber::FiberseqData) -> bool {
+        if !self.fire_filter_active() {
+            return true;
+        }
+        let n_msps = rec.msp.annotations.len();
+        if rec.m6a.annotations.is_empty() || n_msps == 0 {
+            return false;
+        }
+        if n_msps < self.resolved_min_msp() {
+            return false;
+        }
+        let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
+        if ave_msp_size < self.resolved_min_ave_msp_size() {
+            return false;
+        }
+        true
     }
 
     /// This function accepts an iterator over bam records and filters them based on the bit flag.
