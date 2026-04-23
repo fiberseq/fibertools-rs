@@ -478,9 +478,7 @@ impl FiberAnnotations {
                             if parts.len() != forward_starts.len() {
                                 return Err(anyhow::anyhow!(
                                     "Mismatched {} ({}) and {} ({}) array lengths",
-                                    String::from_utf8_lossy(
-                                        annotation_tag.expect("ann_tag is Some here")
-                                    ),
+                                    String::from_utf8_lossy(ann_tag),
                                     parts.len(),
                                     String::from_utf8_lossy(start_tag),
                                     forward_starts.len(),
