@@ -89,4 +89,30 @@ pub struct CallPeaksOptions {
     /// Minimum FIRE coverage required to calculate a score (default: 4)
     #[clap(long, default_value = "4", hide = true)]
     pub min_fire_coverage: i32,
+
+    /// Drop fibers with no m6A calls (matches `ft fire` behavior).
+    /// Default is `true` to match the FIRE peak-calling pipeline.
+    /// Pass `--skip-no-m6a false` to disable.
+    #[clap(long, default_value_t = true, action = clap::ArgAction::Set)]
+    pub skip_no_m6a: bool,
+
+    /// Drop fibers with fewer than `N` MSP calls (matches `ft fire`).
+    /// Default is 10 to match the FIRE peak-calling pipeline.
+    #[clap(long, default_value = "10")]
+    pub min_msp: usize,
+
+    /// Drop fibers whose average MSP size is below `N` (matches `ft fire`).
+    /// Default is 10 to match the FIRE peak-calling pipeline.
+    #[clap(long, default_value = "10")]
+    pub min_ave_msp_size: i64,
+}
+
+impl CallPeaksOptions {
+    pub fn fire_filters(&self) -> crate::utils::fire::FireFiberFilters {
+        crate::utils::fire::FireFiberFilters {
+            skip_no_m6a: self.skip_no_m6a,
+            min_msp: self.min_msp,
+            min_ave_msp_size: self.min_ave_msp_size,
+        }
+    }
 }

@@ -119,6 +119,57 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
     (weighted_rle, *median as f32)
 }
 
+/// Fiber-level filters used by `ft fire`, `ft pileup`, and `ft call-peaks`
+/// to decide whether a single fiberseq read should contribute to downstream
+/// signal. Kept as one struct so the FIRE pipeline's semantics stay consistent
+/// across the three subcommands.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FireFiberFilters {
+    pub skip_no_m6a: bool,
+    pub min_msp: usize,
+    pub min_ave_msp_size: i64,
+}
+
+impl FireFiberFilters {
+    /// True if any filter is actually active. Lets callers skip the per-read
+    /// work when the struct is all-default.
+    pub fn is_active(&self) -> bool {
+        self.skip_no_m6a || self.min_msp > 0 || self.min_ave_msp_size > 0
+    }
+
+    /// Returns the filter category a fiber fails, or `None` if it passes.
+    /// Callers that want to report per-category counts use this; callers that
+    /// just want a boolean can use [`Self::passes`].
+    pub fn fail_reason(&self, rec: &FiberseqData) -> Option<FireFilterFail> {
+        if !self.is_active() {
+            return None;
+        }
+        let n_msps = rec.msp.annotations.len();
+        if rec.m6a.annotations.is_empty() || n_msps == 0 {
+            return Some(FireFilterFail::NoM6a);
+        }
+        if n_msps < self.min_msp {
+            return Some(FireFilterFail::FewMsps);
+        }
+        let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
+        if ave_msp_size < self.min_ave_msp_size {
+            return Some(FireFilterFail::AveMspSize);
+        }
+        None
+    }
+
+    pub fn passes(&self, rec: &FiberseqData) -> bool {
+        self.fail_reason(rec).is_none()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FireFilterFail {
+    NoM6a,
+    FewMsps,
+    AveMspSize,
+}
+
 const FEATS_IN_USE: [&str; 3] = [
     "m6a_count",
     //"at_count",
