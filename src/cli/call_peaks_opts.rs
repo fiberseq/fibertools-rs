@@ -90,29 +90,38 @@ pub struct CallPeaksOptions {
     #[clap(long, default_value = "4", hide = true)]
     pub min_fire_coverage: i32,
 
-    /// Drop fibers with no m6A calls (matches `ft fire` behavior).
-    /// Default is `true` to match the FIRE peak-calling pipeline.
-    /// Pass `--skip-no-m6a false` to disable.
-    #[clap(long, default_value_t = true, action = clap::ArgAction::Set)]
-    pub skip_no_m6a: bool,
+    /// Convenience: apply the FIRE peak-calling pipeline's fiber-level filters
+    /// (`--skip-no-m6a`, `--min-msp 10`, `--min-ave-msp-size 10`). Individual
+    /// filter flags still override when both are set.
+    #[clap(long)]
+    pub fire_filter: bool,
+
+    /// Drop fibers with no m6A calls (matches `ft fire` behavior). Off by default;
+    /// `--fire-filter` turns this on unless explicitly set to `false`.
+    #[clap(long)]
+    pub skip_no_m6a: Option<bool>,
 
     /// Drop fibers with fewer than `N` MSP calls (matches `ft fire`).
-    /// Default is 10 to match the FIRE peak-calling pipeline.
-    #[clap(long, default_value = "10")]
-    pub min_msp: usize,
+    /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
+    #[clap(long)]
+    pub min_msp: Option<usize>,
 
     /// Drop fibers whose average MSP size is below `N` (matches `ft fire`).
-    /// Default is 10 to match the FIRE peak-calling pipeline.
-    #[clap(long, default_value = "10")]
-    pub min_ave_msp_size: i64,
+    /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
+    #[clap(long)]
+    pub min_ave_msp_size: Option<i64>,
 }
 
 impl CallPeaksOptions {
     pub fn fire_filters(&self) -> crate::utils::fire::FireFiberFilters {
         crate::utils::fire::FireFiberFilters {
-            skip_no_m6a: self.skip_no_m6a,
-            min_msp: self.min_msp,
-            min_ave_msp_size: self.min_ave_msp_size,
+            skip_no_m6a: self.skip_no_m6a.unwrap_or(self.fire_filter),
+            min_msp: self
+                .min_msp
+                .unwrap_or(if self.fire_filter { 10 } else { 0 }),
+            min_ave_msp_size: self
+                .min_ave_msp_size
+                .unwrap_or(if self.fire_filter { 10 } else { 0 }),
         }
     }
 }
