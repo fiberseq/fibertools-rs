@@ -45,12 +45,16 @@ fn main() {
     // Generate the model code and state file from the ONNX file.
     use burn_import::onnx::ModelGen;
     use burn_import::onnx::RecordType;
-    for x in &[
+    let onnx_models = [
         "src/m6a_burn/two_zero.onnx",
         "src/m6a_burn/two_two.onnx",
         "src/m6a_burn/three_two.onnx",
         "src/m6a_burn/revio.onnx",
-    ] {
+    ];
+    for x in &onnx_models {
+        println!("cargo:rerun-if-changed={}", x);
+    }
+    for x in &onnx_models {
         ModelGen::new()
             .input(x) // Path to the ONNX model
             .out_dir("m6a_burn/") // Directory for the generated Rust source file (under target/)
