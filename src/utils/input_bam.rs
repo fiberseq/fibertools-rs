@@ -73,12 +73,7 @@ pub struct FiberFilters {
     pub skip_no_m6a: Option<bool>,
     /// Drop fibers with fewer than `N` MSP calls.
     /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
-    #[clap(
-        global = true,
-        long,
-        env = "MIN_MSP",
-        help_heading = "FIRE-Filter"
-    )]
+    #[clap(global = true, long, env = "MIN_MSP", help_heading = "FIRE-Filter")]
     pub min_msp: Option<usize>,
     /// Drop fibers whose average MSP size is below `N`.
     /// Off (0) by default; `--fire-filter` sets this to 10 unless overridden.
