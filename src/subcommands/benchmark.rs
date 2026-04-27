@@ -29,12 +29,5 @@ pub fn run_benchmark(opts: &mut BenchmarkOptions) -> Result<()> {
         fiber_count as f64 / elapsed.as_secs_f64()
     );
 
-    println!("Fibers: {}", fiber_count);
-    println!("Time: {:.3}s", elapsed.as_secs_f64());
-    println!(
-        "Rate: {:.0} fibers/s",
-        fiber_count as f64 / elapsed.as_secs_f64()
-    );
-
     Ok(())
 }

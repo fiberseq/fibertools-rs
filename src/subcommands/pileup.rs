@@ -9,7 +9,6 @@ use crate::*;
 use anyhow::{anyhow, Ok};
 use std::collections::HashMap;
 use std::io::BufRead;
-//use polars::prelude::*;
 use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};

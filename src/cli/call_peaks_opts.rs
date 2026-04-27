@@ -47,7 +47,7 @@ pub struct CallPeaksOptions {
     pub min_fire_frac_filter: f64,
 
     /// Minimum fraction of accessible bases in peak
-    #[clap(long, default_value = "0.0")]
+    #[clap(long, default_value = "0.0", hide = true)]
     pub min_frac_accessible: f64,
 
     /// Rolling window size for finding local maxima (in base pairs)
