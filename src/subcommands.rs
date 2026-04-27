@@ -1,5 +1,9 @@
 /// Add nucleosomes to a bam file
 pub mod add_nucleosomes;
+/// Benchmark fiber iterator performance
+pub mod benchmark;
+/// Call FIRE peaks using FDR-based peak calling
+pub mod call_peaks;
 /// Center fiberseq information around a reference position
 pub mod center;
 /// Clear HiFi kinetics tags from a bam file
@@ -12,6 +16,8 @@ pub mod extract;
 /// add fire data
 pub mod fire;
 pub mod footprint;
+/// create mock BAM with FIRE elements
+pub mod mock_fire;
 /// make a fire track from a bam file
 pub mod pileup;
 /// m6A prediction

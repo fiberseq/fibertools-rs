@@ -62,45 +62,15 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
     else {
         let mut out = fire_opts.input.bam_writer(&fire_opts.out);
         let fibers = fire_opts.input.fibers(&mut bam);
-        let mut skip_because_no_m6a = 0;
-        let mut skip_because_num_msp = 0;
-        let mut skip_because_ave_msp_length = 0;
         for recs in &fibers.chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
                 add_fire_to_rec(r, fire_opts, &model, &precision_table);
             });
             for rec in recs {
-                let n_msps = rec.msp.annotations.len();
-                if fire_opts.skip_no_m6a || fire_opts.min_msp > 0 || fire_opts.min_ave_msp_size > 0
-                {
-                    // skip no calls
-                    if rec.m6a.annotations.is_empty() || n_msps == 0 {
-                        skip_because_no_m6a += 1;
-                        continue;
-                    }
-                    //let max_msp_len = *rec.msp.lengths.iter().flatten().max().unwrap_or(&0);
-                    if n_msps < fire_opts.min_msp {
-                        skip_because_num_msp += 1;
-                        continue;
-                    }
-                    let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
-                    if ave_msp_size < fire_opts.min_ave_msp_size {
-                        skip_because_ave_msp_length += 1;
-                        continue;
-                    }
-                }
                 out.write(&rec.record)?;
             }
         }
-        log::info!(
-                "Skipped {} records because they had an average MSP length less than {}; {} records because they had fewer than {} MSPs; and {} records because they had no m6A sites",
-                skip_because_ave_msp_length,
-                fire_opts.min_ave_msp_size,
-                skip_because_num_msp,
-                fire_opts.min_msp,
-                skip_because_no_m6a,
-            );
     }
     Ok(())
 }

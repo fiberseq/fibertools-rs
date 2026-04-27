@@ -132,6 +132,15 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::PgPansn(pg_pansn_opts)) => {
             subcommands::pg_pansn::run_pg_pansn(pg_pansn_opts)?;
         }
+        Some(Commands::CallPeaks(ref mut call_peaks_opts)) => {
+            subcommands::call_peaks::run_call_peaks(call_peaks_opts)?;
+        }
+        Some(Commands::MockFire(mock_fire_opts)) => {
+            subcommands::mock_fire::run_mock_fire(mock_fire_opts)?;
+        }
+        Some(Commands::Benchmark(benchmark_opts)) => {
+            subcommands::benchmark::run_benchmark(benchmark_opts)?;
+        }
         None => {}
     };
     let duration = pg_start.elapsed();

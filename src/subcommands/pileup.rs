@@ -7,16 +7,48 @@ use crate::utils::bamannotations;
 use crate::utils::bio_io;
 use crate::*;
 use anyhow::{anyhow, Ok};
-use std::collections::HashMap;
-use std::io::BufRead;
-//use polars::prelude::*;
 use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};
+use std::collections::HashMap;
+use std::io::BufRead;
 
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
 static WINDOW_SIZE: usize = 1_000_000;
+
+/// Options for FireTrack that don't require the full PileupOptions
+/// This allows FireTrack to be used independently
+#[derive(Debug, Clone, Default)]
+pub struct FireTrackOptions {
+    pub no_nuc: bool,
+    pub no_msp: bool,
+    pub m6a: bool,
+    pub cpg: bool,
+    pub fiber_coverage: bool,
+    pub shuffle: bool,             // Track if shuffling is enabled
+    pub random_shuffle: bool, // If true, generate random positions instead of using ShuffledFibers
+    pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
+    pub rolling_max: Option<usize>,
+    pub track_fire_elements: bool, // If true, store individual FIRE element positions per base
+}
+
+impl From<&PileupOptions> for FireTrackOptions {
+    fn from(opts: &PileupOptions) -> Self {
+        Self {
+            no_nuc: opts.no_nuc,
+            no_msp: opts.no_msp,
+            m6a: opts.m6a,
+            cpg: opts.cpg,
+            fiber_coverage: opts.effective_fiber_coverage(),
+            shuffle: opts.shuffle.is_some(),
+            random_shuffle: false, // PileupOptions doesn't have this yet
+            shuffle_seed: None,
+            rolling_max: opts.rolling_max,
+            track_fire_elements: false, // Default to false for pileup command
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct FireRow<'a> {
@@ -27,17 +59,17 @@ pub struct FireRow<'a> {
     pub msp_coverage: &'a i32,
     pub cpg_coverage: &'a i32,
     pub m6a_coverage: &'a i32,
-    pileup_opts: &'a PileupOptions,
+    fire_track_opts: &'a FireTrackOptions,
 }
 
 impl PartialEq for FireRow<'_> {
     fn eq(&self, other: &Self) -> bool {
-        let m6a = if self.pileup_opts.m6a {
+        let m6a = if self.fire_track_opts.m6a {
             self.m6a_coverage == other.m6a_coverage
         } else {
             true
         };
-        let cpg = if self.pileup_opts.cpg {
+        let cpg = if self.fire_track_opts.cpg {
             self.cpg_coverage == other.cpg_coverage
         } else {
             true
@@ -59,22 +91,23 @@ impl std::fmt::Display for FireRow<'_> {
             "\t{}\t{}\t{}",
             self.coverage, self.fire_coverage, self.score
         );
-        if !self.pileup_opts.no_nuc {
+        if !self.fire_track_opts.no_nuc {
             rtn += &format!("\t{}", self.nuc_coverage);
         }
-        if !self.pileup_opts.no_msp {
+        if !self.fire_track_opts.no_msp {
             rtn += &format!("\t{}", self.msp_coverage);
         }
-        if self.pileup_opts.m6a {
+        if self.fire_track_opts.m6a {
             rtn += &format!("\t{}", self.m6a_coverage);
         }
-        if self.pileup_opts.cpg {
+        if self.fire_track_opts.cpg {
             rtn += &format!("\t{}", self.cpg_coverage);
         }
         write!(f, "{rtn}")
     }
 }
 
+#[derive(Debug)]
 pub struct ShuffledFibers {
     pub shuffled_fiber_starts: HashMap<(String, String, i64), i64>,
 }
@@ -142,7 +175,54 @@ impl ShuffledFibers {
     }
 }
 
+/// Generate a random shuffle offset for a fiber using uniform distribution
+/// Uses deterministic PRNG seeded from fiber name + seed for reproducibility
+fn generate_random_shuffle_offset(
+    fiber: &FiberseqData,
+    chrom_len: usize,
+    seed: Option<u64>,
+) -> Option<i64> {
+    use rand::rngs::StdRng;
+    use rand::{Rng, SeedableRng};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let fiber_len = fiber.record.reference_end() - fiber.record.reference_start();
+    let original_start = fiber.record.reference_start();
+
+    // Check if fiber can fit in chromosome
+    let max_start = (chrom_len as i64 - fiber_len).max(0);
+    if max_start <= 0 {
+        return Some(0); // Fiber too long, keep at position 0
+    }
+
+    // Create deterministic seed from fiber name + optional seed
+    let mut hasher = DefaultHasher::new();
+    fiber.get_qname().hash(&mut hasher);
+    if let Some(s) = seed {
+        s.hash(&mut hasher);
+    }
+    let fiber_seed = hasher.finish();
+
+    // Use StdRng for uniform distribution
+    let mut rng = StdRng::seed_from_u64(fiber_seed);
+    let shuffled_start = rng.gen_range(0..=max_start);
+
+    // Return offset (shuffled_start - original_start)
+    Some(shuffled_start - original_start)
+}
+
+/// Represents a single FIRE element (MSP) with its genomic coordinates and unique ID
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FireElement {
+    pub start: i64,
+    pub end: i64,
+    pub id: usize, // Unique ID for this FIRE element (for tracking in merging)
+}
+
+#[derive(Debug)]
 pub struct FireTrack<'a> {
+    pub chrom: String,
     pub chrom_start: usize,
     pub chrom_end: usize,
     pub track_len: usize,
@@ -154,22 +234,40 @@ pub struct FireTrack<'a> {
     pub nuc_coverage: Vec<i32>,
     pub cpg_coverage: Vec<i32>,
     pub m6a_coverage: Vec<i32>,
-    pileup_opts: &'a PileupOptions,
+    fire_track_opts: FireTrackOptions, // Now owned, not borrowed
     shuffled_fibers: &'a Option<ShuffledFibers>,
     cur_offset: i64,
+    // Store fiber information for later shuffle generation
+    // Key: (fiber_name, original_start), Value: fiber_length
+    fibers_seen: HashMap<(String, i64), i64>,
+    // Optional: Store individual FIRE elements per position
+    // fire_elements[position] = Vec of FireElements overlapping that position
+    pub fire_elements: Option<Vec<Vec<FireElement>>>,
+    // Counter for assigning unique IDs to FIRE elements
+    next_fire_id: usize,
 }
 
 impl<'a> FireTrack<'a> {
     pub fn new(
+        chrom: String,
         chrom_start: usize,
         chrom_end: usize,
-        pileup_opts: &'a PileupOptions,
+        fire_track_opts: FireTrackOptions, // Take ownership
         shuffled_fibers: &'a Option<ShuffledFibers>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
         let raw_scores = vec![-1.0; track_len];
         let scores = vec![-1.0; track_len];
+
+        // Initialize fire_elements only if tracking is enabled
+        let fire_elements = if fire_track_opts.track_fire_elements {
+            Some(vec![Vec::new(); track_len])
+        } else {
+            None
+        };
+
         Self {
+            chrom,
             chrom_start,
             chrom_end,
             track_len,
@@ -181,13 +279,16 @@ impl<'a> FireTrack<'a> {
             nuc_coverage: vec![0; track_len],
             cpg_coverage: vec![0; track_len],
             m6a_coverage: vec![0; track_len],
-            pileup_opts,
+            fire_track_opts,
             shuffled_fibers,
             cur_offset: 0,
+            fibers_seen: HashMap::new(),
+            fire_elements,
+            next_fire_id: 0,
         }
     }
 
-    #[inline]
+    //#[inline]
     fn add_range_set(
         array: &mut [i32],
         ranges: &bamannotations::Ranges,
@@ -217,7 +318,7 @@ impl<'a> FireTrack<'a> {
     }
 
     fn fiber_start_and_end(&self, fiber: &FiberseqData) -> (i64, i64) {
-        if !self.pileup_opts.fiber_coverage {
+        if !self.fire_track_opts.fiber_coverage {
             return (
                 fiber.record.reference_start() + self.cur_offset,
                 fiber.record.reference_end() + self.cur_offset,
@@ -260,25 +361,45 @@ impl<'a> FireTrack<'a> {
         (start + self.cur_offset, end + self.cur_offset)
     }
 
-    /// inline this function
-    #[inline]
-    fn update_with_fiber(&mut self, fiber: &FiberseqData) {
+    pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
-        if self.pileup_opts.fiber_coverage
+        if self.fire_track_opts.fiber_coverage
             && fiber.msp.reference_starts().is_empty()
             && fiber.nuc.reference_starts().is_empty()
         {
             return;
         }
 
+        // Store fiber information for later shuffle generation (only for real, not shuffled)
+        if self.cur_offset == 0 && !self.fire_track_opts.shuffle {
+            let fiber_name = fiber.get_qname();
+            let original_start = fiber.record.reference_start();
+            let fiber_len = fiber.record.reference_end() - original_start;
+            self.fibers_seen
+                .insert((fiber_name, original_start), fiber_len);
+        }
+
         // find the offset if we are shuffling data
+        // Priority: 1) shuffled_fibers from file, 2) random shuffle, 3) no shuffle
         self.cur_offset = match self.shuffled_fibers {
-            Some(shuffled_fibers) => match shuffled_fibers.get_shuffle_offset(fiber) {
-                Some(offset) => offset,
-                None => return, // skip missing fiber if it is not in the shuffle
-            },
-            None => 0,
+            Some(shuffled_fibers) => {
+                // Use pre-computed shuffle from file
+                match shuffled_fibers.get_shuffle_offset(fiber) {
+                    Some(offset) => offset,
+                    None => return, // skip missing fiber if it is not in the shuffle
+                }
+            }
+            None if self.fire_track_opts.random_shuffle => {
+                // Generate random shuffle offset
+                generate_random_shuffle_offset(
+                    fiber,
+                    self.chrom_end,
+                    self.fire_track_opts.shuffle_seed,
+                )
+                .unwrap_or(0)
+            }
+            None => 0, // No shuffling
         };
 
         if self.cur_offset != 0 && self.chrom_start != 0 {
@@ -306,7 +427,25 @@ impl<'a> FireTrack<'a> {
                     if annotation.qual < MIN_FIRE_QUAL {
                         continue;
                     }
-                    let score_update = (1.0 - annotation.qual as f32 / 255.0).log10() * -50.0;
+                    // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
+                    let capped_qual = annotation.qual.min(253) as f32;
+                    let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
+
+                    // If tracking FIRE elements, create a FireElement for this MSP
+                    let fire_element = if self.fire_track_opts.track_fire_elements {
+                        let elem_start = rs + self.cur_offset;
+                        let elem_end = re + self.cur_offset;
+                        let fire_id = self.next_fire_id;
+                        self.next_fire_id += 1;
+                        Some(FireElement {
+                            start: elem_start,
+                            end: elem_end,
+                            id: fire_id,
+                        })
+                    } else {
+                        None
+                    };
+
                     for i in rs..re {
                         let pos = i + self.cur_offset - self.chrom_start as i64;
                         if pos < 0 || pos >= self.track_len as i64 {
@@ -314,6 +453,13 @@ impl<'a> FireTrack<'a> {
                         }
                         self.fire_coverage[pos as usize] += 1;
                         self.raw_scores[pos as usize] += score_update;
+
+                        // Store the FIRE element at this position if tracking is enabled
+                        if let (Some(fire_elements), Some(elem)) =
+                            (&mut self.fire_elements, fire_element)
+                        {
+                            fire_elements[pos as usize].push(elem);
+                        }
                     }
                 }
                 _ => continue,
@@ -322,16 +468,16 @@ impl<'a> FireTrack<'a> {
 
         // add other sets of data to the FireTrack depending on CLI opts
         let mut pairs = vec![];
-        if !self.pileup_opts.no_nuc {
+        if !self.fire_track_opts.no_nuc {
             pairs.push((&mut self.nuc_coverage, &fiber.nuc));
         }
-        if !self.pileup_opts.no_msp {
+        if !self.fire_track_opts.no_msp {
             pairs.push((&mut self.msp_coverage, &fiber.msp));
         }
-        if self.pileup_opts.m6a {
+        if self.fire_track_opts.m6a {
             pairs.push((&mut self.m6a_coverage, &fiber.m6a));
         }
-        if self.pileup_opts.cpg {
+        if self.fire_track_opts.cpg {
             pairs.push((&mut self.cpg_coverage, &fiber.cpg));
         }
 
@@ -340,13 +486,12 @@ impl<'a> FireTrack<'a> {
         }
     }
 
-    pub fn calculate_scores(&mut self) {
+    pub fn calculate_scores(&mut self, min_fire_coverage: Option<i32>) {
+        let min_fire_coverage = min_fire_coverage.unwrap_or(MIN_FIRE_COVERAGE);
         for i in 0..self.track_len {
             if self.fire_coverage[i] <= 0 {
                 self.scores[i] = -1.0;
-            } else if self.fire_coverage[i] < MIN_FIRE_COVERAGE
-                && self.pileup_opts.shuffle.is_none()
-            {
+            } else if self.fire_coverage[i] < min_fire_coverage && !self.fire_track_opts.shuffle {
                 // there is no minimum fire coverage if we are shuffling
                 self.scores[i] = -1.0;
             } else {
@@ -357,7 +502,7 @@ impl<'a> FireTrack<'a> {
 
     pub fn calculate_rolling_max_score(&mut self) -> Vec<f32> {
         let mut rolling_max = vec![-1.0; self.track_len];
-        let window_size = self.pileup_opts.rolling_max.unwrap();
+        let window_size = self.fire_track_opts.rolling_max.unwrap();
         let look_back = window_size / 2;
         for (i, cur_roll_max) in rolling_max.iter_mut().enumerate().take(self.track_len) {
             let start = i.saturating_sub(look_back);
@@ -383,11 +528,166 @@ impl<'a> FireTrack<'a> {
             nuc_coverage: &self.nuc_coverage[i],
             cpg_coverage: &self.cpg_coverage[i],
             m6a_coverage: &self.m6a_coverage[i],
-            pileup_opts: self.pileup_opts,
+            fire_track_opts: &self.fire_track_opts,
+        }
+    }
+
+    /// Calculate median coverage across the track
+    /// Returns (median_coverage, positions_with_coverage, positions_with_fire)
+    pub fn median_coverage(&self) -> (f64, usize) {
+        let mut coverages: Vec<i32> = self.coverage.iter().filter(|&&c| c > 0).copied().collect();
+
+        let positions_with_coverage = coverages.len();
+
+        if coverages.is_empty() {
+            return (0.0, 0);
+        }
+
+        coverages.sort_unstable();
+
+        let median = if coverages.len() % 2 == 0 {
+            let mid = coverages.len() / 2;
+            (coverages[mid - 1] as f64 + coverages[mid] as f64) / 2.0
+        } else {
+            coverages[coverages.len() / 2] as f64
+        };
+
+        (median, positions_with_coverage)
+    }
+
+    /// Calculate median and estimated standard deviation (sqrt of median for Poisson)
+    /// Returns (median, std_dev, positions_with_coverage)
+    pub fn median_and_std_coverage(&self) -> (f64, f64, usize) {
+        let (median, positions_with_coverage) = self.median_coverage();
+
+        // For sequencing data, we assume Poisson distribution where std_dev ≈ sqrt(median)
+        let std_dev = median.sqrt();
+
+        (median, std_dev, positions_with_coverage)
+    }
+
+    /// Generate a ShuffledFibers HashMap from a list of fibers
+    /// This creates random shuffled positions for each fiber within the chromosome.
+    /// Uses the FireTrack's coverage to avoid placing shuffled fibers in regions with:
+    /// - Zero coverage (always avoided)
+    /// - Coverage below min_cov (if specified)
+    /// - Coverage above max_cov (if specified)
+    ///
+    /// Will retry up to 1000 times to find a valid position.
+    pub fn generate_shuffled_positions(
+        &self,
+        seed: Option<u64>,
+        min_cov: Option<i32>,
+        max_cov: Option<i32>,
+    ) -> ShuffledFibers {
+        use rand::rngs::StdRng;
+        use rand::{Rng, SeedableRng};
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut shuffled_fiber_starts = HashMap::new();
+        let mut regenerated_count = 0;
+
+        for ((fiber, original_start), fiber_len) in &self.fibers_seen {
+            let max_start = (self.track_len as i64 - fiber_len).max(0);
+            let coverage = self.coverage[*original_start as usize];
+
+            // filter by coverage constraints before attempting to shuffle
+            let has_valid_coverage = coverage > 0
+                && min_cov.is_none_or(|min| coverage >= min)
+                && max_cov.is_none_or(|max| coverage <= max);
+            if !has_valid_coverage {
+                continue;
+            }
+
+            // Create deterministic seed from fiber name
+            let mut hasher = DefaultHasher::new();
+            fiber.hash(&mut hasher);
+            if let Some(s) = seed {
+                s.hash(&mut hasher);
+            }
+            let fiber_seed = hasher.finish();
+
+            // Generate random position, retrying up to 1000 times if coverage is invalid
+            let mut rng = StdRng::seed_from_u64(fiber_seed);
+            let mut shuffled_start = rng.gen_range(0..=max_start);
+
+            // Try up to 1000 times to find a position with valid coverage
+            let mut attempts = 0;
+            while attempts < 1000 {
+                // Check if this position has valid coverage
+                // No bounds check needed: shuffled_start is guaranteed to be in [0, max_start]
+                // where max_start = track_len - fiber_len, so it's always valid
+                let cov = self.coverage[shuffled_start as usize];
+
+                // Check coverage constraints
+                let has_valid_coverage = cov > 0
+                    && min_cov.is_none_or(|min| cov >= min)
+                    && max_cov.is_none_or(|max| cov <= max);
+
+                if has_valid_coverage {
+                    if attempts > 0 {
+                        regenerated_count += 1;
+                    }
+                    break;
+                }
+
+                // Regenerate position
+                shuffled_start = rng.gen_range(0..=max_start);
+                attempts += 1;
+            }
+
+            // Store as (chrom, fiber_name, original_start) -> shuffled_start
+            let key = (self.chrom.clone(), fiber.clone(), *original_start);
+            shuffled_fiber_starts.insert(key, shuffled_start);
+        }
+
+        log::debug!(
+            "Generated shuffle positions for {} fibers ({} regenerated for valid coverage [min={:?}, max={:?}])",
+            shuffled_fiber_starts.len(),
+            regenerated_count,
+            min_cov,
+            max_cov
+        );
+
+        ShuffledFibers {
+            shuffled_fiber_starts,
         }
     }
 }
 
+/// Options needed for FiberseqPileup
+/// This is a lightweight struct that only contains the options actually used by FiberseqPileup
+#[derive(Debug, Clone)]
+pub struct FiberseqPileupOptions {
+    /// Track options for FireTrack (coverage, marks, etc.)
+    pub fire_track_opts: FireTrackOptions,
+    /// Output rolling max of the score column over X bases
+    pub rolling_max: Option<usize>,
+    /// Include haplotype-specific tracks
+    pub haps: bool,
+    /// Write output one base at a time even if values don't change
+    pub per_base: bool,
+    /// Keep zero coverage regions
+    pub keep_zeros: bool,
+    /// Minimum FIRE coverage required to calculate a score (default: 4)
+    pub min_fire_coverage: Option<i32>,
+}
+
+impl From<&PileupOptions> for FiberseqPileupOptions {
+    fn from(opts: &PileupOptions) -> Self {
+        Self {
+            fire_track_opts: FireTrackOptions::from(opts),
+            rolling_max: opts.rolling_max,
+            haps: opts.haps,
+            per_base: opts.per_base,
+            keep_zeros: opts.keep_zeros,
+            min_fire_coverage: None, // Use default
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct FiberseqPileup<'a> {
     pub all_data: FireTrack<'a>,
     pub hap1_data: Option<FireTrack<'a>>,
@@ -398,9 +698,11 @@ pub struct FiberseqPileup<'a> {
     pub chrom_end: usize,
     pub track_len: usize,
     has_data: bool,
-    pileup_opts: &'a PileupOptions,
+    pileup_opts: FiberseqPileupOptions,
     shuffled_fibers: &'a Option<ShuffledFibers>,
-    rolling_max: Option<Vec<f32>>,
+    pub rolling_max: Option<Vec<f32>>,
+    pub fdr_scores: Option<Vec<f64>>,
+    pub region_name: Option<String>,
 }
 
 impl<'a> FiberseqPileup<'a> {
@@ -408,25 +710,48 @@ impl<'a> FiberseqPileup<'a> {
         chrom: &str,
         chrom_start: usize,
         chrom_end: usize,
-        pileup_opts: &'a PileupOptions,
+        pileup_opts: FiberseqPileupOptions,
         shuffled_fibers: &'a Option<ShuffledFibers>,
+        region_name: Option<String>,
     ) -> Self {
         let track_len = chrom_end - chrom_start + 1;
-        let all_data = FireTrack::new(chrom_start, chrom_end, pileup_opts, &None);
+        let fire_track_opts = pileup_opts.fire_track_opts.clone();
+        let all_data = FireTrack::new(
+            chrom.to_string(),
+            chrom_start,
+            chrom_end,
+            fire_track_opts.clone(),
+            &None,
+        );
         let (hap1_data, hap2_data) = if pileup_opts.haps {
             (
-                Some(FireTrack::new(chrom_start, chrom_end, pileup_opts, &None)),
-                Some(FireTrack::new(chrom_start, chrom_end, pileup_opts, &None)),
+                Some(FireTrack::new(
+                    chrom.to_string(),
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
+                Some(FireTrack::new(
+                    chrom.to_string(),
+                    chrom_start,
+                    chrom_end,
+                    fire_track_opts.clone(),
+                    &None,
+                )),
             )
         } else {
             (None, None)
         };
 
         let shuffled_data = if shuffled_fibers.is_some() {
+            let mut shuffled_opts = fire_track_opts.clone();
+            shuffled_opts.shuffle = true;
             Some(FireTrack::new(
+                chrom.to_string(),
                 chrom_start,
                 chrom_end,
-                pileup_opts,
+                shuffled_opts,
                 shuffled_fibers,
             ))
         } else {
@@ -446,6 +771,8 @@ impl<'a> FiberseqPileup<'a> {
             pileup_opts,
             shuffled_fibers,
             rolling_max: None,
+            fdr_scores: None,
+            region_name,
         }
     }
 
@@ -453,58 +780,80 @@ impl<'a> FiberseqPileup<'a> {
         self.has_data
     }
 
-    pub fn add_records(
-        &mut self,
-        records: bam::Records<'a, IndexedReader>,
-    ) -> Result<(), anyhow::Error> {
-        self.pileup_opts
-            .input
-            .filters
-            .filter_on_bit_flags(records)
-            .chunks(1000)
-            .into_iter()
-            .map(|r| r.collect::<Vec<_>>())
-            .for_each(|r| {
-                let fibers: Vec<FiberseqData> = FiberseqData::from_records(
-                    r,
-                    &self.pileup_opts.input.header_view(),
-                    &self.pileup_opts.input.filters,
-                );
-                if !fibers.is_empty() {
-                    self.has_data = true;
-                }
-                for fiber in fibers {
-                    // skip if the fiber was unable to be shuffled
-                    if self.shuffled_fibers.is_some()
-                        && !self.shuffled_fibers.as_ref().unwrap().has_fiber(&fiber)
-                    {
-                        continue;
-                    }
+    /// Calculate and store FDR scores for each position based on the FDR table
+    pub fn calculate_fdr_scores(&mut self, fdr_table: &[crate::subcommands::call_peaks::FdrEntry]) {
+        let mut fdr_scores = vec![1.0; self.track_len];
 
-                    self.all_data.update_with_fiber(&fiber);
-                    // add hap1 data
-                    if let Some(hap1_data) = &mut self.hap1_data {
-                        if fiber.get_hp() == "H1" {
-                            hap1_data.update_with_fiber(&fiber);
-                        }
-                    }
-                    // add hap2 data
-                    if let Some(hap2_data) = &mut self.hap2_data {
-                        if fiber.get_hp() == "H2" {
-                            hap2_data.update_with_fiber(&fiber);
-                        }
-                    }
-                    // add shuffled data
-                    if let Some(shuffled_data) = &mut self.shuffled_data {
-                        shuffled_data.update_with_fiber(&fiber);
+        if fdr_table.is_empty() {
+            self.fdr_scores = Some(fdr_scores);
+            return;
+        }
+
+        for (i, &score) in self.all_data.scores.iter().enumerate() {
+            if score < 0.0 {
+                // No coverage, FDR = 1.0 (already set)
+                continue;
+            }
+
+            // Binary search to find the FDR for this score
+            let search_result = fdr_table.binary_search_by(|entry| {
+                entry
+                    .threshold
+                    .partial_cmp(&(score as f64))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            fdr_scores[i] = match search_result {
+                Result::Ok(idx) => fdr_table[idx].fdr,
+                Result::Err(idx) => {
+                    if idx == 0 {
+                        fdr_table[0].fdr
+                    } else {
+                        fdr_table[idx - 1].fdr
                     }
                 }
-            });
-        self.calculate_scores();
-        Ok(())
+            };
+        }
+
+        self.fdr_scores = Some(fdr_scores);
     }
 
-    pub fn header(pileup_opts: &PileupOptions) -> String {
+    /// Add fibers from an iterator
+    /// This is more efficient than add_records as it works directly with FiberseqData
+    pub fn add_fibers(&mut self, fibers: impl Iterator<Item = FiberseqData>) {
+        for fiber in fibers {
+            self.has_data = true;
+
+            // skip if the fiber was unable to be shuffled
+            if self.shuffled_fibers.is_some()
+                && !self.shuffled_fibers.as_ref().unwrap().has_fiber(&fiber)
+            {
+                continue;
+            }
+
+            self.all_data.update_with_fiber(&fiber);
+            // add hap1 data
+            if let Some(hap1_data) = &mut self.hap1_data {
+                if fiber.get_hp() == "H1" {
+                    hap1_data.update_with_fiber(&fiber);
+                }
+            }
+            // add hap2 data
+            if let Some(hap2_data) = &mut self.hap2_data {
+                if fiber.get_hp() == "H2" {
+                    hap2_data.update_with_fiber(&fiber);
+                }
+            }
+            // add shuffled data
+            if let Some(shuffled_data) = &mut self.shuffled_data {
+                shuffled_data.update_with_fiber(&fiber);
+            }
+        }
+
+        self.calculate_scores();
+    }
+
+    pub fn header(pileup_opts: &PileupOptions, include_name: bool) -> String {
         let mut header = format!("{}\t{}\t{}", "#chrom", "start", "end");
 
         let mut suffixes = vec![""];
@@ -537,25 +886,30 @@ impl<'a> FiberseqPileup<'a> {
         if pileup_opts.rolling_max.is_some() {
             header += "\trolling_max";
         }
+        // Add name column at the end to minimize breaking downstream tools
+        if include_name {
+            header += "\tname";
+        }
         header += "\n";
         header
     }
 
     fn calculate_scores(&mut self) {
-        self.all_data.calculate_scores();
+        self.all_data
+            .calculate_scores(self.pileup_opts.min_fire_coverage);
         // calculate rolling max
         if self.pileup_opts.rolling_max.is_some() {
             self.rolling_max = Some(self.all_data.calculate_rolling_max_score());
         }
         // scores for other tracks
         if let Some(hap1_data) = &mut self.hap1_data {
-            hap1_data.calculate_scores();
+            hap1_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
         if let Some(hap2_data) = &mut self.hap2_data {
-            hap2_data.calculate_scores();
+            hap2_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
         if let Some(shuffled_data) = &mut self.shuffled_data {
-            shuffled_data.calculate_scores();
+            shuffled_data.calculate_scores(self.pileup_opts.min_fire_coverage);
         }
     }
 
@@ -652,6 +1006,10 @@ impl<'a> FiberseqPileup<'a> {
                         self.rolling_max.as_ref().unwrap()[write_start_index]
                     );
                 }
+                // Add name column at the end to minimize breaking downstream tools
+                if let Some(name) = &self.region_name {
+                    line += &format!("\t{}", name);
+                }
                 // don't write empty lines unless keep_zeros is set
                 let mut cov = self.all_data.coverage[write_start_index];
                 if let Some(shuffled_data) = &self.shuffled_data {
@@ -699,9 +1057,16 @@ fn run_rgn(
     out: &mut Box<dyn Write>,
     pileup_opts: &PileupOptions,
     shuffled_fibers: &Option<ShuffledFibers>,
+    region_name: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let tid = bam.header().tid(chrom.as_bytes()).unwrap();
-    let chrom_len = bam.header().target_len(tid).unwrap() as i64;
+    let tid = bam.header().tid(chrom.as_bytes()).ok_or(anyhow::anyhow!(
+        "Chromosome {} not found in BAM header",
+        chrom
+    ))?;
+    let chrom_len = bam.header().target_len(tid).ok_or(anyhow::anyhow!(
+        "Chromosome {} length not found in BAM header",
+        chrom
+    ))? as i64;
 
     let window_size = if shuffled_fibers.is_some() {
         (chrom_len + 1) as usize
@@ -719,26 +1084,28 @@ fn run_rgn(
             chrom_end = chrom_len;
         }
 
-        // check if region has data
-        bam.fetch((chrom, chrom_start, chrom_end))?;
-        let mut tmp_records = bam.records();
-        if tmp_records.next().is_none() {
-            continue;
-        }
-        // fetch the data
-        bam.fetch((chrom, chrom_start, chrom_end))?;
-        let records = bam.records();
+        // Fetch fibers from the region using the new iterator-based approach
+        let fiber_iter =
+            pileup_opts
+                .input
+                .fetch_fibers(bam, chrom, Some(chrom_start), Some(chrom_end))?;
+
         // make the pileup
         log::debug!("Initializing pileup for {chrom}:{chrom_start}-{chrom_end}");
         let mut pileup = FiberseqPileup::new(
             chrom,
             chrom_start as usize,
             chrom_end as usize,
-            pileup_opts,
+            pileup_opts.into(),
             shuffled_fibers,
+            region_name.clone(),
         );
-        pileup.add_records(records)?;
-        pileup.write(out)?;
+        pileup.add_fibers(fiber_iter);
+
+        // Only write if we have data
+        if pileup.has_data() {
+            pileup.write(out)?;
+        }
     }
 
     Ok(())
@@ -751,18 +1118,47 @@ pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error
     let header = pileup_opts.input.header_view();
 
     let mut out = bio_io::writer(&pileup_opts.out)?;
-    // add the header
-    out.write_all(FiberseqPileup::header(pileup_opts).as_bytes())?;
 
     let shuffled_fibers = match &pileup_opts.shuffle {
         Some(file_path) => Some(ShuffledFibers::new(file_path)?),
         None => None,
     };
 
-    match &pileup_opts.rgn {
-        // if a region is specified, only process that region
-        Some(rgn) => {
-            let (rgn, chrom) = region_parser(rgn);
+    // Handle regions based on source (BED file, command-line args, or all chromosomes)
+    // We process regions immediately rather than collecting them because FetchDefinition has lifetime constraints
+    if let Some(bed_path) = &pileup_opts.bed {
+        // Parse BED file
+        let bed_records = bio_io::read_bed_regions(bed_path)?;
+        let include_name = bed_records.iter().any(|r| r.name.is_some());
+
+        // add the header
+        out.write_all(FiberseqPileup::header(pileup_opts, include_name).as_bytes())?;
+
+        // Process each BED record immediately
+        for rec in bed_records {
+            let fetch_def = FetchDefinition::RegionString(rec.chrom.as_bytes(), rec.start, rec.end);
+            // If any record has a name, use "." for records without names to keep column count consistent
+            let region_name = if include_name {
+                Some(rec.name.unwrap_or_else(|| ".".to_string()))
+            } else {
+                None
+            };
+            run_rgn(
+                &rec.chrom,
+                fetch_def,
+                &mut bam,
+                &mut out,
+                pileup_opts,
+                &shuffled_fibers,
+                region_name,
+            )?;
+        }
+    } else if !pileup_opts.rgn.is_empty() {
+        // Use command-line regions
+        out.write_all(FiberseqPileup::header(pileup_opts, false).as_bytes())?;
+
+        for rgn_str in &pileup_opts.rgn {
+            let (rgn, chrom) = region_parser(rgn_str);
             run_rgn(
                 &chrom,
                 rgn,
@@ -770,22 +1166,27 @@ pub fn pileup_track(pileup_opts: &mut PileupOptions) -> Result<(), anyhow::Error
                 &mut out,
                 pileup_opts,
                 &shuffled_fibers,
+                None,
             )?;
         }
-        // if no region is specified, process all regions
-        None => {
-            for chrom in header.target_names() {
-                let rgn = FetchDefinition::String(chrom);
-                run_rgn(
-                    &String::from_utf8_lossy(chrom),
-                    rgn,
-                    &mut bam,
-                    &mut out,
-                    pileup_opts,
-                    &shuffled_fibers,
-                )?;
-            }
+    } else {
+        // Process all chromosomes
+        out.write_all(FiberseqPileup::header(pileup_opts, false).as_bytes())?;
+
+        for chrom in header.target_names() {
+            let chrom_str = String::from_utf8_lossy(chrom).to_string();
+            let rgn = FetchDefinition::String(chrom);
+            run_rgn(
+                &chrom_str,
+                rgn,
+                &mut bam,
+                &mut out,
+                pileup_opts,
+                &shuffled_fibers,
+                None,
+            )?;
         }
     }
+
     Ok(())
 }

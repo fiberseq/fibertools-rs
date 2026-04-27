@@ -498,19 +498,22 @@ impl FiberseqData {
     }
 }
 
-pub struct FiberseqRecords<'a> {
-    bam_chunk: BamChunk<'a>,
+pub struct FiberseqRecords<'a, R = bam::Reader>
+where
+    R: bam::Read,
+{
+    bam_chunk: BamChunk<'a, R>,
     header: HeaderView,
     filters: FiberFilters,
     cur_chunk: Vec<FiberseqData>,
 }
 
-impl<'a> FiberseqRecords<'a> {
+impl<'a> FiberseqRecords<'a, bam::Reader> {
     pub fn new(bam: &'a mut bam::Reader, filters: FiberFilters) -> Self {
         let header = bam.header().clone();
         let bam_recs = bam.records();
         let mut bam_chunk = BamChunk::new(bam_recs, None);
-        bam_chunk.set_bit_flag_filter(filters.bit_flag);
+        bam_chunk.set_bit_flag_filter(filters.get_bit_flag());
         let cur_chunk: Vec<FiberseqData> = vec![];
         FiberseqRecords {
             bam_chunk,
@@ -521,21 +524,48 @@ impl<'a> FiberseqRecords<'a> {
     }
 }
 
-impl Iterator for FiberseqRecords<'_> {
+impl<'a> FiberseqRecords<'a, bam::IndexedReader> {
+    pub fn from_rec_iterator(
+        bam_recs: bam::Records<'a, bam::IndexedReader>,
+        header: HeaderView,
+        filters: FiberFilters,
+    ) -> Self {
+        let mut bam_chunk = BamChunk::new(bam_recs, None);
+        bam_chunk.set_bit_flag_filter(filters.get_bit_flag());
+        let cur_chunk: Vec<FiberseqData> = vec![];
+        FiberseqRecords {
+            bam_chunk,
+            header,
+            filters,
+            cur_chunk,
+        }
+    }
+}
+
+impl<R> Iterator for FiberseqRecords<'_, R>
+where
+    R: bam::Read,
+{
     type Item = FiberseqData;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // if we are out of data check for another chunk in the bam
-        if self.cur_chunk.is_empty() {
-            match self.bam_chunk.next() {
-                Some(recs) => {
-                    self.cur_chunk = FiberseqData::from_records(recs, &self.header, &self.filters);
-                    // we will be popping from this list so we want to remove the first element first, not the last
-                    self.cur_chunk.reverse();
+        loop {
+            // if we are out of data check for another chunk in the bam
+            if self.cur_chunk.is_empty() {
+                match self.bam_chunk.next() {
+                    Some(recs) => {
+                        self.cur_chunk =
+                            FiberseqData::from_records(recs, &self.header, &self.filters);
+                        // we will be popping from this list so we want to remove the first element first, not the last
+                        self.cur_chunk.reverse();
+                    }
+                    None => return None,
                 }
-                None => return None,
+            }
+            let rec = self.cur_chunk.pop()?;
+            if self.filters.passes_fire_filter(&rec) {
+                return Some(rec);
             }
         }
-        self.cur_chunk.pop()
     }
 }

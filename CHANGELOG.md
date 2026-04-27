@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🚀 New subcommands
+
+- **`ft call-peaks`**: peak caller for FIRE pileup BED output. Identifies enriched regions, applies optional FIRE fiber-level filters, and emits per-peak statistics.
+- **`ft mock-fire`**: generate mock FIRE-style data for testing and benchmarking pipelines.
+- **`ft benchmark`**: lightweight benchmarking harness for measuring throughput on key subcommands.
+
+### 🔧 Improvements
+
+- **`ft pileup`**: accepts multiple regions in a single invocation; default `--frac-fibers` filter applied to drop low-coverage windows.
+- **FIRE fiber-level filters hoisted to global `FiberFilters`**: `--fire-filter`, `--min-msp`, `--min-ave-msp-size`, and `--skip-no-m6a` are now available as global flags shared by `ft fire`, `ft pileup`, and `ft call-peaks`. `--fire-filter` is a convenience preset; individual flags override its defaults.
+- **Train-FIRE Snakemake pipeline** added under `Train-FIRE/` for end-to-end FIRE model training.
+- Build/dev-loop improvements: thin-LTO and a dedicated test profile for faster iteration.
+
+### 🐛 Bug fixes
+
+- **fa:Z extras pairing on reverse-strand reads with overlapping/shared-start peaks (follow-up to #103)**: when multiple BED annotations share a query start position on a reverse-strand read, the post-hoc `ann_vals.reverse()` step in `FiberAnnotations::from_bam_tags` did not produce a permutation equivalent to the stable sort over flipped coordinates, scrambling the fa:Z extras (e.g. peak names/lengths) relative to their fs/fl annotations on extraction. Fix pre-pairs extras with annotations before the flip+sort so the permutation is consistent. BAM encodings were always correct; the bug only affected extraction. Affects v0.8.0–v0.8.2.
+
+### 🧪 Tests
+
+- `tests/call_peaks_test.rs`: end-to-end coverage of the new peak caller.
+- `tests/fibertig_test.rs`: regression test for the fa:Z reverse-strand shared-start pairing bug, using Anna Minkina's exact failing input.
+- Unit tests in `src/utils/input_bam.rs` covering `passes_fire_filter` semantics: skip-no-m6a behavior, min-msp, min-ave-msp-size, the `--fire-filter` combo, and explicit-flag overrides.
+
+### ⚡ Performance
+
+- Per-record FIRE feature extraction in `ft fire -f` is now parallelized (#104).
+
 ### [0.8.2]
 
 #### Bug Fixes

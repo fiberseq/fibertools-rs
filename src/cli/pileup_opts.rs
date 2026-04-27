@@ -6,10 +6,15 @@ use std::fmt::Debug;
 pub struct PileupOptions {
     #[clap(flatten)]
     pub input: InputBam,
-    /// Region string to make a pileup of. e.g. chr1:1-1000 or chr1:1-1,000
+    /// Region string(s) to make a pileup of. e.g. chr1:1-1000 or chr1:1-1,000
+    /// Can be specified multiple times for multiple regions.
     /// If not provided will make a pileup of the whole genome
-    #[clap(default_value = None)]
-    pub rgn: Option<String>,
+    #[clap(short, long)]
+    pub rgn: Vec<String>,
+    /// BED file with regions to query. If the BED file has a name column (4th column),
+    /// the name will be added to each output line for that region.
+    #[clap(short, long, conflicts_with = "rgn")]
+    pub bed: Option<String>,
     /// Output file
     #[clap(short, long, default_value = "-")]
     pub out: String,
@@ -48,4 +53,13 @@ pub struct PileupOptions {
     /// No NUC columns
     #[clap(long)]
     pub no_nuc: bool,
+}
+
+impl PileupOptions {
+    /// `--fire-filter` bundles `--fiber-coverage` in addition to the three
+    /// filters. Callers should use this in place of reading `fiber_coverage`
+    /// directly so the bundle stays coherent.
+    pub fn effective_fiber_coverage(&self) -> bool {
+        self.fiber_coverage || self.input.filters.fire_filter
+    }
 }

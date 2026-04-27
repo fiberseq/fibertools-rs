@@ -1,0 +1,214 @@
+# Shared inputs for FIRE model training sweep
+# Paths are resolved relative to the Train-FIRE/ directory unless absolute.
+
+reference:
+  # Auto-fetched by rule fetch_reference from the UCSC goldenPath server.
+  # Override with a local path (and drop the rule's output) if you already have it.
+  fai: resources/ref/hg38.analysisSet.fa.fai
+  fasta: resources/ref/hg38.analysisSet.fa
+  genome: hg38
+
+# Input CRAM/BAM used for training feature extraction.
+# May be a local path OR an s3://... URL. For s3, set `s3_endpoint` below
+# and the pipeline will download the file once to results/shared/input.cram.
+training_bam: s3://stergachis/public/FIRE/broadly-consented/GM12878/GM12878-fire-v0.1-filtered.cram
+s3_endpoint: https://s3.kopah.uw.edu
+sample_rate: 0.10
+
+# Held-out region for model application + trackhub visualization.
+# This chromosome is ALSO injected into the exclusion bed so no training
+# data is drawn from it.
+test_region: chr19
+# Optional separate BAM/CRAM for visualization (defaults to training_bam)
+test_bam: null
+
+# Site budget and peak merging
+n_sites: 500000
+# Draw this many length-matched negatives per positive. >1 gives mokapot's
+# FDR/q-value estimator and triqler's spline a richer decoy pool. Training
+# itself still sees balance_train:true downsampling if enabled.
+neg_multiplier: 10
+merge_distance: 147
+
+# Regions always excluded from training (gaps, SDs, etc.)
+exclude_beds:
+  - resources/exclude/hg38.gap.bed.gz
+  - resources/exclude/SDs.merged.hg38.bed.gz
+
+# Chromosome name regex used to drop alt/random/MT/sex chroms from training
+exclude_chroms_regex: "_|chrEBV|chrMT|chrX|chrY|chrM"
+
+# Defaults applied to every experiment unless overridden in its own `train:` block
+train_defaults:
+  min_msp_length_for_positive_fire_call: 85
+  min_msp_length_for_negative_fire_call: 85
+  train_fdr: 0.05
+  test_fdr: 0.05
+  subset_max_train: 10000000
+  direction: msp_len_times_m6a_fc
+  grid_search: true
+  n_estimators: [200, 300]
+  max_depth: [9, 15]
+  min_child_weight_fracs: [0.001, 0.005]
+  colsample_bytree: [0.5, 1.0]
+  gamma: [1]
+  # Lower eta + more trees + early stopping generally improves model quality.
+  # Defaults preserve legacy behavior (eta=0.3, no early stopping, balanced train,
+  # mokapot max_iter=15). Override per-experiment to opt in.
+  learning_rate: [0.3]
+  early_stopping_rounds: 0          # >0 enables early stopping against a held-out val split
+  early_stopping_val_frac: 0.15     # fraction of train held out for the ES val set
+  balance_train: true               # downsample majority class in train; set false to let scale_pos_weight handle imbalance
+  mokapot_max_iter: 15              # number of mokapot iterative refit rounds
+  mokapot_override: false           # if true, downgrade "model performs worse than direction" from error to warning
+
+# Trackhub metadata
+trackhub:
+  name: fire-models
+  short_label: "FIRE model sweep"
+  long_label: "FIRE model sweep across training configurations"
+  email: mrvollger@genetics.utah.edu
+
+# ------------------------------------------------------------------
+# Region sets. A `region_set` is the (positives, negative_exclude_beds)
+# input pair. Every experiment references one by name, and the whole
+# regions + training-data pipeline runs ONCE per region_set (not per
+# experiment) so we don't redo identical bedtools work.
+#
+# positive_beds:         used for +1 labels
+# negative_exclude_beds: NOT used as positives, but their regions are
+#                        also excluded when sampling negatives so we
+#                        don't place negatives on top of likely signal
+# ------------------------------------------------------------------
+region_sets:
+  default:
+    positive_beds:
+      - path: resources/mixed-positives/GM12878-fire-v0.1-peaks-20-percent.bed.gz
+      - path: resources/mixed-positives/GM12878_DHS.bed.gz
+      - path: resources/mixed-positives/hotspots_ENCFF452DZE.bed.gz
+      - path: resources/mixed-positives/hotspots_ENCFF828AUX.bed.gz
+      - path: resources/mixed-positives/peaks_CTCF_ENCFF951PEM.bed.gz
+      - path: resources/mixed-positives/peaks_ENCFF073ORT.bed.gz
+      - path: resources/mixed-positives/peaks_ENCFF598KWZ.bed.gz
+    negative_exclude_beds:
+      - path: resources/mixed-positives/ATAC.bed.gz
+      - path: resources/mixed-positives/GM12878-fire-v0.1-peaks.bed.gz
+
+
+# ------------------------------------------------------------------
+# Experiments. Each is a distinct training config.
+# `region_set:` names an entry above. Experiments that share a
+# region_set share positives/negatives/features/training-data.
+# ------------------------------------------------------------------
+experiments:
+
+  # Baseline: train_defaults (moderate grid search over n_estimators/max_depth/etc.)
+  default_grid:
+    region_set: default
+
+  default_grid_unbalanced:
+    region_set: default
+    train:
+      balance_train: false
+      train_fdr: 0.20
+
+  # Fast, non-CV baseline: a single shallow XGBoost model with no grid search.
+  # Useful reference for how much the grid search is buying. This config is
+  # weak enough that XGBoost may not beat the `direction` feature alone, so
+  # we allow mokapot's "model performs worse" check to be a warning here.
+  shallow_fixed:
+    region_set: default
+    train:
+      grid_search: false
+      n_estimators: [100]
+      max_depth: [6]
+      min_child_weight_fracs: [0.01]
+      colsample_bytree: [1.0]
+      gamma: [1]
+      mokapot_override: true
+
+  # Higher-capacity grid: deeper trees + more boosters.
+  # Risk is overfitting; compare to default_grid to see if capacity helps.
+  deep_wide_grid:
+    region_set: default
+    train:
+      n_estimators: [400, 600]
+      max_depth: [15, 21]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+
+  deep_wide_grid_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [400, 600]
+      max_depth: [15, 21]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      balance_train: false
+      train_fdr: 0.20
+
+  # Strong-regularization grid: higher gamma + bigger leaf hessian,
+  # smaller column sample. Tests the overfitting hypothesis.
+  strong_reg_grid:
+    region_set: default
+    train:
+      n_estimators: [200, 300]
+      max_depth: [9]
+      min_child_weight_fracs: [0.005, 0.02]
+      colsample_bytree: [0.5, 0.75]
+      gamma: [5, 10]
+
+  strong_reg_grid_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [200, 300]
+      max_depth: [9]
+      min_child_weight_fracs: [0.005, 0.02]
+      colsample_bytree: [0.5, 0.75]
+      gamma: [5, 10]
+      balance_train: false
+      train_fdr: 0.20
+
+  # Slow-learn grid: low eta with a large n_estimators cap, early stopping
+  # picks the actual tree count per fold.
+  slow_learn_es:
+    region_set: default
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05, 0.1]
+      early_stopping_rounds: 50
+
+  slow_learn_es_unbalanced:
+    region_set: default
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05, 0.1]
+      early_stopping_rounds: 50
+      balance_train: false
+      train_fdr: 0.20
+
+  # Keep all training data (no balance downsample) and give mokapot more
+  # refit iterations. scale_pos_weight handles class imbalance inside XGBoost.
+  full_data_long_mokapot:
+    region_set: default
+    train:
+      n_estimators: [2000]
+      max_depth: [9, 15]
+      min_child_weight_fracs: [0.001, 0.005]
+      colsample_bytree: [0.5, 1.0]
+      gamma: [1]
+      learning_rate: [0.05]
+      early_stopping_rounds: 50
+      balance_train: false
+      mokapot_max_iter: 30
+      train_fdr: 0.20

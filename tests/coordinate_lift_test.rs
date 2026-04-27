@@ -6,7 +6,7 @@ use rust_htslib::bam::Read;
 fn test_coordinate_lift() -> anyhow::Result<()> {
     let mut bam = bam::Reader::from_path("tests/data/nuc_example.bam")?;
 
-    for result in bam.records() {
+    if let Some(result) = bam.records().next() {
         let record = result?;
 
         // Print basic record info
@@ -67,8 +67,6 @@ fn test_coordinate_lift() -> anyhow::Result<()> {
             }
             Err(e) => println!("Error lifting coordinates: {}", e),
         }
-
-        break; // Only process first record
     }
 
     Ok(())

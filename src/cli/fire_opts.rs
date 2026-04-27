@@ -28,15 +28,6 @@ pub struct FireOptions {
     /// Output FIREs features for training in a table format
     #[clap(short, long)]
     pub feats_to_text: bool,
-    /// Don't write reads with no m6A calls to the output bam
-    #[clap(short, long)]
-    pub skip_no_m6a: bool,
-    /// Skip reads without at least `N` MSP calls
-    #[clap(long, default_value = "0", env = "MIN_MSP")]
-    pub min_msp: usize,
-    /// Skip reads without an average MSP size greater than `N`
-    #[clap(long, default_value = "0", env)]
-    pub min_ave_msp_size: i64,
     /// Width of bin for feature collection
     #[clap(short, long, default_value = "40", env, 
         default_value_ifs([
@@ -53,7 +44,7 @@ pub struct FireOptions {
     #[clap(long, default_value = "100", env)]
     pub best_window_size: i64,
     /// Use 5mC data in FIREs
-    #[clap(short, long, hide = true)]
+    #[clap(long, hide = true)]
     pub use_5mc: bool,
     /// Minium length of msp to call a FIRE
     #[clap(long, default_value = "85", env)]
@@ -78,9 +69,6 @@ impl Default for FireOptions {
             extract: false,
             all: false,
             feats_to_text: false,
-            skip_no_m6a: false,
-            min_msp: 0,
-            min_ave_msp_size: 0,
             width_bin: 40,
             bin_num: 9,
             best_window_size: 100,

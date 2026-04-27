@@ -583,3 +583,63 @@ fn test_from_bam_tags_fa_pairing_reverse_strand_multi_peak() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn test_from_bam_tags_fa_pairing_reverse_strand_shared_start() -> Result<()> {
+    // Regression test for Anna's fibertig peak-length scrambling: two peaks share
+    // forward-strand start position 0 (fs=0), and all four peaks overlap heavily.
+    // After flipping to aligned coordinates the sort by aligned start is no longer
+    // equivalent to reversing the input order, so a naive `ann_vals.reverse()`
+    // breaks the extras pairing. The extras must be carried through the sort.
+    let seq_len: u32 = 1_000;
+    let fs: Vec<u32> = vec![0, 0, 12, 159];
+    let fl: Vec<u32> = vec![263, 124, 209, 305];
+    let fa = "peakA|peakB|peakC|peakD";
+
+    let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
+
+    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
+        .expect("tags should parse");
+
+    assert_eq!(anns.annotations.len(), 4);
+    assert!(anns.reverse);
+
+    // forward peak [s, s+l) -> ref peak [seq_len - (s+l), seq_len - s)
+    //   peakA forward [0, 263)   -> ref [737, 1000), len 263
+    //   peakB forward [0, 124)   -> ref [876, 1000), len 124
+    //   peakC forward [12, 221)  -> ref [779, 988),  len 209
+    //   peakD forward [159, 464) -> ref [536, 841),  len 305
+    // Ref-start ascending: D, A, C, B.
+    let expected = [
+        (536_i64, 841_i64, 305_i64, "peakD"),
+        (737, 1_000, 263, "peakA"),
+        (779, 988, 209, "peakC"),
+        (876, 1_000, 124, "peakB"),
+    ];
+    for (i, (ann, (exp_start, exp_end, exp_len, exp_tag))) in
+        anns.annotations.iter().zip(expected.iter()).enumerate()
+    {
+        assert_eq!(
+            ann.reference_start,
+            Some(*exp_start),
+            "ref_start mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.reference_end,
+            Some(*exp_end),
+            "ref_end mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.reference_length,
+            Some(*exp_len),
+            "ref_length mismatch at index {i}"
+        );
+        assert_eq!(
+            ann.extra_columns.as_ref().map(|c| c.join(";")),
+            Some((*exp_tag).to_string()),
+            "fa-extras pairing wrong at index {i} (size {exp_len}): got {:?}",
+            ann.extra_columns,
+        );
+    }
+    Ok(())
+}

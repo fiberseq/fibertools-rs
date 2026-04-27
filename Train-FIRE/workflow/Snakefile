@@ -1,0 +1,66 @@
+from snakemake.utils import min_version
+
+min_version("9.17")
+
+
+# Config is always supplied at the CLI via `--configfile`, so a test run
+# with `--configfile .tests/config.yaml` fully replaces experiments +
+# region_sets instead of deep-merging with the production config.
+if not config:
+    raise WorkflowError(
+        "no config loaded — pass --configfile config/config.yaml "
+        "(or --configfile .tests/config.yaml for the smoke test)"
+    )
+
+
+EXPERIMENTS = list(config["experiments"].keys())
+REGION_SET_NAMES = list(config.get("region_sets", {}).keys())
+MODELS = ["baseline"] + EXPERIMENTS
+
+
+wildcard_constraints:
+    exp="|".join(EXPERIMENTS),
+    model="|".join(MODELS),
+    rs="|".join(REGION_SET_NAMES) if REGION_SET_NAMES else "NEVER_MATCHES_ANYTHING",
+    chrom=r"[A-Za-z0-9_.-]+",
+
+
+include: "rules/common.smk"
+include: "rules/resources.smk"
+include: "rules/regions.smk"
+include: "rules/features.smk"
+include: "rules/train.smk"
+include: "rules/apply.smk"
+include: "rules/trackhub.smk"
+
+
+rule all:
+    input:
+        expand("results/experiments/{exp}/FIRE.gbdt.json", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/FIRE.FDR.pdf", exp=EXPERIMENTS),
+        expand("results/models/{model}/fire-fibers.bb", model=MODELS),
+        expand("results/models/{model}/fire-fiber-decorators.bb", model=MODELS),
+        "results/comparison/fdr_overlay.pdf",
+        "results/comparison/metrics.tsv",
+        "results/trackhub/hub.txt",
+        "results/trackhub/trackDb.txt",
+
+
+rule train_only:
+    input:
+        expand("results/experiments/{exp}/FIRE.gbdt.json", exp=EXPERIMENTS),
+        expand("results/experiments/{exp}/FIRE.FDR.pdf", exp=EXPERIMENTS),
+        "results/comparison/fdr_overlay.pdf",
+
+
+rule data_only:
+    """Pipeline smoke target: runs everything up to and including the
+per-region_set training-data.bed.gz. Skips XGBoost/mokapot training, which
+requires real multi-locus features to produce a usable model."""
+    input:
+        expand("results/region_sets/{rs}/training-data.bed.gz", rs=REGION_SET_NAMES),
+
+
+rule clean:
+    shell:
+        "rm -rf results"

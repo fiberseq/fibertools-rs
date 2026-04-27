@@ -1,0 +1,39 @@
+[workspace]
+authors = ["Mitchell R. Vollger <mrvollger@gmail.com>"]
+channels = ["conda-forge", "bioconda"]
+description = "FIRE model training sweep + trackhub"
+name = "Train-FIRE"
+platforms = ["osx-64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+fmt = "ruff format . && taplo format pixi.toml && snakefmt workflow/"
+dry-run = { cmd = ["snakemake", "--configfile", "config/config.yaml", "-n"] }
+# End-to-end smoke test on the tiny .tests/ dataset: ~150 chr19 reads at
+# the NAPA locus (positives) + ~250 reads from a quiet chr19 region at
+# ~chr19:9.09-9.11Mb (negatives, no overlap with any peak/gap/SD).
+# Runs regions -> features -> training-data -> xgboost+mokapot end-to-end.
+# First invocation materializes the conda env.
+test = { cmd = [
+  "snakemake",
+  "--configfile",
+  ".tests/config.yaml",
+  "-j",
+  "4",
+  "--use-conda",
+  "--rerun-incomplete",
+  "train_only",
+] }
+test-clean = "rm -rf results .snakemake"
+# Primary production entrypoint (also lets users `cd` into the project root).
+snakemake = { cmd = "cd $INIT_CWD && snakemake --configfile $PIXI_PROJECT_ROOT/config/config.yaml -s $PIXI_PROJECT_ROOT/workflow/Snakefile" }
+
+
+[dependencies]
+conda = "*"
+snakemake = "==9.17.1"
+snakefmt = "*"
+ruff = "*"
+taplo = "*"
+snakemake-executor-plugin-slurm = "*"
+snakemake-logger-plugin-snkmt = "*"
