@@ -13,6 +13,34 @@ pub struct FdrEntry {
     pub real_bp: f64,
 }
 
+/// Look up the FDR value for a given score in an ascending-by-threshold FDR table.
+/// Returns 1.0 if the table is empty (FIRE fraction mode).
+/// For scores below all thresholds, returns the lowest-threshold entry's FDR.
+/// Otherwise returns the FDR of the largest threshold <= score.
+pub fn lookup_fdr(score: f32, fdr_table: &[FdrEntry]) -> f64 {
+    if fdr_table.is_empty() {
+        return 1.0;
+    }
+
+    let idx = fdr_table.binary_search_by(|entry| {
+        entry
+            .threshold
+            .partial_cmp(&(score as f64))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    match idx {
+        Ok(i) => fdr_table[i].fdr,
+        Err(i) => {
+            if i == 0 {
+                fdr_table[0].fdr
+            } else {
+                fdr_table[i - 1].fdr
+            }
+        }
+    }
+}
+
 /// Pileup record structure (simplified for FDR calculation)
 #[derive(Debug, Clone)]
 pub struct PileupRecord {

@@ -1,5 +1,5 @@
 use super::chrom_names_and_lengths;
-use super::fdr::FdrEntry;
+use super::fdr::{lookup_fdr, FdrEntry};
 use crate::cli::CallPeaksOptions;
 use crate::subcommands::pileup::{
     FiberseqPileup, FiberseqPileupOptions, FireTrack, FireTrackOptions,
@@ -8,6 +8,31 @@ use crate::utils::bio_io;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
+
+/// Calculate reciprocal overlap between two genomic intervals.
+/// Returns 0.0 if the intervals are on different chromosomes or do not overlap.
+/// Otherwise returns `min(overlap_len / a_len, overlap_len / b_len)`.
+pub fn reciprocal_overlap_raw(
+    a_chrom: &str,
+    a_start: usize,
+    a_end: usize,
+    b_chrom: &str,
+    b_start: usize,
+    b_end: usize,
+) -> f64 {
+    if a_chrom != b_chrom {
+        return 0.0;
+    }
+    let overlap_start = a_start.max(b_start);
+    let overlap_end = a_end.min(b_end);
+    if overlap_start >= overlap_end {
+        return 0.0;
+    }
+    let overlap_len = (overlap_end - overlap_start) as f64;
+    let a_len = (a_end - a_start) as f64;
+    let b_len = (b_end - b_start) as f64;
+    (overlap_len / a_len).min(overlap_len / b_len)
+}
 
 /// Filtering thresholds for peak calling
 #[derive(Debug, Clone, Copy)]
@@ -216,12 +241,12 @@ impl<'a> Peak<'a> {
             fire_frac >= min_frac
         } else {
             // FDR mode: check if FDR <= threshold AND fire_frac >= min_fire_frac_filter
-            let fdr = Self::lookup_fdr(score, fdr_table);
+            let fdr = lookup_fdr(score, fdr_table);
             fdr <= thresholds.max_fdr && fire_frac >= thresholds.min_fire_frac_filter
         };
 
         // Calculate FDR for display purposes (even in FIRE fraction mode)
-        let fdr = Self::lookup_fdr(score, fdr_table);
+        let fdr = lookup_fdr(score, fdr_table);
 
         // Check if coverage passes thresholds
         let coverage = pileup.all_data.coverage[middle_pos];
@@ -274,35 +299,6 @@ impl<'a> Peak<'a> {
             })
         } else {
             None
-        }
-    }
-
-    /// Look up FDR value for a given score
-    /// Returns 1.0 if FDR table is empty (FIRE fraction mode)
-    fn lookup_fdr(score: f32, fdr_table: &[FdrEntry]) -> f64 {
-        if fdr_table.is_empty() {
-            // FIRE fraction mode: return placeholder FDR
-            return 1.0;
-        }
-
-        // Binary search to find the nearest threshold
-        // We want the largest threshold that is <= score
-        let idx = fdr_table.binary_search_by(|entry| {
-            entry
-                .threshold
-                .partial_cmp(&(score as f64))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        match idx {
-            Ok(i) => fdr_table[i].fdr,
-            Err(i) => {
-                if i == 0 {
-                    fdr_table[0].fdr
-                } else {
-                    fdr_table[i - 1].fdr
-                }
-            }
         }
     }
 
@@ -362,27 +358,14 @@ impl<'a> Peak<'a> {
     /// Calculate reciprocal overlap between two peaks
     /// Returns the minimum of (overlap / self_length, overlap / other_length)
     pub fn reciprocal_overlap(&self, other: &Peak) -> f64 {
-        // Check if peaks are on the same chromosome
-        if self.chrom != other.chrom {
-            return 0.0;
-        }
-
-        // Calculate overlap
-        let overlap_start = self.start.max(other.start);
-        let overlap_end = self.end.min(other.end);
-
-        if overlap_start >= overlap_end {
-            return 0.0; // No overlap
-        }
-
-        let overlap_len = (overlap_end - overlap_start) as f64;
-        let self_len = (self.end - self.start) as f64;
-        let other_len = (other.end - other.start) as f64;
-
-        let self_frac = overlap_len / self_len;
-        let other_frac = overlap_len / other_len;
-
-        self_frac.min(other_frac)
+        reciprocal_overlap_raw(
+            &self.chrom,
+            self.start,
+            self.end,
+            &other.chrom,
+            other.start,
+            other.end,
+        )
     }
 
     /// Determine if this peak should merge with another peak

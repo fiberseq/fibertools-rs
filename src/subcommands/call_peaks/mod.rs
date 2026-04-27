@@ -2,9 +2,10 @@ mod fdr;
 mod peaks;
 
 pub use fdr::{
-    fdr_table, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder, PileupRecord,
+    fdr_table, lookup_fdr, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder,
+    PileupRecord,
 };
-pub use peaks::call_peaks;
+pub use peaks::{call_peaks, reciprocal_overlap_raw};
 
 use crate::cli::CallPeaksOptions;
 use crate::subcommands::pileup::{FireTrack, FireTrackOptions};

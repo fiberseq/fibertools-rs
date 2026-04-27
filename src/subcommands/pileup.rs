@@ -7,11 +7,11 @@ use crate::utils::bamannotations;
 use crate::utils::bio_io;
 use crate::*;
 use anyhow::{anyhow, Ok};
-use std::collections::HashMap;
-use std::io::BufRead;
 use ordered_float::NotNan;
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::{FetchDefinition, IndexedReader};
+use std::collections::HashMap;
+use std::io::BufRead;
 
 const MIN_FIRE_COVERAGE: i32 = 4;
 const MIN_FIRE_QUAL: u8 = 229; // floor(255*0.9)
