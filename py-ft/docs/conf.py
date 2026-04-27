@@ -33,13 +33,10 @@ extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.intersphinx",
     # "edit_on_github",
-    "m2r2",
-    # include markdown
     "nbsphinx",
 ]
 
-# source_suffix = '.rst'
-source_suffix = [".rst", ".md", ".py"]
+source_suffix = [".rst", ".py"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
