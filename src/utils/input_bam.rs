@@ -135,12 +135,23 @@ impl FiberFilters {
     /// True if `rec` passes the FIRE fiber-level filters (skip_no_m6a,
     /// min_msp, min_ave_msp_size). Called by `FiberseqRecords::next` so
     /// every downstream consumer sees only filtered fibers.
+    ///
+    /// Edge cases worth preserving:
+    /// - Fibers with zero MSPs are always rejected once any filter is
+    ///   active. The check also guards the divide-by-zero in the average
+    ///   MSP size below, so don't drop it when refactoring.
+    /// - The no-m6a rejection is gated on `resolved_skip_no_m6a()` so
+    ///   `--skip-no-m6a=false` actually disables it (e.g. when combined
+    ///   with `--fire-filter`).
     pub fn passes_fire_filter(&self, rec: &crate::fiber::FiberseqData) -> bool {
         if !self.fire_filter_active() {
             return true;
         }
         let n_msps = rec.msp.annotations.len();
-        if rec.m6a.annotations.is_empty() || n_msps == 0 {
+        if n_msps == 0 {
+            return false;
+        }
+        if self.resolved_skip_no_m6a() && rec.m6a.annotations.is_empty() {
             return false;
         }
         if n_msps < self.resolved_min_msp() {
@@ -302,5 +313,153 @@ impl std::default::Default for InputBam {
             global: cli::GlobalOpts::default(),
             header: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fiber::FiberseqData;
+    use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
+    use crate::utils::basemods::BaseMods;
+
+    /// Build a minimal `FiberseqData` shaped only for `passes_fire_filter`.
+    /// `msp_lengths` populates `rec.msp.annotations` (each entry contributes
+    /// to count and average size). `m6a_count` controls whether `m6a`
+    /// annotations are empty or present (only emptiness matters for the
+    /// filter).
+    fn make_fsd(msp_lengths: &[i64], m6a_count: usize) -> FiberseqData {
+        let msp_anns: Vec<FiberAnnotation> = msp_lengths
+            .iter()
+            .map(|&len| FiberAnnotation {
+                start: 0,
+                end: len,
+                length: len,
+                qual: 0,
+                reference_start: None,
+                reference_end: None,
+                reference_length: None,
+                extra_columns: None,
+            })
+            .collect();
+        let m6a_anns: Vec<FiberAnnotation> = (0..m6a_count)
+            .map(|i| FiberAnnotation {
+                start: i as i64,
+                end: i as i64 + 1,
+                length: 1,
+                qual: 0,
+                reference_start: None,
+                reference_end: None,
+                reference_length: None,
+                extra_columns: None,
+            })
+            .collect();
+        FiberseqData {
+            record: rust_htslib::bam::Record::new(),
+            msp: FiberAnnotations::from_annotations(msp_anns, 1000, false),
+            nuc: FiberAnnotations::from_annotations(vec![], 1000, false),
+            m6a: FiberAnnotations::from_annotations(m6a_anns, 1000, false),
+            cpg: FiberAnnotations::from_annotations(vec![], 1000, false),
+            base_mods: BaseMods { base_mods: vec![] },
+            ec: 0.0,
+            target_name: ".".to_string(),
+            rg: ".".to_string(),
+            center_position: None,
+        }
+    }
+
+    fn filters() -> FiberFilters {
+        FiberFilters::default()
+    }
+
+    #[test]
+    fn passes_when_no_filter_active() {
+        // Default config: nothing rejected, even fibers with no m6a / no msps.
+        let f = filters();
+        assert!(!f.fire_filter_active());
+        assert!(f.passes_fire_filter(&make_fsd(&[], 0)));
+        assert!(f.passes_fire_filter(&make_fsd(&[100, 100, 100], 5)));
+    }
+
+    #[test]
+    fn skip_no_m6a_rejects_only_no_m6a_fibers() {
+        let mut f = filters();
+        f.skip_no_m6a = Some(true);
+        assert!(f.fire_filter_active());
+        // No m6a → reject (and no-msp also rejected as a side effect).
+        assert!(!f.passes_fire_filter(&make_fsd(&[100], 0)));
+        // Has m6a, even with zero msps, still rejected by the empty-msp guard.
+        assert!(!f.passes_fire_filter(&make_fsd(&[], 3)));
+        // Has both → passes (other thresholds default to 0).
+        assert!(f.passes_fire_filter(&make_fsd(&[5], 1)));
+    }
+
+    #[test]
+    fn min_msp_rejects_fibers_with_too_few_msps() {
+        let mut f = filters();
+        f.min_msp = Some(3);
+        assert!(f.fire_filter_active());
+        assert!(!f.passes_fire_filter(&make_fsd(&[100, 100], 5)));
+        assert!(f.passes_fire_filter(&make_fsd(&[100, 100, 100], 5)));
+    }
+
+    #[test]
+    fn min_ave_msp_size_rejects_low_average() {
+        let mut f = filters();
+        f.min_ave_msp_size = Some(50);
+        // Average = 30 → reject.
+        assert!(!f.passes_fire_filter(&make_fsd(&[10, 20, 60], 5)));
+        // Average = 60 → pass.
+        assert!(f.passes_fire_filter(&make_fsd(&[40, 60, 80], 5)));
+    }
+
+    #[test]
+    fn fire_filter_combo_applies_all_three_defaults() {
+        // `--fire-filter` alone should imply skip_no_m6a + min_msp=10 + min_ave_msp_size=10.
+        let mut f = filters();
+        f.fire_filter = true;
+        assert!(f.resolved_skip_no_m6a());
+        assert_eq!(f.resolved_min_msp(), 10);
+        assert_eq!(f.resolved_min_ave_msp_size(), 10);
+        // <10 msps → reject.
+        let nine_long_msps: Vec<i64> = vec![100; 9];
+        assert!(!f.passes_fire_filter(&make_fsd(&nine_long_msps, 5)));
+        // 10 msps but ave_size = 5 < 10 → reject.
+        let ten_short_msps: Vec<i64> = vec![5; 10];
+        assert!(!f.passes_fire_filter(&make_fsd(&ten_short_msps, 5)));
+        // 10 msps, ave_size = 100, has m6a → pass.
+        let ten_long_msps: Vec<i64> = vec![100; 10];
+        assert!(f.passes_fire_filter(&make_fsd(&ten_long_msps, 5)));
+        // Same fiber but no m6a → reject (skip_no_m6a is implied).
+        assert!(!f.passes_fire_filter(&make_fsd(&ten_long_msps, 0)));
+    }
+
+    #[test]
+    fn explicit_flag_overrides_fire_filter_default() {
+        // `--fire-filter --min-msp=5` should use 5, not 10.
+        let mut f = filters();
+        f.fire_filter = true;
+        f.min_msp = Some(5);
+        assert_eq!(f.resolved_min_msp(), 5);
+        // Other two still take fire-filter defaults.
+        assert!(f.resolved_skip_no_m6a());
+        assert_eq!(f.resolved_min_ave_msp_size(), 10);
+        // 5 msps would have failed under the 10 default, but passes under 5.
+        let five_long_msps: Vec<i64> = vec![100; 5];
+        assert!(f.passes_fire_filter(&make_fsd(&five_long_msps, 5)));
+    }
+
+    #[test]
+    fn explicit_skip_no_m6a_false_overrides_fire_filter_default() {
+        // `--fire-filter --skip-no-m6a=false` keeps the size/count thresholds
+        // but should turn the no-m6a guard off. The empty-msp guard still
+        // applies (it's a divide-by-zero protection), so we use a record
+        // with msps but no m6a.
+        let mut f = filters();
+        f.fire_filter = true;
+        f.skip_no_m6a = Some(false);
+        assert!(!f.resolved_skip_no_m6a());
+        let ten_long_msps: Vec<i64> = vec![100; 10];
+        assert!(f.passes_fire_filter(&make_fsd(&ten_long_msps, 0)));
     }
 }
