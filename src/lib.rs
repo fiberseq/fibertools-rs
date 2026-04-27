@@ -21,9 +21,9 @@ use std::io::Write;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 lazy_static! {
     pub static ref FULL_VERSION: String = format!(
-        "v{}\tgit-details {}",
+        "v{}\tgit-commit {}",
         env!("CARGO_PKG_VERSION"),
-        env!("VERGEN_GIT_DESCRIBE")
+        &env!("VERGEN_GIT_SHA")[..7.min(env!("VERGEN_GIT_SHA").len())]
     );
 }
 // if this string (bar)gets too long it displays weird when writing to stdout
