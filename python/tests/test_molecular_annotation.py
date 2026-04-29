@@ -191,16 +191,31 @@ class TestErrorHandling:
                 "test", "+", "", starts=[100, 200], lengths=[50, 60], names=["only_one"]
             )
 
-    def test_conflicting_annotation_type(self):
-        """Test that adding same type with different strand/quality raises error."""
+    def test_conflicting_quality_spec(self):
+        """Test that adding same name with different quality_spec raises error.
+
+        Annotation type identity is keyed on `name` alone, so strand may
+        differ across additions to the same type. quality_spec must agree.
+        """
         annotations = MolecularAnnotations(1000)
         annotations.add_annotations("msp", "+", "P", starts=[100], lengths=[50], qualities=[40])
 
-        with pytest.raises(ValueError, match="already exists"):
-            # Same name but different strand
+        with pytest.raises(ValueError, match="quality_spec"):
+            # Same name but different quality_spec
             annotations.add_annotations(
-                "msp", "-", "P", starts=[200], lengths=[60], qualities=[35]
+                "msp", "+", "Q", starts=[200], lengths=[60], qualities=[35]
             )
+
+    def test_mixed_strand_same_name_merges(self):
+        """Adding the same name with different strand accumulates into one type."""
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations("msp", "+", "P", starts=[100], lengths=[50], qualities=[40])
+        # Same name, different strand — should succeed, not error.
+        annotations.add_annotations(
+            "msp", "-", "P", starts=[200], lengths=[60], qualities=[35]
+        )
+        assert annotations.total_annotation_count() == 2
+        assert annotations.annotation_type_names() == ["msp"]
 
     def test_from_tags_invalid_format(self):
         """Test that invalid MA format raises error."""

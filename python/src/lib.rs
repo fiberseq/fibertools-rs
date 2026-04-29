@@ -203,9 +203,16 @@ impl MolecularAnnotations {
     ///
     /// Accepts 0-based half-open intervals [start, end).
     ///
+    /// Annotation type identity is keyed on `type_name` alone — strand is a
+    /// per-annotation property. Multiple `add_annotations` calls with the
+    /// same `type_name` and matching `quality_spec` accumulate into a single
+    /// in-memory type, even when their `strand` values differ. Conflicting
+    /// `quality_spec` for the same `type_name` raises ValueError.
+    ///
     /// Args:
     ///     type_name: Name of the annotation type (e.g., "msp", "nuc", "fire")
-    ///     strand: Strand orientation: "+" (forward), "-" (reverse), or "." (unknown)
+    ///     strand: Strand applied to every annotation in this batch:
+    ///         "+" (forward), "-" (reverse), or "." (unknown).
     ///     quality_spec: Quality specification string. Each character is "P" (Phred) or
     ///         "Q" (Linear). The length determines how many quality values per annotation.
     ///         Examples: "P" (one phred), "PQ" (two: phred + linear), "" (none).
@@ -219,7 +226,8 @@ impl MolecularAnnotations {
     ///
     /// Raises:
     ///     ValueError: If array lengths don't match, both ends and lengths are provided,
-    ///         neither ends nor lengths are provided, or strand/quality_spec is invalid.
+    ///         neither ends nor lengths are provided, strand/quality_spec is invalid,
+    ///         or the type already exists with a different quality_spec.
     ///
     /// Example:
     ///     >>> annot = MolecularAnnotations(1000)
@@ -229,6 +237,9 @@ impl MolecularAnnotations {
     ///     >>> annot.add_annotations("ctcf", "+", "PQ", [100, 200], lengths=[50, 60], qualities=[40, 255, 30, 200])
     ///     >>> # No quality
     ///     >>> annot.add_annotations("nuc", "+", "", [100, 200], lengths=[50, 60])
+    ///     >>> # Mixed-strand annotations of the same type — accumulate into one type
+    ///     >>> annot.add_annotations("ctcf", "+", "Q", [10], lengths=[4], qualities=[200])
+    ///     >>> annot.add_annotations("ctcf", "-", "Q", [50], lengths=[3], qualities=[180])
     #[pyo3(signature = (type_name, strand, quality_spec, starts, ends=None, lengths=None, qualities=None, names=None))]
     pub fn add_annotations(
         &mut self,
@@ -259,7 +270,6 @@ impl MolecularAnnotations {
                         format!("starts and ends must have same length ({} vs {})", starts.len(), ends.len())
                     ));
                 }
-                // Validate and convert ends to lengths
                 let mut lens = Vec::with_capacity(starts.len());
                 for i in 0..starts.len() {
                     let start = starts[i];
@@ -279,7 +289,6 @@ impl MolecularAnnotations {
                         format!("starts and lengths must have same length ({} vs {})", starts.len(), lengths.len())
                     ));
                 }
-                // Validate lengths are positive (u32 can't be negative, but check for zero)
                 for (i, &len) in lengths.iter().enumerate() {
                     if len == 0 {
                         return Err(pyo3::exceptions::PyValueError::new_err(
@@ -293,8 +302,10 @@ impl MolecularAnnotations {
 
         let strand = parse_strand(strand)?;
         let qs = parse_quality_spec(quality_spec)?;
-        let num_q = qs.num_qualities();
 
+        // qualities/names length validation (matches Rust add_annotations,
+        // but we do it here to keep the Python error messages descriptive)
+        let num_q = qs.num_qualities();
         if let Some(ref q) = qualities {
             let expected = starts.len() * num_q;
             if q.len() != expected {
@@ -306,7 +317,6 @@ impl MolecularAnnotations {
                 ));
             }
         }
-
         if let Some(ref n) = names {
             if n.len() != starts.len() {
                 return Err(pyo3::exceptions::PyValueError::new_err(
@@ -315,36 +325,17 @@ impl MolecularAnnotations {
             }
         }
 
-        // Find or create the annotation type
-        let at = if let Some(existing) = self.inner.get_type_mut(type_name) {
-            // Verify strand and quality spec match
-            if existing.strand != strand || existing.quality_spec != qs {
-                return Err(pyo3::exceptions::PyValueError::new_err(
-                    format!(
-                        "Annotation type '{}' already exists with different configuration: \
-                        existing='{}{}', attempted='{}{}'",
-                        type_name, existing.strand, existing.quality_spec, strand, qs
-                    )
-                ));
-            }
-            existing
-        } else {
-            self.inner.add_annotation_type(type_name, strand, qs)
-        };
-
-        // Add all annotations
-        for i in 0..starts.len() {
-            let q = if num_q > 0 {
-                qualities
-                    .as_ref()
-                    .map(|qs| qs[i * num_q..(i + 1) * num_q].to_vec())
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            let name = names.as_ref().map(|n| n[i].clone());
-            at.add(starts[i], computed_lengths[i], q, name);
-        }
+        self.inner
+            .add_annotations(
+                type_name,
+                qs,
+                &starts,
+                &computed_lengths,
+                strand,
+                qualities.as_deref(),
+                names.as_deref(),
+            )
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(())
     }
