@@ -85,15 +85,15 @@ When the quality type indicator is omitted, no quality values are stored for tha
 
 #### Strand Convention
 
-Strand information is relative to the sequenced molecule and follows the same convention as the MM and ML tags for base modifications in the SAM specification:
+Strand information describes the biology of an annotation feature, not the alignment orientation, and follows the same convention as the MM and ML tags for base modifications in the SAM specification:
 
-- **All coordinates are in read orientation**: Coordinates always refer to positions on the forward strand of the original read sequence (i.e. starting from the leftmost base of the unaligned read).
-- **For reverse-strand annotations (`-`)**: The annotation feature is on the reverse/Crick strand of the DNA molecule; however, coordinates still start from the left of the read sequence on the forward strand.
-- **Strand is independent of alignment**: The strand indicator describes the biology of the feature, not the alignment orientation. If a read aligns to the reverse strand of a reference, the MA tag strand indicators remain unchanged.
+- **Per-annotation property**: Strand is a property of each individual annotation, not of the annotation type. One annotation type may contain annotations on different strands.
+- **All coordinates are in read orientation**: Coordinates always refer to positions on the forward strand of the original read sequence (i.e. starting from the leftmost base of the unaligned read), regardless of the strand a given annotation describes.
+- **Alignment independent**: If a read aligns to the reverse strand of a reference, the MA tag strand indicators remain unchanged.
 
 **Example of strand-specific annotations** on a read of length 10 (where `#` marks the annotated region, `-` marks unannotated positions, and coordinates are 1-based):
 
-This shows CTCF annotations on both the forward strand (start 1 length 4) and reverse strand (start 6 length 3).
+This shows CTCF annotations on both the forward strand (start 1 length 4) and reverse strand (start 6 length 3). They belong to the same logical `ctcf` annotation type — the on-disk format groups them into separate sections by strand.
 
 ```
 MA:Z:10;ctcf+Q:1-4;ctcf-Q:6-3
@@ -103,6 +103,14 @@ Position: 1234567890
 Forward:  ####------
 Reverse:  -----###--
 ```
+
+#### Annotation type uniqueness
+
+Within a single MA tag, an annotation type is uniquely identified by its `name` alone. Strand is a property of individual annotations within the type, and `quality_spec` is a property of the type but is not part of its identity for uniqueness purposes (see below).
+
+The on-disk MA tag format groups annotations by `(name, strand, quality_spec)` into sections for compactness. Producers MAY emit multiple sections sharing the same `name` when the annotations span different strands, e.g. `ctcf+Q:1-4;ctcf-Q:6-3` — these represent the same logical type with strand-split annotations.
+
+Producers MUST NOT emit two sections with the same `name` and conflicting `quality_spec` within one MA tag. Parsers MUST treat repeated `name` sections as the same type and merge their annotations; parsers MUST error on conflicting `quality_spec` for the same `name`.
 
 ### Annotation Data
 
