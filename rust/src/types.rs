@@ -271,13 +271,17 @@ impl FromStr for QualitySpec {
 
 /// A single molecular annotation.
 ///
-/// All coordinates are 0-based half-open [start, end).
+/// All coordinates are 0-based half-open [start, end). Strand is a property
+/// of each annotation, not of its containing [`AnnotationType`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
-    /// 0-based start position (inclusive)
+    /// 0-based start position (inclusive), in original molecular orientation
     pub start: u32,
     /// Length in base pairs (end = start + length)
     pub length: u32,
+    /// Strand of this annotation. Describes the biology of the feature, not
+    /// the alignment orientation.
+    pub strand: Strand,
     /// Quality scores (one per quality spec character, empty if type has no quality)
     pub qualities: Vec<u8>,
     /// Optional name/label for this annotation
@@ -292,14 +296,14 @@ impl Annotation {
     /// # Panics
     /// Panics in debug mode if:
     /// - `start + length` would overflow u32
-    pub fn new(start: u32, length: u32, qualities: Vec<u8>, name: Option<String>) -> Self {
+    pub fn new(start: u32, length: u32, strand: Strand, qualities: Vec<u8>, name: Option<String>) -> Self {
         debug_assert!(
             start.checked_add(length).is_some(),
             "Annotation coordinate overflow: start={} + length={} exceeds u32",
             start,
             length
         );
-        Self { start, length, qualities, name }
+        Self { start, length, strand, qualities, name }
     }
 
     /// Returns the end position (0-based, exclusive).
@@ -341,13 +345,17 @@ impl Annotation {
     }
 }
 
-/// A group of annotations of the same type
+/// A group of annotations of the same type.
+///
+/// Annotation type identity within a [`MolecularAnnotations`](crate::MolecularAnnotations)
+/// is keyed on `name` alone. Strand is a property of each [`Annotation`];
+/// one type may contain annotations on different strands. `quality_spec` is
+/// a per-type property but is not part of the identity — adding the same
+/// `name` twice with conflicting `quality_spec` is an error.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnnotationType {
     /// Name of the annotation type (e.g., "msp", "nuc", "fire")
     pub name: String,
-    /// Strand orientation
-    pub strand: Strand,
     /// Quality specification (number and scaling of quality values per annotation)
     pub quality_spec: QualitySpec,
     /// Individual annotations of this type
@@ -355,19 +363,20 @@ pub struct AnnotationType {
 }
 
 impl AnnotationType {
-    /// Create a new annotation type
-    pub fn new(name: impl Into<String>, strand: Strand, quality_spec: QualitySpec) -> Self {
+    /// Create a new annotation type.
+    pub fn new(name: impl Into<String>, quality_spec: QualitySpec) -> Self {
         Self {
             name: name.into(),
-            strand,
             quality_spec,
             annotations: Vec::new(),
         }
     }
 
-    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.PQ")
-    pub fn type_signature(&self) -> String {
-        format!("{}{}{}", self.name, self.strand, self.quality_spec)
+    /// Returns the on-disk section signature string for a given strand
+    /// (e.g., `"msp+P"`, `"nuc-"`, `"fire.PQ"`). Used during serialization
+    /// when annotations are grouped by `(name, strand)` into MA sections.
+    pub fn type_signature(&self, strand: Strand) -> String {
+        format!("{}{}{}", self.name, strand, self.quality_spec)
     }
 
     /// Add an annotation to this type.
@@ -378,10 +387,11 @@ impl AnnotationType {
         &mut self,
         start: u32,
         length: u32,
+        strand: Strand,
         qualities: Vec<u8>,
         name: Option<String>,
     ) -> &mut Self {
-        self.annotations.push(Annotation::new(start, length, qualities, name));
+        self.annotations.push(Annotation::new(start, length, strand, qualities, name));
         self
     }
 }
