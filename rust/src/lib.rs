@@ -30,25 +30,26 @@
 //! ```
 //! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
 //!
-//! // Build annotations programmatically
+//! // Build annotations programmatically. Annotation type identity is keyed
+//! // on `name` alone — strand is a per-annotation property.
 //! let mut annotations = MolecularAnnotations::new(1000);
 //!
 //! // Add MSP annotations with phred quality scores
 //! annotations
-//!     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-//!     .add(100, 50, vec![40], None)
-//!     .add(200, 60, vec![35], None);
+//!     .add_annotation_type("msp", "P".parse().unwrap())
+//!     .add(100, 50, Strand::Forward, vec![40], None)
+//!     .add(200, 60, Strand::Forward, vec![35], None);
 //!
 //! // Add nucleosome annotations without quality scores
 //! annotations
-//!     .add_annotation_type("nuc", Strand::Forward, QualitySpec::none())
-//!     .add(150, 147, vec![], None)
-//!     .add(350, 147, vec![], None);
+//!     .add_annotation_type("nuc", QualitySpec::none())
+//!     .add(150, 147, Strand::Forward, vec![], None)
+//!     .add(350, 147, Strand::Forward, vec![], None);
 //!
 //! // Add FIRE annotation with linear quality
 //! annotations
-//!     .add_annotation_type("fire", Strand::Unknown, "Q".parse().unwrap())
-//!     .add(500, 75, vec![200], Some("enhancer1".to_string()));
+//!     .add_annotation_type("fire", "Q".parse().unwrap())
+//!     .add(500, 75, Strand::Unknown, vec![200], Some("enhancer1".to_string()));
 //!
 //! // Add annotation type with multiple quality values per annotation (PQQP = 4 values each)
 //! use molecular_annotation::QualityScaling;
@@ -57,10 +58,12 @@
 //!     QualityScaling::Linear, QualityScaling::Phred,
 //! ]);
 //! annotations
-//!     .add_annotation_type("ctcf", Strand::Forward, pqqp)
-//!     .add(600, 20, vec![40, 200, 180, 35], None);
+//!     .add_annotation_type("ctcf", pqqp)
+//!     .add(600, 20, Strand::Forward, vec![40, 200, 180, 35], None);
 //!
-//! // Serialize with inline encoding (start-length pairs in MA string)
+//! // Serialize with inline encoding (start-length pairs in MA string).
+//! // Sections are emitted per (name, strand): types with annotations on
+//! // multiple strands produce multiple sections sharing the same name.
 //! annotations.set_encoding(Encoding::Inline);
 //! let ma_inline = annotations.to_ma_string();
 //! assert_eq!(ma_inline, "1000;msp+P:101-50,201-60;nuc+:151-147,351-147;fire.Q:501-75;ctcf+PQQP:601-20");
@@ -94,8 +97,8 @@
 //!
 //! let mut annotations = MolecularAnnotations::new(1000);
 //! annotations
-//!     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-//!     .add(100, 50, vec![40], None);  // query [100, 150) in 0-based half-open
+//!     .add_annotation_type("msp", "P".parse().unwrap())
+//!     .add(100, 50, Strand::Forward, vec![40], None);  // query [100, 150) in 0-based half-open
 //!
 //! // Set aligned blocks for liftover (query positions are forward-oriented)
 //! // Second argument is is_reverse: false for forward-aligned reads
@@ -163,34 +166,66 @@ impl MolecularAnnotations {
         self
     }
 
-    /// Add a new annotation type and return a mutable reference to it.
+    /// Get-or-create the annotation type with the given name.
     ///
-    /// This enables the builder pattern for adding annotations:
+    /// If a type with this `name` already exists with a matching
+    /// `quality_spec`, returns the existing type. If it exists with a
+    /// different `quality_spec`, **panics**. Programmatic callers that need
+    /// fallible behavior should use [`try_add_annotation_type`](Self::try_add_annotation_type).
+    ///
+    /// Annotation type identity is keyed on `name` alone — strand is a
+    /// per-annotation property, supplied via [`AnnotationType::add`].
+    ///
     /// ```ignore
-    /// annotations.add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-    ///     .add(100, 50, vec![40], None)
-    ///     .add(200, 60, vec![35], None);
+    /// annotations.add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add(100, 50, Strand::Forward, vec![40], None)
+    ///     .add(200, 60, Strand::Reverse, vec![35], None);
     /// ```
     pub fn add_annotation_type(
         &mut self,
         name: &str,
-        strand: Strand,
         quality_spec: QualitySpec,
     ) -> &mut AnnotationType {
-        self.annotation_types.push(AnnotationType::new(name.to_string(), strand, quality_spec));
-        // Safety: we just pushed, so last_mut() will always succeed
-        self.annotation_types.last_mut().unwrap()
+        self.try_add_annotation_type(name, quality_spec)
+            .expect("conflicting quality_spec for existing annotation type")
+    }
+
+    /// Fallible variant of [`add_annotation_type`](Self::add_annotation_type).
+    ///
+    /// Returns the existing type if `name` is already present with a matching
+    /// `quality_spec`. Returns [`ParseError::ConflictingAnnotationType`] if
+    /// the existing type has a different `quality_spec`. Otherwise creates
+    /// a new type and returns a mutable reference to it.
+    pub fn try_add_annotation_type(
+        &mut self,
+        name: &str,
+        quality_spec: QualitySpec,
+    ) -> Result<&mut AnnotationType, ParseError> {
+        if let Some(idx) = self.annotation_types.iter().position(|t| t.name == name) {
+            if self.annotation_types[idx].quality_spec != quality_spec {
+                return Err(ParseError::ConflictingAnnotationType {
+                    name: name.to_string(),
+                    reason: format!(
+                        "existing quality_spec {} differs from requested {}",
+                        self.annotation_types[idx].quality_spec, quality_spec
+                    ),
+                });
+            }
+            return Ok(&mut self.annotation_types[idx]);
+        }
+        self.annotation_types.push(AnnotationType::new(name, quality_spec));
+        Ok(self.annotation_types.last_mut().unwrap())
     }
 
     /// Get the names of all annotation types.
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, QualitySpec};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
-    /// annotations.add_annotation_type("msp", Strand::Forward, "P".parse().unwrap());
-    /// annotations.add_annotation_type("nuc", Strand::Forward, QualitySpec::none());
+    /// annotations.add_annotation_type("msp", "P".parse().unwrap());
+    /// annotations.add_annotation_type("nuc", QualitySpec::none());
     ///
     /// assert_eq!(annotations.annotation_type_names(), vec!["msp", "nuc"]);
     /// ```
@@ -210,20 +245,24 @@ impl MolecularAnnotations {
 
     /// Add multiple annotations of the same type at once.
     ///
-    /// Accepts 0-based half-open [start, start+length) coordinates.
+    /// Accepts 0-based half-open [start, start+length) coordinates. The
+    /// `strand` parameter is applied to every annotation in this batch.
+    /// Callers needing mixed strands per type call `add_annotations` once
+    /// per strand — both calls land in the same in-memory `AnnotationType`.
     ///
     /// # Arguments
     /// * `name` - Name of the annotation type (e.g., "msp", "nuc", "fire")
-    /// * `strand` - Strand orientation
     /// * `quality_spec` - Quality specification
     /// * `starts` - 0-based start positions
     /// * `lengths` - Lengths of the annotations in base pairs
+    /// * `strand` - Strand applied to every annotation in this batch
     /// * `qualities` - Optional flat quality array. Length must be
     ///   `starts.len() * quality_spec.num_qualities()`.
     /// * `names` - Optional names/labels, must match starts length if provided
     ///
     /// # Errors
-    /// Returns an error if array lengths don't match.
+    /// Returns an error if array lengths don't match, or if `name` already
+    /// exists with a different `quality_spec`.
     ///
     /// # Example
     /// ```
@@ -232,23 +271,24 @@ impl MolecularAnnotations {
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations.add_annotations(
     ///     "msp",
-    ///     Strand::Forward,
     ///     "P".parse().unwrap(),
     ///     &[100, 200, 300],
     ///     &[50, 60, 70],
+    ///     Strand::Forward,
     ///     Some(&[40, 35, 30]),
     ///     None,
     /// ).unwrap();
     ///
     /// assert_eq!(annotations.total_annotation_count(), 3);
     /// ```
+    #[allow(clippy::too_many_arguments)]
     pub fn add_annotations(
         &mut self,
         name: &str,
-        strand: Strand,
         quality_spec: QualitySpec,
         starts: &[u32],
         lengths: &[u32],
+        strand: Strand,
         qualities: Option<&[u8]>,
         names: Option<&[String]>,
     ) -> Result<&mut Self, ParseError> {
@@ -277,24 +317,8 @@ impl MolecularAnnotations {
             }
         }
 
-        // Find or create the annotation type
-        let at = if let Some(existing) = self.get_type_mut(name) {
-            // Verify strand and quality spec match
-            if existing.strand != strand || existing.quality_spec != quality_spec {
-                return Err(ParseError::ConflictingAnnotationType {
-                    name: name.to_string(),
-                    reason: format!(
-                        "existing: {}{}, new: {}{}",
-                        existing.strand, existing.quality_spec, strand, quality_spec
-                    ),
-                });
-            }
-            existing
-        } else {
-            self.add_annotation_type(name, strand, quality_spec)
-        };
+        let at = self.try_add_annotation_type(name, quality_spec)?;
 
-        // Add all annotations
         for i in 0..starts.len() {
             let q = if num_q > 0 {
                 qualities
@@ -303,8 +327,8 @@ impl MolecularAnnotations {
             } else {
                 Vec::new()
             };
-            let name = names.map(|n| n[i].clone());
-            at.add(starts[i], lengths[i], q, name);
+            let n = names.map(|n| n[i].clone());
+            at.add(starts[i], lengths[i], strand, q, n);
         }
 
         Ok(self)
@@ -338,8 +362,8 @@ impl MolecularAnnotations {
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-    ///     .add(100, 50, vec![40], None);
+    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// // Collect into a Vec to avoid lifetime issues
     /// let msp_annotations: Vec<_> = annotations.iter_type("msp")
@@ -379,7 +403,7 @@ impl MolecularAnnotations {
 
             AnnotationInfo {
                 type_name: &annot_type.name,
-                strand: annot_type.strand,
+                strand: a.strand,
                 quality_spec: &annot_type.quality_spec,
                 query_start,
                 query_end,
@@ -411,8 +435,8 @@ impl MolecularAnnotations {
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-    ///     .add(100, 50, vec![40], None);
+    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// for info in annotations.iter_full() {
     ///     println!("{}: [{}, {}) qualities={:?}",
@@ -429,48 +453,86 @@ impl MolecularAnnotations {
             .flat_map(move |annot_type| self.iter_annotation_type(annot_type))
     }
 
+    /// Section emission order for MA / AL / AQ / AN serialization.
+    ///
+    /// For each annotation type (in insertion order), groups its annotations
+    /// by [`Strand`] in enum order (`Forward`, `Reverse`, `Unknown`). Each
+    /// non-empty group becomes one section. Within a group, annotation order
+    /// follows insertion order.
+    ///
+    /// Yields `(annotation_type, strand, indices)` where `indices` are
+    /// positions into `annotation_type.annotations`.
+    fn emission_sections(&self) -> impl Iterator<Item = (&AnnotationType, Strand, Vec<usize>)> + '_ {
+        const STRANDS: [Strand; 3] = [Strand::Forward, Strand::Reverse, Strand::Unknown];
+        self.annotation_types.iter().flat_map(|t| {
+            STRANDS.into_iter().filter_map(move |s| {
+                let indices: Vec<usize> = t
+                    .annotations
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, a)| a.strand == s)
+                    .map(|(i, _)| i)
+                    .collect();
+                if indices.is_empty() {
+                    None
+                } else {
+                    Some((t, s, indices))
+                }
+            })
+        })
+    }
+
     /// Generate the MA:Z tag string.
     ///
     /// Converts internal 0-based half-open to 1-based closed per MA tag spec
-    /// (internal `start=99` → MA tag `100`).
+    /// (internal `start=99` → MA tag `100`). Annotations within each type
+    /// are grouped by strand into sections; types with annotations on
+    /// multiple strands emit multiple sections sharing the same `name`.
+    /// Empty types emit no section.
     pub fn to_ma_string(&self) -> String {
         let mut parts = vec![self.read_length.to_string()];
 
-        for annot_type in &self.annotation_types {
+        for (annot_type, strand, indices) in self.emission_sections() {
             let positions: Vec<String> = match self.encoding {
-                Encoding::Inline => annot_type
-                    .annotations
+                Encoding::Inline => indices
                     .iter()
-                    .map(|a| format!("{}-{}", a.start + 1, a.length))  // Convert 0-based to 1-based
+                    .map(|&i| {
+                        let a = &annot_type.annotations[i];
+                        format!("{}-{}", a.start + 1, a.length)
+                    })
                     .collect(),
-                Encoding::Separate => annot_type
-                    .annotations
+                Encoding::Separate => indices
                     .iter()
-                    .map(|a| (a.start + 1).to_string())  // Convert 0-based to 1-based
+                    .map(|&i| (annot_type.annotations[i].start + 1).to_string())
                     .collect(),
             };
 
-            parts.push(format!("{}:{}", annot_type.type_signature(), positions.join(",")));
+            parts.push(format!("{}:{}", annot_type.type_signature(strand), positions.join(",")));
         }
 
         parts.join(";")
     }
 
-    /// Generate the AL:B:I array (lengths)
+    /// Generate the AL:B:I array (lengths). Order matches MA section order.
     pub fn to_al_array(&self) -> Vec<u32> {
-        self.annotation_types
-            .iter()
-            .flat_map(|t| t.annotations.iter().map(|a| a.length))
+        self.emission_sections()
+            .flat_map(|(t, _strand, indices)| {
+                indices.into_iter().map(move |i| t.annotations[i].length)
+            })
             .collect()
     }
 
-    /// Generate the AQ:B:C array (None if no annotations have quality)
+    /// Generate the AQ:B:C array (None if no annotations have quality).
+    /// Order matches MA section order.
     pub fn to_aq_array(&self) -> Option<Vec<u8>> {
         let qualities: Vec<u8> = self
-            .annotation_types
-            .iter()
-            .filter(|t| t.quality_spec.has_quality())
-            .flat_map(|t| t.annotations.iter().flat_map(|a| a.qualities.iter().copied()))
+            .emission_sections()
+            .filter(|(t, _, _)| t.quality_spec.has_quality())
+            .flat_map(|(t, _strand, indices)| {
+                indices
+                    .into_iter()
+                    .flat_map(move |i| t.annotations[i].qualities.iter().copied())
+            })
             .collect();
 
         if qualities.is_empty() {
@@ -480,7 +542,8 @@ impl MolecularAnnotations {
         }
     }
 
-    /// Generate the AN:Z tag string (None if no annotations have names)
+    /// Generate the AN:Z tag string (None if no annotations have names).
+    /// Order matches MA section order.
     pub fn to_an_string(&self) -> Option<String> {
         let has_any_names = self
             .annotation_types
@@ -492,12 +555,11 @@ impl MolecularAnnotations {
         }
 
         let names: Vec<String> = self
-            .annotation_types
-            .iter()
-            .flat_map(|t| {
-                t.annotations.iter().map(|a| {
-                    a.name.as_deref().unwrap_or("").to_string()
-                })
+            .emission_sections()
+            .flat_map(|(t, _strand, indices)| {
+                indices
+                    .into_iter()
+                    .map(move |i| t.annotations[i].name.as_deref().unwrap_or("").to_string())
             })
             .collect();
 
@@ -519,8 +581,8 @@ impl MolecularAnnotations {
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-    ///     .add(99, 50, vec![40], None);  // 0-based
+    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add(99, 50, Strand::Forward, vec![40], None);  // 0-based
     ///
     /// let (ma, al, aq, an) = annotations.to_tags();
     /// assert_eq!(ma, "1000;msp+P:100-50");  // 1-based in tag
@@ -863,11 +925,15 @@ impl MolecularAnnotations {
         let names: Vec<&str> = an.map(|s| s.split(',').collect()).unwrap_or_default();
 
         // Track position in AL and AQ arrays
-        let mut al_idx = 0;
-        let mut aq_idx = 0;
-        let mut name_idx = 0;
+        let mut al_idx = 0usize;
+        let mut aq_idx = 0usize;
+        let mut name_idx = 0usize;
 
-        let mut annotation_types = Vec::new();
+        // Build incrementally so try_add_annotation_type is the dedup
+        // choke point: same `name` across multiple sections accumulates
+        // into one in-memory AnnotationType, with per-annotation strand
+        // carried over from each section header.
+        let mut out = MolecularAnnotations::new(read_length);
 
         // Parse each annotation type section
         for part in &parts[1..] {
@@ -907,8 +973,8 @@ impl MolecularAnnotations {
                 })
                 .collect::<Result<Vec<_>, ParseError>>()?;
 
-            // Create annotations
-            let mut annot_type = AnnotationType::new(name, strand, quality_spec);
+            // Get-or-merge into the existing AnnotationType for `name`.
+            let at = out.try_add_annotation_type(&name, quality_spec.clone())?;
 
             for (pos, inline_length) in position_length_pairs {
                 // Get length: from inline format or from AL array
@@ -957,10 +1023,8 @@ impl MolecularAnnotations {
                     None
                 };
 
-                annot_type.annotations.push(Annotation::new(pos, length, qualities, annot_name));
+                at.add(pos, length, strand, qualities, annot_name);
             }
-
-            annotation_types.push(annot_type);
         }
 
         // Validate that we consumed all AL values (only if using separate format)
@@ -972,19 +1036,13 @@ impl MolecularAnnotations {
         }
 
         // Detect encoding from input format
-        let detected_encoding = if al_idx == 0 && !annotation_types.is_empty() {
+        out.encoding = if al_idx == 0 && !out.annotation_types.is_empty() {
             Encoding::Inline
         } else {
             Encoding::Separate
         };
 
-        Ok(Self {
-            read_length,
-            annotation_types,
-            encoding: detected_encoding,
-            aligned_blocks: None,
-            is_reverse_aligned: false,
-        })
+        Ok(out)
     }
 }
 

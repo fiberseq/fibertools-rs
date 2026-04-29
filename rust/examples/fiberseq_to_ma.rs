@@ -45,10 +45,10 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
     if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
-                annotations.add_annotation_type("nuc", Strand::Forward, QualitySpec::none());
+                annotations.add_annotation_type("nuc", QualitySpec::none());
             for (start, length) in ns.iter().zip(nl.iter()) {
                 // API uses 0-based internally, converts to 1-based when writing MA tag
-                nuc_type.add(*start, *length, vec![], None);
+                nuc_type.add(*start, *length, Strand::Forward, vec![], None);
             }
         }
     }
@@ -70,7 +70,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
                 QualitySpec::none()
             };
 
-            let msp_type = annotations.add_annotation_type("msp", Strand::Forward, quality_spec);
+            let msp_type = annotations.add_annotation_type("msp", quality_spec);
             for (i, (start, length)) in a_starts.iter().zip(al.iter()).enumerate() {
                 let qualities = if has_quality {
                     aq.as_ref()
@@ -81,7 +81,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
                     vec![]
                 };
                 // API uses 0-based internally, converts to 1-based when writing MA tag
-                msp_type.add(*start, *length, qualities, None);
+                msp_type.add(*start, *length, Strand::Forward, qualities, None);
             }
         }
     }
