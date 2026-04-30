@@ -25,6 +25,7 @@ use rust_htslib::bam::{self, record::Aux};
 /// Annotation type names used by fibertools-rs.
 pub const NUC_TYPE: &str = "nuc";
 pub const MSP_TYPE: &str = "msp";
+pub const FIRE_TYPE: &str = "fire";
 
 /// Legacy fibertools-rs tags. Listed here so callers (and the writer below)
 /// have one place to look up which tags this module produces/consumes.
@@ -222,10 +223,57 @@ pub fn extract_nuc_msp_arrays(
     Ok((nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual))
 }
 
-/// Build a [`MolecularAnnotations`] for `nuc` and `msp` annotation types from
-/// raw `u32` start/length arrays in molecular orientation, plus an optional
-/// per-MSP linear quality array. Convenience for producers that have already
-/// computed coordinates and want to hand them to [`write_annotations`].
+/// Build a [`MolecularAnnotations`] for nuc/msp/fire types from raw arrays in
+/// molecular orientation. Each input is optional; passing `None` skips that
+/// type. Coordinates and lengths are paired positionally.
+///
+/// - `nuc`:  `(starts, lengths)` — no quality.
+/// - `msp`:  `(starts, lengths, optional Q-scaled qualities)`. With qualities
+///   present, the type uses `msp+Q`; without, `msp+` (no quality).
+/// - `fire`: `(starts, lengths, phred-scaled qualities)`. Always `fire+P`.
+pub fn build_annotations(
+    record: &bam::Record,
+    nuc: Option<(&[u32], &[u32])>,
+    msp: Option<(&[u32], &[u32], Option<&[u8]>)>,
+    fire: Option<(&[u32], &[u32], &[u8])>,
+) -> MolecularAnnotations {
+    let mut annot = MolecularAnnotations::from_record(record);
+    if let Some((starts, lens)) = nuc {
+        if !starts.is_empty() {
+            let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
+            for (s, l) in starts.iter().zip(lens.iter()) {
+                t.add(*s, *l, Strand::Forward, vec![], None);
+            }
+        }
+    }
+    if let Some((starts, lens, q)) = msp {
+        if !starts.is_empty() {
+            let qspec = match q {
+                Some(_) => "Q".parse::<QualitySpec>().expect("Q parses"),
+                None => QualitySpec::none(),
+            };
+            let t = annot.add_annotation_type(MSP_TYPE, qspec);
+            for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
+                let qv = q.map(|q| vec![q[i]]).unwrap_or_default();
+                t.add(*s, *l, Strand::Forward, qv, None);
+            }
+        }
+    }
+    if let Some((starts, lens, phred)) = fire {
+        if !starts.is_empty() {
+            let t =
+                annot.add_annotation_type(FIRE_TYPE, "P".parse::<QualitySpec>().expect("P parses"));
+            for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
+                t.add(*s, *l, Strand::Forward, vec![phred[i]], None);
+            }
+        }
+    }
+    annot
+}
+
+/// Backwards-compatible wrapper around [`build_annotations`]. Existing
+/// nuc/msp producers can keep calling this until they migrate to the
+/// fire-aware [`build_annotations`].
 pub fn build_nuc_msp_annotations(
     record: &bam::Record,
     nuc_starts: &[u32],
@@ -234,25 +282,29 @@ pub fn build_nuc_msp_annotations(
     msp_lengths: &[u32],
     msp_qual: Option<&[u8]>,
 ) -> MolecularAnnotations {
-    let mut annot = MolecularAnnotations::from_record(record);
-    if !nuc_starts.is_empty() {
-        let nuc = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
-        for (s, l) in nuc_starts.iter().zip(nuc_lengths.iter()) {
-            nuc.add(*s, *l, Strand::Forward, vec![], None);
-        }
-    }
-    if !msp_starts.is_empty() {
-        let q_spec = match msp_qual {
-            Some(_) => "Q".parse::<QualitySpec>().expect("Q parses"),
-            None => QualitySpec::none(),
-        };
-        let msp = annot.add_annotation_type(MSP_TYPE, q_spec);
-        for (i, (s, l)) in msp_starts.iter().zip(msp_lengths.iter()).enumerate() {
-            let q = msp_qual.map(|q| vec![q[i]]).unwrap_or_default();
-            msp.add(*s, *l, Strand::Forward, q, None);
-        }
-    }
-    annot
+    let nuc = (!nuc_starts.is_empty()).then_some((nuc_starts, nuc_lengths));
+    let msp = (!msp_starts.is_empty()).then_some((msp_starts, msp_lengths, msp_qual));
+    build_annotations(record, nuc, msp, None)
+}
+
+/// Convenience: read fire annotations as raw arrays in molecular orientation.
+/// Returns `(starts, lengths, phred_qualities)`. All three are empty if the
+/// record has no `fire` MA type.
+pub fn extract_fire_arrays(record: &bam::Record) -> Result<(Vec<u32>, Vec<u32>, Vec<u8>)> {
+    let annot = read_annotations(record)?;
+    Ok(annot
+        .get_type(FIRE_TYPE)
+        .map(|t| {
+            let starts = t.annotations.iter().map(|a| a.start).collect();
+            let lens = t.annotations.iter().map(|a| a.length).collect();
+            let phred = t
+                .annotations
+                .iter()
+                .map(|a| a.qualities.first().copied().unwrap_or(0))
+                .collect();
+            (starts, lens, phred)
+        })
+        .unwrap_or_default())
 }
 
 fn u32_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u32>> {
