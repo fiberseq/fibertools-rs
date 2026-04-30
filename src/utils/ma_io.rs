@@ -1,14 +1,22 @@
 //! MA-spec annotation I/O bridge for fibertools-rs.
 //!
-//! `read_annotations` returns a [`MolecularAnnotations`] for any input record:
-//! the spec `MA`/`AL`/`AQ`/`AN` tags take precedence; otherwise the legacy
-//! fibertools-rs tags (`ns`/`nl` for nucleosomes, `as`/`al`/`aq` for MSPs) are
-//! parsed inline. Pre-FIRE BAMs have no `aq` and so produce `msp+` (no
-//! quality). Post-FIRE BAMs map `aq` onto the linear-scaled `msp+Q` quality.
+//! Reading: prefers MA/AL/AQ/AN; falls back to legacy `ns/nl/as/al/aq` if no
+//! MA tag is present. Returns a populated [`MolecularAnnotations`] (read
+//! length and aligned blocks set) even when no annotation tags exist.
 //!
-//! `write_annotations` always emits the spec tags. When `legacy` is set, it
-//! additionally writes the corresponding `ns`/`nl`/`as`/`al`/`aq` tags so
-//! downstream tooling that hasn't migrated yet still sees what it expects.
+//! Writing: always emits MA-spec tags. With `legacy=true` it additionally
+//! emits legacy `ns/nl/as/al/aq` for `nuc` and `msp` types so pre-MA
+//! consumers (older pyft, IGV decorators) keep working during the
+//! migration. With `legacy=false` any pre-existing legacy tags are stripped.
+//!
+//! Annotation type names produced by fibertools-rs:
+//! - `nuc`  (forward strand, no quality)
+//! - `msp`  (forward strand, no quality pre-FIRE; `Q` post-FIRE)
+//! - `fire` (forward strand, `P` phred quality)
+//!
+//! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
+//! populated by `BaseMods::populate_ma`, but are NEVER read or written here:
+//! their on-disk source of truth is `MM`/`ML`.
 
 use anyhow::{bail, Result};
 use molecular_annotation::{Annotation, MolecularAnnotations, QualitySpec, Strand};
