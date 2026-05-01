@@ -22,6 +22,10 @@ pub struct PgInjectOptions {
     /// Extract BED annotations from an annotated BAM file (reverses injection)
     #[clap(short, long)]
     pub extract: bool,
+    /// Append a `fibertig-strand` column ('+' / '-') recording the alignment
+    /// direction of the source fibertig when extracting BED annotations
+    #[clap(long)]
+    pub fibertig_strand: bool,
     /// Additionally write the output BAM header to this file
     #[clap(long)]
     pub header_out: Option<String>,

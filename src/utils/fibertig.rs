@@ -547,7 +547,11 @@ impl FiberTig {
 
         // Extract and write BED header if present
         if let Some(bed_header) = Self::extract_bed_header_from_bam_header(&header) {
-            writeln!(writer, "{}", bed_header)?;
+            if opts.fibertig_strand {
+                writeln!(writer, "{}\tfibertig-strand", bed_header)?;
+            } else {
+                writeln!(writer, "{}", bed_header)?;
+            }
         }
 
         // Read through BAM records and extract annotations
@@ -558,6 +562,8 @@ impl FiberTig {
             if record.tid() < 0 {
                 continue;
             }
+
+            let strand = if record.is_reverse() { '-' } else { '+' };
 
             // Try to extract annotations using the standard fs/fl/fa tags
             if let Some(fiber_annotations) = FiberAnnotations::from_bam_tags(
@@ -587,6 +593,9 @@ impl FiberTig {
                         for col in extra_cols {
                             write!(writer, "\t{col}")?;
                         }
+                    }
+                    if opts.fibertig_strand {
+                        write!(writer, "\t{strand}")?;
                     }
                     writeln!(writer)?;
                 }

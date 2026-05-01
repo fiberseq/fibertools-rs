@@ -297,6 +297,7 @@ fn test_inject_with_bed_annotations() -> Result<()> {
         split_size: 20, // Small split size to force splitting
         uncompressed: false,
         extract: false,
+        fibertig_strand: false,
         header_out: None,
         pansn: PansnParameters::default(),
     };
@@ -394,6 +395,7 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
         split_size: 100_000, // Large split size to avoid splitting
         uncompressed: false,
         extract: false,
+        fibertig_strand: false,
         header_out: None,
         pansn: PansnParameters::default(),
     };
@@ -412,6 +414,7 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
         split_size: 100_000,
         uncompressed: false,
         extract: true,
+        fibertig_strand: false,
         header_out: None,
         pansn: PansnParameters {
             strip: true,
@@ -446,6 +449,107 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
                 );
             }
         }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_extract_to_bed_with_fibertig_strand() -> Result<()> {
+    use rust_htslib::bam::{Header, Read as BamRead, Reader as BamReader, Writer};
+    use std::io::BufRead;
+
+    // Build a tiny BAM with one forward and one reverse-strand record, each
+    // carrying fs/fl/fa annotations covering the same query interval.
+    let header = Header::new();
+    let mut header = header;
+    let mut sq = rust_htslib::bam::header::HeaderRecord::new(b"SQ");
+    sq.push_tag(b"SN", "chr1");
+    sq.push_tag(b"LN", "100");
+    header.push_record(&sq);
+
+    let temp_bam = NamedTempFile::new()?;
+    {
+        let mut writer =
+            Writer::from_path(temp_bam.path(), &header, rust_htslib::bam::Format::Bam)?;
+        // Forward record: fs=10, fl=10, fa=fwd → ref [10,20)
+        let fwd = build_tagged_record(100, &[10], &[10], "fwd", false);
+        writer.write(&fwd)?;
+        // Reverse record: fs=10, fl=10 in forward/contig coords → ref [80,90)
+        let rev = build_tagged_record(100, &[10], &[10], "rev", true);
+        writer.write(&rev)?;
+    }
+
+    // Sanity: BamReader reads the records we just wrote.
+    {
+        let mut reader = BamReader::from_path(temp_bam.path())?;
+        let n = reader.records().count();
+        assert_eq!(n, 2);
+    }
+
+    // Extract WITH the strand flag on.
+    let temp_bed = NamedTempFile::new()?;
+    let extract_opts = PgInjectOptions {
+        global: GlobalOpts::default(),
+        reference: temp_bam.path().to_str().unwrap().to_string(),
+        out: temp_bed.path().to_str().unwrap().to_string(),
+        bed: None,
+        split_size: 100_000,
+        uncompressed: false,
+        extract: true,
+        fibertig_strand: true,
+        header_out: None,
+        pansn: PansnParameters::default(),
+    };
+    FiberTig::extract_to_bed(&extract_opts)?;
+
+    let lines: Vec<String> =
+        fibertools_rs::utils::bio_io::buffer_from(temp_bed.path().to_str().unwrap())?
+            .lines()
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+    // Expect two BED rows; last column is + for the forward record and -
+    // for the reverse record.
+    let data: Vec<Vec<&str>> = lines
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .map(|l| l.split('\t').collect())
+        .collect();
+    assert_eq!(data.len(), 2);
+
+    let fwd_row = data
+        .iter()
+        .find(|f| f.contains(&"fwd"))
+        .expect("forward row");
+    assert_eq!(*fwd_row.last().unwrap(), "+");
+
+    let rev_row = data
+        .iter()
+        .find(|f| f.contains(&"rev"))
+        .expect("reverse row");
+    assert_eq!(*rev_row.last().unwrap(), "-");
+
+    // Extract WITHOUT the flag — last column should now be the fa value, not +/-.
+    let temp_bed2 = NamedTempFile::new()?;
+    let extract_opts_off = PgInjectOptions {
+        out: temp_bed2.path().to_str().unwrap().to_string(),
+        fibertig_strand: false,
+        ..extract_opts
+    };
+    FiberTig::extract_to_bed(&extract_opts_off)?;
+    let lines2: Vec<String> =
+        fibertools_rs::utils::bio_io::buffer_from(temp_bed2.path().to_str().unwrap())?
+            .lines()
+            .collect::<std::io::Result<Vec<_>>>()?;
+    let data2: Vec<Vec<&str>> = lines2
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .map(|l| l.split('\t').collect())
+        .collect();
+    assert_eq!(data2.len(), 2);
+    for row in &data2 {
+        let last = *row.last().unwrap();
+        assert!(last == "fwd" || last == "rev", "got {last}");
     }
 
     Ok(())
