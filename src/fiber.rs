@@ -37,13 +37,13 @@ impl FiberseqData {
         }
         .to_string();
 
-        let nuc_starts = get_u32_tag(&record, b"ns");
-        let msp_starts = get_u32_tag(&record, b"as");
-        let nuc_length = get_u32_tag(&record, b"nl");
-        let msp_length = get_u32_tag(&record, b"al");
+        let (nuc_starts, nuc_length, msp_starts, msp_length, msp_qual) =
+            crate::utils::ma_io::extract_nuc_msp_arrays(&record).unwrap_or_else(|e| {
+                log::warn!("Failed to read annotations: {e}");
+                Default::default()
+            });
         let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
         let mut msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
-        let msp_qual = get_u8_tag(&record, b"aq");
         if !msp_qual.is_empty() {
             msp.set_qual(msp_qual);
         }

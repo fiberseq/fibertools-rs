@@ -1,10 +1,9 @@
 use super::decorator::get_fire_color;
 use crate::cli::FireOptions;
 use crate::fiber::FiberseqData;
-use crate::utils::bio_io;
+use crate::utils::{bio_io, ma_io};
 use crate::*;
 use anyhow;
-use bam::record::{Aux, AuxArray};
 use gbdt::gradient_boost::GBDT;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -15,18 +14,40 @@ pub fn add_fire_to_rec(
     fire_opts: &FireOptions,
     model: &GBDT,
     precision_table: &MapPrecisionValues,
+    legacy: bool,
 ) {
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
+    // FIRE produces precisions in MSP-iteration (BAM) order. Convert to
+    // molecular orientation so they pair with the molecular-ordered MSP
+    // coords that go into the MA tag.
     if rec.record.is_reverse() {
         precisions.reverse();
     }
-    let aux_array: AuxArray<u8> = (&precisions).into();
-    let aux_array_field = Aux::ArrayU8(aux_array);
-    rec.record.remove_aux(b"aq").unwrap_or(()); // remove any existing ML field
-    rec.record
-        .push_aux(b"aq", aux_array_field)
-        .expect("Cannot add FIRE precision to bam");
+
+    let mut annot = match ma_io::read_annotations(&rec.record) {
+        Ok(a) => a,
+        Err(e) => { log::warn!("FIRE: failed to read annotations: {e}"); return; }
+    };
+
+    let Some(msp) = annot.get_type(ma_io::MSP_TYPE) else {
+        log::warn!("FIRE: no msp annotations on record; skipping");
+        return;
+    };
+    if msp.annotations.len() != precisions.len() {
+        log::warn!(
+            "FIRE precision count ({}) does not match MSP count ({}); skipping",
+            precisions.len(), msp.annotations.len(),
+        );
+        return;
+    }
+
+    let starts: Vec<u32> = msp.annotations.iter().map(|a| a.start).collect();
+    let lens:   Vec<u32> = msp.annotations.iter().map(|a| a.length).collect();
+    ma_io::add_fire_annotations(&mut annot, &starts, &lens, &precisions);
+
+    ma_io::write_annotations(&mut rec.record, &annot, legacy);
+    
     log::trace!("precisions: {precisions:?}");
 }
 
@@ -65,7 +86,13 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
         for recs in &fibers.chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
-                add_fire_to_rec(r, fire_opts, &model, &precision_table);
+                add_fire_to_rec(
+                    r,
+                    fire_opts,
+                    &model,
+                    &precision_table,
+                    fire_opts.legacy_tags,
+                );
             });
             for rec in recs {
                 out.write(&rec.record)?;

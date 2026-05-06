@@ -56,6 +56,10 @@ pub struct FireOptions {
     /// Optional path to a FDR table
     #[clap(long, env)]
     pub fdr_table: Option<String>,
+    /// Also emit legacy ns/nl/as/al/aq tags alongside the MA-spec tags
+    /// (`MA`/`AQ`/`AN`). Default: only MA-spec tags are written.
+    #[clap(long)]
+    pub legacy_tags: bool,
 }
 
 impl Default for FireOptions {
@@ -76,6 +80,7 @@ impl Default for FireOptions {
             min_msp_length_for_positive_fire_call: 85,
             model: None,
             fdr_table: None,
+            legacy_tags: false,
         }
     }
 }

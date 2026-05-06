@@ -29,6 +29,10 @@ pub struct PredictM6AOptions {
     /// Skip the actual prediction step to allow for testing the speed of other parts of the code
     #[clap(long, help_heading = "Developer-Options", hide = true)]
     pub fake: bool,
+    /// Also emit legacy ns/nl/as/al/aq tags alongside the MA-spec tags
+    /// (`MA`/`AQ`/`AN`). Default: only MA-spec tags are written.
+    #[clap(long)]
+    pub legacy_tags: bool,
 }
 
 impl std::default::Default for PredictM6AOptions {
@@ -42,6 +46,7 @@ impl std::default::Default for PredictM6AOptions {
             all_calls: false,
             batch_size: 1,
             fake: false,
+            legacy_tags: false,
         }
     }
 }
