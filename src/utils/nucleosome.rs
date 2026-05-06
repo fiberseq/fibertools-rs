@@ -1,8 +1,7 @@
 use crate::cli::NucleosomeParameters;
-use rust_htslib::{
-    bam,
-    bam::record::{Aux, AuxArray},
-};
+use crate::utils::ma_io;
+use molecular_annotation::MolecularAnnotations;
+use rust_htslib::bam;
 
 pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeParameters) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
@@ -189,13 +188,8 @@ pub fn add_nucleosomes_to_record(
     record: &mut bam::Record,
     m6a: &[i64],
     options: &NucleosomeParameters,
+    legacy: bool,
 ) {
-    record.remove_aux(b"ns").unwrap_or(());
-    record.remove_aux(b"nl").unwrap_or(());
-    record.remove_aux(b"as").unwrap_or(());
-    record.remove_aux(b"al").unwrap_or(());
-    record.remove_aux(b"aq").unwrap_or(());
-
     let nucs = if options.allowed_m6a_skips < 0 {
         find_nucleosomes(m6a, options)
     } else {
@@ -205,18 +199,10 @@ pub fn add_nucleosomes_to_record(
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
 
-    for (&tag, array) in
-        [b"ns", b"nl", b"as", b"al"]
-            .iter()
-            .zip([nuc_starts, nuc_lengths, msp_starts, msp_lengths])
-    {
-        if array.is_empty() {
-            continue;
-        }
-        let aux_array: AuxArray<u32> = (&array).into();
-        let aux_array_field = Aux::ArrayU32(aux_array);
-        record.push_aux(tag, aux_array_field).unwrap();
-    }
+    let mut annot = MolecularAnnotations::from_record(record);
+    ma_io::add_nuc_annotations(&mut annot, &nuc_starts, &nuc_lengths);
+    ma_io::add_msp_annotations(&mut annot, &msp_starts, &msp_lengths, None);
+    ma_io::write_annotations(record, &annot, legacy);
 }
 
 #[cfg(test)]

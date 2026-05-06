@@ -132,9 +132,18 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
 /// Write annotations to a BAM record.
 ///
 /// Always emits the MA-spec tags. When `legacy` is set, also emits the
-/// fibertools-rs legacy `ns`/`nl`/`as`/`al`/`aq` tags for `nuc` and `msp`
-/// annotation types. When not set, any pre-existing legacy tags are stripped
-/// so the output is MA-only.
+/// fibertools-rs legacy `ns`/`nl`/`as`/`al`/`aq` tags so pre-MA consumers
+/// (older pyft, IGV decorators) keep working during the migration.
+///
+/// The legacy mapping:
+/// - `nuc` → `ns`/`nl`
+/// - `msp` → `as`/`al`
+/// - `fire` → `aq` (paired with the `as`/`al` from `msp`, since pre-MA
+///   fibertools stored FIRE precisions as MSP qualities). When no `fire`
+///   type is present, `aq` falls back to `msp`'s own quality if it has one.
+///
+/// When `legacy` is not set, any pre-existing legacy tags are stripped so
+/// the output is MA-only.
 pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations, legacy: bool) {
     for tag in LEGACY_NUC_MSP_TAGS {
         record.remove_aux(tag).ok();
@@ -149,14 +158,45 @@ fn write_legacy_nuc_msp(record: &mut bam::Record, annot: &MolecularAnnotations) 
     if let Some(nuc) = annot.get_type(NUC_TYPE) {
         push_starts_lens(record, b"ns", b"nl", &nuc.annotations);
     }
+
+    // Legacy convention: pre-MA fibertools wrote FIRE precisions onto the
+    // MSP `aq` tag — there was no separate FIRE tag. So legacy MSP output
+    // takes coords from MSP and quality from FIRE when FIRE is present;
+    // otherwise it falls back to MSP's own quality (when present), or no
+    // `aq` at all (pre-FIRE state).
     if let Some(msp) = annot.get_type(MSP_TYPE) {
         push_starts_lens(record, b"as", b"al", &msp.annotations);
-        if msp.quality_spec.num_qualities() == 1 && msp.quality_spec.has_quality() {
-            let aq: Vec<u8> = msp
-                .annotations
-                .iter()
-                .map(|a| a.qualities.first().copied().unwrap_or(0))
-                .collect();
+
+        let aq: Option<Vec<u8>> = if let Some(fire) = annot.get_type(FIRE_TYPE) {
+            // Sanity: legacy convention assumes FIRE coords mirror MSP coords.
+            // If they don't, the `aq` array we emit won't align with `as`/`al`.
+            debug_assert_eq!(
+                fire.annotations.len(),
+                msp.annotations.len(),
+                "legacy aq emission requires fire and msp to have matching counts"
+            );
+            if fire.annotations.len() == msp.annotations.len() {
+                Some(
+                    fire.annotations
+                        .iter()
+                        .map(|a| a.qualities.first().copied().unwrap_or(0))
+                        .collect(),
+                )
+            } else {
+                None
+            }
+        } else if msp.quality_spec.num_qualities() == 1 && msp.quality_spec.has_quality() {
+            Some(
+                msp.annotations
+                    .iter()
+                    .map(|a| a.qualities.first().copied().unwrap_or(0))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
+        if let Some(aq) = aq {
             if !aq.is_empty() {
                 record.push_aux(b"aq", Aux::ArrayU8((&aq).into())).ok();
             }
@@ -223,14 +263,68 @@ pub fn extract_nuc_msp_arrays(
     Ok((nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual))
 }
 
-/// Build a [`MolecularAnnotations`] for nuc/msp/fire types from raw arrays in
-/// molecular orientation. Each input is optional; passing `None` skips that
-/// type. Coordinates and lengths are paired positionally.
+/// Add `nuc` annotations (forward strand, no quality) to `annot`.
 ///
-/// - `nuc`:  `(starts, lengths)` — no quality.
-/// - `msp`:  `(starts, lengths, optional Q-scaled qualities)`. With qualities
-///   present, the type uses `msp+Q`; without, `msp+` (no quality).
-/// - `fire`: `(starts, lengths, phred-scaled qualities)`. Always `fire+P`.
+/// No-op if `starts` is empty. `starts` and `lens` must be the same length
+/// and paired positionally.
+pub fn add_nuc_annotations(
+    annot: &mut MolecularAnnotations,
+    starts: &[u32],
+    lens: &[u32],
+) {
+    if starts.is_empty() {
+        return;
+    }
+    let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
+    for (s, l) in starts.iter().zip(lens.iter()) {
+        t.add(*s, *l, Strand::Forward, vec![], None);
+    }
+}
+
+/// Add `msp` annotations (forward strand) to `annot`.
+///
+/// With `qualities` present, the type uses `msp+Q`; without, `msp+` (no
+/// quality). No-op if `starts` is empty. All input slices must be the same
+/// length and paired positionally.
+pub fn add_msp_annotations(
+    annot: &mut MolecularAnnotations,
+    starts: &[u32],
+    lens: &[u32],
+    qualities: Option<&[u8]>,
+) {
+    if starts.is_empty() {
+        return;
+    }
+    let qspec = match qualities {
+        Some(_) => "Q".parse::<QualitySpec>().expect("Q parses"),
+        None => QualitySpec::none(),
+    };
+    let t = annot.add_annotation_type(MSP_TYPE, qspec);
+    for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
+        let qv = qualities.map(|q| vec![q[i]]).unwrap_or_default();
+        t.add(*s, *l, Strand::Forward, qv, None);
+    }
+}
+
+/// Add `fire` annotations (forward strand, phred quality) to `annot`.
+///
+/// No-op if `starts` is empty. All input slices must be the same length and
+/// paired positionally.
+pub fn add_fire_annotations(
+    annot: &mut MolecularAnnotations,
+    starts: &[u32],
+    lens: &[u32],
+    phred: &[u8],
+) {
+    if starts.is_empty() {
+        return;
+    }
+    let t = annot.add_annotation_type(FIRE_TYPE, "P".parse::<QualitySpec>().expect("P parses"));
+    for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
+        t.add(*s, *l, Strand::Forward, vec![phred[i]], None);
+    }
+}
+
 pub fn build_annotations(
     record: &bam::Record,
     nuc: Option<(&[u32], &[u32])>,
@@ -239,34 +333,13 @@ pub fn build_annotations(
 ) -> MolecularAnnotations {
     let mut annot = MolecularAnnotations::from_record(record);
     if let Some((starts, lens)) = nuc {
-        if !starts.is_empty() {
-            let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
-            for (s, l) in starts.iter().zip(lens.iter()) {
-                t.add(*s, *l, Strand::Forward, vec![], None);
-            }
-        }
+        add_nuc_annotations(&mut annot, starts, lens);
     }
     if let Some((starts, lens, q)) = msp {
-        if !starts.is_empty() {
-            let qspec = match q {
-                Some(_) => "Q".parse::<QualitySpec>().expect("Q parses"),
-                None => QualitySpec::none(),
-            };
-            let t = annot.add_annotation_type(MSP_TYPE, qspec);
-            for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
-                let qv = q.map(|q| vec![q[i]]).unwrap_or_default();
-                t.add(*s, *l, Strand::Forward, qv, None);
-            }
-        }
+        add_msp_annotations(&mut annot, starts, lens, q);
     }
     if let Some((starts, lens, phred)) = fire {
-        if !starts.is_empty() {
-            let t =
-                annot.add_annotation_type(FIRE_TYPE, "P".parse::<QualitySpec>().expect("P parses"));
-            for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
-                t.add(*s, *l, Strand::Forward, vec![phred[i]], None);
-            }
-        }
+        add_fire_annotations(&mut annot, starts, lens, phred);
     }
     annot
 }

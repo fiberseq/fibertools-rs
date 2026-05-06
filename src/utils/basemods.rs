@@ -11,6 +11,13 @@ use std::collections::HashMap;
 
 use std::convert::TryFrom;
 
+/// A group of base modification calls of one (base, strand, modification_type)
+/// triple — for example, "all m6A calls on adenines on the forward strand."
+///
+/// Per-call positions and qualities live in `ranges`. This reuses the
+/// `Ranges`/`FiberAnnotations` infrastructure (rather than a separate type)
+/// to share the position-flipping, quality-filtering, and reference-liftover
+/// logic. Each call is stored as a 1bp range; the `length` field is always 1.
 #[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
 pub struct BaseMod {
     pub modified_base: u8,
