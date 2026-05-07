@@ -6,3 +6,6 @@ mod extract;
 mod center;
 #[path = "regression/qc.rs"]
 mod qc;
+#[path = "regression/pileup.rs"]
+mod pileup;
+

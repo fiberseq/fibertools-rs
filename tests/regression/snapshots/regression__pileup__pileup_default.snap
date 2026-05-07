@@ -1,6 +1,6 @@
 ---
 source: tests/regression/pileup.rs
-expression: "std::fs::read_to_string(tmp.path()).unwrap()"
+expression: "select_tsv_cols(&out,\n&[\"#chrom\", \"start\", \"end\", \"coverage\", \"fire_coverage\", \"score\",\n\"nuc_coverage\", \"msp_coverage\",])"
 ---
 #chrom	start	end	coverage	fire_coverage	score	nuc_coverage	msp_coverage
 ptg000001l	306	466	1	0	-1	0	0

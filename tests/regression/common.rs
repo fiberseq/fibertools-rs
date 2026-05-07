@@ -11,6 +11,34 @@ pub fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+/// Select named columns from TSV output by header name, in the order given.
+/// Snapshots only the specified columns so that adding new columns to a
+/// command's output doesn't count as a regression.
+pub fn select_tsv_cols(tsv: &str, cols: &[&str]) -> String {
+    let mut lines = tsv.lines();
+    let headers: Vec<&str> = lines.next().unwrap_or("").split('\t').collect();
+    let indices: Vec<usize> = cols
+        .iter()
+        .map(|c| {
+            headers
+                .iter()
+                .position(|h| h == c)
+                .unwrap_or_else(|| panic!("column {c:?} not found; headers: {headers:?}"))
+        })
+        .collect();
+    let mut out = cols.join("\t") + "\n";
+    for line in lines {
+        let fields: Vec<&str> = line.split('\t').collect();
+        out += &indices
+            .iter()
+            .map(|&i| fields.get(i).copied().unwrap_or(""))
+            .collect::<Vec<_>>()
+            .join("\t");
+        out += "\n";
+    }
+    out
+}
+
 /// Run ft with the given args; return stdout as a String. Panics on non-zero exit.
 pub fn run(args: &[&str]) -> String {
     let out = Command::new(ft())
