@@ -7,7 +7,8 @@ fn extract_m6a() {
     run(&[
         "extract",
         fixture("all.bam").to_str().unwrap(),
-        "--m6a", tmp.path().to_str().unwrap(),
+        "--m6a",
+        tmp.path().to_str().unwrap(),
     ]);
     insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
 }
@@ -18,7 +19,8 @@ fn extract_nuc() {
     run(&[
         "extract",
         fixture("all.bam").to_str().unwrap(),
-        "--nuc", tmp.path().to_str().unwrap(),
+        "--nuc",
+        tmp.path().to_str().unwrap(),
     ]);
     insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
 }
@@ -29,7 +31,8 @@ fn extract_msp() {
     run(&[
         "extract",
         fixture("all.bam").to_str().unwrap(),
-        "--msp", tmp.path().to_str().unwrap(),
+        "--msp",
+        tmp.path().to_str().unwrap(),
     ]);
     insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
 }
@@ -42,15 +45,23 @@ fn extract_all_napa() {
     run(&[
         "extract",
         fixture("NAPA.bam").to_str().unwrap(),
-        "--all", tmp.path().to_str().unwrap(),
+        "--all",
+        tmp.path().to_str().unwrap(),
     ]);
     let out = std::fs::read_to_string(tmp.path()).unwrap();
-    insta::assert_snapshot!(select_tsv_cols(&out, &[
-        "#ct", "st", "en", "fiber",
-        "nuc_starts", "nuc_lengths",
-        "msp_starts", "msp_lengths",
-        "fire", "m6a",
-    ]));
+    insta::assert_snapshot!(select_tsv_cols(
+        &out,
+        &[
+            "#ct",
+            "st",
+            "en",
+            "fiber",
+            "nuc_starts",
+            "nuc_lengths",
+            "msp_starts",
+            "msp_lengths",
+            "fire",
+            "m6a",
+        ]
+    ));
 }
-
-
