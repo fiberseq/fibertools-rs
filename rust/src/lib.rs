@@ -127,7 +127,7 @@ pub use types::{
 use std::str::FromStr;
 
 /// Container for all molecular annotations on a read
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MolecularAnnotations {
     /// Length of the read at the time annotations were made
     pub read_length: u32,
