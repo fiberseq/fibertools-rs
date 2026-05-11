@@ -1,5 +1,18 @@
-use super::common::{fixture, run, select_tsv_cols};
+use super::common::{fixture, run, select_bed12_cols, select_tsv_cols};
 use tempfile::NamedTempFile;
+
+// bed12 columns worth snapshotting: locator + per-record feature data.
+// score/thick_*/item_rgb are constants or duplicates for these outputs.
+const BED12_COLS: &[&str] = &[
+    "chrom",
+    "start",
+    "end",
+    "name",
+    "strand",
+    "block_count",
+    "block_sizes",
+    "block_starts",
+];
 
 #[test]
 fn extract_m6a() {
@@ -10,7 +23,8 @@ fn extract_m6a() {
         "--m6a",
         tmp.path().to_str().unwrap(),
     ]);
-    insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
+    let out = std::fs::read_to_string(tmp.path()).unwrap();
+    insta::assert_snapshot!(select_bed12_cols(&out, BED12_COLS));
 }
 
 #[test]
@@ -22,7 +36,8 @@ fn extract_nuc() {
         "--nuc",
         tmp.path().to_str().unwrap(),
     ]);
-    insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
+    let out = std::fs::read_to_string(tmp.path()).unwrap();
+    insta::assert_snapshot!(select_bed12_cols(&out, BED12_COLS));
 }
 
 #[test]
@@ -34,7 +49,8 @@ fn extract_msp() {
         "--msp",
         tmp.path().to_str().unwrap(),
     ]);
-    insta::assert_snapshot!(std::fs::read_to_string(tmp.path()).unwrap());
+    let out = std::fs::read_to_string(tmp.path()).unwrap();
+    insta::assert_snapshot!(select_bed12_cols(&out, BED12_COLS));
 }
 
 // NAPA.bam has FIRE annotations (aq tag) — exercises FIRE in the --all tabular output

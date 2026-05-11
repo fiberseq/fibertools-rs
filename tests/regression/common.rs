@@ -39,6 +39,47 @@ pub fn select_tsv_cols(tsv: &str, cols: &[&str]) -> String {
     out
 }
 
+/// Select bed12 fields by name from headerless bed12 output. Field names follow
+/// the bed12 spec. Emits a synthetic header so snapshots stay self-describing,
+/// and lets tests drop redundant/constant columns (score, thick_*, item_rgb)
+/// without binding to numeric indices.
+pub fn select_bed12_cols(tsv: &str, cols: &[&str]) -> String {
+    const BED12: &[&str] = &[
+        "chrom",
+        "start",
+        "end",
+        "name",
+        "score",
+        "strand",
+        "thick_start",
+        "thick_end",
+        "item_rgb",
+        "block_count",
+        "block_sizes",
+        "block_starts",
+    ];
+    let indices: Vec<usize> = cols
+        .iter()
+        .map(|c| {
+            BED12
+                .iter()
+                .position(|f| f == c)
+                .unwrap_or_else(|| panic!("bed12 field {c:?} not in spec; valid: {BED12:?}"))
+        })
+        .collect();
+    let mut out = cols.join("\t") + "\n";
+    for line in tsv.lines() {
+        let fields: Vec<&str> = line.split('\t').collect();
+        out += &indices
+            .iter()
+            .map(|&i| fields.get(i).copied().unwrap_or(""))
+            .collect::<Vec<_>>()
+            .join("\t");
+        out += "\n";
+    }
+    out
+}
+
 /// Run ft with the given args; return stdout as a String. Panics on non-zero exit.
 pub fn run(args: &[&str]) -> String {
     let out = Command::new(ft())
