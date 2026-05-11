@@ -2,6 +2,7 @@ use crate::utils::bamannotations::*;
 use crate::utils::bio_io::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use regex::Regex;
 use rust_htslib::{
     bam,
@@ -10,6 +11,10 @@ use rust_htslib::{
 use std::collections::HashMap;
 
 use std::convert::TryFrom;
+
+/// Annotation type names emitted by `BaseMods::populate_ma`.
+pub const M6A_TYPE: &str = "m6a";
+pub const CPG_TYPE: &str = "cpg";
 
 /// A group of base modification calls of one (base, strand, modification_type)
 /// triple — for example, "all m6A calls on adenines on the forward strand."
@@ -302,6 +307,32 @@ impl BaseMods {
             .map(|x| &x.ranges)
             .collect();
         Ranges::merge_ranges(ranges)
+    }
+
+    /// Inject `m6a` and `cpg` annotation types into `annot` from the parsed
+    /// ML/MM data on this object. Coordinates are emitted in molecular
+    /// orientation (forward) and the per-base ML score is preserved as a
+    /// linear ("Q") quality.
+    ///
+    /// The MA tag layer in `ma_io` never reads or writes m6a/cpg — their
+    /// on-disk source of truth is ML/MM — so this is the only place the
+    /// `MolecularAnnotations` object gets these types attached.
+    pub fn populate_ma(&self, annot: &mut MolecularAnnotations) {
+        Self::add_basemod_type(annot, M6A_TYPE, &self.m6a());
+        Self::add_basemod_type(annot, CPG_TYPE, &self.cpg());
+    }
+
+    fn add_basemod_type(annot: &mut MolecularAnnotations, type_name: &str, merged: &Ranges) {
+        if merged.annotations.is_empty() {
+            return;
+        }
+        let starts = merged.forward_starts();
+        let quals = merged.get_forward_quals();
+        let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
+        let t = annot.add_annotation_type(type_name, qspec);
+        for (s, q) in starts.iter().zip(quals.iter()) {
+            t.add(*s as u32, 1, Strand::Forward, vec![*q], None);
+        }
     }
 
     /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;

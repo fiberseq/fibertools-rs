@@ -111,15 +111,17 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
     //out_buffer.write_all(header.as_bytes())?;
 
     for rec in fibers {
-        let msp_starts = rec.msp.reference_starts();
-        let nuc_starts = rec.nuc.reference_starts();
+        let msp = rec.msp();
+        let nuc = rec.nuc();
+        let msp_starts = msp.reference_starts();
+        let nuc_starts = nuc.reference_starts();
         let start_iter = msp_starts.iter().chain(nuc_starts.iter());
 
-        let msp_ends = rec.msp.reference_ends();
-        let nuc_ends = rec.nuc.reference_ends();
+        let msp_ends = msp.reference_ends();
+        let nuc_ends = nuc.reference_ends();
         let end_iter = msp_ends.iter().chain(nuc_ends.iter());
-        let msp_qual = rec.msp.qual();
-        let nuc_qual = rec.nuc.qual();
+        let msp_qual = msp.qual();
+        let nuc_qual = nuc.qual();
         let qual_iter = msp_qual.iter().chain(nuc_qual.iter());
         let n_msps = msp_starts.len();
         for (count, ((start, end), qual)) in start_iter.zip(end_iter).zip(qual_iter).enumerate() {

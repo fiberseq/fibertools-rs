@@ -3,9 +3,11 @@ use super::subcommands::center::CenteredFiberData;
 use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamannotations::*;
-use crate::utils::basemods::BaseMods;
+use crate::utils::basemods::{BaseMods, CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
+use crate::utils::ma_io::{MSP_TYPE, NUC_TYPE};
+use molecular_annotation::MolecularAnnotations;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
@@ -15,6 +17,7 @@ use std::fmt::Write;
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
+    pub annotations: MolecularAnnotations,
     pub msp: Ranges,
     pub nuc: Ranges,
     pub m6a: Ranges,
@@ -36,7 +39,10 @@ impl FiberseqData {
             "."
         }
         .to_string();
-
+        let mut annotations = crate::utils::ma_io::read_annotations(&record).unwrap_or_else(|e| {
+            log::warn!("Failed to read annotations: {e}");
+            MolecularAnnotations::from_record(&record)
+        });
         let (nuc_starts, nuc_length, msp_starts, msp_length, msp_qual) =
             crate::utils::ma_io::extract_nuc_msp_arrays(&record).unwrap_or_else(|e| {
                 log::warn!("Failed to read annotations: {e}");
@@ -64,6 +70,7 @@ impl FiberseqData {
         // get fiberseq basemods
         let mut base_mods = BaseMods::new(&record, filters.min_ml_score);
         base_mods.filter_at_read_ends(filters.strip_starting_basemods);
+        base_mods.populate_ma(&mut annotations);
 
         //let (m6a, cpg) = FiberMods::new(&base_mods);
         let m6a = base_mods.m6a();
@@ -71,6 +78,7 @@ impl FiberseqData {
 
         let mut fsd = FiberseqData {
             record,
+            annotations,
             msp,
             nuc,
             m6a,
@@ -127,6 +135,26 @@ impl FiberseqData {
     // GET FUNCTIONS
     //
 
+    /// View over `msp` annotations derived from `self.annotations`.
+    pub fn msp(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, MSP_TYPE)
+    }
+
+    /// View over `nuc` annotations derived from `self.annotations`.
+    pub fn nuc(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, NUC_TYPE)
+    }
+
+    /// View over `m6a` annotations derived from `self.annotations`.
+    pub fn m6a(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, M6A_TYPE)
+    }
+
+    /// View over `cpg` annotations derived from `self.annotations`.
+    pub fn cpg(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, CPG_TYPE)
+    }
+
     pub fn get_qname(&self) -> String {
         String::from_utf8_lossy(self.record.qname()).to_string()
     }
@@ -176,6 +204,8 @@ impl FiberseqData {
 
     /// Validate that all MSP boundaries align with m6A positions after centering
     fn validate_msp_m6a_alignment(&self) {
+        // Legacy fields are used here because centering only mutates the
+        // legacy Ranges (Branch 2 will move centering onto the MA spec).
         let m6a_positions = self.m6a.starts();
         let msp_boundaries: Vec<i64> = self
             .msp
@@ -203,54 +233,50 @@ impl FiberseqData {
     //  WRITE BED12 FUNCTIONS
     //
     pub fn write_msp(&self, reference: bool) -> String {
+        let msp = self.msp();
         let (starts, _ends, lengths) = if reference {
             (
-                self.msp.reference_starts(),
-                self.msp.reference_ends(),
-                self.msp.reference_lengths(),
+                msp.reference_starts(),
+                msp.reference_ends(),
+                msp.reference_lengths(),
             )
         } else {
-            (
-                self.msp.option_starts(),
-                self.msp.option_ends(),
-                self.msp.option_lengths(),
-            )
+            (msp.option_starts(), msp.option_ends(), msp.option_lengths())
         };
         self.to_bed12(reference, &starts, &lengths, LINKER_COLOR)
     }
 
     pub fn write_nuc(&self, reference: bool) -> String {
+        let nuc = self.nuc();
         let (starts, _ends, lengths) = if reference {
             (
-                self.nuc.reference_starts(),
-                self.nuc.reference_ends(),
-                self.nuc.reference_lengths(),
+                nuc.reference_starts(),
+                nuc.reference_ends(),
+                nuc.reference_lengths(),
             )
         } else {
-            (
-                self.nuc.option_starts(),
-                self.nuc.option_ends(),
-                self.nuc.option_lengths(),
-            )
+            (nuc.option_starts(), nuc.option_ends(), nuc.option_lengths())
         };
         self.to_bed12(reference, &starts, &lengths, NUC_COLOR)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
+        let m6a = self.m6a();
         let starts = if reference {
-            self.m6a.reference_starts()
+            m6a.reference_starts()
         } else {
-            self.m6a.option_starts()
+            m6a.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, M6A_COLOR)
     }
 
     pub fn write_cpg(&self, reference: bool) -> String {
+        let cpg = self.cpg();
         let starts = if reference {
-            self.cpg.reference_starts()
+            cpg.reference_starts()
         } else {
-            self.cpg.option_starts()
+            cpg.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, CPG_COLOR)
@@ -415,11 +441,15 @@ impl FiberseqData {
             .count() as i64;
 
         // get the info
-        let m6a_count = self.m6a.annotations.len();
-        let m6a_qual = self.m6a.qual().iter().map(|a| Some(*a as i64)).collect();
-        let cpg_count = self.cpg.annotations.len();
-        let cpg_qual = self.cpg.qual().iter().map(|a| Some(*a as i64)).collect();
-        let fire = self.msp.qual().iter().map(|a| Some(*a as i64)).collect();
+        let m6a = self.m6a();
+        let cpg = self.cpg();
+        let msp = self.msp();
+        let nuc = self.nuc();
+        let m6a_count = m6a.len();
+        let m6a_qual = m6a.qual().iter().map(|a| Some(*a as i64)).collect();
+        let cpg_count = cpg.len();
+        let cpg_qual = cpg.qual().iter().map(|a| Some(*a as i64)).collect();
+        let fire = msp.qual().iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -453,8 +483,8 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = self.nuc.lengths().iter().sum::<i64>();
-        let total_msp_bp = self.msp.lengths().iter().sum::<i64>();
+        let total_nuc_bp = nuc.lengths().iter().sum::<i64>();
+        let total_msp_bp = msp.lengths().iter().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
@@ -462,20 +492,20 @@ impl FiberseqData {
         .unwrap();
         // add fiber features
         let vecs = [
-            self.nuc.option_starts(),
-            self.nuc.option_lengths(),
-            self.nuc.reference_starts(),
-            self.nuc.reference_lengths(),
-            self.msp.option_starts(),
-            self.msp.option_lengths(),
+            nuc.option_starts(),
+            nuc.option_lengths(),
+            nuc.reference_starts(),
+            nuc.reference_lengths(),
+            msp.option_starts(),
+            msp.option_lengths(),
             fire,
-            self.msp.reference_starts(),
-            self.msp.reference_lengths(),
-            self.m6a.option_starts(),
-            self.m6a.reference_starts(),
+            msp.reference_starts(),
+            msp.reference_lengths(),
+            m6a.option_starts(),
+            m6a.reference_starts(),
             m6a_qual,
-            self.cpg.option_starts(),
-            self.cpg.reference_starts(),
+            cpg.option_starts(),
+            cpg.reference_starts(),
             cpg_qual,
         ];
         for vec in &vecs {

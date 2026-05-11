@@ -356,6 +356,7 @@ mod tests {
             .collect();
         FiberseqData {
             record: rust_htslib::bam::Record::new(),
+            annotations: molecular_annotation::MolecularAnnotations::new(1000),
             msp: FiberAnnotations::from_annotations(msp_anns, 1000, false),
             nuc: FiberAnnotations::from_annotations(vec![], 1000, false),
             m6a: FiberAnnotations::from_annotations(m6a_anns, 1000, false),
