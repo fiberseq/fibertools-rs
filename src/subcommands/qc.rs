@@ -130,7 +130,7 @@ impl<'a> QcStats<'a> {
 
         // add the m6a to the working queue
         let mut m6a_vec: Vec<f64> = vec![0.0; fiber.record.seq_len()];
-        for m6a in fiber.m6a.starts().iter() {
+        for m6a in fiber.m6a().starts().iter() {
             m6a_vec[*m6a as usize] = 1.0;
         }
 
@@ -155,18 +155,20 @@ impl<'a> QcStats<'a> {
     }
 
     fn add_ranges(&mut self, fiber: &fiber::FiberseqData) {
-        Self::add_range_lengths(&mut self.msp_lengths, &fiber.msp);
-        Self::add_range_lengths(&mut self.nuc_lengths, &fiber.nuc);
+        let msp = fiber.msp();
+        let nuc = fiber.nuc();
+        Self::add_range_lengths(&mut self.msp_lengths, &msp.lengths());
+        Self::add_range_lengths(&mut self.nuc_lengths, &nuc.lengths());
         self.nuc_count
-            .entry(fiber.nuc.annotations.len() as i64)
+            .entry(nuc.len() as i64)
             .and_modify(|e| *e += 1)
             .or_insert(1);
         self.msp_count
-            .entry(fiber.msp.annotations.len() as i64)
+            .entry(msp.len() as i64)
             .and_modify(|e| *e += 1)
             .or_insert(1);
         // read length per nucleosome
-        let read_length = fiber.record.seq_len() as f32 / fiber.nuc.annotations.len() as f32;
+        let read_length = fiber.record.seq_len() as f32 / nuc.len() as f32;
         self.read_length_per_nuc
             .entry(ordered_float_10k_round(read_length))
             .and_modify(|e| *e += 1)
@@ -204,7 +206,7 @@ impl<'a> QcStats<'a> {
     }
 
     fn add_basemod_stats(&mut self, fiber: &fiber::FiberseqData) {
-        let m6a_count = fiber.m6a.annotations.len() as i64;
+        let m6a_count = fiber.m6a().len() as i64;
         self.m6a_count
             .entry(m6a_count)
             .and_modify(|e| *e += 1)
@@ -226,31 +228,28 @@ impl<'a> QcStats<'a> {
 
         // cpg count
         self.cpg_count
-            .entry(fiber.cpg.annotations.len() as i64)
+            .entry(fiber.cpg().len() as i64)
             .and_modify(|e| *e += 1)
             .or_insert(1);
     }
 
-    fn add_range_lengths(
-        hashmap: &mut HashMap<i64, i64>,
-        range: &crate::utils::bamannotations::Ranges,
-    ) {
-        for r in range.lengths().iter() {
+    fn add_range_lengths(hashmap: &mut HashMap<i64, i64>, lengths: &[i64]) {
+        for r in lengths.iter() {
             hashmap.entry(*r).and_modify(|e| *e += 1).or_insert(1);
         }
     }
 
     /// calculate the m6a per MSP/FIRE element
     fn m6a_per_msp(&mut self, fiber: &fiber::FiberseqData) {
-        for annotation in fiber.msp.into_iter() {
-            let st = annotation.start;
-            let en = annotation.end;
-            let qual = annotation.qual;
+        let msp = fiber.msp();
+        let m6a_starts = fiber.m6a().starts();
+        for annotation in &msp {
+            let st = annotation.query_start as i64;
+            let en = annotation.query_end as i64;
+            let qual = annotation.qualities.first().copied().unwrap_or(0);
             let is_fire = qual >= 230;
             let msp_size = en - st;
-            let m6a_count = fiber
-                .m6a
-                .starts()
+            let m6a_count = m6a_starts
                 .iter()
                 .filter(|&&m6a_st| st <= m6a_st && m6a_st < en)
                 .count() as i64;

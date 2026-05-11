@@ -166,9 +166,10 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
         map.insert(color, vec![]);
     }
 
-    let ref_starts = fiber.msp.reference_starts();
-    let ref_lengths = fiber.msp.reference_lengths();
-    let quals = fiber.msp.qual();
+    let msp = fiber.msp();
+    let ref_starts = msp.reference_starts();
+    let ref_lengths = msp.reference_lengths();
+    let quals = msp.qual();
 
     for ((pos, length), qual) in ref_starts.iter().zip(ref_lengths.iter()).zip(quals.iter()) {
         if let (Some(p), Some(l)) = (pos, length) {
@@ -201,10 +202,11 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
 }
 
 pub fn decorator_from_bam(fiber: &FiberseqData) -> (String, Vec<Decorator<'_>>) {
-    let m6a_starts = fiber.m6a.reference_starts();
-    let cpg_starts = fiber.cpg.reference_starts();
-    let nuc_starts = fiber.nuc.reference_starts();
-    let nuc_lengths = fiber.nuc.reference_lengths();
+    let m6a_starts = fiber.m6a().reference_starts();
+    let cpg_starts = fiber.cpg().reference_starts();
+    let nuc = fiber.nuc();
+    let nuc_starts = nuc.reference_starts();
+    let nuc_lengths = nuc.reference_lengths();
 
     let mut decorators = vec![
         Decorator::new(fiber, &m6a_starts, None, M6A_COLOR, "m6A"),

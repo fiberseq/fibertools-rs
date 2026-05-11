@@ -1,7 +1,7 @@
 use crate::utils::bamlift::*;
+use molecular_annotation::{AnnotationInfo, MolecularAnnotations};
 use rust_htslib::bam;
 use rust_htslib::bam::ext::BamRecordExtensions;
-
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct FiberAnnotation {
     pub start: i64,
@@ -125,7 +125,15 @@ impl FiberAnnotations {
             // MA spec inward semantics for multi-bp query-space ranges.
             // Half-open block matching; endpoints in indel gaps snap inward
             // toward the aligned region rather than to the nearer block edge.
-            let blocks = molecular_annotation::AlignedBlocks::from_record(record);
+            //
+            // Build AlignedBlocks directly from aligned_block_pairs to match
+            // the legacy lift's exact source (the spec's `from_record` skips
+            // records that report is_unmapped, which fibertig synthetic test
+            // records can hit even with a valid CIGAR).
+            let pairs = record.aligned_block_pairs().map(|([qs, qe], [rs, re])| {
+                ([qs as u32, qe as u32], [rs as u32, re as u32])
+            });
+            let blocks = molecular_annotation::AlignedBlocks::from_pairs(pairs, seq_len as u32);
             let mut rs_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
             let mut re_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
             let mut rl_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
@@ -208,6 +216,14 @@ impl FiberAnnotations {
         for (annotation, &q) in self.annotations.iter_mut().zip(forward_qual.iter()) {
             annotation.qual = q;
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.annotations.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.annotations.is_empty()
     }
 
     // Backward compatibility methods
@@ -639,3 +655,130 @@ impl<'a> Iterator for FiberAnnotationsIterator<'a> {
 
 // Backward compatibility alias
 pub type RangesIterator<'a> = FiberAnnotationsIterator<'a>;
+
+
+/// View over a specific annotation type, providing the column-oriented
+/// surface fibertools historically got from `FiberAnnotations` while
+/// delegating per-annotation iteration to the library's
+/// [`AnnotationInfo`].
+///
+/// Stays valid when the type is absent: every accessor returns an empty
+/// `Vec` / zero count, so call sites avoid `Option` plumbing.
+///
+/// All accessors and the per-annotation iterator yield results in
+/// **BAM-orient ascending** order. The spec stores annotations in
+/// molecular order; for reverse-aligned reads we reverse so consumers
+/// (BED12 blocks, pileup intervals, TSV columns) get ascending output.
+pub struct AnnotationTypeView<'a> {
+    annot: &'a MolecularAnnotations,
+    type_name: &'a str,
+}
+
+impl<'a> AnnotationTypeView<'a> {
+    pub(crate) fn new(annot: &'a MolecularAnnotations, type_name: &'a str) -> Self {
+        Self { annot, type_name }
+    }
+
+    pub fn len(&self) -> usize {
+        self.annot
+            .get_type(self.type_name)
+            .map(|t| t.annotations.len())
+            .unwrap_or(0)
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Materialize the annotation infos for this type in BAM-orient
+    /// ascending order. Computes reference coords once and amortizes that
+    /// cost across all column accessors and iter consumers.
+    fn bam_ordered(&self) -> Vec<AnnotationInfo<'a>> {
+        let Some(it) = self.annot.iter_type(self.type_name) else {
+            return Vec::new();
+        };
+        let mut v: Vec<AnnotationInfo<'a>> = it.collect();
+        if self.annot.is_reverse_aligned() {
+            v.reverse();
+        }
+        v
+    }
+
+    pub fn starts(&self) -> Vec<i64> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| a.query_start as i64)
+            .collect()
+    }
+    pub fn ends(&self) -> Vec<i64> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| a.query_end as i64)
+            .collect()
+    }
+    pub fn option_starts(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| Some(a.query_start as i64))
+            .collect()
+    }
+    pub fn option_ends(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| Some(a.query_end as i64))
+            .collect()
+    }
+    pub fn option_lengths(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| Some((a.query_end - a.query_start) as i64))
+            .collect()
+    }
+    pub fn lengths(&self) -> Vec<i64> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| (a.query_end - a.query_start) as i64)
+            .collect()
+    }
+    pub fn qual(&self) -> Vec<u8> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| a.qualities.first().copied().unwrap_or(0))
+            .collect()
+    }
+    pub fn reference_starts(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| a.ref_start.map(|x| x as i64))
+            .collect()
+    }
+    pub fn reference_ends(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| a.ref_end.map(|x| x as i64))
+            .collect()
+    }
+    pub fn reference_lengths(&self) -> Vec<Option<i64>> {
+        self.bam_ordered()
+            .into_iter()
+            .map(|a| match (a.ref_start, a.ref_end) {
+                (Some(s), Some(e)) => Some((e - s) as i64),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Iterate per-annotation in BAM-orient ascending order, yielding the
+    /// library's [`AnnotationInfo`] view directly. Call sites read fields
+    /// like `info.query_start`, `info.ref_start`, `info.qualities`.
+    pub fn iter(&self) -> std::vec::IntoIter<AnnotationInfo<'a>> {
+        self.bam_ordered().into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &AnnotationTypeView<'a> {
+    type Item = AnnotationInfo<'a>;
+    type IntoIter = std::vec::IntoIter<AnnotationInfo<'a>>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
