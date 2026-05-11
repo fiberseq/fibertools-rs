@@ -394,4 +394,10 @@ impl AnnotationType {
         self.annotations.push(Annotation::new(start, length, strand, qualities, name));
         self
     }
+    /// Drop annotations for which `predicate` returns false.
+    pub fn retain<F: FnMut(&Annotation) -> bool>(&mut self, predicate: F) {
+        self.annotations.retain(predicate);
+    }
 }
+
+

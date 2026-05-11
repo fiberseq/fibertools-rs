@@ -602,6 +602,17 @@ impl MolecularAnnotations {
         (ma, al, aq, an)
     }
 
+    /// Retain annotations of `type_name` matching `predicate`.
+    /// No-op if the type doesn't exist.
+    pub fn retain<F>(&mut self, type_name: &str, predicate: F)
+    where
+        F: FnMut(&Annotation) -> bool,
+    {
+        if let Some(t) = self.get_type_mut(type_name) {
+            t.retain(predicate);
+        }
+    }
+
     /// Write annotations to a BAM record.
     ///
     /// This sets the MA:Z tag, and optionally AL:B:I, AQ:B:C, and AN:Z tags

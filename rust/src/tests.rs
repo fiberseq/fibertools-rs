@@ -1178,3 +1178,300 @@ fn test_round_trip_strand_split_preserves_on_disk_form() {
     assert_eq!(ma, original);
     assert_eq!(aq, Some(vec![200, 180]));
 }
+
+#[test]
+fn test_retain_on_annotation_type_directly() {
+    // The lower-level AnnotationType::retain works on the type in isolation.
+    let mut at = AnnotationType::new("msp", "P".parse().unwrap());
+    at.add(100, 50, Strand::Forward, vec![40], None);
+    at.add(200, 60, Strand::Forward, vec![35], None);
+    at.add(300, 70, Strand::Forward, vec![30], None);
+
+    at.retain(|a| a.length >= 60);
+
+    assert_eq!(at.annotations.len(), 2);
+    assert_eq!(at.annotations[0].length, 60);
+    assert_eq!(at.annotations[1].length, 70);
+}
+
+#[test]
+fn test_retain_filters_by_length() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None)
+        .add(200, 60, Strand::Forward, vec![35], None)
+        .add(300, 70, Strand::Forward, vec![30], None);
+
+    annotations.retain("msp", |a| a.length > 55);
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].length, 60);
+    assert_eq!(msp.annotations[1].length, 70);
+}
+
+#[test]
+fn test_retain_filters_by_quality() {
+    // Quality is per-annotation; the closure pulls qualities[0] like the
+    // fibertools `qual` filter does for single-quality specs.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None)
+        .add(200, 60, Strand::Forward, vec![10], None)
+        .add(300, 70, Strand::Forward, vec![200], None);
+
+    annotations.retain("msp", |a| a.qualities.first().copied().unwrap_or(0) >= 40);
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].qualities, vec![40]);
+    assert_eq!(msp.annotations[1].qualities, vec![200]);
+}
+
+#[test]
+fn test_retain_with_range_predicate() {
+    // Mirrors fibertools' `len(msp)=50:100` ranged filter: [start, end).
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", QualitySpec::none())
+        .add(0, 30, Strand::Forward, vec![], None)
+        .add(100, 50, Strand::Forward, vec![], None)
+        .add(200, 75, Strand::Forward, vec![], None)
+        .add(300, 100, Strand::Forward, vec![], None)
+        .add(400, 150, Strand::Forward, vec![], None);
+
+    annotations.retain("msp", |a| a.length >= 50 && a.length < 100);
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].length, 50);
+    assert_eq!(msp.annotations[1].length, 75);
+}
+
+#[test]
+fn test_retain_predicate_keeps_all() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None)
+        .add(200, 60, Strand::Forward, vec![35], None);
+
+    annotations.retain("msp", |_| true);
+
+    assert_eq!(annotations.get_type("msp").unwrap().annotations.len(), 2);
+}
+
+#[test]
+fn test_retain_predicate_drops_all() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None)
+        .add(200, 60, Strand::Forward, vec![35], None);
+
+    annotations.retain("msp", |_| false);
+
+    // Type still exists, just with zero annotations (matches the empty-type
+    // emission behavior in test_annotation_type_with_no_annotations_drops_from_emission).
+    assert_eq!(annotations.annotation_types.len(), 1);
+    assert_eq!(annotations.get_type("msp").unwrap().annotations.len(), 0);
+    assert_eq!(annotations.to_ma_string(), "1000");
+}
+
+#[test]
+fn test_retain_only_affects_named_type() {
+    // Filtering "msp" must leave "nuc" annotations untouched.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None)
+        .add(200, 60, Strand::Forward, vec![35], None);
+    annotations
+        .add_annotation_type("nuc", QualitySpec::none())
+        .add(150, 147, Strand::Forward, vec![], None)
+        .add(350, 147, Strand::Forward, vec![], None);
+
+    annotations.retain("msp", |a| a.length >= 60);
+
+    assert_eq!(annotations.get_type("msp").unwrap().annotations.len(), 1);
+    // nuc untouched.
+    assert_eq!(annotations.get_type("nuc").unwrap().annotations.len(), 2);
+}
+
+#[test]
+fn test_retain_unknown_type_is_noop() {
+    // Filtering a non-existent type name must not panic or modify anything.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(100, 50, Strand::Forward, vec![40], None);
+
+    annotations.retain("does_not_exist", |_| false);
+
+    assert_eq!(annotations.get_type("msp").unwrap().annotations.len(), 1);
+    assert!(annotations.get_type("does_not_exist").is_none());
+}
+
+#[test]
+fn test_retain_on_empty_type_is_noop() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations.add_annotation_type("empty", QualitySpec::none());
+
+    annotations.retain("empty", |_| false);
+
+    assert_eq!(annotations.annotation_types.len(), 1);
+    assert_eq!(annotations.get_type("empty").unwrap().annotations.len(), 0);
+}
+
+#[test]
+fn test_retain_preserves_insertion_order() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", QualitySpec::none())
+        .add(100, 10, Strand::Forward, vec![], None)
+        .add(200, 50, Strand::Forward, vec![], None)
+        .add(300, 20, Strand::Forward, vec![], None)
+        .add(400, 60, Strand::Forward, vec![], None)
+        .add(500, 30, Strand::Forward, vec![], None);
+
+    annotations.retain("msp", |a| a.length >= 30);
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 3);
+    assert_eq!(msp.annotations[0].start, 200);
+    assert_eq!(msp.annotations[1].start, 400);
+    assert_eq!(msp.annotations[2].start, 500);
+}
+
+#[test]
+fn test_retain_preserves_per_annotation_strand() {
+    // Strand is per-annotation; retain must keep the matched annotations'
+    // strand intact, including a mix of strands within one type.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("ctcf", "Q".parse().unwrap())
+        .add(0, 4, Strand::Forward, vec![200], None)
+        .add(10, 30, Strand::Reverse, vec![180], None)
+        .add(50, 5, Strand::Forward, vec![150], None);
+
+    // Keep only annotations whose length >= 5.
+    annotations.retain("ctcf", |a| a.length >= 5);
+
+    let ctcf = annotations.get_type("ctcf").unwrap();
+    assert_eq!(ctcf.annotations.len(), 2);
+    assert_eq!(ctcf.annotations[0].strand, Strand::Reverse);
+    assert_eq!(ctcf.annotations[0].length, 30);
+    assert_eq!(ctcf.annotations[1].strand, Strand::Forward);
+    assert_eq!(ctcf.annotations[1].length, 5);
+}
+
+#[test]
+fn test_retain_preserves_multi_quality_values() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    let pq = QualitySpec::from_str("PQ").unwrap();
+    annotations
+        .add_annotation_type("msp", pq)
+        .add(100, 50, Strand::Forward, vec![40, 255], None)
+        .add(200, 60, Strand::Forward, vec![10, 100], None)
+        .add(300, 70, Strand::Forward, vec![30, 200], None);
+
+    // Filter on the linear (second) quality value.
+    annotations.retain("msp", |a| a.qualities[1] >= 200);
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].qualities, vec![40, 255]);
+    assert_eq!(msp.annotations[1].qualities, vec![30, 200]);
+}
+
+#[test]
+fn test_retain_updates_serialization() {
+    // After retain, the on-disk MA/AL/AQ tags should reflect only the
+    // surviving annotations and respect strand-grouped section order.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations.set_encoding(Encoding::Inline);
+    annotations
+        .add_annotation_type("msp", "P".parse().unwrap())
+        .add(99, 50, Strand::Forward, vec![40], None)    // MA tag pos 100
+        .add(199, 60, Strand::Forward, vec![35], None)   // MA tag pos 200
+        .add(299, 70, Strand::Forward, vec![30], None);  // MA tag pos 300
+
+    annotations.retain("msp", |a| a.length >= 60);
+
+    assert_eq!(annotations.to_ma_string(), "1000;msp+P:200-60,300-70");
+    assert_eq!(annotations.to_aq_array(), Some(vec![35, 30]));
+}
+
+#[test]
+fn test_retain_updates_total_annotation_count() {
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", QualitySpec::none())
+        .add(100, 50, Strand::Forward, vec![], None)
+        .add(200, 60, Strand::Forward, vec![], None);
+    annotations
+        .add_annotation_type("nuc", QualitySpec::none())
+        .add(150, 147, Strand::Forward, vec![], None);
+
+    assert_eq!(annotations.total_annotation_count(), 3);
+
+    annotations.retain("msp", |a| a.length >= 60);
+
+    assert_eq!(annotations.total_annotation_count(), 2);
+}
+
+#[test]
+fn test_retain_with_mutable_state_in_closure() {
+    // FnMut: the closure may hold mutable state (e.g. a counter / cap on
+    // how many to keep). Useful for take-N-style filters.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", QualitySpec::none())
+        .add(100, 50, Strand::Forward, vec![], None)
+        .add(200, 60, Strand::Forward, vec![], None)
+        .add(300, 70, Strand::Forward, vec![], None)
+        .add(400, 80, Strand::Forward, vec![], None);
+
+    let mut kept = 0;
+    annotations.retain("msp", |_| {
+        if kept < 2 {
+            kept += 1;
+            true
+        } else {
+            false
+        }
+    });
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].start, 100);
+    assert_eq!(msp.annotations[1].start, 200);
+}
+
+#[test]
+fn test_retain_with_reference_coords_via_aligned_blocks() {
+    // A more realistic use case: filter by reference-coord predicate by
+    // pre-computing the lift inside the closure.
+    let mut annotations = MolecularAnnotations::new(1000);
+    annotations
+        .add_annotation_type("msp", QualitySpec::none())
+        .add(50, 20, Strand::Forward, vec![], None)    // ref [1050, 1070)
+        .add(200, 30, Strand::Forward, vec![], None)   // ref [1200, 1230)
+        .add(450, 40, Strand::Forward, vec![], None);  // ref [1450, 1490)
+
+    annotations.set_aligned_blocks(vec![([0, 500], [1000, 1500])], false);
+
+    // Need to snapshot the blocks out before borrowing mutably for retain.
+    let blocks = annotations.aligned_blocks().cloned().unwrap();
+    annotations.retain("msp", |a| {
+        let (rs, _) = a.ref_coords(&blocks);
+        rs.map(|s| s >= 1200).unwrap_or(false)
+    });
+
+    let msp = annotations.get_type("msp").unwrap();
+    assert_eq!(msp.annotations.len(), 2);
+    assert_eq!(msp.annotations[0].start, 200);
+    assert_eq!(msp.annotations[1].start, 450);
+}
