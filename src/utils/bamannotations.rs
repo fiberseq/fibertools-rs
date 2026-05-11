@@ -111,20 +111,38 @@ impl FiberAnnotations {
             .collect::<Vec<_>>();
 
         let (reference_starts, reference_ends, reference_lengths) = if single_bp_liftover {
-            lift_query_range_exact(record, &starts, &starts)
+            lift_query_range_exact(record, &starts, &starts).unwrap_or_else(|e| {
+                log::error!(
+                    "Failed lifting over annotations in BAM record: {} aligned from {} to {}.",
+                    String::from_utf8_lossy(record.qname()),
+                    record.reference_start() + 1,
+                    record.reference_end()
+                );
+                log::error!("Failed to lift query range: {}", e);
+                panic!("Failed to lift query range: {}", e);
+            })
         } else {
-            lift_query_range(record, &starts, &ends)
-        }
-        .unwrap_or_else(|e| {
-            log::error!(
-                "Failed lifting over annotations in BAM record: {} aligned from {} to {}.",
-                String::from_utf8_lossy(record.qname()),
-                record.reference_start() + 1,
-                record.reference_end()
-            );
-            log::error!("Failed to lift query range: {}", e);
-            panic!("Failed to lift query range: {}", e);
-        });
+            // MA spec inward semantics for multi-bp query-space ranges.
+            // Half-open block matching; endpoints in indel gaps snap inward
+            // toward the aligned region rather than to the nearer block edge.
+            let blocks = molecular_annotation::AlignedBlocks::from_record(record);
+            let mut rs_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
+            let mut re_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
+            let mut rl_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
+            for (&s, &e) in starts.iter().zip(ends.iter()) {
+                let (rs, re) = blocks.lift_to_reference(s as u32, e as u32);
+                let rs = rs.map(|x| x as i64);
+                let re = re.map(|x| x as i64);
+                let rl = match (rs, re) {
+                    (Some(s), Some(e)) => Some(e - s),
+                    _ => None,
+                };
+                rs_vec.push(rs);
+                re_vec.push(re);
+                rl_vec.push(rl);
+            }
+            (rs_vec, re_vec, rl_vec)
+        };
 
         // Normalize extras into a Vec matching the other parallel vectors so
         // it can be zipped in and move with the annotation through the sort.
