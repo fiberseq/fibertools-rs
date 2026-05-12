@@ -162,7 +162,10 @@ impl<'a> Footprint<'a> {
                         if self.motif.spans(rs as i64, re as i64) {
                             self.n_spanning_msps += 1;
                             has_spanning_msp = true;
-                            msp_qual = msp.qualities.first().copied().unwrap_or(0) as i16;
+                            msp_qual = crate::utils::bamannotations::primary_qual(
+                                msp.qualities,
+                                msp.type_name,
+                            ) as i16;
                             break;
                         }
                     }

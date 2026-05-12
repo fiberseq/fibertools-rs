@@ -179,7 +179,9 @@ fn write_legacy_nuc_msp(record: &mut bam::Record, annot: &MolecularAnnotations) 
                 Some(
                     fire.annotations
                         .iter()
-                        .map(|a| a.qualities.first().copied().unwrap_or(0))
+                        .map(|a| {
+                            crate::utils::bamannotations::primary_qual(&a.qualities, FIRE_TYPE)
+                        })
                         .collect(),
                 )
             } else {
@@ -189,7 +191,7 @@ fn write_legacy_nuc_msp(record: &mut bam::Record, annot: &MolecularAnnotations) 
             Some(
                 msp.annotations
                     .iter()
-                    .map(|a| a.qualities.first().copied().unwrap_or(0))
+                    .map(|a| crate::utils::bamannotations::primary_qual(&a.qualities, MSP_TYPE))
                     .collect(),
             )
         } else {
@@ -252,7 +254,7 @@ pub fn extract_nuc_msp_arrays(
             let qs: Vec<u8> = if t.quality_spec.has_quality() {
                 t.annotations
                     .iter()
-                    .map(|a| a.qualities.first().copied().unwrap_or(0))
+                    .map(|a| crate::utils::bamannotations::primary_qual(&a.qualities, MSP_TYPE))
                     .collect()
             } else {
                 Vec::new()
@@ -369,7 +371,7 @@ pub fn extract_fire_arrays(record: &bam::Record) -> Result<(Vec<u32>, Vec<u32>, 
             let phred = t
                 .annotations
                 .iter()
-                .map(|a| a.qualities.first().copied().unwrap_or(0))
+                .map(|a| crate::utils::bamannotations::primary_qual(&a.qualities, FIRE_TYPE))
                 .collect();
             (starts, lens, phred)
         })
