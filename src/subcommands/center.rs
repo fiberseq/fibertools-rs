@@ -1,11 +1,11 @@
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
 use crate::utils::bamannotations::primary_qual;
-use crate::utils::bamlift::*;
 use crate::utils::bio_io;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ProgressBar};
+use molecular_annotation::AlignedBlocks;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
@@ -146,25 +146,31 @@ impl CenteredFiberData {
         (ref_offset, mol_offset)
     }
 
-    /// find the query position that corresponds to the central reference position
+    /// find the query position that corresponds to the central reference position.
+    ///
+    /// Uses the spec library's exact-1bp `lift_to_query`. Builds
+    /// `AlignedBlocks` from `aligned_block_pairs` directly so synthetic
+    /// records with `is_unmapped()`-leaning flag combinations still get
+    /// their CIGAR-derived blocks (same trick `read_fibertig_tags` uses).
     pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
-        let read_center: Vec<i64> = lift_query_positions_exact(record, &[reference_position])
-            .ok()?
-            .into_iter()
-            .flatten()
-            .collect();
+        if reference_position < 0 {
+            return None;
+        }
+        let pairs = record
+            .aligned_block_pairs()
+            .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
+        let blocks = AlignedBlocks::from_pairs(pairs, record.seq_len() as u32);
+        let (q_start, _) =
+            blocks.lift_to_query(reference_position as u32, reference_position as u32 + 1);
+        let qp = q_start.map(|x| x as i64);
         log::debug!(
             "{}, {}, {}, {:?}",
             reference_position,
             record.reference_start(),
             record.reference_end(),
-            read_center
+            qp
         );
-        if read_center.is_empty() {
-            None
-        } else {
-            Some(read_center[0])
-        }
+        qp
     }
 
     /// Get the sequence
