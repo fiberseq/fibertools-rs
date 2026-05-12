@@ -61,14 +61,16 @@ pub fn read_fibertig_tags(record: &Record) -> Result<MolecularAnnotations> {
         Ok(Aux::String(s)) => {
             let parts: Vec<Option<String>> = s
                 .split('|')
-                .map(|p| if p.is_empty() { None } else { Some(p.to_string()) })
+                .map(|p| {
+                    if p.is_empty() {
+                        None
+                    } else {
+                        Some(p.to_string())
+                    }
+                })
                 .collect();
             if parts.len() != fs.len() {
-                anyhow::bail!(
-                    "fa ({}) and fs ({}) length mismatch",
-                    parts.len(),
-                    fs.len()
-                );
+                anyhow::bail!("fa ({}) and fs ({}) length mismatch", parts.len(), fs.len());
             }
             Some(parts)
         }
@@ -670,11 +672,7 @@ impl FiberTig {
             let contig_name =
                 std::str::from_utf8(header_view.tid2name(record.tid() as u32))?.to_string();
 
-            for info in annot
-                .iter_type(FIBERTIG_TYPE)
-                .into_iter()
-                .flatten()
-            {
+            for info in annot.iter_type(FIBERTIG_TYPE).into_iter().flatten() {
                 let (Some(ref_start), Some(ref_end)) = (info.ref_start, info.ref_end) else {
                     continue;
                 };

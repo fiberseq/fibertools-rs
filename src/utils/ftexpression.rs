@@ -1,5 +1,4 @@
 use crate::fiber::FiberseqData;
-use crate::utils::bamannotations;
 use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
@@ -138,43 +137,6 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     }
 }
 
-pub fn apply_filter_to_range(
-    parsed: &ParsedExpr,
-    range: &mut bamannotations::Ranges,
-) -> Result<(), anyhow::Error> {
-    let starting_len = range.annotations.len();
-
-    let to_keep: Vec<bool> = if parsed.fn_name == "len" {
-        range
-            .annotations
-            .iter()
-            .map(|annotation| len(annotation.length, &parsed.op, &parsed.threshold))
-            .collect()
-    } else if parsed.fn_name == "qual" {
-        range
-            .annotations
-            .iter()
-            .map(|annotation| qual(annotation.qual, &parsed.op, &parsed.threshold))
-            .collect()
-    } else {
-        anyhow::bail!("Invalid function name: {}", &parsed.fn_name);
-    };
-
-    // Filter annotations based on the to_keep boolean vector
-    range.annotations = range
-        .annotations
-        .iter()
-        .zip(to_keep.iter())
-        .filter_map(|(annotation, &keep)| if keep { Some(annotation.clone()) } else { None })
-        .collect();
-
-    // check we dropped the right number of values
-    let n_dropped = to_keep.iter().filter(|&x| !x).count();
-    assert_eq!(starting_len, range.annotations.len() + n_dropped);
-
-    Ok(())
-}
-
 pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(), anyhow::Error> {
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
@@ -203,64 +165,4 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
         }
     }
     Ok(())
-}
-
-/// tests
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::utils::bamannotations;
-
-    fn make_fake_range() -> bamannotations::Ranges {
-        use bamannotations::{FiberAnnotation, FiberAnnotations};
-
-        let annotations = vec![
-            FiberAnnotation {
-                start: 0,
-                end: 5,
-                length: 5,
-                qual: 0,
-                reference_start: Some(0),
-                reference_end: Some(5),
-                reference_length: Some(5),
-                extra_columns: None,
-            },
-            FiberAnnotation {
-                start: 10,
-                end: 15,
-                length: 5,
-                qual: 255,
-                reference_start: Some(10),
-                reference_end: Some(15),
-                reference_length: Some(5),
-                extra_columns: None,
-            },
-            FiberAnnotation {
-                start: 17,
-                end: 20,
-                length: 3,
-                qual: 181,
-                reference_start: Some(17),
-                reference_end: Some(20),
-                reference_length: Some(3),
-                extra_columns: None,
-            },
-        ];
-
-        FiberAnnotations {
-            annotations,
-            seq_len: 100,
-            reverse: false,
-        }
-    }
-
-    #[test]
-    fn test_this_one() {
-        let filter = "len(msp)=50:100";
-        let mut range = make_fake_range();
-        let parser = parse_filter(filter);
-        eprintln!("{:?}", range.annotations.len());
-        apply_filter_to_range(&parser, &mut range).unwrap();
-        eprintln!("{:?}", range.annotations.len());
-    }
 }
