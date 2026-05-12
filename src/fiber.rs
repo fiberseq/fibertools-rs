@@ -2,7 +2,7 @@ use super::subcommands::center::CenterPosition;
 use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamannotations::*;
-use crate::utils::basemods::{BaseMods, CPG_TYPE, M6A_TYPE};
+use crate::utils::basemods::{parse_mm_ml_into_ma, CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
 use crate::utils::ma_io::{MSP_TYPE, NUC_TYPE};
@@ -17,7 +17,6 @@ use std::fmt::Write;
 pub struct FiberseqData {
     pub record: bam::Record,
     pub annotations: MolecularAnnotations,
-    pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
     pub rg: String,
@@ -52,15 +51,18 @@ impl FiberseqData {
             None => ".".to_string(),
         };
 
-        // get fiberseq basemods (also injects m6a/cpg into `annotations`)
-        let mut base_mods = BaseMods::new(&record, filters.min_ml_score);
-        base_mods.filter_at_read_ends(filters.strip_starting_basemods);
-        base_mods.populate_ma(&mut annotations);
+        // Parse MM/ML directly into the spec object as m6a / cpg types.
+        // No intermediate BaseMods needed on the read side.
+        parse_mm_ml_into_ma(
+            &record,
+            &mut annotations,
+            filters.min_ml_score,
+            filters.strip_starting_basemods,
+        );
 
         let mut fsd = FiberseqData {
             record,
             annotations,
-            base_mods,
             ec,
             target_name,
             rg,

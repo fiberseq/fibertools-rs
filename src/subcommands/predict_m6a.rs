@@ -222,35 +222,54 @@ where
         assert_eq!(data.len(), records.len());
         let mut cur_predict_st = 0;
         for (option_data, record) in data.iter().zip(records) {
-            // base mods in the exiting record
-            let mut cur_basemods = basemods::BaseMods::new(record, 0);
-            cur_basemods.drop_m6a();
-            log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+            // Load existing MM/ML into a MolecularAnnotations, then drop any
+            // pre-existing m6a calls — we're about to replace them with the
+            // model's predictions. CpG / other annotation types are preserved.
+            let mut annot = molecular_annotation::MolecularAnnotations::from_record(record);
+            basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
+            annot
+                .annotation_types
+                .retain(|t| t.name != basemods::M6A_TYPE);
+
             // check if there is any data
             let (a_data, t_data) = match option_data {
                 Some((a_data, t_data)) => (a_data, t_data),
                 None => continue,
             };
-            // iterate over A and then T basemods
+            // Iterate over A and then T basemods, collecting their forward
+            // positions + ML qualities into a single sorted m6a list.
+            let mut m6a_calls: Vec<(u32, u8)> = Vec::new();
             for data in &[a_data, t_data] {
                 let cur_predict_en = cur_predict_st + data.count;
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
-
                 cur_predict_st += data.count;
-                cur_basemods.base_mods.push(opts.basemod_from_ml(
-                    record,
-                    cur_predictions,
-                    &data.positions,
-                    &data.base_mod,
-                ));
+                let (poss, quals) =
+                    opts.basemod_from_ml(record, cur_predictions, &data.positions, &data.base_mod);
+                m6a_calls.extend(poss.into_iter().zip(quals));
             }
+            if !m6a_calls.is_empty() {
+                m6a_calls.sort_by_key(|&(p, _)| p);
+                let qspec = "Q"
+                    .parse::<molecular_annotation::QualitySpec>()
+                    .expect("Q parses");
+                let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
+                for (pos, qual) in &m6a_calls {
+                    t.add(
+                        *pos,
+                        1,
+                        molecular_annotation::Strand::Forward,
+                        vec![*qual],
+                        None,
+                    );
+                }
+            }
+
             // write the ml and mm tags
-            cur_basemods.add_mm_and_ml_tags(record);
+            basemods::write_mm_ml(record, &annot);
 
-            //let modified_bases_forward = cur_basemods.forward_m6a().0;
-            let modified_bases_forward = cur_basemods.m6a().forward_starts();
-
-            // adding the nucleosomes
+            // adding the nucleosomes — uses the forward m6a positions we just placed.
+            let modified_bases_forward: Vec<i64> =
+                m6a_calls.iter().map(|&(p, _)| p as i64).collect();
             nucleosome::add_nucleosomes_to_record(
                 record,
                 &modified_bases_forward,
@@ -270,56 +289,48 @@ where
         data.iter().flatten().count()
     }
 
-    /// Create a basemod object form our predictions
+    /// Filter raw model predictions into (forward_position, ML_quality)
+    /// pairs suitable for adding to a `MolecularAnnotations` m6a
+    /// annotation type. Drops predictions below the ML threshold and
+    /// within the first/last `WINDOW/2` bases of the read.
     pub fn basemod_from_ml(
         &self,
         record: &mut bam::Record,
         predictions: &[f32],
         positions: &[usize],
-        base_mod: &str,
-    ) -> basemods::BaseMod {
+        _base_mod: &str,
+    ) -> (Vec<u32>, Vec<u8>) {
         // do not report predictions for the first and last 7 bases
         let min_pos = (WINDOW / 2) as i64;
         let max_pos = (record.seq_len() - WINDOW / 2) as i64;
-        let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
-            Vec<u8>,
-            Vec<f32>,
-            Vec<i64>,
-        ) = predictions
-            .iter()
-            .zip(positions.iter())
-            .map(|(&x, &pos)| (self.float_to_u8(x), x, pos as i64))
-            .filter(|(ml, _, pos)| *ml >= self.min_ml_value() && *pos >= min_pos && *pos < max_pos)
-            .multiunzip();
+
+        let mut poss: Vec<u32> = Vec::new();
+        let mut quals: Vec<u8> = Vec::new();
+        let mut low_nonzero = 0usize;
+        let mut zero = 0usize;
+        for (&pred, &pos) in predictions.iter().zip(positions.iter()) {
+            let ml = self.float_to_u8(pred);
+            let pos_i = pos as i64;
+            if pred > 0.0 && pred <= 1.0 / 255.0 {
+                low_nonzero += 1;
+            }
+            if pred <= 0.0 && pred > -0.00000001 {
+                zero += 1;
+            }
+            if ml >= self.min_ml_value() && pos_i >= min_pos && pos_i < max_pos {
+                poss.push(pos as u32);
+                quals.push(ml);
+            }
+        }
 
         log::debug!(
             "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
-            full_probabilities_forward
-                .iter()
-                .filter(|&x| *x <= 1.0 / 255.0)
-                .filter(|&x| *x > 0.0)
-                .count(),
-            full_probabilities_forward
-                .iter()
-                .filter(|&x| *x <= 0.0)
-                .filter(|&x| *x > -0.00000001)
-                .count(),
+            low_nonzero,
+            zero,
             predictions.len()
         );
 
-        let base_mod = base_mod.as_bytes();
-        let modified_base = base_mod[0];
-        let strand = base_mod[1] as char;
-        let modification_type = base_mod[2] as char;
-
-        basemods::BaseMod::new(
-            record,
-            modified_base,
-            strand,
-            modification_type,
-            modified_bases_forward,
-            modified_probabilities_forward,
-        )
+        (poss, quals)
     }
 
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {

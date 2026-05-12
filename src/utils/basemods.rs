@@ -1,397 +1,325 @@
-use crate::utils::bamannotations::*;
+//! MM/ML BAM tag I/O for fiberseq base modifications.
+//!
+//! Read path: `parse_mm_ml_into_ma` parses a record's MM/ML tags directly
+//! into a [`MolecularAnnotations`] as annotation types. No intermediate
+//! `BaseMods` struct — the spec object is the sole in-memory
+//! representation.
+//!
+//! Mod-type dispatch:
+//! - mod_type `'a'` (any group, e.g. `A+a`, `T-a`, `N+a`) → `m6a` type.
+//! - mod_type `'m'` (any group, e.g. `C+m`, `G+m`) → `cpg` type.
+//! - any other group (`C+h`, `T+f`, ChEBI IDs, etc.) → its own annotation
+//!   type named verbatim after the MM group header (e.g. `"C+h"`).
+//!   Calls round-trip through `write_mm_ml` unchanged.
+//!
+//! Write path: `write_mm_ml` emits MM/ML from a [`MolecularAnnotations`].
+//! Canonical types (`m6a`, `cpg`) have their groups reconstructed from
+//! the forward sequence (`A`→`A+a`, `T`→`T-a`, `C`→`C+m`, `G`→`G+m`).
+//! Non-canonical types stored under a valid MM group name are emitted
+//! verbatim under that header.
+
 use crate::utils::bio_io::*;
 use bio::alphabets::dna::revcomp;
 use lazy_static::lazy_static;
 use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use regex::Regex;
-use rust_htslib::{
-    bam,
-    bam::record::{Aux, AuxArray},
-};
-use std::collections::HashMap;
+use rust_htslib::bam;
+use rust_htslib::bam::record::Aux;
+use std::collections::BTreeMap;
 
-use std::convert::TryFrom;
-
-/// Annotation type names emitted by `BaseMods::populate_ma`.
+/// Annotation type names emitted by `parse_mm_ml_into_ma`.
 pub const M6A_TYPE: &str = "m6a";
 pub const CPG_TYPE: &str = "cpg";
 
-/// A group of base modification calls of one (base, strand, modification_type)
-/// triple — for example, "all m6A calls on adenines on the forward strand."
+lazy_static! {
+    // MM:Z:([ACGTUN][-+]([A-Za-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
+    static ref MM_RE: Regex =
+        Regex::new(r"((([ACGTUN])([-+])([A-Za-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
+}
+
+/// Parse the MM/ML tags of `record` directly into `annot`. Positions are
+/// stored in molecular (forward) orientation as 1bp annotations with a
+/// single `Q` quality score per call.
 ///
-/// Per-call positions and qualities live in `ranges`. This reuses the
-/// `Ranges`/`FiberAnnotations` infrastructure (rather than a separate type)
-/// to share the position-flipping, quality-filtering, and reference-liftover
-/// logic. Each call is stored as a 1bp range; the `length` field is always 1.
-#[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone)]
-pub struct BaseMod {
-    pub modified_base: u8,
-    pub strand: char,
-    pub modification_type: char,
-    pub ranges: Ranges,
-    pub record_is_reverse: bool,
-}
+/// Per-call filtering:
+/// - calls with ML quality < `min_ml_score` are dropped.
+/// - calls within `strip_at_ends` bp of either end of the forward
+///   sequence are dropped (no-op if `strip_at_ends <= 0`).
+///
+/// Dispatch by MM mod_type:
+/// - `'a'` → [`M6A_TYPE`] (collapses `A+a`, `T-a`, `N+a`, etc.)
+/// - `'m'` → [`CPG_TYPE`] (collapses `C+m`, `G+m`, etc.)
+/// - any other → annotation type named verbatim after the MM group
+///   header (e.g. `"C+h"` for 5hmC). [`write_mm_ml`] emits these
+///   unchanged.
+///
+/// For canonical `m6a` / `cpg`, MM's per-group `(canonical_base,
+/// strand_sign)` is reconstructed from the forward sequence at write
+/// time, so input encodings like `N+a` are normalized to `A+a` / `T-a`
+/// on output.
+pub fn parse_mm_ml_into_ma(
+    record: &bam::Record,
+    annot: &mut MolecularAnnotations,
+    min_ml_score: u8,
+    strip_at_ends: i64,
+) {
+    let ml_tag = get_u8_tag(record, b"ML");
+    let Ok(Aux::String(mm_text)) = record.aux(b"MM") else {
+        log::trace!("No MM tag found");
+        return;
+    };
 
-impl BaseMod {
-    pub fn new(
-        record: &bam::Record,
-        modified_base: u8,
-        strand: char,
-        modification_type: char,
-        modified_bases_forward: Vec<i64>,
-        modified_probabilities_forward: Vec<u8>,
-    ) -> Self {
-        let tmp = modified_bases_forward.clone();
-        let mut ranges = Ranges::new(record, modified_bases_forward, None, None);
-        ranges.set_qual(modified_probabilities_forward);
-        let record_is_reverse = record.is_reverse();
-        assert_eq!(tmp, ranges.forward_starts(), "forward starts not equal");
-        Self {
-            modified_base,
-            strand,
-            modification_type,
-            ranges,
-            record_is_reverse,
-        }
-    }
+    let forward_bases = if record.is_reverse() {
+        convert_seq_uppercase(revcomp(record.seq().as_bytes()))
+    } else {
+        convert_seq_uppercase(record.seq().as_bytes())
+    };
+    let seq_len = forward_bases.len();
+    let strip = strip_at_ends.max(0) as usize;
+    let upper = seq_len.saturating_sub(strip);
 
-    pub fn is_m6a(&self) -> bool {
-        self.modification_type == 'a'
-    }
+    let mut m6a_calls: Vec<(u32, u8)> = Vec::new();
+    let mut cpg_calls: Vec<(u32, u8)> = Vec::new();
+    // Non-canonical groups: keyed by their MM header string (e.g. "C+h").
+    let mut other_calls: BTreeMap<String, Vec<(u32, u8)>> = BTreeMap::new();
+    let mut num_mods_seen = 0usize;
 
-    pub fn is_cpg(&self) -> bool {
-        self.modification_type == 'm'
-    }
-
-    pub fn filter_at_read_ends(&mut self, n_strip: i64) {
-        if n_strip <= 0 {
-            return;
-        }
-        self.ranges.filter_starts_at_read_ends(n_strip);
-    }
-}
-
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct BaseMods {
-    pub base_mods: Vec<BaseMod>,
-}
-
-impl BaseMods {
-    pub fn new(record: &bam::Record, min_ml_score: u8) -> BaseMods {
-        // my basemod parser is ~25% faster than rust_htslib's
-        BaseMods::my_mm_ml_parser(record, min_ml_score)
-    }
-
-    pub fn my_mm_ml_parser(record: &bam::Record, min_ml_score: u8) -> BaseMods {
-        // regex for matching the MM tag
-        lazy_static! {
-            // MM:Z:([ACGTUN][-+]([A-Za-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
-            static ref MM_RE: Regex =
-                Regex::new(r"((([ACGTUN])([-+])([A-Za-z]+|[0-9]+))[.?]?((,[0-9]+)*;)*)").unwrap();
-        }
-        // Array to store all the different modifications within the MM tag
-        let mut rtn = vec![];
-
-        let ml_tag = get_u8_tag(record, b"ML");
-
-        let mut num_mods_seen = 0;
-
-        // if there is an MM tag iterate over all the regex matches
-        if let Ok(Aux::String(mm_text)) = record.aux(b"MM") {
-            for cap in MM_RE.captures_iter(mm_text) {
-                let mod_base = cap.get(3).map(|m| m.as_str().as_bytes()[0]).unwrap();
-                let mod_strand = cap.get(4).map_or("", |m| m.as_str());
-                let modification_type = cap.get(5).map_or("", |m| m.as_str());
-                let mod_dists_str = cap.get(6).map_or("", |m| m.as_str());
-                // parse the string containing distances between modifications into a vector of i64
-                let mod_dists: Vec<i64> = mod_dists_str
-                    .trim_end_matches(';')
-                    .split(',')
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.parse().unwrap())
-                    .collect();
-
-                // get forward sequence bases from the bam record
-                let forward_bases = if record.is_reverse() {
-                    convert_seq_uppercase(revcomp(record.seq().as_bytes()))
-                } else {
-                    convert_seq_uppercase(record.seq().as_bytes())
-                };
-                log::trace!(
-                    "mod_base: {}, mod_strand: {}, modification_type: {}, mod_dists: {:?}",
-                    mod_base as char,
-                    mod_strand,
-                    modification_type,
-                    mod_dists
-                );
-                // find real positions in the forward sequence
-                let mut cur_mod_idx = 0;
-                let mut cur_seq_idx = 0;
-                let mut dist_from_last_mod_base = 0;
-                let mut unfiltered_modified_positions: Vec<i64> = vec![0; mod_dists.len()];
-                while cur_seq_idx < forward_bases.len() && cur_mod_idx < mod_dists.len() {
-                    let cur_base = forward_bases[cur_seq_idx];
-                    if (cur_base == mod_base || mod_base == b'N')
-                        && dist_from_last_mod_base == mod_dists[cur_mod_idx]
-                    {
-                        unfiltered_modified_positions[cur_mod_idx] =
-                            i64::try_from(cur_seq_idx).unwrap();
-                        dist_from_last_mod_base = 0;
-                        cur_mod_idx += 1;
-                    } else if cur_base == mod_base {
-                        dist_from_last_mod_base += 1
-                    }
-                    cur_seq_idx += 1;
-                }
-                // assert that we extract the same number of modifications as we have distances
-                assert_eq!(
-                    cur_mod_idx,
-                    mod_dists.len(),
-                    "{:?} {}",
-                    String::from_utf8_lossy(record.qname()),
-                    record.is_reverse()
-                );
-
-                // check for the probability of modification.
-                let num_mods_cur_end = num_mods_seen + unfiltered_modified_positions.len();
-                let unfiltered_modified_probabilities = if num_mods_cur_end > ml_tag.len() {
-                    let needed_num_of_zeros = num_mods_cur_end - ml_tag.len();
-                    let mut to_add = vec![0; needed_num_of_zeros];
-                    let mut has = ml_tag[num_mods_seen..ml_tag.len()].to_vec();
-                    has.append(&mut to_add);
-                    log::warn!(
-                        "ML tag is too short for the number of modifications found in the MM tag. Assuming an ML value of 0 after the first {num_mods_cur_end} modifications."
-                    );
-                    has
-                } else {
-                    ml_tag[num_mods_seen..num_mods_cur_end].to_vec()
-                };
-                num_mods_seen = num_mods_cur_end;
-
-                // must be true for filtering, and at this point
-                assert_eq!(
-                    unfiltered_modified_positions.len(),
-                    unfiltered_modified_probabilities.len()
-                );
-
-                // Filter mods based on probabilities
-                let (modified_probabilities, modified_positions): (Vec<u8>, Vec<i64>) =
-                    unfiltered_modified_probabilities
-                        .iter()
-                        .zip(unfiltered_modified_positions.iter())
-                        .filter(|(&ml, &_mm)| ml >= min_ml_score)
-                        .unzip();
-
-                // don't add empty basemods
-                if modified_positions.is_empty() {
-                    continue;
-                }
-                // add to a struct
-                let mods = BaseMod::new(
-                    record,
-                    mod_base,
-                    mod_strand.chars().next().unwrap(),
-                    modification_type.chars().next().unwrap(),
-                    modified_positions,
-                    modified_probabilities,
-                );
-                rtn.push(mods);
-            }
-        } else {
-            log::trace!("No MM tag found");
-        }
-
-        if ml_tag.len() != num_mods_seen {
-            log::warn!(
-                "ML tag ({}) different number than MM tag ({}).",
-                ml_tag.len(),
-                num_mods_seen
-            );
-        }
-        // needed so I can compare methods
-        rtn.sort();
-        BaseMods { base_mods: rtn }
-    }
-
-    pub fn hashmap_to_basemods(
-        map: HashMap<(i32, i32, i32), Vec<(i64, u8)>>,
-        record: &bam::Record,
-    ) -> BaseMods {
-        let mut rtn = vec![];
-        for (mod_info, mods) in map {
-            let mod_base = mod_info.0 as u8;
-            let mod_type = mod_info.1 as u8 as char;
-            let mod_strand = if mod_info.2 == 0 { '+' } else { '-' };
-            let (mut positions, mut qualities): (Vec<i64>, Vec<u8>) = mods.into_iter().unzip();
-            if record.is_reverse() {
-                let length = record.seq_len() as i64;
-                positions = positions
-                    .into_iter()
-                    .rev()
-                    .map(|p| length - p - 1)
-                    .collect();
-                qualities.reverse();
-            }
-            let mods = BaseMod::new(record, mod_base, mod_strand, mod_type, positions, qualities);
-            rtn.push(mods);
-        }
-        // needed so I can compare methods
-        rtn.sort();
-        BaseMods { base_mods: rtn }
-    }
-
-    /// remove m6a base mods from the struct
-    pub fn drop_m6a(&mut self) {
-        self.base_mods.retain(|bm| !bm.is_m6a());
-    }
-
-    /// remove cpg/5mc base mods from the struct
-    pub fn drop_cpg(&mut self) {
-        self.base_mods.retain(|bm| !bm.is_cpg());
-    }
-
-    /// drop the forward stand of basemod calls
-    pub fn drop_forward(&mut self) {
-        self.base_mods.retain(|bm| bm.strand == '-');
-    }
-
-    /// drop the reverse strand of basemod calls   
-    pub fn drop_reverse(&mut self) {
-        self.base_mods.retain(|bm| bm.strand == '+');
-    }
-
-    /// drop m6A modifications with a qual less than the min_ml_score
-    pub fn filter_m6a(&mut self, min_ml_score: u8) {
-        self.base_mods
-            .iter_mut()
-            .filter(|bm| bm.is_m6a())
-            .for_each(|bm| bm.ranges.filter_by_qual(min_ml_score));
-    }
-
-    /// drop 5mC modifications with a qual less than the min_ml_score
-    pub fn filter_5mc(&mut self, min_ml_score: u8) {
-        self.base_mods
-            .iter_mut()
-            .filter(|bm| bm.is_cpg())
-            .for_each(|bm| bm.ranges.filter_by_qual(min_ml_score));
-    }
-
-    /// filter the basemods at the read ends
-    pub fn filter_at_read_ends(&mut self, n_strip: i64) {
-        if n_strip <= 0 {
-            return;
-        }
-        self.base_mods
-            .iter_mut()
-            .for_each(|bm| bm.filter_at_read_ends(n_strip));
-    }
-
-    /// combine the forward and reverse m6a data
-    pub fn m6a(&self) -> Ranges {
-        let ranges = self
-            .base_mods
-            .iter()
-            .filter(|x| x.is_m6a())
-            .map(|x| &x.ranges)
+    for cap in MM_RE.captures_iter(mm_text) {
+        let mod_base = cap.get(3).map(|m| m.as_str().as_bytes()[0]).unwrap();
+        let strand_sign = cap
+            .get(4)
+            .map_or("+", |m| m.as_str())
+            .chars()
+            .next()
+            .unwrap_or('+');
+        let mod_type_str = cap.get(5).map_or("", |m| m.as_str()).to_string();
+        let modification_type = mod_type_str.chars().next().unwrap_or(' ');
+        let mod_dists_str = cap.get(6).map_or("", |m| m.as_str());
+        let mod_dists: Vec<i64> = mod_dists_str
+            .trim_end_matches(';')
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().unwrap())
             .collect();
-        Ranges::merge_ranges(ranges)
-    }
 
-    /// combine the forward and reverse cpd/5mc data
-    pub fn cpg(&self) -> Ranges {
-        let ranges = self
-            .base_mods
-            .iter()
-            .filter(|x| x.is_cpg())
-            .map(|x| &x.ranges)
-            .collect();
-        Ranges::merge_ranges(ranges)
-    }
-
-    /// Inject `m6a` and `cpg` annotation types into `annot` from the parsed
-    /// ML/MM data on this object. Coordinates are emitted in molecular
-    /// orientation (forward) and the per-base ML score is preserved as a
-    /// linear ("Q") quality.
-    ///
-    /// The MA tag layer in `ma_io` never reads or writes m6a/cpg — their
-    /// on-disk source of truth is ML/MM — so this is the only place the
-    /// `MolecularAnnotations` object gets these types attached.
-    pub fn populate_ma(&self, annot: &mut MolecularAnnotations) {
-        Self::add_basemod_type(annot, M6A_TYPE, &self.m6a());
-        Self::add_basemod_type(annot, CPG_TYPE, &self.cpg());
-    }
-
-    fn add_basemod_type(annot: &mut MolecularAnnotations, type_name: &str, merged: &Ranges) {
-        if merged.annotations.is_empty() {
-            return;
+        if mod_dists.is_empty() {
+            continue;
         }
-        let starts = merged.forward_starts();
-        let quals = merged.get_forward_quals();
-        let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
-        let t = annot.add_annotation_type(type_name, qspec);
-        for (s, q) in starts.iter().zip(quals.iter()) {
-            t.add(*s as u32, 1, Strand::Forward, vec![*q], None);
-        }
-    }
 
-    /// Example MM tag: MM:Z:C+m,11,6,10;A+a,0,0,0;
-    /// Example ML tag: ML:B:C,157,30,2,164,118,255
-    pub fn add_mm_and_ml_tags(&self, record: &mut bam::Record) {
-        // init the mm and ml tag to be populated
-        let mut ml_tag: Vec<u8> = vec![];
-        let mut mm_tag = "".to_string();
-        // need the original sequence for distances between bases.
-        let mut seq = record.seq().as_bytes();
-        if record.is_reverse() {
-            seq = revcomp(seq);
-        }
-        // add to the ml and mm tag.
-        for basemod in self.base_mods.iter() {
-            // adding quality values (ML)
-            ml_tag.extend(basemod.ranges.get_forward_quals());
-            // get MM tag values
-            let mut cur_mm = vec![];
-            let positions = basemod.ranges.forward_starts();
-            let mut last_pos = 0;
-            for pos in positions {
-                let u_pos = pos as usize;
-                let mut in_between = 0;
-                if last_pos < u_pos {
-                    for base in seq[last_pos..u_pos].iter() {
-                        if *base == basemod.modified_base {
-                            in_between += 1;
-                        }
-                    }
-                }
-                last_pos = u_pos + 1;
-                cur_mm.push(in_between);
+        // Resolve positions in forward sequence via the MM distance
+        // encoding: each value is "how many of `mod_base` to skip
+        // before the next modified base."
+        let mut positions: Vec<u32> = vec![0; mod_dists.len()];
+        let mut cur_mod_idx = 0;
+        let mut dist_from_last_mod_base = 0i64;
+        for (cur_seq_idx, cur_base) in forward_bases.iter().enumerate() {
+            if cur_mod_idx >= mod_dists.len() {
+                break;
             }
-            // Add to the MM string
-            mm_tag.push(basemod.modified_base as char);
-            mm_tag.push(basemod.strand);
-            mm_tag.push(basemod.modification_type);
-            for diff in cur_mm {
-                mm_tag.push_str(&format!(",{diff}"));
+            if (*cur_base == mod_base || mod_base == b'N')
+                && dist_from_last_mod_base == mod_dists[cur_mod_idx]
+            {
+                positions[cur_mod_idx] = cur_seq_idx as u32;
+                dist_from_last_mod_base = 0;
+                cur_mod_idx += 1;
+            } else if *cur_base == mod_base {
+                dist_from_last_mod_base += 1;
             }
-            mm_tag.push(';')
-            // next basemod
         }
-        log::trace!(
-            "{}\n{}\n{}\n",
+        assert_eq!(
+            cur_mod_idx,
+            mod_dists.len(),
+            "MM/ML parser: {} (reverse={})",
+            String::from_utf8_lossy(record.qname()),
             record.is_reverse(),
-            mm_tag,
-            String::from_utf8_lossy(&seq)
         );
-        // clear out the old base mods
-        record.remove_aux(b"MM").unwrap_or(());
-        record.remove_aux(b"ML").unwrap_or(());
-        // Add MM
-        let aux_integer_field = Aux::String(&mm_tag);
-        record.push_aux(b"MM", aux_integer_field).unwrap();
-        // Add ML
-        let aux_array: AuxArray<u8> = (&ml_tag).into();
-        let aux_array_field = Aux::ArrayU8(aux_array);
-        record.push_aux(b"ML", aux_array_field).unwrap();
+
+        // Pair this group's calls with ML qualities.
+        let group_end = num_mods_seen + positions.len();
+        let group_quals: Vec<u8> = if group_end > ml_tag.len() {
+            let needed = group_end - ml_tag.len();
+            let mut existing = ml_tag[num_mods_seen..].to_vec();
+            existing.extend(std::iter::repeat_n(0, needed));
+            log::warn!(
+                "ML tag is too short for the number of modifications found in the MM tag. Assuming an ML value of 0 after the first {group_end} modifications."
+            );
+            existing
+        } else {
+            ml_tag[num_mods_seen..group_end].to_vec()
+        };
+        num_mods_seen = group_end;
+
+        // Filter + dispatch by mod_type. Non-canonical groups are
+        // stored under their verbatim MM header so they round-trip
+        // exactly through write_mm_ml.
+        let bucket: &mut Vec<(u32, u8)> = match modification_type {
+            'a' => &mut m6a_calls,
+            'm' => &mut cpg_calls,
+            _ => {
+                let key = format!("{}{}{}", mod_base as char, strand_sign, mod_type_str);
+                other_calls.entry(key).or_default()
+            }
+        };
+        for (pos, qual) in positions.iter().copied().zip(group_quals) {
+            if qual < min_ml_score {
+                continue;
+            }
+            let p = pos as usize;
+            if strip > 0 && (p < strip || p >= upper) {
+                continue;
+            }
+            bucket.push((pos, qual));
+        }
     }
+
+    if ml_tag.len() != num_mods_seen {
+        log::warn!(
+            "ML tag ({}) different number than MM tag ({}).",
+            ml_tag.len(),
+            num_mods_seen,
+        );
+    }
+
+    add_calls(annot, M6A_TYPE, &mut m6a_calls);
+    add_calls(annot, CPG_TYPE, &mut cpg_calls);
+    for (name, mut calls) in other_calls {
+        add_calls(annot, &name, &mut calls);
+    }
+}
+
+fn add_calls(annot: &mut MolecularAnnotations, name: &str, calls: &mut [(u32, u8)]) {
+    if calls.is_empty() {
+        return;
+    }
+    calls.sort_by_key(|(p, _)| *p);
+    let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
+    let t = annot.add_annotation_type(name, qspec);
+    for &(pos, qual) in calls.iter() {
+        t.add(pos, 1, Strand::Forward, vec![qual], None);
+    }
+}
+
+/// Emit MM/ML tags from `annot` onto `record`. Existing `MM` and `ML`
+/// aux are removed first.
+///
+/// Sources:
+/// - [`M6A_TYPE`] / [`CPG_TYPE`] — canonical fiberseq types. MM groups
+///   reconstructed from the forward sequence (`A`→`A+a`, `T`→`T-a`,
+///   `C`→`C+m`, `G`→`G+m`). Calls landing on an unexpected base are
+///   emitted under that base with `+` strand and a warning.
+/// - Any other annotation type whose name is a valid MM group header
+///   (e.g. `"C+h"`, `"N+a"`, `"T+12"`) is emitted verbatim under that
+///   header. Skip counts are computed against the named base (`N`
+///   counts every position).
+/// - All other annotation types (`msp`, `nuc`, `fire`, etc.) are
+///   skipped — they are not base modifications.
+///
+/// MM groups are emitted in deterministic (lexicographic header) order.
+pub fn write_mm_ml(record: &mut bam::Record, annot: &MolecularAnnotations) {
+    let forward_seq = if record.is_reverse() {
+        revcomp(record.seq().as_bytes())
+    } else {
+        record.seq().as_bytes()
+    };
+
+    // header (e.g. "A+a", "C+h") → Vec<(pos, qual)>. BTreeMap gives
+    // deterministic emission order.
+    let mut groups: BTreeMap<String, Vec<(u32, u8)>> = BTreeMap::new();
+
+    // Canonical types: reconstruct (base, strand) per call from forward seq.
+    for (type_name, mod_type_char, canonical) in [
+        (M6A_TYPE, 'a', &[(b'A', '+'), (b'T', '-')] as &[(u8, char)]),
+        (CPG_TYPE, 'm', &[(b'C', '+'), (b'G', '+')] as &[(u8, char)]),
+    ] {
+        let Some(t) = annot.get_type(type_name) else {
+            continue;
+        };
+        for a in &t.annotations {
+            let seq_base = forward_seq.get(a.start as usize).copied().unwrap_or(b'N');
+            let (group_base, group_strand) = canonical
+                .iter()
+                .find(|&&(b, _)| b == seq_base)
+                .copied()
+                .unwrap_or_else(|| {
+                    log::warn!(
+                        "{} call at pos {} on unexpected base {:?}; emitting as {}{}{}",
+                        type_name,
+                        a.start,
+                        seq_base as char,
+                        seq_base as char,
+                        '+',
+                        mod_type_char,
+                    );
+                    (seq_base, '+')
+                });
+            let header = format!("{}{}{}", group_base as char, group_strand, mod_type_char);
+            let qual = a.qualities.first().copied().unwrap_or(0);
+            groups.entry(header).or_default().push((a.start, qual));
+        }
+    }
+
+    // Non-canonical types: name is the MM group header (e.g. "C+h").
+    for t in annot.annotation_types.iter() {
+        if t.name == M6A_TYPE || t.name == CPG_TYPE {
+            continue;
+        }
+        if !is_valid_mm_header(&t.name) {
+            continue;
+        }
+        for a in &t.annotations {
+            let qual = a.qualities.first().copied().unwrap_or(0);
+            groups
+                .entry(t.name.clone())
+                .or_default()
+                .push((a.start, qual));
+        }
+    }
+
+    let mut mm_tag = String::new();
+    let mut ml_tag: Vec<u8> = Vec::new();
+    for (header, mut calls) in groups {
+        calls.sort_by_key(|(p, _)| *p);
+        ml_tag.extend(calls.iter().map(|&(_, q)| q));
+        mm_tag.push_str(&header);
+        // First byte of the header is the skip base (`N` counts everything).
+        let skip_base = header.as_bytes()[0];
+        let mut last_pos = 0usize;
+        for (pos, _) in &calls {
+            let p = *pos as usize;
+            let in_between = if last_pos < p {
+                forward_seq[last_pos..p]
+                    .iter()
+                    .filter(|&&b| skip_base == b'N' || b == skip_base)
+                    .count()
+            } else {
+                0
+            };
+            last_pos = p + 1;
+            mm_tag.push_str(&format!(",{in_between}"));
+        }
+        mm_tag.push(';');
+    }
+
+    record.remove_aux(b"MM").ok();
+    record.remove_aux(b"ML").ok();
+    record
+        .push_aux(b"MM", Aux::String(&mm_tag))
+        .expect("push MM tag");
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&ml_tag).into()))
+        .expect("push ML tag");
+}
+
+/// True if `name` looks like an MM group header: one canonical base
+/// (`ACGTUN`), a strand sign, then a non-empty alphanumeric mod type.
+fn is_valid_mm_header(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    if bytes.len() < 3 {
+        return false;
+    }
+    let base_ok = matches!(bytes[0], b'A' | b'C' | b'G' | b'T' | b'U' | b'N');
+    let strand_ok = bytes[1] == b'+' || bytes[1] == b'-';
+    let mod_ok = bytes[2..].iter().all(|b| b.is_ascii_alphanumeric());
+    base_ok && strand_ok && mod_ok
 }

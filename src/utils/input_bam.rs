@@ -321,7 +321,6 @@ impl std::default::Default for InputBam {
 mod tests {
     use super::*;
     use crate::fiber::FiberseqData;
-    use crate::utils::basemods::BaseMods;
     use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 
     /// Build a minimal `FiberseqData` shaped only for `passes_fire_filter`.
@@ -346,7 +345,6 @@ mod tests {
         FiberseqData {
             record: rust_htslib::bam::Record::new(),
             annotations,
-            base_mods: BaseMods { base_mods: vec![] },
             ec: 0.0,
             target_name: ".".to_string(),
             rg: ".".to_string(),

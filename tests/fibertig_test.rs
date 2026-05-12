@@ -523,7 +523,11 @@ fn test_read_fibertig_tags_reverse_strand_multi_peak() -> Result<()> {
     let infos: Vec<_> = annot.iter_type(FIBERTIG_TYPE).unwrap().collect();
     for (i, (info, (exp_start, exp_end, exp_name))) in infos.iter().zip(expected.iter()).enumerate()
     {
-        assert_eq!(info.ref_start, Some(*exp_start), "ref_start mismatch at {i}");
+        assert_eq!(
+            info.ref_start,
+            Some(*exp_start),
+            "ref_start mismatch at {i}"
+        );
         assert_eq!(info.ref_end, Some(*exp_end), "ref_end mismatch at {i}");
         assert_eq!(info.name, Some(*exp_name), "name mismatch at {i}");
     }
@@ -561,7 +565,11 @@ fn test_read_fibertig_tags_reverse_strand_shared_start() -> Result<()> {
     let infos: Vec<_> = annot.iter_type(FIBERTIG_TYPE).unwrap().collect();
     for (i, (info, (exp_start, exp_end, exp_name))) in infos.iter().zip(expected.iter()).enumerate()
     {
-        assert_eq!(info.ref_start, Some(*exp_start), "ref_start mismatch at {i}");
+        assert_eq!(
+            info.ref_start,
+            Some(*exp_start),
+            "ref_start mismatch at {i}"
+        );
         assert_eq!(info.ref_end, Some(*exp_end), "ref_end mismatch at {i}");
         assert_eq!(info.name, Some(*exp_name), "name mismatch at {i}");
     }
