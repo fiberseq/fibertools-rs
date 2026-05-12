@@ -51,6 +51,51 @@ pub struct AnnotationInfo<'a> {
     pub name: Option<&'a str>,
 }
 
+/// An annotation with coordinates projected into a shifted coordinate frame.
+///
+/// Returned by [`MolecularAnnotations::project_query`] and
+/// [`MolecularAnnotations::project_reference`]. Both `start` and `end` are
+/// 0-based half-open `[start, end)` intervals, shifted so the projection
+/// anchor sits at 0. Either bound may be negative.
+///
+/// The frame the coordinates live in is determined by which `project_*`
+/// method produced the value — `ProjectedAnnotation` itself carries no
+/// frame metadata, on the assumption that the caller knows what they
+/// asked for. The same goes for the anchor and the flip flag.
+///
+/// Projected annotations are a one-way view intended for output and
+/// downstream analysis. They cannot be serialized back into MA tags
+/// (the on-disk format requires non-negative positions) and do not
+/// round-trip through [`MolecularAnnotations`].
+///
+/// Fields borrow from the source [`MolecularAnnotations`]; the projected
+/// view lives only as long as the container it came from.
+///
+/// # Example
+/// ```
+/// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+///
+/// let mut annotations = MolecularAnnotations::new(1000);
+/// annotations
+///     .add_annotation_type("msp", "P".parse().unwrap())
+///     .add(100, 50, Strand::Forward, vec![40], None);  // [100, 150)
+///
+/// // Project around query position 120: annotation lands at [-20, 30).
+/// let projected: Vec<_> = annotations.project_query(120, false).collect();
+/// assert_eq!(projected[0].start, -20);
+/// assert_eq!(projected[0].end, 30);
+/// ```
+#[derive(Debug, Clone)]
+pub struct ProjectedAnnotation<'a> {
+    pub type_name: &'a str,
+    pub start: i64,
+    pub end: i64,
+    pub strand: Strand,
+    pub qualities: &'a [u8],
+    pub name: Option<&'a str>,
+}
+
+
 /// Error types for parsing molecular annotations
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
@@ -271,13 +316,17 @@ impl FromStr for QualitySpec {
 
 /// A single molecular annotation.
 ///
-/// All coordinates are 0-based half-open [start, end).
+/// All coordinates are 0-based half-open [start, end). Strand is a property
+/// of each annotation, not of its containing [`AnnotationType`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
-    /// 0-based start position (inclusive)
+    /// 0-based start position (inclusive), in original molecular orientation
     pub start: u32,
     /// Length in base pairs (end = start + length)
     pub length: u32,
+    /// Strand of this annotation. Describes the biology of the feature, not
+    /// the alignment orientation.
+    pub strand: Strand,
     /// Quality scores (one per quality spec character, empty if type has no quality)
     pub qualities: Vec<u8>,
     /// Optional name/label for this annotation
@@ -292,14 +341,14 @@ impl Annotation {
     /// # Panics
     /// Panics in debug mode if:
     /// - `start + length` would overflow u32
-    pub fn new(start: u32, length: u32, qualities: Vec<u8>, name: Option<String>) -> Self {
+    pub fn new(start: u32, length: u32, strand: Strand, qualities: Vec<u8>, name: Option<String>) -> Self {
         debug_assert!(
             start.checked_add(length).is_some(),
             "Annotation coordinate overflow: start={} + length={} exceeds u32",
             start,
             length
         );
-        Self { start, length, qualities, name }
+        Self { start, length, strand, qualities, name }
     }
 
     /// Returns the end position (0-based, exclusive).
@@ -341,13 +390,17 @@ impl Annotation {
     }
 }
 
-/// A group of annotations of the same type
+/// A group of annotations of the same type.
+///
+/// Annotation type identity within a [`MolecularAnnotations`](crate::MolecularAnnotations)
+/// is keyed on `name` alone. Strand is a property of each [`Annotation`];
+/// one type may contain annotations on different strands. `quality_spec` is
+/// a per-type property but is not part of the identity — adding the same
+/// `name` twice with conflicting `quality_spec` is an error.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnnotationType {
     /// Name of the annotation type (e.g., "msp", "nuc", "fire")
     pub name: String,
-    /// Strand orientation
-    pub strand: Strand,
     /// Quality specification (number and scaling of quality values per annotation)
     pub quality_spec: QualitySpec,
     /// Individual annotations of this type
@@ -355,19 +408,20 @@ pub struct AnnotationType {
 }
 
 impl AnnotationType {
-    /// Create a new annotation type
-    pub fn new(name: impl Into<String>, strand: Strand, quality_spec: QualitySpec) -> Self {
+    /// Create a new annotation type.
+    pub fn new(name: impl Into<String>, quality_spec: QualitySpec) -> Self {
         Self {
             name: name.into(),
-            strand,
             quality_spec,
             annotations: Vec::new(),
         }
     }
 
-    /// Returns the type signature string (e.g., "msp+P", "nuc-", "fire.PQ")
-    pub fn type_signature(&self) -> String {
-        format!("{}{}{}", self.name, self.strand, self.quality_spec)
+    /// Returns the on-disk section signature string for a given strand
+    /// (e.g., `"msp+P"`, `"nuc-"`, `"fire.PQ"`). Used during serialization
+    /// when annotations are grouped by `(name, strand)` into MA sections.
+    pub fn type_signature(&self, strand: Strand) -> String {
+        format!("{}{}{}", self.name, strand, self.quality_spec)
     }
 
     /// Add an annotation to this type.
@@ -378,10 +432,17 @@ impl AnnotationType {
         &mut self,
         start: u32,
         length: u32,
+        strand: Strand,
         qualities: Vec<u8>,
         name: Option<String>,
     ) -> &mut Self {
-        self.annotations.push(Annotation::new(start, length, qualities, name));
+        self.annotations.push(Annotation::new(start, length, strand, qualities, name));
         self
     }
+    /// Drop annotations for which `predicate` returns false.
+    pub fn retain<F: FnMut(&Annotation) -> bool>(&mut self, predicate: F) {
+        self.annotations.retain(predicate);
+    }
 }
+
+

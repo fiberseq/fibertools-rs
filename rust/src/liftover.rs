@@ -103,7 +103,7 @@ impl AlignedBlock {
 /// between query (read) and reference coordinate systems.
 ///
 /// Query positions are assumed to be forward-oriented (as stored in the MA tag).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct AlignedBlocks {
     blocks: Vec<AlignedBlock>,
     /// Length of the query sequence

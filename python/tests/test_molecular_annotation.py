@@ -1,7 +1,12 @@
 """Tests for the molecular_annotation Python bindings."""
 
 import pytest
-from molecular_annotation import MolecularAnnotations, from_record, write_to_record
+from molecular_annotation import (
+    Annotation,
+    MolecularAnnotations,
+    from_record,
+    write_to_record,
+)
 
 
 class TestMolecularAnnotations:
@@ -191,16 +196,31 @@ class TestErrorHandling:
                 "test", "+", "", starts=[100, 200], lengths=[50, 60], names=["only_one"]
             )
 
-    def test_conflicting_annotation_type(self):
-        """Test that adding same type with different strand/quality raises error."""
+    def test_conflicting_quality_spec(self):
+        """Test that adding same name with different quality_spec raises error.
+
+        Annotation type identity is keyed on `name` alone, so strand may
+        differ across additions to the same type. quality_spec must agree.
+        """
         annotations = MolecularAnnotations(1000)
         annotations.add_annotations("msp", "+", "P", starts=[100], lengths=[50], qualities=[40])
 
-        with pytest.raises(ValueError, match="already exists"):
-            # Same name but different strand
+        with pytest.raises(ValueError, match="quality_spec"):
+            # Same name but different quality_spec
             annotations.add_annotations(
-                "msp", "-", "P", starts=[200], lengths=[60], qualities=[35]
+                "msp", "+", "Q", starts=[200], lengths=[60], qualities=[35]
             )
+
+    def test_mixed_strand_same_name_merges(self):
+        """Adding the same name with different strand accumulates into one type."""
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations("msp", "+", "P", starts=[100], lengths=[50], qualities=[40])
+        # Same name, different strand — should succeed, not error.
+        annotations.add_annotations(
+            "msp", "-", "P", starts=[200], lengths=[60], qualities=[35]
+        )
+        assert annotations.total_annotation_count() == 2
+        assert annotations.annotation_type_names() == ["msp"]
 
     def test_from_tags_invalid_format(self):
         """Test that invalid MA format raises error."""
@@ -388,3 +408,154 @@ class TestPysamIntegration:
 
         with pytest.raises(KeyError):
             from_record(record)
+
+
+class TestRetain:
+    """Tests for MolecularAnnotations.retain (mirrors rust/src/tests.rs)."""
+
+    def test_retain_filters_by_length(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp",
+            "+",
+            "P",
+            starts=[100, 200, 300],
+            lengths=[50, 60, 70],
+            qualities=[40, 35, 30],
+        )
+
+        annotations.retain("msp", lambda a: a.length > 55)
+
+        items = annotations.iter_type("msp")
+        assert items is not None
+        assert len(items) == 2
+        # iter_type tuple: (q_start, q_end, f_start, f_end, r_start, r_end, quals, name)
+        assert items[0][3] - items[0][2] == 60
+        assert items[1][3] - items[1][2] == 70
+
+    def test_retain_filters_by_quality(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp",
+            "+",
+            "P",
+            starts=[100, 200, 300],
+            lengths=[50, 60, 70],
+            qualities=[40, 10, 200],
+        )
+
+        annotations.retain("msp", lambda a: a.qualities[0] >= 40)
+
+        items = annotations.iter_type("msp")
+        assert items is not None
+        assert len(items) == 2
+        assert items[0][6] == [40]
+        assert items[1][6] == [200]
+
+    def test_retain_with_range_predicate(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp",
+            "+",
+            "",
+            starts=[0, 100, 200, 300, 400],
+            lengths=[30, 50, 75, 100, 150],
+        )
+
+        annotations.retain("msp", lambda a: 50 <= a.length < 100)
+
+        items = annotations.iter_type("msp")
+        assert items is not None
+        assert len(items) == 2
+        assert items[0][3] - items[0][2] == 50
+        assert items[1][3] - items[1][2] == 75
+
+    def test_retain_keeps_all(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp", "+", "P", starts=[100, 200], lengths=[50, 60], qualities=[40, 35]
+        )
+
+        annotations.retain("msp", lambda a: True)
+
+        assert annotations.total_annotation_count() == 2
+
+    def test_retain_drops_all(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp", "+", "P", starts=[100, 200], lengths=[50, 60], qualities=[40, 35]
+        )
+
+        annotations.retain("msp", lambda a: False)
+
+        # Type stays in the container but contributes no annotations and
+        # therefore doesn't appear in the emitted MA string.
+        assert annotations.annotation_type_names() == ["msp"]
+        assert annotations.total_annotation_count() == 0
+        assert annotations.to_ma_string() == "1000"
+
+    def test_retain_only_affects_named_type(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp", "+", "P", starts=[100, 200], lengths=[50, 60], qualities=[40, 35]
+        )
+        annotations.add_annotations(
+            "nuc", "+", "", starts=[150, 400], lengths=[147, 147]
+        )
+
+        annotations.retain("msp", lambda a: a.length >= 60)
+
+        msp = annotations.iter_type("msp")
+        nuc = annotations.iter_type("nuc")
+        assert len(msp) == 1
+        assert len(nuc) == 2
+
+    def test_retain_missing_type_is_noop(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations("msp", "+", "", starts=[100], lengths=[50])
+
+        # Should not raise; should leave the existing type untouched.
+        annotations.retain("does_not_exist", lambda a: False)
+
+        assert annotations.total_annotation_count() == 1
+
+    def test_retain_exposes_annotation_fields(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "fire",
+            "-",
+            "Q",
+            starts=[500],
+            lengths=[75],
+            qualities=[200],
+            names=["enhancer1"],
+        )
+
+        seen: list[Annotation] = []
+
+        def collect(a: Annotation) -> bool:
+            seen.append(a)
+            return True
+
+        annotations.retain("fire", collect)
+
+        assert len(seen) == 1
+        a = seen[0]
+        assert a.start == 500
+        assert a.length == 75
+        assert a.end == 575
+        assert a.strand == "-"
+        assert a.qualities == [200]
+        assert a.name == "enhancer1"
+
+    def test_retain_propagates_predicate_exception(self):
+        annotations = MolecularAnnotations(1000)
+        annotations.add_annotations(
+            "msp", "+", "P", starts=[100, 200], lengths=[50, 60], qualities=[40, 35]
+        )
+
+        def bad(a: Annotation) -> bool:
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            annotations.retain("msp", bad)
