@@ -134,6 +134,14 @@ impl FiberseqData {
         AnnotationTypeView::new(&self.annotations, CPG_TYPE)
     }
 
+    /// Flush `self.annotations` onto the underlying record's MA aux
+    /// tags. The single write path — every subcommand that mutates
+    /// annotations should call this and then hand the record to the
+    /// BAM writer.
+    pub fn serialize_annotations(&mut self, legacy: bool) {
+        crate::utils::ma_io::write_annotations(&mut self.record, &self.annotations, legacy);
+    }
+
     pub fn get_qname(&self) -> String {
         String::from_utf8_lossy(self.record.qname()).to_string()
     }

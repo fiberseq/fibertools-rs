@@ -15,8 +15,9 @@
 //! - `fire` (forward strand, `P` phred quality)
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
-//! populated by `BaseMods::populate_ma`, but are NEVER read or written here:
-//! their on-disk source of truth is `MM`/`ML`.
+//! populated by [`crate::utils::basemods::parse_mm_ml_into_ma`], but are
+//! NEVER read or written here: their on-disk source of truth is `MM`/`ML`.
+//! The writer below strips them before emission as a safety net.
 
 use anyhow::{bail, Result};
 use molecular_annotation::{Annotation, MolecularAnnotations, QualitySpec, Strand};
@@ -148,7 +149,14 @@ pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations,
     for tag in LEGACY_NUC_MSP_TAGS {
         record.remove_aux(tag).ok();
     }
-    annot.to_record(record);
+    // Base modifications (`m6a`, `cpg`) belong in MM/ML — never in the
+    // MA tag set. Drop them before serialization. See the module docs
+    // for the on-disk source-of-truth split.
+    let mut for_ma = annot.clone();
+    for_ma.annotation_types.retain(|t| {
+        t.name != crate::utils::basemods::M6A_TYPE && t.name != crate::utils::basemods::CPG_TYPE
+    });
+    for_ma.to_record(record);
     if legacy {
         write_legacy_nuc_msp(record, annot);
     }

@@ -25,32 +25,29 @@ pub fn add_fire_to_rec(
         precisions.reverse();
     }
 
-    let mut annot = match ma_io::read_annotations(&rec.record) {
-        Ok(a) => a,
-        Err(e) => {
-            log::warn!("FIRE: failed to read annotations: {e}");
+    // Use the FiberseqData's already-loaded MA object; no record
+    // re-read. MSP coords come from rec.annotations directly.
+    let (starts, lens): (Vec<u32>, Vec<u32>) = {
+        let Some(msp) = rec.annotations.get_type(ma_io::MSP_TYPE) else {
+            log::warn!("FIRE: no msp annotations on record; skipping");
+            return;
+        };
+        if msp.annotations.len() != precisions.len() {
+            log::warn!(
+                "FIRE precision count ({}) does not match MSP count ({}); skipping",
+                precisions.len(),
+                msp.annotations.len(),
+            );
             return;
         }
+        (
+            msp.annotations.iter().map(|a| a.start).collect(),
+            msp.annotations.iter().map(|a| a.length).collect(),
+        )
     };
+    ma_io::add_fire_annotations(&mut rec.annotations, &starts, &lens, &precisions);
 
-    let Some(msp) = annot.get_type(ma_io::MSP_TYPE) else {
-        log::warn!("FIRE: no msp annotations on record; skipping");
-        return;
-    };
-    if msp.annotations.len() != precisions.len() {
-        log::warn!(
-            "FIRE precision count ({}) does not match MSP count ({}); skipping",
-            precisions.len(),
-            msp.annotations.len(),
-        );
-        return;
-    }
-
-    let starts: Vec<u32> = msp.annotations.iter().map(|a| a.start).collect();
-    let lens: Vec<u32> = msp.annotations.iter().map(|a| a.length).collect();
-    ma_io::add_fire_annotations(&mut annot, &starts, &lens, &precisions);
-
-    ma_io::write_annotations(&mut rec.record, &annot, legacy);
+    rec.serialize_annotations(legacy);
 
     log::trace!("precisions: {precisions:?}");
 }
