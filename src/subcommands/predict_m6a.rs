@@ -267,15 +267,21 @@ where
             // write the ml and mm tags
             basemods::write_mm_ml(record, &annot);
 
-            // adding the nucleosomes — uses the forward m6a positions we just placed.
+            // Compute nucleosomes + MSPs from the forward m6a positions
+            // and append them to the same MA object we just built up.
             let modified_bases_forward: Vec<i64> =
                 m6a_calls.iter().map(|&(p, _)| p as i64).collect();
-            nucleosome::add_nucleosomes_to_record(
+            nucleosome::add_nucleosomes_to_annotations(
                 record,
+                &mut annot,
                 &modified_bases_forward,
                 &opts.nuc_opts,
-                opts.legacy_tags,
             );
+
+            // Single MA write — m6a went out via MM/ML above; nuc/msp
+            // (and any pre-existing annotation types we preserved) go
+            // out here.
+            crate::utils::ma_io::write_annotations(record, &annot, opts.legacy_tags);
 
             // clear the existing data
             if !opts.keep {

@@ -184,11 +184,15 @@ pub fn filter_for_end(
         .unzip()
 }
 
-pub fn add_nucleosomes_to_record(
-    record: &mut bam::Record,
+/// Compute nucleosomes + MSPs from `m6a` calls and append them to
+/// `annot` in place. Writing the MA tags onto the record is the
+/// caller's responsibility (typically via [`FiberseqData::serialize_annotations`]
+/// or [`ma_io::write_annotations`]).
+pub fn add_nucleosomes_to_annotations(
+    record: &bam::Record,
+    annot: &mut MolecularAnnotations,
     m6a: &[i64],
     options: &NucleosomeParameters,
-    legacy: bool,
 ) {
     let nucs = if options.allowed_m6a_skips < 0 {
         find_nucleosomes(m6a, options)
@@ -199,10 +203,8 @@ pub fn add_nucleosomes_to_record(
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
 
-    let mut annot = MolecularAnnotations::from_record(record);
-    ma_io::add_nuc_annotations(&mut annot, &nuc_starts, &nuc_lengths);
-    ma_io::add_msp_annotations(&mut annot, &msp_starts, &msp_lengths, None);
-    ma_io::write_annotations(record, &annot, legacy);
+    ma_io::add_nuc_annotations(annot, &nuc_starts, &nuc_lengths);
+    ma_io::add_msp_annotations(annot, &msp_starts, &msp_lengths, None);
 }
 
 #[cfg(test)]
