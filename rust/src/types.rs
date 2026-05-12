@@ -51,6 +51,51 @@ pub struct AnnotationInfo<'a> {
     pub name: Option<&'a str>,
 }
 
+/// An annotation with coordinates projected into a shifted coordinate frame.
+///
+/// Returned by [`MolecularAnnotations::project_query`] and
+/// [`MolecularAnnotations::project_reference`]. Both `start` and `end` are
+/// 0-based half-open `[start, end)` intervals, shifted so the projection
+/// anchor sits at 0. Either bound may be negative.
+///
+/// The frame the coordinates live in is determined by which `project_*`
+/// method produced the value — `ProjectedAnnotation` itself carries no
+/// frame metadata, on the assumption that the caller knows what they
+/// asked for. The same goes for the anchor and the flip flag.
+///
+/// Projected annotations are a one-way view intended for output and
+/// downstream analysis. They cannot be serialized back into MA tags
+/// (the on-disk format requires non-negative positions) and do not
+/// round-trip through [`MolecularAnnotations`].
+///
+/// Fields borrow from the source [`MolecularAnnotations`]; the projected
+/// view lives only as long as the container it came from.
+///
+/// # Example
+/// ```
+/// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+///
+/// let mut annotations = MolecularAnnotations::new(1000);
+/// annotations
+///     .add_annotation_type("msp", "P".parse().unwrap())
+///     .add(100, 50, Strand::Forward, vec![40], None);  // [100, 150)
+///
+/// // Project around query position 120: annotation lands at [-20, 30).
+/// let projected: Vec<_> = annotations.project_query(120, false).collect();
+/// assert_eq!(projected[0].start, -20);
+/// assert_eq!(projected[0].end, 30);
+/// ```
+#[derive(Debug, Clone)]
+pub struct ProjectedAnnotation<'a> {
+    pub type_name: &'a str,
+    pub start: i64,
+    pub end: i64,
+    pub strand: Strand,
+    pub qualities: &'a [u8],
+    pub name: Option<&'a str>,
+}
+
+
 /// Error types for parsing molecular annotations
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {

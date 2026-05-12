@@ -121,7 +121,7 @@ mod types;
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
     Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, ParseError,
-    QualityScaling, QualitySpec, Strand,
+    ProjectedAnnotation, QualityScaling, QualitySpec, Strand,
 };
 
 use std::str::FromStr;
@@ -213,7 +213,8 @@ impl MolecularAnnotations {
             }
             return Ok(&mut self.annotation_types[idx]);
         }
-        self.annotation_types.push(AnnotationType::new(name, quality_spec));
+        self.annotation_types
+            .push(AnnotationType::new(name, quality_spec));
         Ok(self.annotation_types.last_mut().unwrap())
     }
 
@@ -230,7 +231,10 @@ impl MolecularAnnotations {
     /// assert_eq!(annotations.annotation_type_names(), vec!["msp", "nuc"]);
     /// ```
     pub fn annotation_type_names(&self) -> Vec<&str> {
-        self.annotation_types.iter().map(|t| t.name.as_str()).collect()
+        self.annotation_types
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect()
     }
 
     /// Get an annotation type by name
@@ -336,7 +340,10 @@ impl MolecularAnnotations {
 
     /// Returns the total number of annotations across all types
     pub fn total_annotation_count(&self) -> usize {
-        self.annotation_types.iter().map(|t| t.annotations.len()).sum()
+        self.annotation_types
+            .iter()
+            .map(|t| t.annotations.len())
+            .sum()
     }
 
     /// Iterate over all annotations across all types
@@ -452,7 +459,66 @@ impl MolecularAnnotations {
             .iter()
             .flat_map(move |annot_type| self.iter_annotation_type(annot_type))
     }
+    /// Project annotations into a query-coordinate system anchored at 0.
+    ///
+    /// Each annotation's coords (in BAM orientation, matching `iter_full`) are
+    /// shifted by `-anchor`. If `flip` is true, each interval is reversed
+    /// around 0: `[a, b)` → `[-(b-1), -(a-1))`.
+    pub fn project_query(
+        &self,
+        anchor: i64,
+        flip: bool,
+    ) -> impl Iterator<Item = ProjectedAnnotation<'_>> + '_ {
+        self.annotation_types.iter().flat_map(move |t| {
+            t.annotations.iter().map(move |a| {
+                let (qs, qe) = if self.is_reverse_aligned {
+                    self.flip_range(a.start, a.end())
+                } else {
+                    (a.start, a.end())
+                };
+                let (start, end) = project_interval(qs as i64, qe as i64, anchor, flip);
+                ProjectedAnnotation {
+                    type_name: &t.name,
+                    start,
+                    end,
+                    strand: a.strand,
+                    qualities: &a.qualities,
+                    name: a.name.as_deref(),
+                }
+            })
+        })
+    }
 
+    /// Project annotations into a reference-coordinate system anchored at 0.
+    ///
+    /// Requires aligned blocks. Annotations that don't lift to reference
+    /// coords (no blocks, or in a gap) are skipped.
+    pub fn project_reference(
+        &self,
+        anchor: i64,
+        flip: bool,
+    ) -> impl Iterator<Item = ProjectedAnnotation<'_>> + '_ {
+        self.annotation_types.iter().flat_map(move |t| {
+            t.annotations.iter().filter_map(move |a| {
+                let blocks = self.aligned_blocks.as_ref()?;
+                let (qs, qe) = if self.is_reverse_aligned {
+                    self.flip_range(a.start, a.end())
+                } else {
+                    (a.start, a.end())
+                };
+                let (rs, re) = blocks.lift_to_reference(qs, qe);
+                let (start, end) = project_interval(rs? as i64, re? as i64, anchor, flip);
+                Some(ProjectedAnnotation {
+                    type_name: &t.name,
+                    start,
+                    end,
+                    strand: a.strand,
+                    qualities: &a.qualities,
+                    name: a.name.as_deref(),
+                })
+            })
+        })
+    }
     /// Section emission order for MA / AL / AQ / AN serialization.
     ///
     /// For each annotation type (in insertion order), groups its annotations
@@ -462,7 +528,9 @@ impl MolecularAnnotations {
     ///
     /// Yields `(annotation_type, strand, indices)` where `indices` are
     /// positions into `annotation_type.annotations`.
-    fn emission_sections(&self) -> impl Iterator<Item = (&AnnotationType, Strand, Vec<usize>)> + '_ {
+    fn emission_sections(
+        &self,
+    ) -> impl Iterator<Item = (&AnnotationType, Strand, Vec<usize>)> + '_ {
         const STRANDS: [Strand; 3] = [Strand::Forward, Strand::Reverse, Strand::Unknown];
         self.annotation_types.iter().flat_map(|t| {
             STRANDS.into_iter().filter_map(move |s| {
@@ -507,7 +575,11 @@ impl MolecularAnnotations {
                     .collect(),
             };
 
-            parts.push(format!("{}:{}", annot_type.type_signature(strand), positions.join(",")));
+            parts.push(format!(
+                "{}:{}",
+                annot_type.type_signature(strand),
+                positions.join(",")
+            ));
         }
 
         parts.join(";")
@@ -825,10 +897,7 @@ impl MolecularAnnotations {
     /// Vector of [`LiftedCoords`] tuples `(query_start, query_end, ref_start, ref_end)`,
     /// all as 0-based half-open intervals.
     /// Returns `None` if the type doesn't exist or aligned blocks are not set.
-    pub fn get_ref_coords(
-        &self,
-        type_name: &str,
-    ) -> Option<Vec<LiftedCoords>> {
+    pub fn get_ref_coords(&self, type_name: &str) -> Option<Vec<LiftedCoords>> {
         let blocks = self.aligned_blocks.as_ref()?;
         let coords = self.get_coords(type_name)?;
 
@@ -955,7 +1024,10 @@ impl MolecularAnnotations {
             // Split on ':' to get type info and positions
             let type_and_positions: Vec<&str> = part.splitn(2, ':').collect();
             if type_and_positions.len() != 2 {
-                return Err(ParseError::InvalidFormat(format!("Invalid annotation type format: {}", part)));
+                return Err(ParseError::InvalidFormat(format!(
+                    "Invalid annotation type format: {}",
+                    part
+                )));
             }
 
             let type_info = type_and_positions[0];
@@ -974,12 +1046,18 @@ impl MolecularAnnotations {
                 .filter(|s| !s.is_empty())
                 .map(|s| {
                     if let Some((start_str, len_str)) = s.split_once('-') {
-                        let start: u32 = start_str.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid start: {}", start_str)))?;
-                        let len: u32 = len_str.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid length: {}", len_str)))?;
-                        Ok((start - 1, Some(len)))  // Convert 1-based to 0-based
+                        let start: u32 = start_str.parse().map_err(|_| {
+                            ParseError::InvalidCoordinate(format!("Invalid start: {}", start_str))
+                        })?;
+                        let len: u32 = len_str.parse().map_err(|_| {
+                            ParseError::InvalidCoordinate(format!("Invalid length: {}", len_str))
+                        })?;
+                        Ok((start - 1, Some(len))) // Convert 1-based to 0-based
                     } else {
-                        let start: u32 = s.parse().map_err(|_| ParseError::InvalidCoordinate(format!("Invalid position: {}", s)))?;
-                        Ok((start - 1, None))  // Convert 1-based to 0-based
+                        let start: u32 = s.parse().map_err(|_| {
+                            ParseError::InvalidCoordinate(format!("Invalid position: {}", s))
+                        })?;
+                        Ok((start - 1, None)) // Convert 1-based to 0-based
                     }
                 })
                 .collect::<Result<Vec<_>, ParseError>>()?;
@@ -1028,7 +1106,11 @@ impl MolecularAnnotations {
                 let annot_name = if name_idx < names.len() {
                     let n = names[name_idx];
                     name_idx += 1;
-                    if n.is_empty() { None } else { Some(n.to_string()) }
+                    if n.is_empty() {
+                        None
+                    } else {
+                        Some(n.to_string())
+                    }
                 } else {
                     name_idx += 1;
                     None
@@ -1065,13 +1147,14 @@ pub(crate) fn parse_type_info(s: &str) -> Result<(String, Strand, QualitySpec), 
         .find(|(_, c)| *c == '+' || *c == '-' || *c == '.')
         .map(|(i, _)| i);
 
-    let strand_pos = strand_pos.ok_or_else(|| {
-        ParseError::InvalidFormat(format!("No strand indicator found in: {}", s))
-    })?;
+    let strand_pos = strand_pos
+        .ok_or_else(|| ParseError::InvalidFormat(format!("No strand indicator found in: {}", s)))?;
 
     let name = &s[..strand_pos];
     if name.is_empty() {
-        return Err(ParseError::InvalidFormat("Empty annotation type name".to_string()));
+        return Err(ParseError::InvalidFormat(
+            "Empty annotation type name".to_string(),
+        ));
     }
 
     let strand_char = &s[strand_pos..strand_pos + 1];
@@ -1081,6 +1164,18 @@ pub(crate) fn parse_type_info(s: &str) -> Result<(String, Strand, QualitySpec), 
     let quality_spec = QualitySpec::from_str(quality_str)?;
 
     Ok((name.to_string(), strand, quality_spec))
+}
+
+/// Shift `[raw_start, raw_end)` so `anchor` is at 0, optionally flipping
+/// around 0 (reverses orientation): `[a, b)` → `[-(b-1), -(a-1))`.
+#[inline]
+fn project_interval(raw_start: i64, raw_end: i64, anchor: i64, flip: bool) -> (i64, i64) {
+    let (s, e) = (raw_start - anchor, raw_end - anchor);
+    if flip {
+        (-e + 1, -s + 1)
+    } else {
+        (s, e)
+    }
 }
 
 #[cfg(test)]
