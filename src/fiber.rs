@@ -1,5 +1,4 @@
 use super::subcommands::center::CenterPosition;
-use super::subcommands::center::CenteredFiberData;
 use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamannotations::*;
@@ -18,10 +17,6 @@ use std::fmt::Write;
 pub struct FiberseqData {
     pub record: bam::Record,
     pub annotations: MolecularAnnotations,
-    pub msp: Ranges,
-    pub nuc: Ranges,
-    pub m6a: Ranges,
-    pub cpg: Ranges,
     pub base_mods: BaseMods,
     pub ec: f32,
     pub target_name: String,
@@ -43,16 +38,6 @@ impl FiberseqData {
             log::warn!("Failed to read annotations: {e}");
             MolecularAnnotations::from_record(&record)
         });
-        let (nuc_starts, nuc_length, msp_starts, msp_length, msp_qual) =
-            crate::utils::ma_io::extract_nuc_msp_arrays(&record).unwrap_or_else(|e| {
-                log::warn!("Failed to read annotations: {e}");
-                Default::default()
-            });
-        let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
-        let mut msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
-        if !msp_qual.is_empty() {
-            msp.set_qual(msp_qual);
-        }
 
         // get the number of passes
         let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
@@ -67,23 +52,15 @@ impl FiberseqData {
             None => ".".to_string(),
         };
 
-        // get fiberseq basemods
+        // get fiberseq basemods (also injects m6a/cpg into `annotations`)
         let mut base_mods = BaseMods::new(&record, filters.min_ml_score);
         base_mods.filter_at_read_ends(filters.strip_starting_basemods);
         base_mods.populate_ma(&mut annotations);
 
-        //let (m6a, cpg) = FiberMods::new(&base_mods);
-        let m6a = base_mods.m6a();
-        let cpg = base_mods.cpg();
-
         let mut fsd = FiberseqData {
             record,
             annotations,
-            msp,
-            nuc,
-            m6a,
             base_mods,
-            cpg,
             ec,
             target_name,
             rg,
@@ -176,56 +153,6 @@ impl FiberseqData {
             Ok(Aux::U32(v)) => format!("H{v}"),
             Ok(Aux::I32(v)) => format!("H{v}"),
             _ => "UNK".to_string(),
-        }
-    }
-
-    /// Center all coordinates on the read using the offset attribute.
-    pub fn center(&self, center_position: &CenterPosition) -> Option<Self> {
-        // setup new fiberseq data object to return
-        let mut new = self.clone();
-        let (ref_offset, mol_offset) =
-            CenteredFiberData::find_offsets(&self.record, center_position);
-
-        // Apply offsets to all annotations using the new methods
-        new.m6a
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.cpg
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.msp
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.nuc
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-
-        // Validate that MSPs still start and end on m6A marks after centering
-        new.validate_msp_m6a_alignment();
-
-        Some(new)
-    }
-
-    /// Validate that all MSP boundaries align with m6A positions after centering
-    fn validate_msp_m6a_alignment(&self) {
-        // Legacy fields are used here because centering only mutates the
-        // legacy Ranges (Branch 2 will move centering onto the MA spec).
-        let m6a_positions = self.m6a.starts();
-        let msp_boundaries: Vec<i64> = self
-            .msp
-            .starts()
-            .into_iter()
-            .chain(self.msp.ends().into_iter().map(|x| x - 1))
-            .collect();
-
-        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
-            return; // Skip validation if no data
-        }
-
-        for msp_pos in &msp_boundaries {
-            if !m6a_positions.contains(msp_pos) {
-                log::warn!(
-                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
-                    msp_pos,
-                    String::from_utf8_lossy(self.record.qname())
-                );
-            }
         }
     }
 

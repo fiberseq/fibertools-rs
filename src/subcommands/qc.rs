@@ -112,7 +112,7 @@ impl<'a> QcStats<'a> {
     /// converts the m6A calls into a boolean vector for the ACF calculation
     fn add_m6a_starts_for_acf(&mut self, fiber: &fiber::FiberseqData) {
         // skip conditions
-        if !self.qc_opts.acf || fiber.m6a.annotations.len() < self.qc_opts.acf_min_m6a {
+        if !self.qc_opts.acf || fiber.m6a().len() < self.qc_opts.acf_min_m6a {
             return;
         }
 
