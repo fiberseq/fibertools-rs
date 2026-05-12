@@ -40,10 +40,67 @@ use pyo3::prelude::*;
 
 // Use fully qualified path to avoid name collision with the pymodule
 use ::molecular_annotation::{
+    Annotation as RustAnnotation,
     MolecularAnnotations as RustMolecularAnnotations,
     QualitySpec as RustQualitySpec,
     Strand as RustStrand,
 };
+
+/// A single molecular annotation (read-only snapshot).
+///
+/// Passed to the predicate of `MolecularAnnotations.retain`. All coordinates
+/// are 0-based half-open `[start, end)` in the original molecular orientation.
+#[pyclass(name = "Annotation", frozen)]
+#[derive(Clone)]
+pub struct Annotation {
+    /// 0-based start position (inclusive), in molecular orientation.
+    #[pyo3(get)]
+    pub start: u32,
+    /// Length in base pairs.
+    #[pyo3(get)]
+    pub length: u32,
+    strand_char: char,
+    /// Quality scores (one per quality spec character; empty if type has no quality).
+    #[pyo3(get)]
+    pub qualities: Vec<u8>,
+    /// Optional name/label for this annotation.
+    #[pyo3(get)]
+    pub name: Option<String>,
+}
+
+impl Annotation {
+    fn from_rust(a: &RustAnnotation) -> Self {
+        Self {
+            start: a.start,
+            length: a.length,
+            strand_char: a.strand.as_char(),
+            qualities: a.qualities.clone(),
+            name: a.name.clone(),
+        }
+    }
+}
+
+#[pymethods]
+impl Annotation {
+    /// End position (0-based, exclusive). Saturates at u32::MAX on overflow.
+    #[getter]
+    fn end(&self) -> u32 {
+        self.start.saturating_add(self.length)
+    }
+
+    /// Strand as a single-character string: "+", "-", or ".".
+    #[getter]
+    fn strand(&self) -> String {
+        self.strand_char.to_string()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Annotation(start={}, length={}, strand='{}', qualities={:?}, name={:?})",
+            self.start, self.length, self.strand_char, self.qualities, self.name
+        )
+    }
+}
 
 /// Container for all molecular annotations on a read.
 ///
@@ -340,6 +397,59 @@ impl MolecularAnnotations {
         Ok(())
     }
 
+    /// Retain only the annotations of `type_name` for which `predicate` returns True.
+    ///
+    /// The predicate is called once per annotation with an `Annotation` snapshot
+    /// (read-only view of `start`, `length`, `end`, `strand`, `qualities`, `name`).
+    /// Annotations for which it returns False are removed. If `type_name` does
+    /// not exist, this is a no-op. The type itself is left in place even if
+    /// all of its annotations are dropped (matches the Rust API and the
+    /// empty-type emission behavior — an empty type does not appear in the MA tag).
+    ///
+    /// Args:
+    ///     type_name: Name of the annotation type to filter.
+    ///     predicate: Callable taking an Annotation and returning bool.
+    ///
+    /// Raises:
+    ///     Propagates any exception raised by `predicate`. The first error
+    ///     short-circuits the filter; subsequent annotations are left in place.
+    ///
+    /// Example:
+    ///     >>> annot.retain("msp", lambda a: a.length >= 50)
+    ///     >>> annot.retain("msp", lambda a: a.qualities and a.qualities[0] >= 40)
+    ///     >>> annot.retain("msp", lambda a: 50 <= a.length < 100)
+    pub fn retain(
+        &mut self,
+        py: Python<'_>,
+        type_name: &str,
+        predicate: PyObject,
+    ) -> PyResult<()> {
+        let mut err: Option<PyErr> = None;
+        self.inner.retain(type_name, |a| {
+            if err.is_some() {
+                return true;
+            }
+            let snapshot = Annotation::from_rust(a);
+            match predicate.call1(py, (snapshot,)) {
+                Ok(result) => match result.extract::<bool>(py) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        err = Some(e);
+                        true
+                    }
+                },
+                Err(e) => {
+                    err = Some(e);
+                    true
+                }
+            }
+        });
+        if let Some(e) = err {
+            return Err(e);
+        }
+        Ok(())
+    }
+
     /// Get coordinates in BAM orientation.
     ///
     /// Returns 0-based half-open [start, end) intervals. For reverse-aligned
@@ -596,5 +706,6 @@ impl MolecularAnnotations {
 #[pymodule]
 fn _molecular_annotation(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<MolecularAnnotations>()?;
+    m.add_class::<Annotation>()?;
     Ok(())
 }
