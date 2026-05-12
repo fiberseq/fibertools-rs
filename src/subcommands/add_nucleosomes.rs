@@ -20,8 +20,12 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
             .par_iter_mut()
             .map(|record| {
                 let fd = FiberseqData::new(record.clone(), None, &nuc_opts.input.filters);
-                //let m6a = fd.base_mods.forward_m6a();
-                let m6a = fd.m6a.forward_starts();
+                // m6a positions in molecular (forward) orientation
+                let m6a: Vec<i64> = fd
+                    .annotations
+                    .get_forward_coords("m6a")
+                    .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
+                    .unwrap_or_default();
                 add_nucleosomes_to_record(record, &m6a, &nuc_opts.nuc, nuc_opts.legacy_tags);
                 record
             })

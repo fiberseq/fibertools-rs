@@ -226,7 +226,7 @@ impl<'a> FireFeats<'a> {
 
     fn get_5mc_count(&self, start: i64, end: i64) -> usize {
         self.rec
-            .cpg
+            .cpg()
             .starts()
             .iter()
             .filter(|&&pos| pos >= start && pos < end)
@@ -236,7 +236,7 @@ impl<'a> FireFeats<'a> {
     fn get_m6a_count(&self, start: i64, end: i64) -> usize {
         let mut m6a_count = self
             .rec
-            .m6a
+            .m6a()
             .starts()
             .iter()
             .filter(|&&pos| pos >= start && pos < end)

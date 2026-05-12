@@ -1,5 +1,6 @@
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bamannotations::primary_qual;
 use crate::utils::bamlift::*;
 use crate::utils::bio_io;
 use crate::*;
@@ -22,6 +23,8 @@ pub struct CenteredFiberData {
     pub dist: Option<i64>,
     center_position: CenterPosition,
     pub offset: i64,
+    mol_offset: i64,
+    ref_offset: i64,
     pub reference: bool,
     pub simplify: bool,
 }
@@ -38,16 +41,102 @@ impl CenteredFiberData {
             CenteredFiberData::find_offsets(&fiber.record, &center_position);
         let offset = if reference { ref_offset } else { mol_offset };
 
-        let fiber = fiber.center(&center_position)?;
-
-        Some(CenteredFiberData {
+        let cfd = CenteredFiberData {
             fiber,
             dist,
             center_position,
             offset,
+            mol_offset,
+            ref_offset,
             reference,
             simplify,
-        })
+        };
+        cfd.validate_msp_m6a_alignment();
+        Some(cfd)
+    }
+
+    /// Project this fiber's annotations of `type_name` into the active
+    /// frame (query when `!self.reference`, reference when `self.reference`)
+    /// via the spec library's `project_query` / `project_reference`. Returns
+    /// (centered_starts, centered_ends, quals) in lockstep.
+    ///
+    /// In query frame every annotation yields a row. In reference frame
+    /// annotations that don't lift are dropped (the spec's
+    /// `project_reference` filters them out); this matches the legacy
+    /// output which skipped `None` ref coords in `write_long`.
+    ///
+    /// Output is reversed when `flip != is_reverse_aligned` so the centered
+    /// coords come out ascending — matching the legacy `apply_offset` which
+    /// reversed the annotations vec for minus-strand centers.
+    fn centered_for_type(&self, type_name: &str) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<u8>) {
+        let flip = self.center_position.strand == '-';
+        let mut starts = Vec::new();
+        let mut ends = Vec::new();
+        let mut quals = Vec::new();
+        if self.reference {
+            for p in self
+                .fiber
+                .annotations
+                .project_reference(self.ref_offset, flip)
+            {
+                if p.type_name != type_name {
+                    continue;
+                }
+                starts.push(Some(p.start));
+                ends.push(Some(p.end));
+                quals.push(primary_qual(p.qualities, p.type_name));
+            }
+        } else {
+            for p in self.fiber.annotations.project_query(self.mol_offset, flip) {
+                if p.type_name != type_name {
+                    continue;
+                }
+                starts.push(Some(p.start));
+                ends.push(Some(p.end));
+                quals.push(primary_qual(p.qualities, p.type_name));
+            }
+        }
+        if flip != self.fiber.annotations.is_reverse_aligned() {
+            starts.reverse();
+            ends.reverse();
+            quals.reverse();
+        }
+        (starts, ends, quals)
+    }
+
+    /// Validate that all MSP boundaries align with m6A positions after
+    /// centering. Operates on the centered (query-frame) coordinates the
+    /// short-form writer would emit, so the warning catches the same
+    /// misalignments the legacy in-place mutation did.
+    fn validate_msp_m6a_alignment(&self) {
+        let flip = self.center_position.strand == '-';
+        let m6a_positions: Vec<i64> = self
+            .fiber
+            .annotations
+            .project_query(self.mol_offset, flip)
+            .filter(|p| p.type_name == "m6a")
+            .map(|p| p.start)
+            .collect();
+        let msp_boundaries: Vec<i64> = self
+            .fiber
+            .annotations
+            .project_query(self.mol_offset, flip)
+            .filter(|p| p.type_name == "msp")
+            .flat_map(|p| [p.start, p.end - 1])
+            .collect();
+
+        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
+            return;
+        }
+        for msp_pos in &msp_boundaries {
+            if !m6a_positions.contains(msp_pos) {
+                log::warn!(
+                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
+                    msp_pos,
+                    String::from_utf8_lossy(self.fiber.record.qname())
+                );
+            }
+        }
     }
     /// find both the ref and mol offsets
     pub fn find_offsets(record: &bam::Record, center_position: &CenterPosition) -> (i64, i64) {
@@ -167,31 +256,13 @@ impl CenteredFiberData {
         Vec<Option<i64>>,
         Vec<u8>,
     ) {
-        if self.reference {
-            (
-                self.fiber.m6a.reference_starts(),
-                self.fiber.m6a.qual(),
-                self.fiber.cpg.reference_starts(),
-                self.fiber.cpg.qual(),
-                self.fiber.nuc.reference_starts(),
-                self.fiber.nuc.reference_ends(),
-                self.fiber.msp.reference_starts(),
-                self.fiber.msp.reference_ends(),
-                self.fiber.msp.qual(),
-            )
-        } else {
-            (
-                self.fiber.m6a.option_starts(),
-                self.fiber.m6a.qual(),
-                self.fiber.cpg.option_starts(),
-                self.fiber.cpg.qual(),
-                self.fiber.nuc.option_starts(),
-                self.fiber.nuc.option_ends(),
-                self.fiber.msp.option_starts(),
-                self.fiber.msp.option_ends(),
-                self.fiber.msp.qual(),
-            )
-        }
+        let (m6a, _, m6a_qual) = self.centered_for_type("m6a");
+        let (cpg, _, cpg_qual) = self.centered_for_type("cpg");
+        let (nuc_st, nuc_en, _) = self.centered_for_type("nuc");
+        let (msp_st, msp_en, fire) = self.centered_for_type("msp");
+        (
+            m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire,
+        )
     }
 
     pub fn write(&self) -> String {

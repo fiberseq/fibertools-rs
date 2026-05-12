@@ -291,17 +291,15 @@ impl<'a> FireTrack<'a> {
     //#[inline]
     fn add_range_set(
         array: &mut [i32],
-        ranges: &bamannotations::Ranges,
+        view: &bamannotations::AnnotationTypeView<'_>,
         cur_offset: i64,
         chrom_start: usize,
     ) {
-        for annotation in ranges {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
+        for info in view {
+            match (info.ref_start, info.ref_end) {
+                (Some(rs), Some(re)) => {
+                    let rs = rs as i64;
+                    let re = re as i64;
                     let re = if rs == re { re + 1 } else { re };
                     for i in rs..re {
                         let pos = i + cur_offset - chrom_start as i64;
@@ -326,30 +324,16 @@ impl<'a> FireTrack<'a> {
         }
         let mut start = i64::MAX;
         let mut end = i64::MIN;
-        for annotation in &fiber.msp {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    start = std::cmp::min(start, rs);
-                    end = std::cmp::max(end, re);
-                }
-                _ => continue,
+        for info in &fiber.msp() {
+            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
+                start = std::cmp::min(start, rs as i64);
+                end = std::cmp::max(end, re as i64);
             }
         }
-        for annotation in &fiber.nuc {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    start = std::cmp::min(start, rs);
-                    end = std::cmp::max(end, re);
-                }
-                _ => continue,
+        for info in &fiber.nuc() {
+            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
+                start = std::cmp::min(start, rs as i64);
+                end = std::cmp::max(end, re as i64);
             }
         }
         if start == i64::MAX {
@@ -417,72 +401,66 @@ impl<'a> FireTrack<'a> {
         }
 
         // calculate the fire coverage and fire score
-        for annotation in &fiber.msp {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    if annotation.qual < MIN_FIRE_QUAL {
-                        continue;
-                    }
-                    // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
-                    let capped_qual = annotation.qual.min(253) as f32;
-                    let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
-
-                    // If tracking FIRE elements, create a FireElement for this MSP
-                    let fire_element = if self.fire_track_opts.track_fire_elements {
-                        let elem_start = rs + self.cur_offset;
-                        let elem_end = re + self.cur_offset;
-                        let fire_id = self.next_fire_id;
-                        self.next_fire_id += 1;
-                        Some(FireElement {
-                            start: elem_start,
-                            end: elem_end,
-                            id: fire_id,
-                        })
-                    } else {
-                        None
-                    };
-
-                    for i in rs..re {
-                        let pos = i + self.cur_offset - self.chrom_start as i64;
-                        if pos < 0 || pos >= self.track_len as i64 {
-                            continue;
-                        }
-                        self.fire_coverage[pos as usize] += 1;
-                        self.raw_scores[pos as usize] += score_update;
-
-                        // Store the FIRE element at this position if tracking is enabled
-                        if let (Some(fire_elements), Some(elem)) =
-                            (&mut self.fire_elements, fire_element)
-                        {
-                            fire_elements[pos as usize].push(elem);
-                        }
-                    }
-                }
+        for info in &fiber.msp() {
+            let (rs, re) = match (info.ref_start, info.ref_end) {
+                (Some(rs), Some(re)) => (rs as i64, re as i64),
                 _ => continue,
+            };
+            let qual = crate::utils::bamannotations::primary_qual(info.qualities, info.type_name);
+            if qual < MIN_FIRE_QUAL {
+                continue;
+            }
+            // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
+            let capped_qual = qual.min(253) as f32;
+            let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
+
+            // If tracking FIRE elements, create a FireElement for this MSP
+            let fire_element = if self.fire_track_opts.track_fire_elements {
+                let elem_start = rs + self.cur_offset;
+                let elem_end = re + self.cur_offset;
+                let fire_id = self.next_fire_id;
+                self.next_fire_id += 1;
+                Some(FireElement {
+                    start: elem_start,
+                    end: elem_end,
+                    id: fire_id,
+                })
+            } else {
+                None
+            };
+
+            for i in rs..re {
+                let pos = i + self.cur_offset - self.chrom_start as i64;
+                if pos < 0 || pos >= self.track_len as i64 {
+                    continue;
+                }
+                self.fire_coverage[pos as usize] += 1;
+                self.raw_scores[pos as usize] += score_update;
+
+                // Store the FIRE element at this position if tracking is enabled
+                if let (Some(fire_elements), Some(elem)) = (&mut self.fire_elements, fire_element) {
+                    fire_elements[pos as usize].push(elem);
+                }
             }
         }
 
         // add other sets of data to the FireTrack depending on CLI opts
         let mut pairs = vec![];
         if !self.fire_track_opts.no_nuc {
-            pairs.push((&mut self.nuc_coverage, &fiber.nuc));
+            pairs.push((&mut self.nuc_coverage, fiber.nuc()));
         }
         if !self.fire_track_opts.no_msp {
-            pairs.push((&mut self.msp_coverage, &fiber.msp));
+            pairs.push((&mut self.msp_coverage, fiber.msp()));
         }
         if self.fire_track_opts.m6a {
-            pairs.push((&mut self.m6a_coverage, &fiber.m6a));
+            pairs.push((&mut self.m6a_coverage, fiber.m6a()));
         }
         if self.fire_track_opts.cpg {
-            pairs.push((&mut self.cpg_coverage, &fiber.cpg));
+            pairs.push((&mut self.cpg_coverage, fiber.cpg()));
         }
 
-        for (array, ranges) in pairs {
-            Self::add_range_set(array, ranges, self.cur_offset, self.chrom_start);
+        for (array, view) in pairs {
+            Self::add_range_set(array, &view, self.cur_offset, self.chrom_start);
         }
     }
 

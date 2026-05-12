@@ -178,19 +178,26 @@ pub fn apply_filter_to_range(
 pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(), anyhow::Error> {
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
-            let parsers = parse_filter_all(s.as_str());
-            for parser in parsers.iter() {
-                match parser.feat_name.as_str() {
-                    "msp" => apply_filter_to_range(parser, &mut fsd.msp)?,
-                    "nuc" => apply_filter_to_range(parser, &mut fsd.nuc)?,
-                    "m6a" => apply_filter_to_range(parser, &mut fsd.m6a)?,
-                    "5mC" => apply_filter_to_range(parser, &mut fsd.cpg)?,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Unknown feature name: {}",
-                            parser.feat_name
-                        ));
-                    }
+            for parser in parse_filter_all(s.as_str()) {
+                let type_name = match parser.feat_name.as_str() {
+                    "msp" => "msp",
+                    "nuc" => "nuc",
+                    "m6a" => "m6a",
+                    "5mC" => "cpg",
+                    other => anyhow::bail!("Unknown feature name: {}", other),
+                };
+                match parser.fn_name.as_str() {
+                    "len" => fsd.annotations.retain(type_name, |a| {
+                        len(a.length as i64, &parser.op, &parser.threshold)
+                    }),
+                    "qual" => fsd.annotations.retain(type_name, |a| {
+                        qual(
+                            crate::utils::bamannotations::primary_qual(&a.qualities, type_name),
+                            &parser.op,
+                            &parser.threshold,
+                        )
+                    }),
+                    other => anyhow::bail!("Invalid function name: {}", other),
                 }
             }
         }
