@@ -267,11 +267,7 @@ pub fn extract_nuc_msp_arrays(
 ///
 /// No-op if `starts` is empty. `starts` and `lens` must be the same length
 /// and paired positionally.
-pub fn add_nuc_annotations(
-    annot: &mut MolecularAnnotations,
-    starts: &[u32],
-    lens: &[u32],
-) {
+pub fn add_nuc_annotations(annot: &mut MolecularAnnotations, starts: &[u32], lens: &[u32]) {
     if starts.is_empty() {
         return;
     }
