@@ -2,6 +2,23 @@ use crate::utils::bamlift::*;
 use molecular_annotation::{AnnotationInfo, MolecularAnnotations};
 use rust_htslib::bam;
 use rust_htslib::bam::ext::BamRecordExtensions;
+
+/// Extract the single per-annotation quality fibertools expects, returning
+/// 0 when the annotation has none. Debug-asserts that the type carries at
+/// most one quality — fibertools' current annotation types (`nuc`, `msp`,
+/// `fire`, `m6a`, `cpg`) are all single-quality. If you add a multi-quality
+/// type, pick the index explicitly at the call site instead of using this
+/// helper.
+#[inline]
+pub fn primary_qual(qualities: &[u8], type_name: &str) -> u8 {
+    debug_assert!(
+        qualities.len() <= 1,
+        "primary_qual: type {:?} carries {} qualities; fibertools expects \u{2264} 1",
+        type_name,
+        qualities.len(),
+    );
+    qualities.first().copied().unwrap_or(0)
+}
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct FiberAnnotation {
     pub start: i64,
@@ -738,10 +755,38 @@ impl<'a> AnnotationTypeView<'a> {
             .map(|a| (a.query_end - a.query_start) as i64)
             .collect()
     }
+    /// Convenience over [`Self::qual_at`] for the common case where the
+    /// annotation type carries at most one quality per annotation. Returns
+    /// 0 for annotations with no qualities.
+    ///
+    /// All fibertools-rs annotation types (`nuc`, `msp+` / `msp+Q`,
+    /// `fire+P`, `m6a+Q`, `cpg+Q`) are single-quality; this method debug-
+    /// asserts that invariant. If you add a multi-quality type, call
+    /// [`Self::qual_at`] with an explicit index instead — `qual()`
+    /// silently dropping quality columns would be a footgun.
     pub fn qual(&self) -> Vec<u8> {
+        self.qual_at(0)
+    }
+
+    /// Per-annotation quality at the given index, BAM-orient ascending.
+    /// Returns 0 when the annotation has fewer than `idx + 1` qualities.
+    ///
+    /// `qual_at(0)` is the canonical single-quality accessor and
+    /// debug-asserts that the type has at most one quality. Other indices
+    /// skip the assertion — the caller is presumed to know the type's
+    /// `QualitySpec`.
+    pub fn qual_at(&self, idx: usize) -> Vec<u8> {
         self.bam_ordered()
             .into_iter()
-            .map(|a| a.qualities.first().copied().unwrap_or(0))
+            .map(|a| {
+                debug_assert!(
+                    idx > 0 || a.qualities.len() <= 1,
+                    "AnnotationTypeView::qual() called on multi-quality type {:?} ({} qualities); use qual_at(idx)",
+                    self.type_name,
+                    a.qualities.len(),
+                );
+                a.qualities.get(idx).copied().unwrap_or(0)
+            })
             .collect()
     }
     pub fn reference_starts(&self) -> Vec<Option<i64>> {

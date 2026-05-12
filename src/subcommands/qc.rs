@@ -246,7 +246,10 @@ impl<'a> QcStats<'a> {
         for annotation in &msp {
             let st = annotation.query_start as i64;
             let en = annotation.query_end as i64;
-            let qual = annotation.qualities.first().copied().unwrap_or(0);
+            let qual = crate::utils::bamannotations::primary_qual(
+                annotation.qualities,
+                annotation.type_name,
+            );
             let is_fire = qual >= 230;
             let msp_size = en - st;
             let m6a_count = m6a_starts
