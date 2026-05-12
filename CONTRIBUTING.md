@@ -13,6 +13,32 @@ cargo fmt
 cargo clippy --workspace
 ```
 
+## Regression tests
+
+End-to-end regression tests live in `tests/regression/` and compare subcommand
+output against committed snapshots using [insta](https://insta.rs/). Each test
+runs the `ft` binary against a fixture in `tests/data/`, projects a stable
+subset of columns (so trailing/added columns aren't false positives), and
+asserts the result matches the snapshot in `tests/regression/snapshots/`.
+
+Run just the regression suite with:
+
+```bash
+cargo test --test regression
+```
+
+When you intentionally change output, regenerate snapshots with
+[`cargo-insta`](https://insta.rs/docs/cli/):
+
+```bash
+cargo install cargo-insta      # one-time
+cargo insta test --review      # walk through diffs interactively
+# or, if the new output is correct as-is:
+cargo insta accept
+```
+
+Inspect the resulting `.snap` diff before committing.
+
 ## Cutting a release
 
 The changelog is managed by git-cliff which will run with the release action.
