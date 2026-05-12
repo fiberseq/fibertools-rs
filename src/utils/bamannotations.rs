@@ -130,9 +130,9 @@ impl FiberAnnotations {
             // the legacy lift's exact source (the spec's `from_record` skips
             // records that report is_unmapped, which fibertig synthetic test
             // records can hit even with a valid CIGAR).
-            let pairs = record.aligned_block_pairs().map(|([qs, qe], [rs, re])| {
-                ([qs as u32, qe as u32], [rs as u32, re as u32])
-            });
+            let pairs = record
+                .aligned_block_pairs()
+                .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
             let blocks = molecular_annotation::AlignedBlocks::from_pairs(pairs, seq_len as u32);
             let mut rs_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
             let mut re_vec: Vec<Option<i64>> = Vec::with_capacity(starts.len());
@@ -655,7 +655,6 @@ impl<'a> Iterator for FiberAnnotationsIterator<'a> {
 
 // Backward compatibility alias
 pub type RangesIterator<'a> = FiberAnnotationsIterator<'a>;
-
 
 /// View over a specific annotation type, providing the column-oriented
 /// surface fibertools historically got from `FiberAnnotations` while

@@ -27,7 +27,10 @@ pub fn add_fire_to_rec(
 
     let mut annot = match ma_io::read_annotations(&rec.record) {
         Ok(a) => a,
-        Err(e) => { log::warn!("FIRE: failed to read annotations: {e}"); return; }
+        Err(e) => {
+            log::warn!("FIRE: failed to read annotations: {e}");
+            return;
+        }
     };
 
     let Some(msp) = annot.get_type(ma_io::MSP_TYPE) else {
@@ -37,17 +40,18 @@ pub fn add_fire_to_rec(
     if msp.annotations.len() != precisions.len() {
         log::warn!(
             "FIRE precision count ({}) does not match MSP count ({}); skipping",
-            precisions.len(), msp.annotations.len(),
+            precisions.len(),
+            msp.annotations.len(),
         );
         return;
     }
 
     let starts: Vec<u32> = msp.annotations.iter().map(|a| a.start).collect();
-    let lens:   Vec<u32> = msp.annotations.iter().map(|a| a.length).collect();
+    let lens: Vec<u32> = msp.annotations.iter().map(|a| a.length).collect();
     ma_io::add_fire_annotations(&mut annot, &starts, &lens, &precisions);
 
     ma_io::write_annotations(&mut rec.record, &annot, legacy);
-    
+
     log::trace!("precisions: {precisions:?}");
 }
 
