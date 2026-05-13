@@ -5,7 +5,7 @@ use crate::utils::bamannotations::*;
 use crate::utils::basemods::{parse_mm_ml_into_ma, CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
-use crate::utils::ma_io::{MSP_TYPE, NUC_TYPE};
+use crate::utils::ma_io::{FIRE_TYPE, MSP_TYPE, NUC_TYPE};
 use molecular_annotation::MolecularAnnotations;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
@@ -132,6 +132,38 @@ impl FiberseqData {
     /// View over `cpg` annotations derived from `self.annotations`.
     pub fn cpg(&self) -> AnnotationTypeView<'_> {
         AnnotationTypeView::new(&self.annotations, CPG_TYPE)
+    }
+
+    /// View over `fire` annotations derived from `self.annotations`.
+    pub fn fire(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
+    }
+
+    /// Per-MSP FIRE precision in BAM-orient ascending order, aligned 1:1
+    /// with [`Self::msp`] iteration. Returns `vec![0; msp_len]` when no
+    /// FIRE data is present.
+    ///
+    /// Resolves in two stages:
+    /// 1. If a `fire` annotation type exists with the same count as
+    ///    `msp`, return its qualities (post-MA write path: FIRE precisions
+    ///    live on `fire+P`).
+    /// 2. Otherwise fall back to `self.msp().qual()` — pre-MA fibertools
+    ///    stored FIRE precisions on the MSP `aq` tag, so legacy BAMs land
+    ///    them in `msp.qualities`.
+    pub fn fire_qual(&self) -> Vec<u8> {
+        let msp_len = self.msp().len();
+        if msp_len == 0 {
+            return Vec::new();
+        }
+        let fire = self.fire();
+        if fire.len() == msp_len {
+            return fire.qual();
+        }
+        let msp_q = self.msp().qual();
+        if msp_q.len() == msp_len && msp_q.iter().any(|&q| q > 0) {
+            return msp_q;
+        }
+        vec![0; msp_len]
     }
 
     /// Flush `self.annotations` onto the underlying record's MA aux
@@ -386,7 +418,11 @@ impl FiberseqData {
         let m6a_qual = m6a.qual().iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = cpg.len();
         let cpg_qual = cpg.qual().iter().map(|a| Some(*a as i64)).collect();
-        let fire = msp.qual().iter().map(|a| Some(*a as i64)).collect();
+        let fire: Vec<Option<i64>> = self
+            .fire_qual()
+            .iter()
+            .map(|a| Some(*a as i64))
+            .collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);

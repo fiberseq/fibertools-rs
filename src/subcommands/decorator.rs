@@ -169,7 +169,7 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
     let msp = fiber.msp();
     let ref_starts = msp.reference_starts();
     let ref_lengths = msp.reference_lengths();
-    let quals = msp.qual();
+    let quals = fiber.fire_qual();
 
     for ((pos, length), qual) in ref_starts.iter().zip(ref_lengths.iter()).zip(quals.iter()) {
         if let (Some(p), Some(l)) = (pos, length) {
