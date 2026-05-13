@@ -94,3 +94,107 @@ fn test_non_canonical_mod_round_trip() {
 
     assert_eq!(a.get_type("C+h"), b.get_type("C+h"));
 }
+
+/// Canonical dispatch is on the exact mod-type code (`"a"` / `"m"`),
+/// not the first character. A multi-char alpha mod type like `C+ac`
+/// (acetylation) starts with `'a'` but must NOT route into `m6a`; it
+/// must be preserved verbatim as a `"C+ac"` annotation type.
+#[test]
+fn test_multichar_alpha_modtype_not_treated_as_canonical() {
+    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let mut rec = bam.records().next().expect("all.bam has records").unwrap();
+
+    let fwd = if rec.is_reverse() {
+        bio::alphabets::dna::revcomp(rec.seq().as_bytes())
+    } else {
+        rec.seq().as_bytes()
+    };
+    let c_positions: Vec<usize> = fwd
+        .iter()
+        .enumerate()
+        .filter(|(_, &b)| b == b'C' || b == b'c')
+        .take(2)
+        .map(|(i, _)| i)
+        .collect();
+    assert!(c_positions.len() >= 2);
+    let mut skips: Vec<usize> = Vec::with_capacity(2);
+    let mut c_count = 0usize;
+    let mut next_target = 0;
+    for (i, &b) in fwd.iter().enumerate() {
+        if next_target >= c_positions.len() {
+            break;
+        }
+        if i == c_positions[next_target] {
+            skips.push(c_count);
+            c_count = 0;
+            next_target += 1;
+        } else if b == b'C' || b == b'c' {
+            c_count += 1;
+        }
+    }
+    let mm = format!("C+ac,{},{};", skips[0], skips[1]);
+    let ml: Vec<u8> = vec![180, 220];
+
+    rec.remove_aux(b"MM").ok();
+    rec.remove_aux(b"ML").ok();
+    rec.push_aux(b"MM", Aux::String(&mm)).unwrap();
+    rec.push_aux(b"ML", Aux::ArrayU8((&ml).into())).unwrap();
+
+    let mut a = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut a, 0, 0);
+
+    // Must land in its own type, not in m6a.
+    assert!(
+        a.get_type(M6A_TYPE).is_none(),
+        "C+ac must not be routed to m6a"
+    );
+    let acetyl = a.get_type("C+ac").expect("C+ac type present after parse");
+    assert_eq!(acetyl.annotations.len(), 2);
+
+    // And round-trips through write_mm_ml unchanged.
+    write_mm_ml(&mut rec, &a);
+    let mut b = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut b, 0, 0);
+    assert_eq!(a.get_type("C+ac"), b.get_type("C+ac"));
+    assert!(b.get_type(M6A_TYPE).is_none());
+}
+
+/// `parse_mm_ml_into_ma` is idempotent: calling it twice on the same
+/// `annot` (or once on an `annot` that already has a stale `m6a` type
+/// from elsewhere) must overwrite, not append.
+#[test]
+fn test_parse_mm_ml_idempotent_on_rerun() {
+    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let rec = bam
+        .records()
+        .filter_map(|r| r.ok())
+        .find(|r| matches!(r.aux(b"MM"), Ok(Aux::String(_))))
+        .expect("all.bam has at least one record with MM");
+
+    let mut once = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut once, 0, 0);
+    let once_m6a = once.get_type(M6A_TYPE).cloned();
+    let once_cpg = once.get_type(CPG_TYPE).cloned();
+
+    // Second pass on the same annot must produce the same counts.
+    parse_mm_ml_into_ma(&rec, &mut once, 0, 0);
+    assert_eq!(once.get_type(M6A_TYPE).cloned(), once_m6a);
+    assert_eq!(once.get_type(CPG_TYPE).cloned(), once_cpg);
+
+    // Pre-seeded stale m6a (as if leaked into the MA tag set by a bad
+    // producer) must be discarded, not merged.
+    let mut seeded = MolecularAnnotations::from_record(&rec);
+    let qspec = "Q"
+        .parse::<molecular_annotation::QualitySpec>()
+        .expect("Q parses");
+    seeded
+        .add_annotation_type(M6A_TYPE, qspec)
+        .add(0, 1, molecular_annotation::Strand::Forward, vec![123], None)
+        .add(1, 1, molecular_annotation::Strand::Forward, vec![45], None);
+    parse_mm_ml_into_ma(&rec, &mut seeded, 0, 0);
+    assert_eq!(
+        seeded.get_type(M6A_TYPE).cloned(),
+        once_m6a,
+        "stale m6a must be replaced by MM/ML, not merged"
+    );
+}
