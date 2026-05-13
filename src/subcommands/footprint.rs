@@ -155,17 +155,15 @@ impl<'a> Footprint<'a> {
         for fiber in self.fibers.iter() {
             let mut has_spanning_msp = false;
             let mut msp_qual = -1;
-            for msp in &fiber.msp() {
+            let fire_quals = fiber.fire_qual();
+            for (idx, msp) in (&fiber.msp()).into_iter().enumerate() {
                 // skip if there is no mapping of the msp
                 match (msp.ref_start, msp.ref_end) {
                     (Some(rs), Some(re)) => {
                         if self.motif.spans(rs as i64, re as i64) {
                             self.n_spanning_msps += 1;
                             has_spanning_msp = true;
-                            msp_qual = crate::utils::bamannotations::primary_qual(
-                                msp.qualities,
-                                msp.type_name,
-                            ) as i16;
+                            msp_qual = fire_quals.get(idx).copied().unwrap_or(0) as i16;
                             break;
                         }
                     }

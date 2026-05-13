@@ -152,6 +152,55 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                     "len" => fsd.annotations.retain(type_name, |a| {
                         len(a.length as i64, &parser.op, &parser.threshold)
                     }),
+                    "qual" if type_name == "msp" => {
+                        // qual(msp) historically meant "filter MSPs by FIRE
+                        // precision" (legacy fibertools wrote FIRE precisions
+                        // onto the MSP `aq` tag). Post-MA, that quality lives
+                        // on the `fire` annotation type instead. Collect
+                        // per-MSP precisions in *molecular* order to align
+                        // with retain's iteration, then drop msp and fire
+                        // in lockstep.
+                        let primary = crate::utils::bamannotations::primary_qual;
+                        let mol_quals: Vec<u8> = if let Some(f) = fsd
+                            .annotations
+                            .get_type("fire")
+                            .filter(|f| {
+                                fsd.annotations
+                                    .get_type("msp")
+                                    .is_some_and(|m| m.annotations.len() == f.annotations.len())
+                            }) {
+                            f.annotations
+                                .iter()
+                                .map(|a| primary(&a.qualities, "fire"))
+                                .collect()
+                        } else if let Some(m) = fsd.annotations.get_type("msp") {
+                            m.annotations
+                                .iter()
+                                .map(|a| primary(&a.qualities, "msp"))
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+                        let keep: Vec<bool> = mol_quals
+                            .iter()
+                            .map(|q| qual(*q, &parser.op, &parser.threshold))
+                            .collect();
+                        let has_fire = fsd.annotations.get_type("fire").is_some();
+                        let mut i = 0;
+                        fsd.annotations.retain("msp", |_| {
+                            let k = keep.get(i).copied().unwrap_or(false);
+                            i += 1;
+                            k
+                        });
+                        if has_fire {
+                            let mut i = 0;
+                            fsd.annotations.retain("fire", |_| {
+                                let k = keep.get(i).copied().unwrap_or(false);
+                                i += 1;
+                                k
+                            });
+                        }
+                    }
                     "qual" => fsd.annotations.retain(type_name, |a| {
                         qual(
                             crate::utils::bamannotations::primary_qual(&a.qualities, type_name),

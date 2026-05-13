@@ -235,6 +235,100 @@ fn missing_annotations_yield_empty_container() {
 }
 
 #[test]
+fn fire_qual_matches_legacy_and_ma_paths() {
+    // Pre-MA fibertools wrote FIRE precisions onto the MSP `aq` tag, so
+    // `msp.qual()` returned the FIRE precision. Post-MA, those precisions
+    // live on the separate `fire+P` annotation type and `msp.qual()` is
+    // empty. `FiberseqData::fire_qual()` must return the same per-MSP
+    // precision vector regardless of which on-disk format the BAM uses.
+    use fibertools_rs::fiber::FiberseqData;
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::{add_fire_annotations, add_msp_annotations, FIRE_TYPE};
+
+    let filters = FiberFilters::default();
+    let mut legacy_count = 0;
+    for record in read_records("NAPA.bam") {
+        let legacy_aq = raw_u8(&record, b"aq");
+        if legacy_aq.is_none() || legacy_aq.as_ref().unwrap().iter().all(|&q| q == 0) {
+            continue;
+        }
+        legacy_count += 1;
+
+        // Legacy path: msp.qual() holds the precisions; no fire type yet.
+        let legacy_fsd = FiberseqData::new(record.clone(), None, &filters);
+        assert!(
+            legacy_fsd.fire().is_empty(),
+            "legacy fixture should not have a fire annotation type yet"
+        );
+        let legacy_qual = legacy_fsd.fire_qual();
+        assert_eq!(
+            legacy_qual,
+            legacy_fsd.msp().qual(),
+            "legacy fire_qual must equal msp.qual()"
+        );
+        assert!(
+            legacy_qual.iter().any(|&q| q > 0),
+            "legacy fixture should expose nonzero FIRE precisions"
+        );
+
+        // Reshape to the post-FIRE MA layout (msp+ with no qualities, fire+P
+        // carrying the same precisions) — this is what `ft fire` produces
+        // post-migration. fire_qual() must yield the same vector.
+        let original = read_annotations(&record).unwrap();
+        let mut reshaped = original.clone();
+        // Drop the legacy msp+Q type and re-add msp+ without qualities.
+        reshaped.annotation_types.retain(|t| t.name != MSP_TYPE);
+        let msp_starts: Vec<u32> = original
+            .get_type(MSP_TYPE)
+            .unwrap()
+            .annotations
+            .iter()
+            .map(|a| a.start)
+            .collect();
+        let msp_lens: Vec<u32> = original
+            .get_type(MSP_TYPE)
+            .unwrap()
+            .annotations
+            .iter()
+            .map(|a| a.length)
+            .collect();
+        let msp_quals: Vec<u8> = original
+            .get_type(MSP_TYPE)
+            .unwrap()
+            .annotations
+            .iter()
+            .map(|a| a.qualities[0])
+            .collect();
+        add_msp_annotations(&mut reshaped, &msp_starts, &msp_lens, None);
+        add_fire_annotations(&mut reshaped, &msp_starts, &msp_lens, &msp_quals);
+
+        let mut ma_only = record.clone();
+        write_annotations(&mut ma_only, &reshaped, false);
+        let ma_fsd = FiberseqData::new(ma_only, None, &filters);
+        assert!(
+            !ma_fsd.fire().is_empty(),
+            "post-FIRE MA layout must expose a fire annotation type"
+        );
+        assert_eq!(
+            ma_fsd.msp().qual().iter().filter(|q| **q > 0).count(),
+            0,
+            "post-FIRE MA layout must not carry FIRE precisions on msp"
+        );
+        assert_eq!(
+            ma_fsd.annotations.get_type(FIRE_TYPE).unwrap().annotations.len(),
+            ma_fsd.msp().len(),
+            "fire and msp must be 1:1"
+        );
+        assert_eq!(
+            ma_fsd.fire_qual(),
+            legacy_qual,
+            "fire_qual must match across legacy and MA-only formats"
+        );
+    }
+    assert!(legacy_count > 0, "expected at least one fixture with aq");
+}
+
+#[test]
 fn mismatched_legacy_lengths_returns_error() {
     let mut record = read_records("nuc_example.bam").into_iter().next().unwrap();
     record.remove_aux(b"ns").ok();

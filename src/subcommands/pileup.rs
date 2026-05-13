@@ -401,12 +401,13 @@ impl<'a> FireTrack<'a> {
         }
 
         // calculate the fire coverage and fire score
-        for info in &fiber.msp() {
+        let fire_quals = fiber.fire_qual();
+        for (idx, info) in (&fiber.msp()).into_iter().enumerate() {
             let (rs, re) = match (info.ref_start, info.ref_end) {
                 (Some(rs), Some(re)) => (rs as i64, re as i64),
                 _ => continue,
             };
-            let qual = crate::utils::bamannotations::primary_qual(info.qualities, info.type_name);
+            let qual = fire_quals.get(idx).copied().unwrap_or(0);
             if qual < MIN_FIRE_QUAL {
                 continue;
             }
