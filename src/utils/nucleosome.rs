@@ -203,6 +203,13 @@ pub fn add_nucleosomes_to_annotations(
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
 
+    // Drop any pre-existing nuc/msp/fire annotations so a re-run replaces
+    // the previous call rather than appending. fire is paired 1:1 with msp
+    // by construction, so leaving fire behind while replacing msp would
+    // strand fire precisions against unrelated MSPs.
+    annot.annotation_types.retain(|t| {
+        t.name != ma_io::NUC_TYPE && t.name != ma_io::MSP_TYPE && t.name != ma_io::FIRE_TYPE
+    });
     ma_io::add_nuc_annotations(annot, &nuc_starts, &nuc_lengths);
     ma_io::add_msp_annotations(annot, &msp_starts, &msp_lengths, None);
 }

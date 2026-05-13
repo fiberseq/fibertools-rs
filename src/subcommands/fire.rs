@@ -45,6 +45,11 @@ pub fn add_fire_to_rec(
             msp.annotations.iter().map(|a| a.length).collect(),
         )
     };
+    // Drop any pre-existing fire annotations so a re-run replaces, rather
+    // than appends to, the previous call.
+    rec.annotations
+        .annotation_types
+        .retain(|t| t.name != ma_io::FIRE_TYPE);
     ma_io::add_fire_annotations(&mut rec.annotations, &starts, &lens, &precisions);
 
     rec.serialize_annotations(legacy);

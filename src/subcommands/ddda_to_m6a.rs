@@ -55,11 +55,16 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
     // set values for the new modified record
     record.set(&q_name, Some(&cigar), &new_forward_seq, &qual);
 
-    // Load existing MM/ML into a MolecularAnnotations, append the
-    // synthesized m6a calls, write back. write_mm_ml reconstructs the
-    // canonical group (A+a vs T-a) from the now-replaced forward seq.
+    // Load existing MM/ML into a MolecularAnnotations, drop any
+    // pre-existing m6a (we're replacing it with the Y/R-derived calls),
+    // then append the synthesized m6a and write back. write_mm_ml
+    // reconstructs the canonical group (A+a vs T-a) from the now-replaced
+    // forward seq.
     let mut annot = MolecularAnnotations::from_record(record);
     basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
+    annot
+        .annotation_types
+        .retain(|t| t.name != basemods::M6A_TYPE);
     let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
     let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
     for pos in modified_bases_forward {
