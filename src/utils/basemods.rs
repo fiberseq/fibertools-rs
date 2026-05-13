@@ -5,12 +5,12 @@
 //! `BaseMods` struct — the spec object is the sole in-memory
 //! representation.
 //!
-//! Mod-type dispatch:
-//! - mod_type `'a'` (any group, e.g. `A+a`, `T-a`, `N+a`) → `m6a` type.
-//! - mod_type `'m'` (any group, e.g. `C+m`, `G+m`) → `cpg` type.
-//! - any other group (`C+h`, `T+f`, ChEBI IDs, etc.) → its own annotation
-//!   type named verbatim after the MM group header (e.g. `"C+h"`).
-//!   Calls round-trip through `write_mm_ml` unchanged.
+//! Mod-type dispatch (exact match on the MM mod_type code):
+//! - `"a"` (any group, e.g. `A+a`, `T-a`, `N+a`) → `m6a` type.
+//! - `"m"` (any group, e.g. `C+m`, `G+m`) → `cpg` type.
+//! - any other code (`C+h`, `T+f`, `C+ac`, ChEBI numeric IDs, etc.) → its
+//!   own annotation type named verbatim after the MM group header (e.g.
+//!   `"C+h"`). Calls round-trip through `write_mm_ml` unchanged.
 //!
 //! Write path: `write_mm_ml` emits MM/ML from a [`MolecularAnnotations`].
 //! Canonical types (`m6a`, `cpg`) have their groups reconstructed from
@@ -46,12 +46,18 @@ lazy_static! {
 /// - calls within `strip_at_ends` bp of either end of the forward
 ///   sequence are dropped (no-op if `strip_at_ends <= 0`).
 ///
-/// Dispatch by MM mod_type:
-/// - `'a'` → [`M6A_TYPE`] (collapses `A+a`, `T-a`, `N+a`, etc.)
-/// - `'m'` → [`CPG_TYPE`] (collapses `C+m`, `G+m`, etc.)
+/// Dispatch by MM mod_type (exact-match):
+/// - `"a"` → [`M6A_TYPE`] (collapses `A+a`, `T-a`, `N+a`, etc.)
+/// - `"m"` → [`CPG_TYPE`] (collapses `C+m`, `G+m`, etc.)
 /// - any other → annotation type named verbatim after the MM group
-///   header (e.g. `"C+h"` for 5hmC). [`write_mm_ml`] emits these
-///   unchanged.
+///   header (e.g. `"C+h"` for 5hmC, `"C+ac"` for acetyl). [`write_mm_ml`]
+///   emits these unchanged.
+///
+/// Idempotent: any pre-existing `m6a` / `cpg` / non-canonical basemod
+/// types on `annot` are dropped first, so MM/ML always overwrites in-
+/// memory state rather than appending. This guards against (a) repeated
+/// calls on the same `annot`, and (b) malformed inputs that wrongly
+/// emit `m6a` into the MA tag set in addition to MM/ML.
 ///
 /// For canonical `m6a` / `cpg`, MM's per-group `(canonical_base,
 /// strand_sign)` is reconstructed from the forward sequence at write
@@ -63,6 +69,14 @@ pub fn parse_mm_ml_into_ma(
     min_ml_score: u8,
     strip_at_ends: i64,
 ) {
+    // MM/ML is the on-disk source of truth for base modifications; any
+    // basemod-shaped type that may already be in `annot` (from a prior
+    // pass, an MA-tag leak in a third-party producer, or repeated calls)
+    // is discarded so we don't silently append on top of stale data.
+    annot
+        .annotation_types
+        .retain(|t| t.name != M6A_TYPE && t.name != CPG_TYPE && !is_valid_mm_header(&t.name));
+
     let ml_tag = get_u8_tag(record, b"ML");
     let Ok(Aux::String(mm_text)) = record.aux(b"MM") else {
         log::trace!("No MM tag found");
@@ -93,7 +107,6 @@ pub fn parse_mm_ml_into_ma(
             .next()
             .unwrap_or('+');
         let mod_type_str = cap.get(5).map_or("", |m| m.as_str()).to_string();
-        let modification_type = mod_type_str.chars().next().unwrap_or(' ');
         let mod_dists_str = cap.get(6).map_or("", |m| m.as_str());
         let mod_dists: Vec<i64> = mod_dists_str
             .trim_end_matches(';')
@@ -150,12 +163,14 @@ pub fn parse_mm_ml_into_ma(
         };
         num_mods_seen = group_end;
 
-        // Filter + dispatch by mod_type. Non-canonical groups are
-        // stored under their verbatim MM header so they round-trip
+        // Filter + dispatch by mod_type. The canonical fiberseq codes are
+        // *exactly* "a" (m6A) and "m" (5mC) — any longer alpha mod type
+        // (`ac` acetyl, `pT` etc.) or ChEBI numeric ID is non-canonical
+        // and stored under its verbatim MM header so it round-trips
         // exactly through write_mm_ml.
-        let bucket: &mut Vec<(u32, u8)> = match modification_type {
-            'a' => &mut m6a_calls,
-            'm' => &mut cpg_calls,
+        let bucket: &mut Vec<(u32, u8)> = match mod_type_str.as_str() {
+            "a" => &mut m6a_calls,
+            "m" => &mut cpg_calls,
             _ => {
                 let key = format!("{}{}{}", mod_base as char, strand_sign, mod_type_str);
                 other_calls.entry(key).or_default()
