@@ -1,7 +1,9 @@
 use anyhow::Result;
 use fibertools_rs::cli::{GlobalOpts, PansnParameters, PgInjectOptions};
-use fibertools_rs::utils::fibertig::{read_fibertig_tags, FiberTig, FIBERTIG_TYPE};
-use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+use fibertools_rs::utils::fibertig::{FiberTig, FIBERTIG_TYPE};
+use fibertools_rs::utils::ma_io;
+use molecular_annotation::{AlignedBlocks, MolecularAnnotations, QualitySpec, Strand};
+use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::HeaderView;
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -230,14 +232,14 @@ fn test_create_annotated_records_from_splits() -> Result<()> {
     assert_eq!(second_record.pos(), 20);
     assert_eq!(second_record.seq_len(), 16);
 
-    // Verify both records have fs/fl/fa tags
-    assert!(first_record.aux(b"fs").is_ok());
-    assert!(first_record.aux(b"fl").is_ok());
-    assert!(first_record.aux(b"fa").is_ok());
+    // Verify both records have MA-spec tags. MA is always emitted; AN
+    // tags along because the fixtures supply names. AL is only emitted
+    // under the Separate encoding, which isn't the spec default.
+    assert!(first_record.aux(b"MA").is_ok());
+    assert!(first_record.aux(b"AN").is_ok());
 
-    assert!(second_record.aux(b"fs").is_ok());
-    assert!(second_record.aux(b"fl").is_ok());
-    assert!(second_record.aux(b"fa").is_ok());
+    assert!(second_record.aux(b"MA").is_ok());
+    assert!(second_record.aux(b"AN").is_ok());
 
     Ok(())
 }
@@ -275,13 +277,12 @@ fn test_inject_with_bed_annotations() -> Result<()> {
     // Should have created records based on bed annotations
     assert!(!fiber_tig.records.is_empty());
 
-    // Verify records have annotations
+    // Verify records have MA-spec annotation tags. Records that carry any
+    // fibertig annotations must have MA; AN tags along because the BED
+    // supplies feature names.
     for record in &fiber_tig.records {
-        // All records should have fs/fl/fa tags since we have annotations
-        if record.aux(b"fs").is_ok() {
-            // If fs tag exists, fl and fa should also exist
-            assert!(record.aux(b"fl").is_ok(), "fl tag missing when fs exists");
-            assert!(record.aux(b"fa").is_ok(), "fa tag missing when fs exists");
+        if record.aux(b"MA").is_ok() {
+            assert!(record.aux(b"AN").is_ok(), "AN tag missing when MA exists");
         }
     }
 
@@ -311,6 +312,72 @@ fn test_bed_annotations_with_unknown_contig() {
     assert!(result.is_err());
     let error_msg = format!("{}", result.unwrap_err());
     assert!(error_msg.contains("Contig 'unknown_chr' not found in BAM header"));
+}
+
+#[test]
+fn test_bed_annotations_comma_in_extra_columns_roundtrips() -> Result<()> {
+    // BED column 4+ values containing the MA-spec AN separator (',') —
+    // and the percent-escape character itself — must round-trip through
+    // inject → extract unchanged. The percent encoding is applied at the
+    // BED↔in-memory boundary; on disk the AN tag is plain ASCII with
+    // commas escaped as %2C.
+    use fibertools_rs::cli::{GlobalOpts, PansnParameters};
+    use std::io::BufRead;
+
+    let mut fasta_file = NamedTempFile::new()?;
+    writeln!(fasta_file, ">chr1")?;
+    writeln!(fasta_file, "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG")?; // 40bp
+    fasta_file.flush()?;
+
+    // Two BED rows with commas (and one with a literal `%`) in column 4+.
+    let mut bed_file = NamedTempFile::new()?;
+    writeln!(bed_file, "chr1\t5\t15\tfoo,bar\t100")?;
+    writeln!(bed_file, "chr1\t20\t30\t50%complete\tx,y,z")?;
+    bed_file.flush()?;
+
+    let temp_bam = NamedTempFile::new()?;
+    let inject_opts = PgInjectOptions {
+        global: GlobalOpts::default(),
+        reference: fasta_file.path().to_str().unwrap().to_string(),
+        out: temp_bam.path().to_str().unwrap().to_string(),
+        bed: Some(bed_file.path().to_str().unwrap().to_string()),
+        split_size: 100_000,
+        uncompressed: false,
+        extract: false,
+        header_out: None,
+        pansn: PansnParameters::default(),
+    };
+    let fiber_tig = FiberTig::from_inject_opts(&inject_opts)?;
+    fiber_tig.write_to_bam(&inject_opts)?;
+
+    let temp_bed_output = NamedTempFile::new()?;
+    let extract_opts = PgInjectOptions {
+        global: GlobalOpts::default(),
+        reference: temp_bam.path().to_str().unwrap().to_string(),
+        out: temp_bed_output.path().to_str().unwrap().to_string(),
+        bed: None,
+        split_size: 100_000,
+        uncompressed: false,
+        extract: true,
+        header_out: None,
+        pansn: PansnParameters::default(),
+    };
+    FiberTig::extract_to_bed(&extract_opts)?;
+
+    let lines: Vec<String> =
+        fibertools_rs::utils::bio_io::buffer_from(temp_bed_output.path().to_str().unwrap())?
+            .lines()
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+    let body: Vec<&String> = lines
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .collect();
+    assert_eq!(body.len(), 2, "expected two BED rows, got: {lines:?}");
+    assert_eq!(body[0], "chr1\t5\t15\tfoo,bar\t100");
+    assert_eq!(body[1], "chr1\t20\t30\t50%complete\tx,y,z");
+
+    Ok(())
 }
 
 #[test]
@@ -419,8 +486,10 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
     Ok(())
 }
 
-// Build a minimal mapped record with fs/fl/fa tags in forward/contig order,
-// then optionally flip it to reverse-strand to simulate what an aligner would emit.
+// Build a minimal mapped record with MA-spec annotation tags in
+// forward/molecular order, then optionally flip it to reverse-strand to
+// simulate what an aligner would emit. Names are taken pairwise from `fa`
+// (`|`-separated); use the empty string for an unnamed annotation.
 fn build_tagged_record(
     seq_len: u32,
     fs: &[u32],
@@ -428,7 +497,7 @@ fn build_tagged_record(
     fa: &str,
     reverse: bool,
 ) -> rust_htslib::bam::Record {
-    use rust_htslib::bam::record::{Aux, Cigar, CigarString};
+    use rust_htslib::bam::record::{Cigar, CigarString};
     use rust_htslib::bam::Record;
 
     let seq: Vec<u8> = vec![b'A'; seq_len as usize];
@@ -440,24 +509,49 @@ fn build_tagged_record(
     record.set_tid(0);
     record.set_pos(0);
     record.set_mapq(60);
+    // `Record::new()` starts in the unmapped state; clear it so
+    // `AlignedBlocks::from_record` (used by `ma_io::read_annotations`)
+    // actually lifts the CIGAR-derived blocks instead of bailing early.
+    record.unset_unmapped();
     if reverse {
         record.set_reverse();
     }
 
-    record
-        .push_aux(b"fs", Aux::ArrayU32((&fs.to_vec()).into()))
-        .unwrap();
-    record
-        .push_aux(b"fl", Aux::ArrayU32((&fl.to_vec()).into()))
-        .unwrap();
-    record.push_aux(b"fa", Aux::String(fa)).unwrap();
+    assert_eq!(fs.len(), fl.len(), "fs/fl length mismatch in fixture");
+    let names: Vec<Option<String>> = fa
+        .split('|')
+        .map(|p| {
+            if p.is_empty() {
+                None
+            } else {
+                Some(p.to_string())
+            }
+        })
+        .collect();
+    assert_eq!(names.len(), fs.len(), "fa/fs length mismatch in fixture");
+
+    let mut annot = MolecularAnnotations::new(seq_len);
+    let pairs = record
+        .aligned_block_pairs()
+        .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
+    annot.set_aligned_blocks_raw(
+        AlignedBlocks::from_pairs(pairs, seq_len),
+        record.is_reverse(),
+    );
+    {
+        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+        for ((s, l), name) in fs.iter().zip(fl.iter()).zip(names.into_iter()) {
+            t.add(*s, *l, Strand::Forward, vec![], name);
+        }
+    }
+    ma_io::write_annotations(&mut record, &annot, false);
 
     record
 }
 
 #[test]
-fn test_read_fibertig_tags_forward_strand() -> Result<()> {
-    // Forward-strand sanity: storage order matches fs/fl input order; iter_type
+fn test_read_fibertig_forward_strand() -> Result<()> {
+    // Forward-strand sanity: storage order matches input order; iter_type
     // gives BAM-orient query coords that for a forward identity-aligned record
     // equal molecular coords, and ref_start/ref_end equal query_start/query_end.
     let seq_len: u32 = 10_000;
@@ -466,7 +560,7 @@ fn test_read_fibertig_tags_forward_strand() -> Result<()> {
     let fa = "peakA|peakB|peakC|peakD";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, false);
-    let annot = read_fibertig_tags(&record)?;
+    let annot = ma_io::read_annotations(&record)?;
     let anns = fibertig_anns(&annot);
     assert_eq!(anns.len(), 4);
     assert!(!annot.is_reverse_aligned());
@@ -488,20 +582,20 @@ fn test_read_fibertig_tags_forward_strand() -> Result<()> {
 }
 
 #[test]
-fn test_read_fibertig_tags_reverse_strand_multi_peak() -> Result<()> {
-    // Reverse-strand parsing: read_fibertig_tags stores molecular coords as
-    // given by fs/fl. iter_type then yields AnnotationInfo with BAM-orient
-    // query coords (= read_len - molecular_end / read_len - molecular_start),
-    // and ref_start/ref_end via the record's aligned blocks. Storage order
-    // stays molecular ascending (fs input order); each annotation keeps its
-    // own name slot, so pairing can't be scrambled by sorting.
+fn test_read_fibertig_reverse_strand_multi_peak() -> Result<()> {
+    // Reverse-strand parsing: storage holds molecular coords as written.
+    // iter_type then yields AnnotationInfo with BAM-orient query coords
+    // (= read_len - molecular_end / read_len - molecular_start), and
+    // ref_start/ref_end via the record's aligned blocks. Storage order
+    // stays molecular ascending; each annotation keeps its own name slot,
+    // so pairing can't be scrambled by sorting.
     let seq_len: u32 = 10_000;
     let fs: Vec<u32> = vec![100, 1_000, 3_000, 6_000, 6_500];
     let fl: Vec<u32> = vec![100, 300, 500, 700, 900];
     let fa = "peakA|peakB|peakC|peakD|peakE";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
-    let annot = read_fibertig_tags(&record)?;
+    let annot = ma_io::read_annotations(&record)?;
     let anns = fibertig_anns(&annot);
     assert_eq!(anns.len(), 5);
     assert!(annot.is_reverse_aligned());
@@ -535,18 +629,18 @@ fn test_read_fibertig_tags_reverse_strand_multi_peak() -> Result<()> {
 }
 
 #[test]
-fn test_read_fibertig_tags_reverse_strand_shared_start() -> Result<()> {
-    // Regression test for fa-pairing scrambling under shared/overlapping
+fn test_read_fibertig_reverse_strand_shared_start() -> Result<()> {
+    // Regression test for name-pairing scrambling under shared/overlapping
     // start positions. With the MA-spec model each Annotation owns its own
     // name, so there is no sort-induced pairing problem to begin with —
-    // storage order matches fs input order regardless of overlap.
+    // storage order matches input order regardless of overlap.
     let seq_len: u32 = 1_000;
     let fs: Vec<u32> = vec![0, 0, 12, 159];
     let fl: Vec<u32> = vec![263, 124, 209, 305];
     let fa = "peakA|peakB|peakC|peakD";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
-    let annot = read_fibertig_tags(&record)?;
+    let annot = ma_io::read_annotations(&record)?;
     let anns = fibertig_anns(&annot);
     assert_eq!(anns.len(), 4);
     assert!(annot.is_reverse_aligned());

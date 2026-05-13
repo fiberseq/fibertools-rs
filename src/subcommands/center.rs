@@ -151,7 +151,7 @@ impl CenteredFiberData {
     /// Uses the spec library's exact-1bp `lift_to_query`. Builds
     /// `AlignedBlocks` from `aligned_block_pairs` directly so synthetic
     /// records with `is_unmapped()`-leaning flag combinations still get
-    /// their CIGAR-derived blocks (same trick `read_fibertig_tags` uses).
+    /// their CIGAR-derived blocks.
     pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
         if reference_position < 0 {
             return None;

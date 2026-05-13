@@ -2,119 +2,27 @@ use crate::cli::PgInjectOptions;
 use crate::subcommands::pg_pansn;
 use crate::utils::bio_io;
 use anyhow::{Context, Result};
-use molecular_annotation::{AlignedBlocks, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use noodles::fasta;
-use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::header::HeaderRecord;
-use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{Header, HeaderView, Read, Record};
 use std::collections::HashMap;
 
 /// Annotation type name used by the fibertig BED ↔ BAM pipeline.
 pub const FIBERTIG_TYPE: &str = "fibertig";
 
-/// Read the fibertig fs/fl/fa BAM tags into a [`MolecularAnnotations`].
-///
-/// - `fs`: feature starts (`B:I`), one per peak, molecular orientation.
-/// - `fl`: feature lengths (`B:I`), one per peak, same order.
-/// - `fa`: pipe-separated extras (`Z`), one chunk per peak in the same
-///   order; within a chunk, columns from the source BED are joined by
-///   `;`. Missing/blank entries map to `name = None` on the annotation.
-///
-/// The returned [`MolecularAnnotations`] has the record's aligned blocks
-/// set so ref coords can be lifted via `iter_type` / `get_ref_coords`.
-pub fn read_fibertig_tags(record: &Record) -> Result<MolecularAnnotations> {
-    // Build AlignedBlocks directly from `aligned_block_pairs` rather than
-    // `from_record`, because the spec's `from_record` early-returns empty
-    // for records that report `is_unmapped()` — synthetic test records
-    // built with `Record::new()` can hit that path even when they have a
-    // valid CIGAR and tid.
-    let mut annot = MolecularAnnotations::new(record.seq_len() as u32);
-    let pairs = record
-        .aligned_block_pairs()
-        .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
-    annot.set_aligned_blocks_raw(
-        AlignedBlocks::from_pairs(pairs, record.seq_len() as u32),
-        record.is_reverse(),
-    );
-    let fs = match record.aux(b"fs") {
-        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().collect::<Vec<u32>>()),
-        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as u32).collect()),
-        _ => None,
-    };
-    let fl = match record.aux(b"fl") {
-        Ok(Aux::ArrayU32(arr)) => Some(arr.iter().collect::<Vec<u32>>()),
-        Ok(Aux::ArrayI32(arr)) => Some(arr.iter().map(|v| v as u32).collect()),
-        _ => None,
-    };
-    let (Some(fs), Some(fl)) = (fs, fl) else {
-        return Ok(annot);
-    };
-    if fs.len() != fl.len() {
-        anyhow::bail!("fs ({}) and fl ({}) length mismatch", fs.len(), fl.len());
-    }
-    if fs.is_empty() {
-        return Ok(annot);
-    }
-
-    let names: Option<Vec<Option<String>>> = match record.aux(b"fa") {
-        Ok(Aux::String(s)) => {
-            let parts: Vec<Option<String>> = s
-                .split('|')
-                .map(|p| {
-                    if p.is_empty() {
-                        None
-                    } else {
-                        Some(p.to_string())
-                    }
-                })
-                .collect();
-            if parts.len() != fs.len() {
-                anyhow::bail!("fa ({}) and fs ({}) length mismatch", parts.len(), fs.len());
-            }
-            Some(parts)
-        }
-        _ => None,
-    };
-
-    let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
-    for (i, (s, l)) in fs.iter().zip(fl.iter()).enumerate() {
-        let name = names.as_ref().and_then(|v| v[i].clone());
-        t.add(*s, *l, Strand::Forward, vec![], name);
-    }
-    Ok(annot)
+/// Percent-encode `,` (and `%` itself) on the way into `Annotation.name`,
+/// so BED column 4+ values containing `,` survive the MA-spec `AN` tag's
+/// non-escapable `,` separator. The `%` -> `%25` step has to happen first
+/// so the encoding is round-trippable.
+fn encode_name_field(field: &str) -> String {
+    field.replace('%', "%25").replace(',', "%2C")
 }
 
-/// Write the fibertig fs/fl/fa BAM tags from a [`MolecularAnnotations`]'s
-/// [`FIBERTIG_TYPE`] annotations. No-op when the type is absent or empty.
-/// `fa` is only emitted if at least one annotation has a non-empty name.
-pub fn write_fibertig_tags(record: &mut Record, annot: &MolecularAnnotations) -> Result<()> {
-    let Some(t) = annot.get_type(FIBERTIG_TYPE) else {
-        return Ok(());
-    };
-    if t.annotations.is_empty() {
-        return Ok(());
-    }
-    let fs: Vec<u32> = t.annotations.iter().map(|a| a.start).collect();
-    let fl: Vec<u32> = t.annotations.iter().map(|a| a.length).collect();
-    record
-        .push_aux(b"fs", Aux::ArrayU32((&fs).into()))
-        .context("Failed to add fs tag")?;
-    record
-        .push_aux(b"fl", Aux::ArrayU32((&fl).into()))
-        .context("Failed to add fl tag")?;
-    if t.annotations.iter().any(|a| a.name.is_some()) {
-        let fa: String = t
-            .annotations
-            .iter()
-            .map(|a| a.name.as_deref().unwrap_or(""))
-            .collect::<Vec<_>>()
-            .join("|");
-        record
-            .push_aux(b"fa", Aux::String(&fa))
-            .context("Failed to add fa tag")?;
-    }
-    Ok(())
+/// Reverse of [`encode_name_field`]. `%2C` decodes first so a literal
+/// `%25%2C` round-trips to `%,` rather than being mis-bracketed.
+fn decode_name_field(field: &str) -> String {
+    field.replace("%2C", ",").replace("%25", "%")
 }
 
 pub struct FiberTig {
@@ -126,9 +34,13 @@ pub struct FiberTig {
 impl FiberTig {
     /// Read a BED file and return per-contig [`MolecularAnnotations`] plus
     /// the BED header line if present. Each BED row becomes one annotation
-    /// in the [`FIBERTIG_TYPE`] type; extra columns (4..N) are `;`-joined
-    /// into [`Annotation::name`] so they round-trip through the `fa` BAM
-    /// tag's `|`-separated layout.
+    /// in the [`FIBERTIG_TYPE`] type; extra columns (4..N) are percent-
+    /// encoded (only `,` -> `%2C` and `%` -> `%25`) and then `;`-joined
+    /// into [`Annotation::name`]. The encoding is necessary because the
+    /// MA-spec `AN` tag uses `,` as a non-escapable separator; without it,
+    /// a comma in a BED name would silently split into a second AN entry
+    /// and break the MA↔AN count balance on read-back. `extract_to_bed`
+    /// decodes the fields back before writing.
     ///
     /// Annotations within each contig are sorted by molecular start, and
     /// each [`MolecularAnnotations`]'s `read_length` is set to that
@@ -168,9 +80,14 @@ impl FiberTig {
             let end: u32 = fields[2].parse().context("Failed to parse end position")?;
             let length = end - start;
 
-            // BED columns 4+ → fa tag chunk (joined with ';')
+            // BED columns 4+ → `Annotation.name`. Each field is percent-
+            // encoded so commas survive the MA-spec AN tag's hard ','
+            // separator, then ';'-joined into a single name string.
+            // `extract_to_bed` reverses this on the way out.
             let name = if fields.len() > 3 {
-                Some(fields[3..].join(";"))
+                let encoded: Vec<String> =
+                    fields[3..].iter().map(|f| encode_name_field(f)).collect();
+                Some(encoded.join(";"))
             } else {
                 None
             };
@@ -269,6 +186,11 @@ impl FiberTig {
         record.set_tid(tid);
         record.set_pos(pos);
         record.set_mapq(60); // High mapping quality
+        // `Record::new()` starts with the unmapped flag set. These records
+        // have tid/pos/CIGAR — they are mapped — so clear it. Otherwise the
+        // MA-spec reader's `AlignedBlocks::from_record` early-returns and
+        // ref coords come back as `None` on the round-trip read.
+        record.unset_unmapped();
         record.unset_paired(); // Unpaired read
         record.set_mtid(-1); // No mate ID for unpaired read
         record.set_mpos(-1); // No mate position
@@ -285,7 +207,7 @@ impl FiberTig {
     /// Returns `((window_start, window_end), per-window MolecularAnnotations)`.
     /// Coordinates in the returned annotations are still contig-absolute;
     /// `create_annotated_records_from_splits` shifts them record-relative
-    /// when building each record's `fs`/`fl` tags.
+    /// when serializing the record's MA-spec tags.
     pub fn approximately_divide_annotations_by_window_size(
         seq_len: i64,
         split_size: i64,
@@ -420,14 +342,14 @@ impl FiberTig {
             // Apply annotations to this record. Coordinates in `annotations`
             // are still contig-absolute (per
             // `approximately_divide_annotations_by_window_size`), so shift
-            // them record-relative before writing the fs/fl tags.
+            // them record-relative before serializing.
             if let Some(t) = annotations.get_type_mut(FIBERTIG_TYPE) {
                 for a in t.annotations.iter_mut() {
                     a.start = a.start.saturating_sub(start_pos as u32);
                 }
             }
 
-            write_fibertig_tags(&mut record, annotations)?;
+            crate::utils::ma_io::write_annotations(&mut record, annotations, false);
 
             records.push(record);
         }
@@ -643,8 +565,8 @@ impl FiberTig {
     // IO functions
     //
 
-    /// Extract BED annotations from an annotated BAM file using the fs/fl/fa
-    /// tags and the record's aligned blocks (for ref coords).
+    /// Extract BED annotations from an annotated BAM file using the
+    /// MA-spec tags and the record's aligned blocks (for ref coords).
     pub fn extract_to_bed(opts: &PgInjectOptions) -> Result<()> {
         use crate::utils::bio_io;
         use std::io::Write;
@@ -665,7 +587,7 @@ impl FiberTig {
             if record.tid() < 0 {
                 continue;
             }
-            let annot = read_fibertig_tags(&record)?;
+            let annot = crate::utils::ma_io::read_annotations(&record)?;
             if annot.get_type(FIBERTIG_TYPE).is_none() {
                 continue;
             }
@@ -679,7 +601,7 @@ impl FiberTig {
                 write!(writer, "{contig_name}\t{ref_start}\t{ref_end}")?;
                 if let Some(name) = info.name {
                     for col in name.split(';') {
-                        write!(writer, "\t{col}")?;
+                        write!(writer, "\t{}", decode_name_field(col))?;
                     }
                 }
                 writeln!(writer)?;
