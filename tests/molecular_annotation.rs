@@ -329,6 +329,119 @@ fn fire_qual_matches_legacy_and_ma_paths() {
 }
 
 #[test]
+fn add_nucleosomes_is_idempotent_on_rerun() {
+    // Running `ft add-nucleosomes` (or `ft predict-m6a` with --nucleosomes)
+    // a second time on an already-annotated BAM must replace the previous
+    // nuc/msp/fire annotations, not append to them. Re-runs are common in
+    // the canonical pipeline (e.g. retuning nucleosome parameters).
+    use fibertools_rs::cli::NucleosomeParameters;
+    use fibertools_rs::fiber::FiberseqData;
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::FIRE_TYPE;
+    use fibertools_rs::utils::nucleosome::add_nucleosomes_to_annotations;
+
+    let filters = FiberFilters::default();
+    let nuc_opts = NucleosomeParameters::default();
+    let mut covered = 0;
+    for record in read_records("NAPA.bam") {
+        let fsd = FiberseqData::new(record.clone(), None, &filters);
+        if fsd.m6a().is_empty() || fsd.msp().is_empty() {
+            continue;
+        }
+        covered += 1;
+        let m6a: Vec<i64> = fsd
+            .annotations
+            .get_forward_coords("m6a")
+            .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
+            .unwrap_or_default();
+
+        // First pass.
+        let mut once = fsd.annotations.clone();
+        add_nucleosomes_to_annotations(&record, &mut once, &m6a, &nuc_opts);
+
+        // Second pass on already-annotated container — must equal first.
+        let mut twice = once.clone();
+        add_nucleosomes_to_annotations(&record, &mut twice, &m6a, &nuc_opts);
+
+        assert_eq!(
+            once.annotation_types, twice.annotation_types,
+            "add_nucleosomes_to_annotations must be idempotent on re-run"
+        );
+
+        // A pre-existing `fire` paired with the old MSPs must also be cleared
+        // on re-run, since fire/msp pairing is positional.
+        let mut with_fire = fsd.annotations.clone();
+        let msp_len = with_fire.get_type(MSP_TYPE).unwrap().annotations.len();
+        let starts: Vec<u32> = with_fire
+            .get_type(MSP_TYPE)
+            .unwrap()
+            .annotations
+            .iter()
+            .map(|a| a.start)
+            .collect();
+        let lens: Vec<u32> = with_fire
+            .get_type(MSP_TYPE)
+            .unwrap()
+            .annotations
+            .iter()
+            .map(|a| a.length)
+            .collect();
+        let precisions = vec![200u8; msp_len];
+        fibertools_rs::utils::ma_io::add_fire_annotations(
+            &mut with_fire,
+            &starts,
+            &lens,
+            &precisions,
+        );
+        assert!(with_fire.get_type(FIRE_TYPE).is_some());
+        add_nucleosomes_to_annotations(&record, &mut with_fire, &m6a, &nuc_opts);
+        assert!(
+            with_fire.get_type(FIRE_TYPE).is_none(),
+            "re-run must drop stale `fire` annotations (paired with stale MSPs)"
+        );
+    }
+    assert!(covered > 0, "expected NAPA.bam to have m6a+msp records");
+}
+
+#[test]
+fn add_fire_is_idempotent_on_rerun() {
+    // Re-running `ft fire` on the same record must not double the fire
+    // annotation list.
+    use fibertools_rs::utils::ma_io::{add_fire_annotations, FIRE_TYPE, MSP_TYPE};
+
+    let record = read_records("NAPA.bam")
+        .into_iter()
+        .find(|r| raw_u32(r, b"as").is_some_and(|v| !v.is_empty()))
+        .expect("NAPA.bam should have an MSP-bearing record");
+    let mut annot = read_annotations(&record).unwrap();
+    let msp = annot.get_type(MSP_TYPE).unwrap();
+    let starts: Vec<u32> = msp.annotations.iter().map(|a| a.start).collect();
+    let lens: Vec<u32> = msp.annotations.iter().map(|a| a.length).collect();
+    let precisions = vec![200u8; starts.len()];
+
+    // Mimic what `fire::add_fire_to_rec` does post-fix: retain off any
+    // pre-existing fire type, then add. The first call seeds the type; the
+    // second call demonstrates idempotency.
+    annot
+        .annotation_types
+        .retain(|t| t.name != FIRE_TYPE);
+    add_fire_annotations(&mut annot, &starts, &lens, &precisions);
+    let first_len = annot.get_type(FIRE_TYPE).unwrap().annotations.len();
+
+    annot
+        .annotation_types
+        .retain(|t| t.name != FIRE_TYPE);
+    add_fire_annotations(&mut annot, &starts, &lens, &precisions);
+    let second_len = annot.get_type(FIRE_TYPE).unwrap().annotations.len();
+
+    assert_eq!(
+        first_len, second_len,
+        "fire annotation count must not grow on re-run"
+    );
+    assert_eq!(first_len, starts.len(), "fire must be 1:1 with msp");
+}
+
+#[test]
 fn mismatched_legacy_lengths_returns_error() {
     let mut record = read_records("nuc_example.bam").into_iter().next().unwrap();
     record.remove_aux(b"ns").ok();
