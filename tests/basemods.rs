@@ -159,6 +159,61 @@ fn test_multichar_alpha_modtype_not_treated_as_canonical() {
     assert!(b.get_type(M6A_TYPE).is_none());
 }
 
+/// A malformed MM tag — claiming more `mod_base` positions than the
+/// forward sequence actually contains — must warn and truncate, not
+/// panic. The next group's ML qualities must still align with its
+/// positions (ML offsets are based on on-disk slot count, not resolved
+/// count).
+#[test]
+fn test_malformed_mm_truncates_without_panic() {
+    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let mut rec = bam.records().next().expect("all.bam has records").unwrap();
+
+    let fwd = if rec.is_reverse() {
+        bio::alphabets::dna::revcomp(rec.seq().as_bytes())
+    } else {
+        rec.seq().as_bytes()
+    };
+    let total_a = fwd.iter().filter(|&&b| b == b'A' || b == b'a').count();
+    let total_c = fwd.iter().filter(|&&b| b == b'C' || b == b'c').count();
+    assert!(total_a >= 2 && total_c >= 1);
+
+    // First group `A+a` claims `total_a + 2` positions — two more than
+    // the sequence has, forcing the resolver to truncate. Second group
+    // `C+m` claims one legitimate C. The ML tag has the on-disk slot
+    // count for both groups; if ML offsets advance correctly, the
+    // C+m quality is the LAST byte.
+    let bogus_a_count = total_a + 2;
+    let mut mm = String::from("A+a");
+    for _ in 0..bogus_a_count {
+        mm.push_str(",0");
+    }
+    mm.push(';');
+    mm.push_str("C+m,0;");
+
+    let mut ml: Vec<u8> = vec![100; bogus_a_count];
+    ml.push(222); // sentinel for the C+m call
+
+    rec.remove_aux(b"MM").ok();
+    rec.remove_aux(b"ML").ok();
+    rec.push_aux(b"MM", Aux::String(&mm)).unwrap();
+    rec.push_aux(b"ML", Aux::ArrayU8((&ml).into())).unwrap();
+
+    let mut a = MolecularAnnotations::from_record(&rec);
+    // Must not panic.
+    parse_mm_ml_into_ma(&rec, &mut a, 0, 0);
+
+    // The resolved m6a count equals the number of A bases in the
+    // sequence (truncated from the claimed bogus count).
+    let m6a = a.get_type(M6A_TYPE).expect("m6a present");
+    assert_eq!(m6a.annotations.len(), total_a);
+    // And the C+m quality survived intact — proving the ML offset
+    // didn't get shifted by the truncated A+a section.
+    let cpg = a.get_type(CPG_TYPE).expect("cpg present");
+    assert_eq!(cpg.annotations.len(), 1);
+    assert_eq!(cpg.annotations[0].qualities, vec![222]);
+}
+
 /// `parse_mm_ml_into_ma` is idempotent: calling it twice on the same
 /// `annot` (or once on an `annot` that already has a stale `m6a` type
 /// from elsewhere) must overwrite, not append.

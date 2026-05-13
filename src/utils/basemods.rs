@@ -140,16 +140,26 @@ pub fn parse_mm_ml_into_ma(
                 dist_from_last_mod_base += 1;
             }
         }
-        assert_eq!(
-            cur_mod_idx,
-            mod_dists.len(),
-            "MM/ML parser: {} (reverse={})",
-            String::from_utf8_lossy(record.qname()),
-            record.is_reverse(),
-        );
+        let resolved = cur_mod_idx;
+        if resolved != mod_dists.len() {
+            // MM tag claims more `mod_base` positions than the forward
+            // sequence actually has. Warn and emit only the calls we
+            // could resolve — the alternative was to panic the whole
+            // worker. ML offsets must still advance by the on-disk
+            // slot count (`mod_dists.len()`) so the next group reads
+            // from the correct ML section.
+            log::warn!(
+                "MM/ML parser: {} (reverse={}) — MM group ended {} positions short of the forward sequence; truncating",
+                String::from_utf8_lossy(record.qname()),
+                record.is_reverse(),
+                mod_dists.len() - resolved,
+            );
+        }
 
-        // Pair this group's calls with ML qualities.
-        let group_end = num_mods_seen + positions.len();
+        // Pair this group's calls with ML qualities. The on-disk ML
+        // section for this group has `mod_dists.len()` entries even if
+        // we could only resolve `resolved` of them.
+        let group_end = num_mods_seen + mod_dists.len();
         let group_quals: Vec<u8> = if group_end > ml_tag.len() {
             let needed = group_end - ml_tag.len();
             let mut existing = ml_tag[num_mods_seen..].to_vec();
@@ -162,6 +172,10 @@ pub fn parse_mm_ml_into_ma(
             ml_tag[num_mods_seen..group_end].to_vec()
         };
         num_mods_seen = group_end;
+        // Drop ML qualities whose position couldn't be resolved, so the
+        // dispatch zip below pairs only the surviving calls.
+        positions.truncate(resolved);
+        let group_quals = &group_quals[..resolved];
 
         // Filter + dispatch by mod_type. The canonical fiberseq codes are
         // *exactly* "a" (m6A) and "m" (5mC) — any longer alpha mod type
@@ -176,7 +190,7 @@ pub fn parse_mm_ml_into_ma(
                 other_calls.entry(key).or_default()
             }
         };
-        for (pos, qual) in positions.iter().copied().zip(group_quals) {
+        for (pos, &qual) in positions.iter().copied().zip(group_quals) {
             if qual < min_ml_score {
                 continue;
             }
