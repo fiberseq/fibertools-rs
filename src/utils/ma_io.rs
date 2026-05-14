@@ -10,9 +10,9 @@
 //! migration. With `legacy=false` any pre-existing legacy tags are stripped.
 //!
 //! Annotation type names produced by fibertools-rs:
-//! - `nuc`  (forward strand, no quality)
-//! - `msp`  (forward strand, no quality pre-FIRE; `Q` post-FIRE)
-//! - `fire` (forward strand, `P` phred quality)
+//! - `nuc`  (no strand, no quality)
+//! - `msp`  (no strand, no quality pre-FIRE; `Q` post-FIRE)
+//! - `fire` (no strand, `Q` linear precision 0–255)
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
 //! populated by [`crate::utils::basemods::parse_mm_ml_into_ma`], but are
@@ -91,7 +91,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
         if !ns.is_empty() {
             let nuc = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
             for (s, l) in ns.iter().zip(nl.iter()) {
-                nuc.add(*s, *l, Strand::Forward, vec![], None);
+                nuc.add(*s, *l, Strand::Unknown, vec![], None);
             }
         }
     }
@@ -122,7 +122,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
             let msp = annot.add_annotation_type(MSP_TYPE, q_spec);
             for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
                 let qualities = aq.as_ref().map(|q| vec![q[i]]).unwrap_or_default();
-                msp.add(*s, *l, Strand::Forward, qualities, None);
+                msp.add(*s, *l, Strand::Unknown, qualities, None);
             }
         }
     }
@@ -283,7 +283,7 @@ pub fn add_nuc_annotations(annot: &mut MolecularAnnotations, starts: &[u32], len
     }
     let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
     for (s, l) in starts.iter().zip(lens.iter()) {
-        t.add(*s, *l, Strand::Forward, vec![], None);
+        t.add(*s, *l, Strand::Unknown, vec![], None);
     }
 }
 
@@ -308,11 +308,11 @@ pub fn add_msp_annotations(
     let t = annot.add_annotation_type(MSP_TYPE, qspec);
     for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
         let qv = qualities.map(|q| vec![q[i]]).unwrap_or_default();
-        t.add(*s, *l, Strand::Forward, qv, None);
+        t.add(*s, *l, Strand::Unknown, qv, None);
     }
 }
 
-/// Add `fire` annotations (forward strand, phred quality) to `annot`.
+/// Add `fire` annotations (no strand, linear precision 0–255) to `annot`.
 ///
 /// No-op if `starts` is empty. All input slices must be the same length and
 /// paired positionally.
@@ -320,14 +320,14 @@ pub fn add_fire_annotations(
     annot: &mut MolecularAnnotations,
     starts: &[u32],
     lens: &[u32],
-    phred: &[u8],
+    precisions: &[u8],
 ) {
     if starts.is_empty() {
         return;
     }
-    let t = annot.add_annotation_type(FIRE_TYPE, "P".parse::<QualitySpec>().expect("P parses"));
+    let t = annot.add_annotation_type(FIRE_TYPE, "Q".parse::<QualitySpec>().expect("Q parses"));
     for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
-        t.add(*s, *l, Strand::Forward, vec![phred[i]], None);
+        t.add(*s, *l, Strand::Unknown, vec![precisions[i]], None);
     }
 }
 
@@ -344,8 +344,8 @@ pub fn build_annotations(
     if let Some((starts, lens, q)) = msp {
         add_msp_annotations(&mut annot, starts, lens, q);
     }
-    if let Some((starts, lens, phred)) = fire {
-        add_fire_annotations(&mut annot, starts, lens, phred);
+    if let Some((starts, lens, precisions)) = fire {
+        add_fire_annotations(&mut annot, starts, lens, precisions);
     }
     annot
 }
@@ -367,8 +367,8 @@ pub fn build_nuc_msp_annotations(
 }
 
 /// Convenience: read fire annotations as raw arrays in molecular orientation.
-/// Returns `(starts, lengths, phred_qualities)`. All three are empty if the
-/// record has no `fire` MA type.
+/// Returns `(starts, lengths, precisions)`. All three are empty if the record
+/// has no `fire` MA type.
 pub fn extract_fire_arrays(record: &bam::Record) -> Result<(Vec<u32>, Vec<u32>, Vec<u8>)> {
     let annot = read_annotations(record)?;
     Ok(annot
@@ -376,12 +376,12 @@ pub fn extract_fire_arrays(record: &bam::Record) -> Result<(Vec<u32>, Vec<u32>, 
         .map(|t| {
             let starts = t.annotations.iter().map(|a| a.start).collect();
             let lens = t.annotations.iter().map(|a| a.length).collect();
-            let phred = t
+            let precisions = t
                 .annotations
                 .iter()
                 .map(|a| crate::utils::bamannotations::primary_qual(&a.qualities, FIRE_TYPE))
                 .collect();
-            (starts, lens, phred)
+            (starts, lens, precisions)
         })
         .unwrap_or_default())
 }
