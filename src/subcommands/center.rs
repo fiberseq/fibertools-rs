@@ -260,21 +260,37 @@ impl CenteredFiberData {
         Vec<Option<i64>>,
         Vec<Option<i64>>,
         Vec<Option<i64>>,
+        Vec<Option<i64>>,
+        Vec<Option<i64>>,
         Vec<u8>,
     ) {
         let (m6a, _, m6a_qual) = self.centered_for_type("m6a");
         let (cpg, _, cpg_qual) = self.centered_for_type("cpg");
         let (nuc_st, nuc_en, _) = self.centered_for_type("nuc");
-        let (msp_st, msp_en, fire) = self.centered_for_type("msp");
+        let (msp_st, msp_en, _) = self.centered_for_type("msp");
+        let (fire_st, fire_en, fire_qual) = self.centered_for_type("fire");
         (
-            m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire,
+            m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire_st, fire_en,
+            fire_qual,
         )
     }
 
     pub fn write(&self) -> String {
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
+        let (
+            m6a,
+            m6a_qual,
+            cpg,
+            cpg_qual,
+            nuc_st,
+            nuc_en,
+            msp_st,
+            msp_en,
+            fire_st,
+            fire_en,
+            fire_qual,
+        ) = self.grab_data();
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
             join_by_str_option(&m6a, ","),
             join_by_str(&m6a_qual, ","),
@@ -284,7 +300,9 @@ impl CenteredFiberData {
             join_by_str_option(&nuc_en, ","),
             join_by_str_option(&msp_st, ","),
             join_by_str_option(&msp_en, ","),
-            join_by_str(&fire, ","),
+            join_by_str_option(&fire_st, ","),
+            join_by_str_option(&fire_en, ","),
+            join_by_str(&fire_qual, ","),
             self.get_sequence(),
         )
     }
@@ -308,7 +326,7 @@ impl CenteredFiberData {
     }
     pub fn header() -> String {
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_m6a_positions",
             "m6a_qual",
@@ -318,6 +336,8 @@ impl CenteredFiberData {
             "centered_nuc_ends",
             "centered_msp_starts",
             "centered_msp_ends",
+            "centered_fire_starts",
+            "centered_fire_ends",
             "fire_qual",
             "query_sequence"
         )
@@ -336,12 +356,25 @@ impl CenteredFiberData {
 
     pub fn write_long(&self) -> String {
         let mut rtn = String::new();
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
+        let (
+            m6a,
+            m6a_qual,
+            cpg,
+            cpg_qual,
+            nuc_st,
+            nuc_en,
+            msp_st,
+            msp_en,
+            fire_st,
+            fire_en,
+            fire_qual,
+        ) = self.grab_data();
         for (t, vals) in [
             ("m6a", (m6a, None, Some(m6a_qual))),
             ("5mC", (cpg, None, Some(cpg_qual))),
             ("nuc", (nuc_st, Some(nuc_en), None)),
-            ("msp", (msp_st, Some(msp_en), Some(fire))),
+            ("msp", (msp_st, Some(msp_en), None)),
+            ("fire", (fire_st, Some(fire_en), Some(fire_qual))),
         ] {
             let starts = vals.0.iter().collect::<Vec<_>>();
             let ends: Vec<Option<i64>> = match vals.1 {

@@ -166,10 +166,12 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
         map.insert(color, vec![]);
     }
 
-    let msp = fiber.msp();
-    let ref_starts = msp.reference_starts();
-    let ref_lengths = msp.reference_lengths();
-    let quals = fiber.fire_qual();
+    // FIRE is its own annotation type — color decorators by FIRE precision
+    // directly. Non-FIRE MSPs are not decorated here
+    let fire = fiber.fire();
+    let ref_starts = fire.reference_starts();
+    let ref_lengths = fire.reference_lengths();
+    let quals = fire.qual();
 
     for ((pos, length), qual) in ref_starts.iter().zip(ref_lengths.iter()).zip(quals.iter()) {
         if let (Some(p), Some(l)) = (pos, length) {

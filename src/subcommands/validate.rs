@@ -35,7 +35,7 @@ pub fn validate_fiberseq_bam(opts: &mut ValidateOptions) -> Result<()> {
     for fiber in opts.bam.fibers(&mut bam) {
         let m6a_okay = !fiber.m6a().is_empty();
         let nuc_okay = !fiber.nuc().is_empty();
-        n_fire_calls += fiber.fire_qual().iter().filter(|q| **q > 0).count();
+        n_fire_calls += fiber.fire().len();
 
         n_aligned += !fiber.record.is_unmapped() as usize;
         n_phased += fiber.record.aux(b"HP").is_ok() as usize;

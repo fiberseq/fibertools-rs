@@ -114,8 +114,9 @@ impl<'a> ReferenceMotif<'a> {
 pub struct Footprint<'a> {
     pub n_spanning_fibers: usize,
     pub n_spanning_msps: usize,
+    pub n_spanning_fires: usize,
     pub has_spanning_msp: Vec<bool>,
-    pub msp_fire_scores: Vec<i16>,
+    pub fire_quals: Vec<i16>,
     pub n_overlapping_nucs: usize,
     pub has_overlapping_nucleosome: Vec<bool>,
     pub footprint_codes: Vec<u16>,
@@ -136,42 +137,52 @@ impl<'a> Footprint<'a> {
         let mut footprint = Self {
             n_spanning_fibers: fibers.len(),
             n_spanning_msps: 0,
+            n_spanning_fires: 0,
             has_spanning_msp: vec![],
-            msp_fire_scores: vec![],
+            fire_quals: vec![],
             n_overlapping_nucs: 0,
             has_overlapping_nucleosome: vec![],
             footprint_codes: vec![],
             motif,
             fibers,
         };
-        // add the number of msps that span the footprint
-        footprint.spanning_msps();
+        // count spanning MSPs (any methylated region) and spanning FIREs
+        // (regulatory element calls) — two independent signals.
+        footprint.spanning_msps_and_fires();
         footprint.establish_footprints();
         footprint.overlapping_nucleosomes();
         footprint
     }
 
-    fn spanning_msps(&mut self) {
+    fn spanning_msps_and_fires(&mut self) {
         for fiber in self.fibers.iter() {
+            // Spanning MSP — "is there any methylated region spanning the motif?"
             let mut has_spanning_msp = false;
-            let mut msp_qual = -1;
-            let fire_quals = fiber.fire_qual();
-            for (idx, msp) in (&fiber.msp()).into_iter().enumerate() {
-                // skip if there is no mapping of the msp
-                match (msp.ref_start, msp.ref_end) {
-                    (Some(rs), Some(re)) => {
-                        if self.motif.spans(rs as i64, re as i64) {
-                            self.n_spanning_msps += 1;
-                            has_spanning_msp = true;
-                            msp_qual = fire_quals.get(idx).copied().unwrap_or(0) as i16;
-                            break;
-                        }
+            for msp in &fiber.msp() {
+                if let (Some(rs), Some(re)) = (msp.ref_start, msp.ref_end) {
+                    if self.motif.spans(rs as i64, re as i64) {
+                        self.n_spanning_msps += 1;
+                        has_spanning_msp = true;
+                        break;
                     }
-                    _ => continue,
                 }
             }
             self.has_spanning_msp.push(has_spanning_msp);
-            self.msp_fire_scores.push(msp_qual);
+
+            // Spanning FIRE — "is there a regulatory element call spanning
+            // the motif, and if so what's its precision?" Independent of
+            // whether any MSP spans.
+            let mut fire_qual: i16 = -1;
+            for fire in &fiber.fire() {
+                if let (Some(rs), Some(re)) = (fire.ref_start, fire.ref_end) {
+                    if self.motif.spans(rs as i64, re as i64) {
+                        self.n_spanning_fires += 1;
+                        fire_qual = fire.qualities.first().copied().unwrap_or(0) as i16;
+                        break;
+                    }
+                }
+            }
+            self.fire_quals.push(fire_qual);
         }
     }
 
@@ -259,7 +270,7 @@ impl<'a> Footprint<'a> {
 
     pub fn out_bed_header(&self) -> String {
         let mut out =
-            "#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\tn_overlapping_nucs\t"
+            "#chrom\tstart\tend\tstrand\tn_spanning_fibers\tn_spanning_msps\tn_spanning_fires\tn_overlapping_nucs\t"
                 .to_string();
         out += &self
             .motif
@@ -277,13 +288,14 @@ impl<'a> Footprint<'a> {
 impl std::fmt::Display for Footprint<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut out = format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.motif.chrom,
             self.motif.start,
             self.motif.end + 1,
             self.motif.strand,
             self.n_spanning_fibers,
             self.n_spanning_msps,
+            self.n_spanning_fires,
             self.n_overlapping_nucs,
         );
 
@@ -308,7 +320,7 @@ impl std::fmt::Display for Footprint<'_> {
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()
                 .join(","),
-            self.msp_fire_scores
+            self.fire_quals
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()

@@ -24,9 +24,11 @@ pub fn add_fire_to_rec(
         precisions.reverse();
     }
 
-    // Use the FiberseqData's already-loaded MA object; no record
-    // re-read. MSP coords come from rec.annotations directly.
-    let (starts, lens): (Vec<u32>, Vec<u32>) = {
+    // FIRE is the filtered subset of MSPs with non-zero precision —
+    // the MSPs whose XGB prediction crossed the "this is a regulatory
+    // element" threshold. Build that subset from the per-MSP coords
+    // and their paired precisions, keeping only entries with p > 0.
+    let (fire_starts, fire_lens, fire_quals): (Vec<u32>, Vec<u32>, Vec<u8>) = {
         let Some(msp) = rec.annotations.get_type(ma_io::MSP_TYPE) else {
             log::warn!("FIRE: no msp annotations on record; skipping");
             return;
@@ -39,17 +41,24 @@ pub fn add_fire_to_rec(
             );
             return;
         }
-        (
-            msp.annotations.iter().map(|a| a.start).collect(),
-            msp.annotations.iter().map(|a| a.length).collect(),
-        )
+        let mut s = Vec::new();
+        let mut l = Vec::new();
+        let mut q = Vec::new();
+        for (a, &p) in msp.annotations.iter().zip(precisions.iter()) {
+            if p > 0 {
+                s.push(a.start);
+                l.push(a.length);
+                q.push(p);
+            }
+        }
+        (s, l, q)
     };
     // Drop any pre-existing fire annotations so a re-run replaces, rather
     // than appends to, the previous call.
     rec.annotations
         .annotation_types
         .retain(|t| t.name != ma_io::FIRE_TYPE);
-    ma_io::add_fire_annotations(&mut rec.annotations, &starts, &lens, &precisions);
+    ma_io::add_fire_annotations(&mut rec.annotations, &fire_starts, &fire_lens, &fire_quals);
 
     rec.serialize_annotations();
 
