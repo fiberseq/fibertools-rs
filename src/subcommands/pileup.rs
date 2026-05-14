@@ -400,14 +400,15 @@ impl<'a> FireTrack<'a> {
             self.coverage[pos as usize] += 1;
         }
 
-        // calculate the fire coverage and fire score
-        let fire_quals = fiber.fire_qual();
-        for (idx, info) in (&fiber.msp()).into_iter().enumerate() {
+        // calculate the fire coverage and fire score. FIRE is its own
+        // annotation type — already filtered to non-zero precision in
+        // add_fire_to_rec. MIN_FIRE_QUAL is the stricter pileup-level gate.
+        for info in &fiber.fire() {
             let (rs, re) = match (info.ref_start, info.ref_end) {
                 (Some(rs), Some(re)) => (rs as i64, re as i64),
                 _ => continue,
             };
-            let qual = fire_quals.get(idx).copied().unwrap_or(0);
+            let qual = info.qualities.first().copied().unwrap_or(0);
             if qual < MIN_FIRE_QUAL {
                 continue;
             }

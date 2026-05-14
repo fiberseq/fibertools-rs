@@ -544,7 +544,7 @@ fn build_tagged_record(
             t.add(*s, *l, Strand::Forward, vec![], name);
         }
     }
-    ma_io::write_annotations(&mut record, &annot, false);
+    ma_io::write_annotations(&mut record, &annot);
 
     record
 }

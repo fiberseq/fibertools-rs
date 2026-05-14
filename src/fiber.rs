@@ -139,33 +139,6 @@ impl FiberseqData {
         AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
     }
 
-    /// Per-MSP FIRE precision in BAM-orient ascending order, aligned 1:1
-    /// with [`Self::msp`] iteration. Returns `vec![0; msp_len]` when no
-    /// FIRE data is present.
-    ///
-    /// Resolves in two stages:
-    /// 1. If a `fire` annotation type exists with the same count as
-    ///    `msp`, return its qualities (post-MA write path: FIRE precisions
-    ///    live on `fire+P`).
-    /// 2. Otherwise fall back to `self.msp().qual()` — pre-MA fibertools
-    ///    stored FIRE precisions on the MSP `aq` tag, so legacy BAMs land
-    ///    them in `msp.qualities`.
-    pub fn fire_qual(&self) -> Vec<u8> {
-        let msp_len = self.msp().len();
-        if msp_len == 0 {
-            return Vec::new();
-        }
-        let fire = self.fire();
-        if fire.len() == msp_len {
-            return fire.qual();
-        }
-        let msp_q = self.msp().qual();
-        if msp_q.len() == msp_len && msp_q.iter().any(|&q| q > 0) {
-            return msp_q;
-        }
-        vec![0; msp_len]
-    }
-
     /// Flush `self.annotations` onto the underlying record's MA aux
     /// tags. The single write path — every subcommand that mutates
     /// annotations should call this and then hand the record to the
@@ -346,7 +319,7 @@ impl FiberseqData {
             x.push_str("fiber_qual\t")
         }
         x.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ec",
             "rq",
             "total_AT_bp",
@@ -360,9 +333,13 @@ impl FiberseqData {
             "ref_nuc_lengths",
             "msp_starts",
             "msp_lengths",
-            "fire",
             "ref_msp_starts",
             "ref_msp_lengths",
+            "fire_starts",
+            "fire_lengths",
+            "fire_qual",
+            "ref_fire_starts",
+            "ref_fire_lengths",
             "m6a",
             "ref_m6a",
             "m6a_qual",
@@ -414,15 +391,12 @@ impl FiberseqData {
         let cpg = self.cpg();
         let msp = self.msp();
         let nuc = self.nuc();
+        let fire = self.fire();
         let m6a_count = m6a.len();
         let m6a_qual = m6a.qual().iter().map(|a| Some(*a as i64)).collect();
         let cpg_count = cpg.len();
         let cpg_qual = cpg.qual().iter().map(|a| Some(*a as i64)).collect();
-        let fire: Vec<Option<i64>> = self
-            .fire_qual()
-            .iter()
-            .map(|a| Some(*a as i64))
-            .collect();
+        let fire_qual: Vec<Option<i64>> = fire.qual().iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -463,7 +437,8 @@ impl FiberseqData {
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
         ))
         .unwrap();
-        // add fiber features
+        // add fiber features. FIRE is its own coord group (parallel to
+        // nuc/m6a/cpg) — not wedged into the MSP columns.
         let vecs = [
             nuc.option_starts(),
             nuc.option_lengths(),
@@ -471,9 +446,13 @@ impl FiberseqData {
             nuc.reference_lengths(),
             msp.option_starts(),
             msp.option_lengths(),
-            fire,
             msp.reference_starts(),
             msp.reference_lengths(),
+            fire.option_starts(),
+            fire.option_lengths(),
+            fire_qual,
+            fire.reference_starts(),
+            fire.reference_lengths(),
             m6a.option_starts(),
             m6a.reference_starts(),
             m6a_qual,
