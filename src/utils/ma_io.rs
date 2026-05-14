@@ -4,14 +4,14 @@
 //! MA tag is present. Returns a populated [`MolecularAnnotations`] (read
 //! length and aligned blocks set) even when no annotation tags exist.
 //!
-//! Writing: always emits MA-spec tags. With `legacy=true` it additionally
-//! emits legacy `ns/nl/as/al/aq` for `nuc` and `msp` types so pre-MA
-//! consumers (older pyft, IGV decorators) keep working during the
-//! migration. With `legacy=false` any pre-existing legacy tags are stripped.
+//! Writing: emits MA-spec tags only. Legacy `ns/nl/as/al/aq` emission is
+//! intentionally not supported — the new FIRE-as-subset semantics is
+//! incompatible with the legacy dense `aq` layout. Pre-MA BAMs remain
+//! readable; downstream consumers must migrate to the MA tag set.
 //!
 //! Annotation type names produced by fibertools-rs:
 //! - `nuc`  (no strand, no quality)
-//! - `msp`  (no strand, no quality pre-FIRE; `Q` post-FIRE)
+//! - `msp`  (no strand, `Q` zero-valued — qualities live on `fire`)
 //! - `fire` (no strand, `Q` linear precision 0–255)
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
@@ -20,7 +20,7 @@
 //! The writer below strips them before emission as a safety net.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{Annotation, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -28,9 +28,9 @@ pub const NUC_TYPE: &str = "nuc";
 pub const MSP_TYPE: &str = "msp";
 pub const FIRE_TYPE: &str = "fire";
 
-/// Legacy fibertools-rs tags. Listed here so callers (and the writer below)
-/// have one place to look up which tags this module produces/consumes.
-pub const LEGACY_NUC_MSP_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
+/// Legacy fibertools-rs tags consumed by the reader as a fallback when no
+/// MA tag is present. These are never emitted; we only ingest them.
+pub const LEGACY_READ_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
 
 /// Read annotations from a BAM record.
 ///
@@ -132,23 +132,10 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
 
 /// Write annotations to a BAM record.
 ///
-/// Always emits the MA-spec tags. When `legacy` is set, also emits the
-/// fibertools-rs legacy `ns`/`nl`/`as`/`al`/`aq` tags so pre-MA consumers
-/// (older pyft, IGV decorators) keep working during the migration.
-///
-/// The legacy mapping:
-/// - `nuc` → `ns`/`nl`
-/// - `msp` → `as`/`al`
-/// - `fire` → `aq` (paired with the `as`/`al` from `msp`, since pre-MA
-///   fibertools stored FIRE precisions as MSP qualities). When no `fire`
-///   type is present, `aq` falls back to `msp`'s own quality if it has one.
-///
-/// When `legacy` is not set, any pre-existing legacy tags are stripped so
-/// the output is MA-only.
-pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations, legacy: bool) {
-    for tag in LEGACY_NUC_MSP_TAGS {
-        record.remove_aux(tag).ok();
-    }
+/// Emits MA-spec tags only. Base modifications (`m6a`, `cpg`) are stripped
+/// before serialization — their on-disk source of truth is `MM`/`ML`, not
+/// the MA tag set.
+pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations) {
     // Base modifications (`m6a`, `cpg`) belong in MM/ML — never in the
     // MA tag set. Drop them before serialization. See the module docs
     // for the on-disk source-of-truth split.
@@ -157,80 +144,6 @@ pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations,
         t.name != crate::utils::basemods::M6A_TYPE && t.name != crate::utils::basemods::CPG_TYPE
     });
     for_ma.to_record(record);
-    if legacy {
-        write_legacy_nuc_msp(record, annot);
-    }
-}
-
-fn write_legacy_nuc_msp(record: &mut bam::Record, annot: &MolecularAnnotations) {
-    if let Some(nuc) = annot.get_type(NUC_TYPE) {
-        push_starts_lens(record, b"ns", b"nl", &nuc.annotations);
-    }
-
-    // Legacy convention: pre-MA fibertools wrote FIRE precisions onto the
-    // MSP `aq` tag — there was no separate FIRE tag. So legacy MSP output
-    // takes coords from MSP and quality from FIRE when FIRE is present;
-    // otherwise it falls back to MSP's own quality (when present), or no
-    // `aq` at all (pre-FIRE state).
-    if let Some(msp) = annot.get_type(MSP_TYPE) {
-        push_starts_lens(record, b"as", b"al", &msp.annotations);
-
-        let aq: Option<Vec<u8>> = if let Some(fire) = annot.get_type(FIRE_TYPE) {
-            // Sanity: legacy convention assumes FIRE coords mirror MSP coords.
-            // If they don't, the `aq` array we emit won't align with `as`/`al`.
-            debug_assert_eq!(
-                fire.annotations.len(),
-                msp.annotations.len(),
-                "legacy aq emission requires fire and msp to have matching counts"
-            );
-            if fire.annotations.len() == msp.annotations.len() {
-                Some(
-                    fire.annotations
-                        .iter()
-                        .map(|a| {
-                            crate::utils::bamannotations::primary_qual(&a.qualities, FIRE_TYPE)
-                        })
-                        .collect(),
-                )
-            } else {
-                None
-            }
-        } else if msp.quality_spec.num_qualities() == 1 && msp.quality_spec.has_quality() {
-            Some(
-                msp.annotations
-                    .iter()
-                    .map(|a| crate::utils::bamannotations::primary_qual(&a.qualities, MSP_TYPE))
-                    .collect(),
-            )
-        } else {
-            None
-        };
-
-        if let Some(aq) = aq {
-            if !aq.is_empty() {
-                record.push_aux(b"aq", Aux::ArrayU8((&aq).into())).ok();
-            }
-        }
-    }
-}
-
-fn push_starts_lens(
-    record: &mut bam::Record,
-    starts_tag: &[u8],
-    lens_tag: &[u8],
-    items: &[Annotation],
-) {
-    if items.is_empty() {
-        return;
-    }
-    let starts: Vec<u32> = items.iter().map(|a| a.start).collect();
-    let lens: Vec<u32> = items.iter().map(|a| a.length).collect();
-    record
-        .push_aux(starts_tag, Aux::ArrayU32((&starts).into()))
-        .ok();
-    record
-        .push_aux(lens_tag, Aux::ArrayU32((&lens).into()))
-        .ok();
 }
 
 /// Convenience for callers that still operate on raw `i64` arrays of
@@ -273,7 +186,7 @@ pub fn extract_nuc_msp_arrays(
     Ok((nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual))
 }
 
-/// Add `nuc` annotations (forward strand, no quality) to `annot`.
+/// Add `nuc` annotations (unknown strand, no quality) to `annot`.
 ///
 /// No-op if `starts` is empty. `starts` and `lens` must be the same length
 /// and paired positionally.
@@ -287,7 +200,7 @@ pub fn add_nuc_annotations(annot: &mut MolecularAnnotations, starts: &[u32], len
     }
 }
 
-/// Add `msp` annotations (forward strand) to `annot`.
+/// Add `msp` annotations (unknown strand) to `annot`.
 ///
 /// With `qualities` present, the type uses `msp+Q`; without, `msp+` (no
 /// quality). No-op if `starts` is empty. All input slices must be the same

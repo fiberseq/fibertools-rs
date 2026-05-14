@@ -130,7 +130,7 @@ fn create_mock_fire_record(
     // `FiberseqData` to round-trip through.
     let mut annot = MolecularAnnotations::from_record(&record);
     ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
-    ma_io::write_annotations(&mut record, &annot, false);
+    ma_io::write_annotations(&mut record, &annot);
 
     Ok(record)
 }

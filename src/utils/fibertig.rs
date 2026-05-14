@@ -349,7 +349,7 @@ impl FiberTig {
                 }
             }
 
-            crate::utils::ma_io::write_annotations(&mut record, annotations, false);
+            crate::utils::ma_io::write_annotations(&mut record, annotations);
 
             records.push(record);
         }
