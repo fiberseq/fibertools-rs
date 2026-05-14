@@ -14,7 +14,6 @@ pub fn add_fire_to_rec(
     fire_opts: &FireOptions,
     model: &GBDT,
     precision_table: &MapPrecisionValues,
-    legacy: bool,
 ) {
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
@@ -52,7 +51,7 @@ pub fn add_fire_to_rec(
         .retain(|t| t.name != ma_io::FIRE_TYPE);
     ma_io::add_fire_annotations(&mut rec.annotations, &starts, &lens, &precisions);
 
-    rec.serialize_annotations(legacy);
+    rec.serialize_annotations();
 
     log::trace!("precisions: {precisions:?}");
 }
@@ -92,13 +91,7 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
         for recs in &fibers.chunks(2_000) {
             let mut recs: Vec<FiberseqData> = recs.collect();
             recs.par_iter_mut().for_each(|r| {
-                add_fire_to_rec(
-                    r,
-                    fire_opts,
-                    &model,
-                    &precision_table,
-                    fire_opts.legacy_tags,
-                );
+                add_fire_to_rec(r, fire_opts, &model, &precision_table);
             });
             for rec in recs {
                 out.write(&rec.record)?;

@@ -48,8 +48,4 @@ pub struct AddNucleosomeOptions {
     pub out: String,
     #[clap(flatten)]
     pub nuc: NucleosomeParameters,
-    /// Also emit legacy ns/nl/as/al/aq tags alongside the MA-spec tags
-    /// (`MA`/`AQ`/`AN`). Default: only MA-spec tags are written.
-    #[clap(long)]
-    pub legacy_tags: bool,
 }

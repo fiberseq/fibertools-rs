@@ -170,8 +170,8 @@ impl FiberseqData {
     /// tags. The single write path — every subcommand that mutates
     /// annotations should call this and then hand the record to the
     /// BAM writer.
-    pub fn serialize_annotations(&mut self, legacy: bool) {
-        crate::utils::ma_io::write_annotations(&mut self.record, &self.annotations, legacy);
+    pub fn serialize_annotations(&mut self) {
+        crate::utils::ma_io::write_annotations(&mut self.record, &self.annotations);
     }
 
     pub fn get_qname(&self) -> String {

@@ -28,7 +28,7 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
                 .unwrap_or_default();
             let record = fd.record.clone();
             add_nucleosomes_to_annotations(&record, &mut fd.annotations, &m6a, &nuc_opts.nuc);
-            fd.serialize_annotations(nuc_opts.legacy_tags);
+            fd.serialize_annotations();
         });
 
         for fd in &fibers {

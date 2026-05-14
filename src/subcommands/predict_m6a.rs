@@ -47,7 +47,6 @@ where
     pub nuc_opts: cli::NucleosomeParameters,
     pub burn_models: m6a_burn::BurnModels<B>,
     pub fake: bool,
-    pub legacy_tags: bool,
 }
 
 impl<B> PredictOptions<B>
@@ -64,7 +63,6 @@ where
         batch_size: usize,
         nuc_opts: cli::NucleosomeParameters,
         fake: bool,
-        legacy_tags: bool,
     ) -> Self {
         // set up a precision table
         let mut map = BTreeMap::new();
@@ -83,7 +81,6 @@ where
             nuc_opts,
             burn_models: m6a_burn::BurnModels::new(&polymerase),
             fake,
-            legacy_tags,
         };
         options.add_model().expect("Error loading model");
         options
@@ -281,7 +278,7 @@ where
             // Single MA write — m6a went out via MM/ML above; nuc/msp
             // (and any pre-existing annotation types we preserved) go
             // out here.
-            crate::utils::ma_io::write_annotations(record, &annot, opts.legacy_tags);
+            crate::utils::ma_io::write_annotations(record, &annot);
 
             // clear the existing data
             if !opts.keep {
@@ -543,7 +540,6 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
         opts.batch_size,
         opts.nuc.clone(),
         opts.fake,
-        opts.legacy_tags,
     );
     // get default fire options
     let fire_opts = crate::cli::FireOptions::default();
@@ -568,7 +564,6 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
                     predict_options.batch_size,
                     predict_options.nuc_opts.clone(),
                     predict_options.fake,
-                    predict_options.legacy_tags,
                 );
                 PredictOptions::predict_m6a_on_records(&thread_opts, records)
             })
@@ -583,13 +578,7 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
         let mut fd_recs =
             FiberseqData::from_records(chunk, &opts.input.header_view(), &opts.input.filters);
         fd_recs.par_iter_mut().for_each(|fd| {
-            crate::subcommands::fire::add_fire_to_rec(
-                fd,
-                &fire_opts,
-                &model,
-                &precision_table,
-                opts.legacy_tags,
-            );
+            crate::subcommands::fire::add_fire_to_rec(fd, &fire_opts, &model, &precision_table);
         });
 
         // write to output
