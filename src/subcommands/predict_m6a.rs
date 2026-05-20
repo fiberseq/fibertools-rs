@@ -234,29 +234,32 @@ where
                 None => continue,
             };
             // Iterate over A and then T basemods, collecting their forward
-            // positions + ML qualities into a single sorted m6a list.
-            let mut m6a_calls: Vec<(u32, u8)> = Vec::new();
-            for data in &[a_data, t_data] {
+            // positions + ML qualities into a single sorted m6a list. Each
+            // call carries its canonical MM group header — A-base calls
+            // are "A+a", T-base calls are "T-a" — so `write_mm_ml` can
+            // emit them under the correct group.
+            let mut m6a_calls: Vec<(u32, u8, &'static str)> = Vec::new();
+            for (data, header) in [(a_data, "A+a"), (t_data, "T-a")] {
                 let cur_predict_en = cur_predict_st + data.count;
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
                 cur_predict_st += data.count;
                 let (poss, quals) =
                     opts.basemod_from_ml(record, cur_predictions, &data.positions, &data.base_mod);
-                m6a_calls.extend(poss.into_iter().zip(quals));
+                m6a_calls.extend(poss.into_iter().zip(quals).map(|(p, q)| (p, q, header)));
             }
             if !m6a_calls.is_empty() {
-                m6a_calls.sort_by_key(|&(p, _)| p);
+                m6a_calls.sort_by_key(|&(p, _, _)| p);
                 let qspec = "Q"
                     .parse::<molecular_annotation::QualitySpec>()
                     .expect("Q parses");
                 let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
-                for (pos, qual) in &m6a_calls {
+                for (pos, qual, header) in &m6a_calls {
                     t.add(
                         *pos,
                         1,
                         molecular_annotation::Strand::Forward,
                         vec![*qual],
-                        None,
+                        Some(header.to_string()),
                     );
                 }
             }
@@ -267,7 +270,7 @@ where
             // Compute nucleosomes + MSPs from the forward m6a positions
             // and append them to the same MA object we just built up.
             let modified_bases_forward: Vec<i64> =
-                m6a_calls.iter().map(|&(p, _)| p as i64).collect();
+                m6a_calls.iter().map(|&(p, _, _)| p as i64).collect();
             nucleosome::add_nucleosomes_to_annotations(
                 record,
                 &mut annot,

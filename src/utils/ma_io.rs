@@ -137,8 +137,10 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
 /// the MA tag set.
 pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations) {
     // Base modifications (`m6a`, `cpg`) belong in MM/ML — never in the
-    // MA tag set. Drop them before serialization. See the module docs
-    // for the on-disk source-of-truth split.
+    // MA tag set. Drop them before serialization. This is a policy
+    // choice (single on-disk source of truth), not a correctness one;
+    // see the basemods module docs for the tradeoff if you want to
+    // expose basemods in MA tags for downstream MA-native consumers.
     let mut for_ma = annot.clone();
     for_ma.annotation_types.retain(|t| {
         t.name != crate::utils::basemods::M6A_TYPE && t.name != crate::utils::basemods::CPG_TYPE
