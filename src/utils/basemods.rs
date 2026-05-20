@@ -1,22 +1,36 @@
 //! MM/ML BAM tag I/O for fiberseq base modifications.
 //!
+//! Scope: m6A (`"a"`) and 5mC (`"m"`) only. MM groups carrying any other
+//! mod-type code are logged and skipped on parse — fibertools-rs's typed
+//! API only exposes these two canonical fiberseq modifications. Adding a
+//! new canonical mod (e.g. 5hmC, `"h"`) is a ~5-line change across
+//! [`ma_type_for_mod_code`], [`is_basemod_type`], and
+//! [`canonical_header`].
+//!
 //! Read path: `parse_mm_ml_into_ma` parses a record's MM/ML tags directly
-//! into a [`MolecularAnnotations`] as annotation types. No intermediate
-//! `BaseMods` struct — the spec object is the sole in-memory
-//! representation.
+//! into a [`MolecularAnnotations`]. Each call's MM group header (e.g.
+//! `"A+a"`, `"T-a"`, `"N+a"`, `"C+m"`) is stored verbatim on
+//! [`Annotation::name`], so headers round-trip through `write_mm_ml`
+//! byte-for-byte — including non-standard encodings like `N+a` that the
+//! old write path silently normalized.
 //!
-//! Mod-type dispatch (exact match on the MM mod_type code):
-//! - `"a"` (any group, e.g. `A+a`, `T-a`, `N+a`) → `m6a` type.
-//! - `"m"` (any group, e.g. `C+m`, `G+m`) → `cpg` type.
-//! - any other code (`C+h`, `T+f`, `C+ac`, ChEBI numeric IDs, etc.) → its
-//!   own annotation type named verbatim after the MM group header (e.g.
-//!   `"C+h"`). Calls round-trip through `write_mm_ml` unchanged.
+//! Write path: `write_mm_ml` emits MM/ML by reading each annotation's
+//! `name` directly. Basemod annotations *must* have `name` set; the
+//! parser sets it from the MM tag, and programmatic producers
+//! (`predict_m6a`, `ddda_to_m6a`) set it via [`canonical_header`]. A
+//! missing `name` on a basemod annotation is a bug and triggers a panic.
 //!
-//! Write path: `write_mm_ml` emits MM/ML from a [`MolecularAnnotations`].
-//! Canonical types (`m6a`, `cpg`) have their groups reconstructed from
-//! the forward sequence (`A`→`A+a`, `T`→`T-a`, `C`→`C+m`, `G`→`G+m`).
-//! Non-canonical types stored under a valid MM group name are emitted
-//! verbatim under that header.
+//! MA-tag policy: `ma_io::write_annotations` *strips* `m6a` and `cpg`
+//! before MA serialization — MM/ML is the on-disk source of truth, and
+//! the MA tag set holds nuc/msp/fire only. This is a policy choice
+//! (avoid duplication, single source of truth), not a correctness one.
+//! Lifting the strip would expose basemods to MA-native consumers (e.g.
+//! the `molecular_annotation` library) at the cost of ~2× disk for
+//! basemod data and a "MM/ML wins on read" invariant. The matched
+//! invariant on the read side is the idempotency wipe in
+//! [`parse_mm_ml_into_ma`]: it discards any basemod-typed annotations
+//! present in `annot` before parsing MM/ML, so an MA tag set that
+//! wrongly contained basemods doesn't get merged on top of MM/ML.
 
 use crate::utils::bio_io::*;
 use bio::alphabets::dna::revcomp;
@@ -31,6 +45,40 @@ use std::collections::BTreeMap;
 pub const M6A_TYPE: &str = "m6a";
 pub const CPG_TYPE: &str = "cpg";
 
+/// Map an MM mod-type code (the trailing alpha/digits in a group like
+/// `A+a`) to a fibertools MA type name. Unknown codes return `None` and
+/// the caller skips the group.
+fn ma_type_for_mod_code(code: &str) -> Option<&'static str> {
+    match code {
+        "a" => Some(M6A_TYPE),
+        "m" => Some(CPG_TYPE),
+        _ => None,
+    }
+}
+
+/// True for annotation types whose on-disk source of truth is MM/ML.
+/// Used to gate idempotency wipes (parse), MA-tag emission (ma_io), and
+/// MM/ML emission (write).
+pub fn is_basemod_type(name: &str) -> bool {
+    matches!(name, M6A_TYPE | CPG_TYPE)
+}
+
+/// Header for a canonical basemod call landing on `base` (read in
+/// forward-strand orientation). Returns `&'static str` for the four
+/// possible canonical headers; `None` if the (type, base) pair isn't a
+/// canonical fiberseq combination. Used by programmatic producers
+/// (`predict_m6a`, `ddda_to_m6a`) to label calls so `write_mm_ml` can
+/// emit them under the right MM group.
+pub fn canonical_header(type_name: &str, base: u8) -> Option<&'static str> {
+    match (type_name, base) {
+        (M6A_TYPE, b'A') => Some("A+a"),
+        (M6A_TYPE, b'T') => Some("T-a"),
+        (CPG_TYPE, b'C') => Some("C+m"),
+        (CPG_TYPE, b'G') => Some("G+m"),
+        _ => None,
+    }
+}
+
 lazy_static! {
     // MM:Z:([ACGTUN][-+]([A-Za-z]+|[0-9]+)[.?]?(,[0-9]+)*;)*
     static ref MM_RE: Regex =
@@ -39,30 +87,27 @@ lazy_static! {
 
 /// Parse the MM/ML tags of `record` directly into `annot`. Positions are
 /// stored in molecular (forward) orientation as 1bp annotations with a
-/// single `Q` quality score per call.
+/// single `Q` quality score per call. Each annotation's `name` carries
+/// the verbatim MM group header it was parsed from (e.g. `"A+a"`,
+/// `"T-a"`, `"N+a"`, `"C+h"`), so [`write_mm_ml`] round-trips it
+/// unchanged.
 ///
 /// Per-call filtering:
 /// - calls with ML quality < `min_ml_score` are dropped.
 /// - calls within `strip_at_ends` bp of either end of the forward
 ///   sequence are dropped (no-op if `strip_at_ends <= 0`).
 ///
-/// Dispatch by MM mod_type (exact-match):
+/// Dispatch by MM mod_type (exact-match) controls the MA type bucket:
 /// - `"a"` → [`M6A_TYPE`] (collapses `A+a`, `T-a`, `N+a`, etc.)
 /// - `"m"` → [`CPG_TYPE`] (collapses `C+m`, `G+m`, etc.)
 /// - any other → annotation type named verbatim after the MM group
-///   header (e.g. `"C+h"` for 5hmC, `"C+ac"` for acetyl). [`write_mm_ml`]
-///   emits these unchanged.
+///   header (e.g. `"C+h"` for 5hmC, `"C+ac"` for acetyl).
 ///
-/// Idempotent: any pre-existing `m6a` / `cpg` / non-canonical basemod
-/// types on `annot` are dropped first, so MM/ML always overwrites in-
-/// memory state rather than appending. This guards against (a) repeated
-/// calls on the same `annot`, and (b) malformed inputs that wrongly
-/// emit `m6a` into the MA tag set in addition to MM/ML.
-///
-/// For canonical `m6a` / `cpg`, MM's per-group `(canonical_base,
-/// strand_sign)` is reconstructed from the forward sequence at write
-/// time, so input encodings like `N+a` are normalized to `A+a` / `T-a`
-/// on output.
+/// Idempotent: any pre-existing basemod-shaped types on `annot` are
+/// dropped first (see [`is_basemod_type`]), so MM/ML always overwrites
+/// in-memory state rather than appending. This guards against (a)
+/// repeated calls on the same `annot`, and (b) malformed inputs that
+/// wrongly emit `m6a` into the MA tag set in addition to MM/ML.
 pub fn parse_mm_ml_into_ma(
     record: &bam::Record,
     annot: &mut MolecularAnnotations,
@@ -73,9 +118,7 @@ pub fn parse_mm_ml_into_ma(
     // basemod-shaped type that may already be in `annot` (from a prior
     // pass, an MA-tag leak in a third-party producer, or repeated calls)
     // is discarded so we don't silently append on top of stale data.
-    annot
-        .annotation_types
-        .retain(|t| t.name != M6A_TYPE && t.name != CPG_TYPE && !is_valid_mm_header(&t.name));
+    annot.annotation_types.retain(|t| !is_basemod_type(&t.name));
 
     let ml_tag = get_u8_tag(record, b"ML");
     let Ok(Aux::String(mm_text)) = record.aux(b"MM") else {
@@ -92,20 +135,17 @@ pub fn parse_mm_ml_into_ma(
     let strip = strip_at_ends.max(0) as usize;
     let upper = seq_len.saturating_sub(strip);
 
-    let mut m6a_calls: Vec<(u32, u8)> = Vec::new();
-    let mut cpg_calls: Vec<(u32, u8)> = Vec::new();
-    // Non-canonical groups: keyed by their MM header string (e.g. "C+h").
-    let mut other_calls: BTreeMap<String, Vec<(u32, u8)>> = BTreeMap::new();
+    // Per-call accumulator: (ma_type, verbatim_header, pos, qual). The
+    // header is owned because the regex capture's lifetime ends at the
+    // next iteration; the ma_type is a static interned name.
+    let mut calls: Vec<(&'static str, String, u32, u8)> = Vec::new();
     let mut num_mods_seen = 0usize;
 
     for cap in MM_RE.captures_iter(mm_text) {
+        // Capture group 2 is the full `base+strand+modtype` prefix —
+        // exactly the MM group header (e.g. "A+a", "T-a", "C+h", "N+12").
+        let header = cap.get(2).map_or("", |m| m.as_str()).to_string();
         let mod_base = cap.get(3).map(|m| m.as_str().as_bytes()[0]).unwrap();
-        let strand_sign = cap
-            .get(4)
-            .map_or("+", |m| m.as_str())
-            .chars()
-            .next()
-            .unwrap_or('+');
         let mod_type_str = cap.get(5).map_or("", |m| m.as_str()).to_string();
         let mod_dists_str = cap.get(6).map_or("", |m| m.as_str());
         let mod_dists: Vec<i64> = mod_dists_str
@@ -177,18 +217,18 @@ pub fn parse_mm_ml_into_ma(
         positions.truncate(resolved);
         let group_quals = &group_quals[..resolved];
 
-        // Filter + dispatch by mod_type. The canonical fiberseq codes are
-        // *exactly* "a" (m6A) and "m" (5mC) — any longer alpha mod type
-        // (`ac` acetyl, `pT` etc.) or ChEBI numeric ID is non-canonical
-        // and stored under its verbatim MM header so it round-trips
-        // exactly through write_mm_ml.
-        let bucket: &mut Vec<(u32, u8)> = match mod_type_str.as_str() {
-            "a" => &mut m6a_calls,
-            "m" => &mut cpg_calls,
-            _ => {
-                let key = format!("{}{}{}", mod_base as char, strand_sign, mod_type_str);
-                other_calls.entry(key).or_default()
-            }
+        // Canonical "a"/"m" → m6a/cpg; everything else is dropped with a
+        // warning. The per-call header travels into `Annotation.name`
+        // so write_mm_ml re-emits it verbatim (preserving A+a vs T-a,
+        // and non-standard encodings like N+a, on round-trip).
+        let Some(ma_type) = ma_type_for_mod_code(&mod_type_str) else {
+            log::warn!(
+                "MM/ML parser: unsupported mod-type {:?} (group {:?}); skipping {} call(s)",
+                mod_type_str,
+                header,
+                resolved,
+            );
+            continue;
         };
         for (pos, &qual) in positions.iter().copied().zip(group_quals) {
             if qual < min_ml_score {
@@ -198,7 +238,7 @@ pub fn parse_mm_ml_into_ma(
             if strip > 0 && (p < strip || p >= upper) {
                 continue;
             }
-            bucket.push((pos, qual));
+            calls.push((ma_type, header.clone(), pos, qual));
         }
     }
 
@@ -210,39 +250,43 @@ pub fn parse_mm_ml_into_ma(
         );
     }
 
-    add_calls(annot, M6A_TYPE, &mut m6a_calls);
-    add_calls(annot, CPG_TYPE, &mut cpg_calls);
-    for (name, mut calls) in other_calls {
-        add_calls(annot, &name, &mut calls);
+    // Group flat call list by MA type so each type's annotations land
+    // in the correct bucket on the spec object. Within a type, calls
+    // are sorted by position — even though different MM group headers
+    // (e.g. A+a and T-a) interleave under m6a, each call's `name`
+    // keeps its header for the write path.
+    let mut by_type: BTreeMap<&'static str, Vec<(String, u32, u8)>> = BTreeMap::new();
+    for (ma_type, header, pos, qual) in calls {
+        by_type.entry(ma_type).or_default().push((header, pos, qual));
+    }
+    for (ma_type, mut group) in by_type {
+        group.sort_by_key(|(_, p, _)| *p);
+        add_calls(annot, ma_type, &group);
     }
 }
 
-fn add_calls(annot: &mut MolecularAnnotations, name: &str, calls: &mut [(u32, u8)]) {
+fn add_calls(annot: &mut MolecularAnnotations, name: &str, calls: &[(String, u32, u8)]) {
     if calls.is_empty() {
         return;
     }
-    calls.sort_by_key(|(p, _)| *p);
     let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
     let t = annot.add_annotation_type(name, qspec);
-    for &(pos, qual) in calls.iter() {
-        t.add(pos, 1, Strand::Forward, vec![qual], None);
+    for (header, pos, qual) in calls {
+        t.add(*pos, 1, Strand::Forward, vec![*qual], Some(header.clone()));
     }
 }
 
 /// Emit MM/ML tags from `annot` onto `record`. Existing `MM` and `ML`
 /// aux are removed first.
 ///
-/// Sources:
-/// - [`M6A_TYPE`] / [`CPG_TYPE`] — canonical fiberseq types. MM groups
-///   reconstructed from the forward sequence (`A`→`A+a`, `T`→`T-a`,
-///   `C`→`C+m`, `G`→`G+m`). Calls landing on an unexpected base are
-///   emitted under that base with `+` strand and a warning.
-/// - Any other annotation type whose name is a valid MM group header
-///   (e.g. `"C+h"`, `"N+a"`, `"T+12"`) is emitted verbatim under that
-///   header. Skip counts are computed against the named base (`N`
-///   counts every position).
-/// - All other annotation types (`msp`, `nuc`, `fire`, etc.) are
-///   skipped — they are not base modifications.
+/// Header for each call is read directly from [`Annotation::name`].
+/// Every basemod annotation must carry a header — the parser sets it
+/// from the MM tag and programmatic producers set it via
+/// [`canonical_header`]. A `None` `name` on a basemod annotation is a
+/// caller bug and panics.
+///
+/// Non-basemod annotation types (`msp`, `nuc`, `fire`, etc.) are
+/// skipped — see [`is_basemod_type`] for the gate.
 ///
 /// MM groups are emitted in deterministic (lexicographic header) order.
 pub fn write_mm_ml(record: &mut bam::Record, annot: &MolecularAnnotations) {
@@ -252,56 +296,24 @@ pub fn write_mm_ml(record: &mut bam::Record, annot: &MolecularAnnotations) {
         record.seq().as_bytes()
     };
 
-    // header (e.g. "A+a", "C+h") → Vec<(pos, qual)>. BTreeMap gives
+    // header (e.g. "A+a", "T-a") → Vec<(pos, qual)>. BTreeMap gives
     // deterministic emission order.
     let mut groups: BTreeMap<String, Vec<(u32, u8)>> = BTreeMap::new();
 
-    // Canonical types: reconstruct (base, strand) per call from forward seq.
-    for (type_name, mod_type_char, canonical) in [
-        (M6A_TYPE, 'a', &[(b'A', '+'), (b'T', '-')] as &[(u8, char)]),
-        (CPG_TYPE, 'm', &[(b'C', '+'), (b'G', '+')] as &[(u8, char)]),
-    ] {
-        let Some(t) = annot.get_type(type_name) else {
+    for t in &annot.annotation_types {
+        if !is_basemod_type(&t.name) {
             continue;
-        };
+        }
         for a in &t.annotations {
-            let seq_base = forward_seq.get(a.start as usize).copied().unwrap_or(b'N');
-            let (group_base, group_strand) = canonical
-                .iter()
-                .find(|&&(b, _)| b == seq_base)
-                .copied()
-                .unwrap_or_else(|| {
-                    log::warn!(
-                        "{} call at pos {} on unexpected base {:?}; emitting as {}{}{}",
-                        type_name,
-                        a.start,
-                        seq_base as char,
-                        seq_base as char,
-                        '+',
-                        mod_type_char,
-                    );
-                    (seq_base, '+')
-                });
-            let header = format!("{}{}{}", group_base as char, group_strand, mod_type_char);
+            let header = a.name.clone().unwrap_or_else(|| {
+                panic!(
+                    "basemod annotation in type {:?} at pos {} has no MM group header; \
+                     producers must set Annotation.name via canonical_header()",
+                    t.name, a.start,
+                )
+            });
             let qual = a.qualities.first().copied().unwrap_or(0);
             groups.entry(header).or_default().push((a.start, qual));
-        }
-    }
-
-    // Non-canonical types: name is the MM group header (e.g. "C+h").
-    for t in annot.annotation_types.iter() {
-        if t.name == M6A_TYPE || t.name == CPG_TYPE {
-            continue;
-        }
-        if !is_valid_mm_header(&t.name) {
-            continue;
-        }
-        for a in &t.annotations {
-            let qual = a.qualities.first().copied().unwrap_or(0);
-            groups
-                .entry(t.name.clone())
-                .or_default()
-                .push((a.start, qual));
         }
     }
 
@@ -340,15 +352,3 @@ pub fn write_mm_ml(record: &mut bam::Record, annot: &MolecularAnnotations) {
         .expect("push ML tag");
 }
 
-/// True if `name` looks like an MM group header: one canonical base
-/// (`ACGTUN`), a strand sign, then a non-empty alphanumeric mod type.
-fn is_valid_mm_header(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    if bytes.len() < 3 {
-        return false;
-    }
-    let base_ok = matches!(bytes[0], b'A' | b'C' | b'G' | b'T' | b'U' | b'N');
-    let strand_ok = bytes[1] == b'+' || bytes[1] == b'-';
-    let mod_ok = bytes[2..].iter().all(|b| b.is_ascii_alphanumeric());
-    base_ok && strand_ok && mod_ok
-}

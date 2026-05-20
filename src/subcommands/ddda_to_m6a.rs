@@ -21,18 +21,21 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
         forward_seq = revcomp(&forward_seq);
     }
 
-    // get the bases that will be modified
-    let mut modified_bases_forward: Vec<u32> = vec![];
+    // Positions to mark as m6a, paired with the canonical post-Y/R base
+    // they land on (T for Y, A for R) in molecular orientation. We carry
+    // the base alongside the position so the write path knows the right
+    // MM group header without re-indexing the (possibly revcomp'd) seq.
+    let mut modified_bases_forward: Vec<(u32, u8)> = vec![];
     let mut y_count = 0;
     let mut r_count = 0;
     let mut new_forward_seq = vec![];
     for (idx, bp) in forward_seq.iter().enumerate() {
         if bp == &b'Y' {
-            modified_bases_forward.push(idx as u32);
+            modified_bases_forward.push((idx as u32, b'T'));
             y_count += 1;
             new_forward_seq.push(b'T');
         } else if bp == &b'R' {
-            modified_bases_forward.push(idx as u32);
+            modified_bases_forward.push((idx as u32, b'A'));
             r_count += 1;
             new_forward_seq.push(b'A');
         } else {
@@ -57,9 +60,9 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
 
     // Load existing MM/ML into a MolecularAnnotations, drop any
     // pre-existing m6a (we're replacing it with the Y/R-derived calls),
-    // then append the synthesized m6a and write back. write_mm_ml
-    // reconstructs the canonical group (A+a vs T-a) from the now-replaced
-    // forward seq.
+    // then append the synthesized m6a and write back. Each call gets
+    // its canonical MM group header (A+a or T-a) tagged via
+    // `canonical_header` so `write_mm_ml` can emit the right groups.
     let mut annot = MolecularAnnotations::from_record(record);
     basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
     annot
@@ -67,8 +70,10 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
         .retain(|t| t.name != basemods::M6A_TYPE);
     let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
     let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
-    for pos in modified_bases_forward {
-        t.add(pos, 1, Strand::Forward, vec![255], None);
+    for (pos, base) in modified_bases_forward {
+        let header = basemods::canonical_header(basemods::M6A_TYPE, base)
+            .expect("ddda_to_m6a only places calls on A/T bases");
+        t.add(pos, 1, Strand::Forward, vec![255], Some(header.to_string()));
     }
     basemods::write_mm_ml(record, &annot);
 }

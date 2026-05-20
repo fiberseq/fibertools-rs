@@ -1,6 +1,8 @@
 use env_logger::{Builder, Target};
-use fibertools_rs::utils::basemods::{parse_mm_ml_into_ma, write_mm_ml, CPG_TYPE, M6A_TYPE};
-use molecular_annotation::MolecularAnnotations;
+use fibertools_rs::utils::basemods::{
+    canonical_header, parse_mm_ml_into_ma, write_mm_ml, CPG_TYPE, M6A_TYPE,
+};
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::{bam, bam::Read};
 
@@ -29,134 +31,47 @@ fn test_mods_round_trip() {
     }
 }
 
-/// Non-canonical MM groups (e.g. `C+h`, 5hmC) must survive round-trip
-/// through `parse_mm_ml_into_ma` and `write_mm_ml`. The legacy
-/// `BaseMods` preserved arbitrary mod types; the new path stores them
-/// as annotation types named after the MM group header.
+/// Unknown mod-type codes (anything other than `"a"` / `"m"` —
+/// including single-char like `C+h` and multi-char like `C+ac`) are
+/// dropped on parse with a warning. We don't store them as their own
+/// annotation type; fibertools-rs's typed API only covers m6a and cpg.
 #[test]
-fn test_non_canonical_mod_round_trip() {
-    // Load any record to get a real sequence, then overwrite MM/ML with
-    // a synthetic non-canonical tag set.
+fn test_unknown_modtype_warns_and_skips() {
     let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
     let mut rec = bam.records().next().expect("all.bam has records").unwrap();
 
-    // Find the first three C positions in the forward sequence to place
-    // hypothetical 5hmC calls on.
+    // Pick the first C in forward orientation to attach a single C+h
+    // call to. Then append a real C+m call so we can confirm the unknown
+    // group doesn't break ML alignment for the canonical one.
     let fwd = if rec.is_reverse() {
         bio::alphabets::dna::revcomp(rec.seq().as_bytes())
     } else {
         rec.seq().as_bytes()
     };
-    let c_positions: Vec<usize> = fwd
+    let _first_c = fwd
         .iter()
-        .enumerate()
-        .filter(|(_, &b)| b == b'C' || b == b'c')
-        .take(3)
-        .map(|(i, _)| i)
-        .collect();
-    assert!(c_positions.len() >= 3, "need at least 3 C bases");
+        .position(|&b| b == b'C')
+        .expect("seq has a C");
 
-    // Build a `C+h,...;` MM tag pointing at those C positions and
-    // matching ML qualities.
-    let mut skips: Vec<usize> = Vec::with_capacity(3);
-    let mut c_count = 0usize;
-    let mut next_target = 0;
-    for (i, &b) in fwd.iter().enumerate() {
-        if next_target >= c_positions.len() {
-            break;
-        }
-        if i == c_positions[next_target] {
-            skips.push(c_count);
-            c_count = 0;
-            next_target += 1;
-        } else if b == b'C' || b == b'c' {
-            c_count += 1;
-        }
-    }
-    let mm = format!("C+h,{},{},{};", skips[0], skips[1], skips[2]);
-    let ml: Vec<u8> = vec![200, 150, 100];
-
+    // C+h,0; then C+m,0; — both attach to the first C in the seq.
+    let mm = "C+h,0;C+m,0;";
+    let ml: Vec<u8> = vec![123, 200];
     rec.remove_aux(b"MM").ok();
     rec.remove_aux(b"ML").ok();
-    rec.push_aux(b"MM", Aux::String(&mm)).unwrap();
-    rec.push_aux(b"ML", Aux::ArrayU8((&ml).into())).unwrap();
-
-    // Parse → write → re-parse, then assert C+h positions and qualities
-    // round-trip.
-    let mut a = MolecularAnnotations::from_record(&rec);
-    parse_mm_ml_into_ma(&rec, &mut a, 0, 0);
-    let a_ch = a.get_type("C+h").expect("C+h type present after parse");
-    assert_eq!(a_ch.annotations.len(), 3);
-
-    write_mm_ml(&mut rec, &a);
-    let mut b = MolecularAnnotations::from_record(&rec);
-    parse_mm_ml_into_ma(&rec, &mut b, 0, 0);
-
-    assert_eq!(a.get_type("C+h"), b.get_type("C+h"));
-}
-
-/// Canonical dispatch is on the exact mod-type code (`"a"` / `"m"`),
-/// not the first character. A multi-char alpha mod type like `C+ac`
-/// (acetylation) starts with `'a'` but must NOT route into `m6a`; it
-/// must be preserved verbatim as a `"C+ac"` annotation type.
-#[test]
-fn test_multichar_alpha_modtype_not_treated_as_canonical() {
-    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
-    let mut rec = bam.records().next().expect("all.bam has records").unwrap();
-
-    let fwd = if rec.is_reverse() {
-        bio::alphabets::dna::revcomp(rec.seq().as_bytes())
-    } else {
-        rec.seq().as_bytes()
-    };
-    let c_positions: Vec<usize> = fwd
-        .iter()
-        .enumerate()
-        .filter(|(_, &b)| b == b'C' || b == b'c')
-        .take(2)
-        .map(|(i, _)| i)
-        .collect();
-    assert!(c_positions.len() >= 2);
-    let mut skips: Vec<usize> = Vec::with_capacity(2);
-    let mut c_count = 0usize;
-    let mut next_target = 0;
-    for (i, &b) in fwd.iter().enumerate() {
-        if next_target >= c_positions.len() {
-            break;
-        }
-        if i == c_positions[next_target] {
-            skips.push(c_count);
-            c_count = 0;
-            next_target += 1;
-        } else if b == b'C' || b == b'c' {
-            c_count += 1;
-        }
-    }
-    let mm = format!("C+ac,{},{};", skips[0], skips[1]);
-    let ml: Vec<u8> = vec![180, 220];
-
-    rec.remove_aux(b"MM").ok();
-    rec.remove_aux(b"ML").ok();
-    rec.push_aux(b"MM", Aux::String(&mm)).unwrap();
+    rec.push_aux(b"MM", Aux::String(mm)).unwrap();
     rec.push_aux(b"ML", Aux::ArrayU8((&ml).into())).unwrap();
 
     let mut a = MolecularAnnotations::from_record(&rec);
     parse_mm_ml_into_ma(&rec, &mut a, 0, 0);
 
-    // Must land in its own type, not in m6a.
-    assert!(
-        a.get_type(M6A_TYPE).is_none(),
-        "C+ac must not be routed to m6a"
-    );
-    let acetyl = a.get_type("C+ac").expect("C+ac type present after parse");
-    assert_eq!(acetyl.annotations.len(), 2);
-
-    // And round-trips through write_mm_ml unchanged.
-    write_mm_ml(&mut rec, &a);
-    let mut b = MolecularAnnotations::from_record(&rec);
-    parse_mm_ml_into_ma(&rec, &mut b, 0, 0);
-    assert_eq!(a.get_type("C+ac"), b.get_type("C+ac"));
-    assert!(b.get_type(M6A_TYPE).is_none());
+    // C+h must be dropped entirely — no "C+h" type, no m6a leakage.
+    assert!(a.get_type("C+h").is_none(), "C+h must not be stored");
+    assert!(a.get_type(M6A_TYPE).is_none(), "C+h must not leak into m6a");
+    // C+m still landed under cpg with the correct quality — proving the
+    // ML offset wasn't desynced by the skipped C+h group.
+    let cpg = a.get_type(CPG_TYPE).expect("C+m landed under cpg");
+    assert_eq!(cpg.annotations.len(), 1);
+    assert_eq!(cpg.annotations[0].qualities, vec![200]);
 }
 
 /// A malformed MM tag — claiming more `mod_base` positions than the
@@ -252,4 +167,111 @@ fn test_parse_mm_ml_idempotent_on_rerun() {
         once_m6a,
         "stale m6a must be replaced by MM/ML, not merged"
     );
+}
+
+/// `N+a` headers must be preserved verbatim through parse→write. Per the
+/// SAM spec, `N` matches any base for distance counting; the old write
+/// path silently rewrote `N+a` to `A+a;T-a` based on the underlying
+/// sequence. The refactor stores each call's MM header on
+/// `Annotation.name`, so the literal `N+a` survives.
+#[test]
+fn test_n_plus_a_preserved_verbatim() {
+    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let mut rec = bam.records().next().expect("all.bam has records").unwrap();
+
+    // N+a,0,0,0; marks the first three positions of the forward sequence
+    // regardless of base. With three zero skips, parse resolves to
+    // positions [0, 1, 2]. The same encoding round-trips on write
+    // because the skip-base is N (every base counts).
+    let mm = "N+a,0,0,0;";
+    let ml: Vec<u8> = vec![210, 220, 230];
+
+    rec.remove_aux(b"MM").ok();
+    rec.remove_aux(b"ML").ok();
+    rec.push_aux(b"MM", Aux::String(mm)).unwrap();
+    rec.push_aux(b"ML", Aux::ArrayU8((&ml).into())).unwrap();
+
+    let mut a = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut a, 0, 0);
+
+    let m6a = a.get_type(M6A_TYPE).expect("N+a routes to m6a");
+    assert_eq!(m6a.annotations.len(), 3);
+    // Every annotation should carry the verbatim header `N+a` on its name.
+    for ann in &m6a.annotations {
+        assert_eq!(ann.name.as_deref(), Some("N+a"));
+    }
+
+    write_mm_ml(&mut rec, &a);
+    let written_mm = match rec.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM tag must be a string"),
+    };
+    assert_eq!(
+        written_mm, "N+a,0,0,0;",
+        "N+a must round-trip verbatim, not get normalized to A+a/T-a"
+    );
+
+    // And re-parsing yields the same annotation set.
+    let mut b = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut b, 0, 0);
+    assert_eq!(a.get_type(M6A_TYPE), b.get_type(M6A_TYPE));
+}
+
+/// Programmatic producers (`predict_m6a`, `ddda_to_m6a`) tag each m6a
+/// call with its canonical MM group header via `canonical_header`
+/// before adding it to the annotation. This test mirrors that pattern
+/// and confirms `write_mm_ml` emits the right groups.
+#[test]
+fn test_predictor_set_headers_round_trip() {
+    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let mut rec = bam.records().next().expect("all.bam has records").unwrap();
+
+    let fwd = if rec.is_reverse() {
+        bio::alphabets::dna::revcomp(rec.seq().as_bytes())
+    } else {
+        rec.seq().as_bytes()
+    };
+    let first_a = fwd.iter().position(|&b| b == b'A').expect("seq has an A") as u32;
+    let first_t = fwd.iter().position(|&b| b == b'T').expect("seq has a T") as u32;
+
+    rec.remove_aux(b"MM").ok();
+    rec.remove_aux(b"ML").ok();
+    let mut annot = MolecularAnnotations::from_record(&rec);
+    let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
+    let t = annot.add_annotation_type(M6A_TYPE, qspec);
+    // Each predictor-emitted call carries its canonical header.
+    let a_header = canonical_header(M6A_TYPE, b'A').unwrap();
+    let t_header = canonical_header(M6A_TYPE, b'T').unwrap();
+    t.add(
+        first_a,
+        1,
+        Strand::Forward,
+        vec![150],
+        Some(a_header.to_string()),
+    );
+    t.add(
+        first_t,
+        1,
+        Strand::Forward,
+        vec![160],
+        Some(t_header.to_string()),
+    );
+
+    write_mm_ml(&mut rec, &annot);
+    let written_mm = match rec.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM tag must be a string"),
+    };
+    assert!(written_mm.contains("A+a,"), "got: {written_mm}");
+    assert!(written_mm.contains("T-a,"), "got: {written_mm}");
+
+    // Re-parse and confirm positions+qualities survived.
+    let mut b = MolecularAnnotations::from_record(&rec);
+    parse_mm_ml_into_ma(&rec, &mut b, 0, 0);
+    let m6a = b.get_type(M6A_TYPE).expect("m6a present after re-parse");
+    let mut positions: Vec<u32> = m6a.annotations.iter().map(|a| a.start).collect();
+    positions.sort();
+    let mut want = vec![first_a, first_t];
+    want.sort();
+    assert_eq!(positions, want);
 }
