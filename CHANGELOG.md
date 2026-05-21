@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.0] - 2026-05-21
 
 ### 🚀 New subcommands
 
@@ -20,12 +20,14 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug fixes
 
 - **fa:Z extras pairing on reverse-strand reads with overlapping/shared-start peaks (follow-up to #103)**: when multiple BED annotations share a query start position on a reverse-strand read, the post-hoc `ann_vals.reverse()` step in `FiberAnnotations::from_bam_tags` did not produce a permutation equivalent to the stable sort over flipped coordinates, scrambling the fa:Z extras (e.g. peak names/lengths) relative to their fs/fl annotations on extraction. Fix pre-pairs extras with annotations before the flip+sort so the permutation is consistent. BAM encodings were always correct; the bug only affected extraction. Affects v0.8.0–v0.8.2.
+- **`hp` tag parsing accepts all integer widths.** longcalld writes `hp` as a 32-bit integer; the previous code only accepted one width and would error on those reads. `hp` is not in the SAM aux spec, so we now accept any integer type. (#108)
 
 ### 🧪 Tests
 
 - `tests/call_peaks_test.rs`: end-to-end coverage of the new peak caller.
 - `tests/fibertig_test.rs`: regression test for the fa:Z reverse-strand shared-start pairing bug, using Anna Minkina's exact failing input.
 - Unit tests in `src/utils/input_bam.rs` covering `passes_fire_filter` semantics: skip-no-m6a behavior, min-msp, min-ave-msp-size, the `--fire-filter` combo, and explicit-flag overrides.
+- **Regression test harness via `insta` snapshots** (`tests/regression/`, #106). Covers `ft extract --m6a/--nuc/--msp/--all`, `ft center`, `ft qc`, `ft pileup`, and `ft fire --extract` against the existing test BAMs. Update workflow documented in `CONTRIBUTING.md`. 
 
 ### ⚡ Performance
 
