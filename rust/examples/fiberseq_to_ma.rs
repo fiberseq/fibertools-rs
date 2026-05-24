@@ -12,7 +12,7 @@
 //! Or with a custom input file:
 //!   cargo run --example fiberseq_to_ma -- path/to/file.cram
 
-use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{MaEncoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
 use std::env;
@@ -149,7 +149,7 @@ fn main() {
             }
 
             // M2/AL tags: alternative separate format for compression comparison
-            annotations.set_encoding(Encoding::Separate);
+            annotations.set_ma_encoding(MaEncoding::Separate);
             let m2_string = annotations.to_ma_string();
             let al_array: Vec<u32> = annotations.to_al_array();
             record

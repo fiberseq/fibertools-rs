@@ -101,7 +101,7 @@ fn test_builder_pattern() {
 fn test_to_ma_string_inline() {
     // Internal coords are 0-based, MA tag uses 1-based
     let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_encoding(Encoding::Inline);
+    annotations.set_ma_encoding(MaEncoding::Inline);
     annotations
         .add_annotation_type("msp", "P".parse().unwrap())
         .add(99, 50, Strand::Forward, vec![40], None)   // 0-based 99 -> 1-based 100 in tag
@@ -114,7 +114,7 @@ fn test_to_ma_string_inline() {
 fn test_to_ma_string_separate() {
     // Internal coords are 0-based, MA tag uses 1-based
     let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_encoding(Encoding::Separate);
+    annotations.set_ma_encoding(MaEncoding::Separate);
     annotations
         .add_annotation_type("msp", "P".parse().unwrap())
         .add(99, 50, Strand::Forward, vec![40], None)   // 0-based 99 -> 1-based 100 in tag
@@ -229,7 +229,7 @@ fn test_from_tags_inline() {
     let annotations = MolecularAnnotations::from_tags(ma, &[], Some(&aq), None).unwrap();
 
     assert_eq!(annotations.read_length, 1000);
-    assert_eq!(annotations.encoding(), Encoding::Inline);
+    assert_eq!(annotations.ma_encoding(), MaEncoding::Inline);
 
     let msp = &annotations.annotation_types[0];
     assert_eq!(msp.annotations.len(), 2);
@@ -304,7 +304,7 @@ fn test_from_tags_with_names() {
 #[test]
 fn test_roundtrip_separate() {
     let mut original = MolecularAnnotations::new(1000);
-    original.set_encoding(Encoding::Separate);
+    original.set_ma_encoding(MaEncoding::Separate);
     original
         .add_annotation_type("msp", "P".parse().unwrap())
         .add(99, 50, Strand::Forward, vec![40], Some("first".to_string()))
@@ -345,7 +345,7 @@ fn test_roundtrip_separate() {
 #[test]
 fn test_roundtrip_inline() {
     let mut original = MolecularAnnotations::new(1000);
-    original.set_encoding(Encoding::Inline);
+    original.set_ma_encoding(MaEncoding::Inline);
     original
         .add_annotation_type("msp", "P".parse().unwrap())
         .add(99, 50, Strand::Forward, vec![40], None)
@@ -363,7 +363,7 @@ fn test_roundtrip_inline() {
     .unwrap();
 
     assert_eq!(original.read_length, parsed.read_length);
-    assert_eq!(parsed.encoding(), Encoding::Inline);
+    assert_eq!(parsed.ma_encoding(), MaEncoding::Inline);
 
     let orig_msp = &original.annotation_types[0];
     let parsed_msp = &parsed.annotation_types[0];
@@ -374,7 +374,7 @@ fn test_roundtrip_inline() {
 #[test]
 fn test_roundtrip_multi_quality() {
     let mut original = MolecularAnnotations::new(1000);
-    original.set_encoding(Encoding::Inline);
+    original.set_ma_encoding(MaEncoding::Inline);
     let pq = QualitySpec::from_str("PQ").unwrap();
     original
         .add_annotation_type("msp", pq)
@@ -1391,7 +1391,7 @@ fn test_retain_updates_serialization() {
     // After retain, the on-disk MA/AL/AQ tags should reflect only the
     // surviving annotations and respect strand-grouped section order.
     let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_encoding(Encoding::Inline);
+    annotations.set_ma_encoding(MaEncoding::Inline);
     annotations
         .add_annotation_type("msp", "P".parse().unwrap())
         .add(99, 50, Strand::Forward, vec![40], None)    // MA tag pos 100
@@ -1474,4 +1474,383 @@ fn test_retain_with_reference_coords_via_aligned_blocks() {
     assert_eq!(msp.annotations.len(), 2);
     assert_eq!(msp.annotations[0].start, 200);
     assert_eq!(msp.annotations[1].start, 450);
+}
+
+#[test]
+fn encoding_default_is_ma() {
+    use crate::Encoding;
+    assert_eq!(Encoding::default(), Encoding::Ma);
+}
+
+#[test]
+fn skip_flag_variants_exist() {
+    use crate::SkipFlag;
+    let _ = SkipFlag::Implicit;
+    let _ = SkipFlag::LowProbability;
+    let _ = SkipFlag::Unknown;
+}
+
+#[test]
+fn annotation_type_default_encoding_is_ma() {
+    use crate::{AnnotationType, QualitySpec};
+    let at = AnnotationType::new("msp", "P".parse::<QualitySpec>().unwrap());
+    assert_eq!(at.encoding, crate::Encoding::Ma);
+    assert!(!at.is_mm_ml());
+}
+
+#[test]
+fn set_encoding_on_empty_type_works() {
+    use crate::{AnnotationType, Encoding, QualitySpec, SkipFlag};
+    let mut at = AnnotationType::new("a", "Q".parse::<QualitySpec>().unwrap());
+    at.set_encoding(Encoding::MmMl { skip_flag: SkipFlag::Implicit });
+    assert!(at.is_mm_ml());
+}
+
+#[test]
+#[should_panic(expected = "cannot change encoding")]
+fn set_encoding_panics_on_non_empty_type() {
+    use crate::{AnnotationType, Encoding, QualitySpec, SkipFlag, Strand};
+    let mut at = AnnotationType::new("a", "Q".parse::<QualitySpec>().unwrap());
+    at.add(10, 1, Strand::Forward, vec![40], None);
+    at.set_encoding(Encoding::MmMl { skip_flag: SkipFlag::Implicit });
+}
+
+#[test]
+fn mm_ml_types_filters_correctly() {
+    use crate::{Encoding, MolecularAnnotations, QualitySpec, SkipFlag};
+    let mut annot = MolecularAnnotations::new(1000);
+    annot.add_annotation_type("msp", "P".parse::<QualitySpec>().unwrap());
+    annot
+        .add_annotation_type("a", "Q".parse::<QualitySpec>().unwrap())
+        .set_encoding(Encoding::MmMl { skip_flag: SkipFlag::Implicit });
+
+    let mm_names: Vec<&str> = annot.mm_ml_types().map(|t| t.name.as_str()).collect();
+    assert_eq!(mm_names, vec!["a"]);
+}
+
+#[test]
+fn to_ma_parts_inline() {
+    use crate::{AnnotationType, MaEncoding, QualitySpec, Strand};
+    let mut at = AnnotationType::new("msp", "P".parse::<QualitySpec>().unwrap());
+    at.add(99, 50, Strand::Forward, vec![40], None);
+    at.add(199, 60, Strand::Forward, vec![35], None);
+
+    let parts = at.to_ma_parts(MaEncoding::Inline).unwrap();
+    assert_eq!(parts.ma_section, ";msp+P:100-50,200-60");
+    assert!(parts.al_values.is_empty());
+    assert_eq!(parts.aq_values, vec![40, 35]);
+    assert_eq!(parts.an_values, vec![String::new(), String::new()]);
+}
+
+#[test]
+fn to_ma_parts_returns_none_for_mm_ml_type() {
+    use crate::{AnnotationType, Encoding, MaEncoding, QualitySpec, SkipFlag};
+    let mut at = AnnotationType::new("a", "Q".parse::<QualitySpec>().unwrap());
+    at.set_encoding(Encoding::MmMl { skip_flag: SkipFlag::Implicit });
+    assert!(at.to_ma_parts(MaEncoding::Inline).is_none());
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_simple_a_plus_a() {
+    use crate::{Encoding, MolecularAnnotations, SkipFlag, Strand};
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(
+        b"read1",
+        None,
+        b"ACAGAA",
+        &vec![255u8; 6],
+    );
+    // A positions in "ACAGAA": 0, 2, 4, 5.
+    // MM "A+a,1,0,0;" → skip 1 A → A at idx 2; skip 0 → A at idx 4; skip 0 → A at idx 5.
+    // ML qualities: 200, 150, 100.
+    record.push_aux(b"MM", Aux::String("A+a,1,0,0;")).unwrap();
+    record.push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100][..]).into())).unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    let a_type = annot.get_type("a").expect("type 'a' present");
+    assert!(matches!(a_type.encoding, Encoding::MmMl { skip_flag: SkipFlag::Implicit }));
+    assert_eq!(a_type.annotations.len(), 3);
+    let starts: Vec<u32> = a_type.annotations.iter().map(|a| a.start).collect();
+    assert_eq!(starts, vec![2, 4, 5]);
+    let strands: Vec<Strand> = a_type.annotations.iter().map(|a| a.strand).collect();
+    assert!(strands.iter().all(|s| *s == Strand::Forward));
+    let names: Vec<&str> = a_type
+        .annotations
+        .iter()
+        .map(|a| a.name.as_deref().unwrap())
+        .collect();
+    assert_eq!(names, vec!["A", "A", "A"]);
+    let quals: Vec<u8> = a_type
+        .annotations
+        .iter()
+        .flat_map(|a| a.qualities.iter().copied())
+        .collect();
+    assert_eq!(quals, vec![200, 150, 100]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_t_minus_a_is_reverse_strand() {
+    use crate::{MolecularAnnotations, Strand};
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"ATATAT", &vec![255u8; 6]);
+    record.push_aux(b"MM", Aux::String("T-a,0,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let t = annot.get_type("a").unwrap();
+    assert!(t.annotations.iter().all(|a| a.strand == Strand::Reverse));
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_multimod_c_plus_mh_splits_into_two_types() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"CCCCCC", &vec![255u8; 6]);
+    // 2 C-positions × 2 codes = 4 ML bytes; interleaved [m1, h1, m2, h2].
+    record.push_aux(b"MM", Aux::String("C+mh,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![10u8, 20, 30, 40][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let m = annot.get_type("m").unwrap();
+    let h = annot.get_type("h").unwrap();
+    let m_quals: Vec<u8> = m.annotations.iter().flat_map(|a| a.qualities.iter().copied()).collect();
+    let h_quals: Vec<u8> = h.annotations.iter().flat_map(|a| a.qualities.iter().copied()).collect();
+    assert_eq!(m_quals, vec![10, 30]);
+    assert_eq!(h_quals, vec![20, 40]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_numeric_chebi_code_kept_intact() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"CCC", &vec![255u8; 3]);
+    record.push_aux(b"MM", Aux::String("C+76792,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![50u8, 60][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    assert!(annot.get_type("76792").is_some());
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_n_wildcard_skip_base() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"ACGT", &vec![255u8; 4]);
+    record.push_aux(b"MM", Aux::String("N+a,0,1;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![100u8, 200][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let t = annot.get_type("a").unwrap();
+    let starts: Vec<u32> = t.annotations.iter().map(|a| a.start).collect();
+    // First N-match → idx 0 (A), then skip 1 (skip idx 1 'C'), next at idx 2 ('G').
+    assert_eq!(starts, vec![0, 2]);
+    let names: Vec<String> = t
+        .annotations
+        .iter()
+        .map(|a| a.name.clone().unwrap())
+        .collect();
+    assert_eq!(names, vec!["N".to_string(), "N".to_string()]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_skip_flag_dot_preserved() {
+    use crate::{Encoding, MolecularAnnotations, SkipFlag};
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAA", &vec![255u8; 3]);
+    record.push_aux(b"MM", Aux::String("A+a.,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![100u8, 200][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let t = annot.get_type("a").unwrap();
+    assert_eq!(
+        t.encoding,
+        Encoding::MmMl { skip_flag: SkipFlag::LowProbability }
+    );
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn parse_ml_shorter_than_mm_pads_with_zero() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAA", &vec![255u8; 3]);
+    record.push_aux(b"MM", Aux::String("A+a,0,0,0;")).unwrap();
+    // ML has 2 bytes; MM expects 3.
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![100u8, 200][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let t = annot.get_type("a").unwrap();
+    let quals: Vec<u8> = t.annotations.iter().flat_map(|a| a.qualities.iter().copied()).collect();
+    assert_eq!(quals, vec![100, 200, 0]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn to_mm_ml_parts_simple() {
+    use crate::{AnnotationType, Encoding, QualitySpec, SkipFlag, Strand};
+    let mut at = AnnotationType::new("a", "Q".parse::<QualitySpec>().unwrap());
+    at.set_encoding(Encoding::MmMl {
+        skip_flag: SkipFlag::Implicit,
+    });
+    // Forward sequence "ACAGAA". A positions: 0, 2, 4, 5.
+    // Add m6a calls at 2 and 5.
+    at.add(2, 1, Strand::Forward, vec![200], Some("A".into()));
+    at.add(5, 1, Strand::Forward, vec![100], Some("A".into()));
+
+    let parts = at.to_mm_ml_parts(b"ACAGAA").unwrap();
+    assert_eq!(parts.mm_groups.len(), 1);
+    assert_eq!(parts.mm_groups[0].header, "A+a");
+    // From start, skip 1 A (idx 0) to reach idx 2 -> delta 1.
+    // From idx 2 (excl.), skip 1 A (idx 4) to reach idx 5 -> delta 1.
+    assert_eq!(parts.mm_groups[0].deltas, vec![1, 1]);
+    assert_eq!(parts.ml_bytes_in_order, vec![200, 100]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn to_mm_ml_parts_returns_none_for_ma_type() {
+    use crate::{AnnotationType, QualitySpec};
+    let at = AnnotationType::new("msp", "P".parse::<QualitySpec>().unwrap());
+    assert!(at.to_mm_ml_parts(b"ACGT").is_none());
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_basic() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
+    record.push_aux(b"MM", Aux::String("A+a,1,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+
+    // Drop existing MM/ML to verify to_record re-emits.
+    let mut out = record.clone();
+    out.remove_aux(b"MM").unwrap();
+    out.remove_aux(b"ML").unwrap();
+    annot.to_record(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    let ml: Vec<u8> = match out.aux(b"ML").unwrap() {
+        Aux::ArrayU8(a) => a.iter().collect(),
+        _ => panic!("ML not u8 array"),
+    };
+    assert_eq!(mm, "A+a,1,0,0;");
+    assert_eq!(ml, vec![200, 150, 100]);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_ma_and_mm_ml_no_cross_contamination() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAAA", &vec![255u8; 4]);
+    record.push_aux(b"MA", Aux::String("4;msp+P:1-2")).unwrap();
+    record.push_aux(b"AQ", Aux::ArrayU8((&vec![50u8][..]).into())).unwrap();
+    record.push_aux(b"MM", Aux::String("A+a,0;")).unwrap();
+    record.push_aux(b"ML", Aux::ArrayU8((&vec![200u8][..]).into())).unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    let mut out = Record::new();
+    out.set(b"r", None, b"AAAA", &vec![255u8; 4]);
+    annot.to_record(&mut out);
+
+    let ma = match out.aux(b"MA").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!(),
+    };
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!(),
+    };
+    assert!(ma.contains("msp"));
+    assert!(!ma.contains("A+a"));  // no MA leak into MM
+    assert!(mm.contains("A+a"));
+    assert!(!mm.contains("msp"));
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_is_fixed_point() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut r1 = Record::new();
+    r1.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
+    r1.push_aux(b"MM", Aux::String("A+a,1,0,0;")).unwrap();
+    r1.push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100][..]).into())).unwrap();
+
+    let annot1 = MolecularAnnotations::from_record(&r1);
+    let mut r2 = Record::new();
+    r2.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
+    annot1.to_record(&mut r2);
+
+    let annot2 = MolecularAnnotations::from_record(&r2);
+    let mut r3 = Record::new();
+    r3.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
+    annot2.to_record(&mut r3);
+
+    let mm2 = match r2.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!(),
+    };
+    let mm3 = match r3.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!(),
+    };
+    assert_eq!(mm2, mm3);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_empty_basemods_no_mm_emitted() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::Record;
+
+    let mut r = Record::new();
+    r.set(b"r", None, b"AAAA", &vec![255u8; 4]);
+    let annot = MolecularAnnotations::new(4);
+    annot.to_record(&mut r);
+    assert!(r.aux(b"MM").is_err());
+    assert!(r.aux(b"ML").is_err());
 }

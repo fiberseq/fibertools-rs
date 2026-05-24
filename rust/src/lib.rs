@@ -28,7 +28,7 @@
 //!
 //! # Example
 //! ```
-//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
+//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding};
 //!
 //! // Build annotations programmatically. Annotation type identity is keyed
 //! // on `name` alone — strand is a per-annotation property.
@@ -64,12 +64,12 @@
 //! // Serialize with inline encoding (start-length pairs in MA string).
 //! // Sections are emitted per (name, strand): types with annotations on
 //! // multiple strands produce multiple sections sharing the same name.
-//! annotations.set_encoding(Encoding::Inline);
+//! annotations.set_ma_encoding(MaEncoding::Inline);
 //! let ma_inline = annotations.to_ma_string();
 //! assert_eq!(ma_inline, "1000;msp+P:101-50,201-60;nuc+:151-147,351-147;fire.Q:501-75;ctcf+PQQP:601-20");
 //!
 //! // Serialize with separate encoding (starts in MA, lengths in AL array)
-//! annotations.set_encoding(Encoding::Separate);
+//! annotations.set_ma_encoding(MaEncoding::Separate);
 //! let ma_separate = annotations.to_ma_string();
 //! let al_array = annotations.to_al_array();
 //! assert_eq!(ma_separate, "1000;msp+P:101,201;nuc+:151,351;fire.Q:501;ctcf+PQQP:601");
@@ -118,10 +118,14 @@
 pub mod liftover;
 mod types;
 
+#[cfg(feature = "htslib")]
+mod basemods;
+
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
-    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, ParseError,
-    ProjectedAnnotation, QualityScaling, QualitySpec, Strand,
+    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaEncoding, MaParts,
+    MmGroup, MmMlParts, ParseError, ProjectedAnnotation, QualityScaling, QualitySpec, SkipFlag,
+    Strand,
 };
 
 use std::str::FromStr;
@@ -133,8 +137,8 @@ pub struct MolecularAnnotations {
     pub read_length: u32,
     /// All annotation types on this read
     pub annotation_types: Vec<AnnotationType>,
-    /// Encoding format for serialization
-    encoding: Encoding,
+    /// Encoding format for MA tag serialization
+    ma_encoding: MaEncoding,
     /// Optional aligned blocks for liftover calculations (private)
     aligned_blocks: Option<AlignedBlocks>,
     /// Whether the read is reverse-aligned. When true, MA coordinates
@@ -149,20 +153,20 @@ impl MolecularAnnotations {
         Self {
             read_length,
             annotation_types: Vec::new(),
-            encoding: Encoding::default(),
+            ma_encoding: MaEncoding::default(),
             aligned_blocks: None,
             is_reverse_aligned: false,
         }
     }
 
-    /// Get the current encoding format
-    pub fn encoding(&self) -> Encoding {
-        self.encoding
+    /// Get the current MA tag encoding format
+    pub fn ma_encoding(&self) -> MaEncoding {
+        self.ma_encoding
     }
 
-    /// Set the encoding format for serialization (returns &mut Self for chaining)
-    pub fn set_encoding(&mut self, encoding: Encoding) -> &mut Self {
-        self.encoding = encoding;
+    /// Set the MA tag encoding format for serialization (returns &mut Self for chaining)
+    pub fn set_ma_encoding(&mut self, encoding: MaEncoding) -> &mut Self {
+        self.ma_encoding = encoding;
         self
     }
 
@@ -353,6 +357,16 @@ impl MolecularAnnotations {
             .flat_map(|t| t.annotations.iter().map(move |a| (t, a)))
     }
 
+    /// Iterator over annotation types with `Encoding::MmMl`.
+    pub fn mm_ml_types(&self) -> impl Iterator<Item = &AnnotationType> {
+        self.annotation_types.iter().filter(|t| t.is_mm_ml())
+    }
+
+    /// Mutable iterator over annotation types with `Encoding::MmMl`.
+    pub fn mm_ml_types_mut(&mut self) -> impl Iterator<Item = &mut AnnotationType> {
+        self.annotation_types.iter_mut().filter(|t| t.is_mm_ml())
+    }
+
     /// Iterate over annotations for a specific type with full coordinate information.
     ///
     /// This method provides comprehensive information for each annotation including:
@@ -519,35 +533,15 @@ impl MolecularAnnotations {
             })
         })
     }
-    /// Section emission order for MA / AL / AQ / AN serialization.
+    /// Iterator over per-type [`MaParts`] for every MA-encoded annotation type.
     ///
-    /// For each annotation type (in insertion order), groups its annotations
-    /// by [`Strand`] in enum order (`Forward`, `Reverse`, `Unknown`). Each
-    /// non-empty group becomes one section. Within a group, annotation order
-    /// follows insertion order.
-    ///
-    /// Yields `(annotation_type, strand, indices)` where `indices` are
-    /// positions into `annotation_type.annotations`.
-    fn emission_sections(
-        &self,
-    ) -> impl Iterator<Item = (&AnnotationType, Strand, Vec<usize>)> + '_ {
-        const STRANDS: [Strand; 3] = [Strand::Forward, Strand::Reverse, Strand::Unknown];
-        self.annotation_types.iter().flat_map(|t| {
-            STRANDS.into_iter().filter_map(move |s| {
-                let indices: Vec<usize> = t
-                    .annotations
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, a)| a.strand == s)
-                    .map(|(i, _)| i)
-                    .collect();
-                if indices.is_empty() {
-                    None
-                } else {
-                    Some((t, s, indices))
-                }
-            })
-        })
+    /// Types whose encoding is not `Encoding::Ma` are skipped (they don't
+    /// participate in MA-tag emission).
+    fn ma_parts_iter(&self) -> impl Iterator<Item = MaParts> + '_ {
+        let layout = self.ma_encoding;
+        self.annotation_types
+            .iter()
+            .filter_map(move |t| t.to_ma_parts(layout))
     }
 
     /// Generate the MA:Z tag string.
@@ -558,54 +552,38 @@ impl MolecularAnnotations {
     /// multiple strands emit multiple sections sharing the same `name`.
     /// Empty types emit no section.
     pub fn to_ma_string(&self) -> String {
-        let mut parts = vec![self.read_length.to_string()];
-
-        for (annot_type, strand, indices) in self.emission_sections() {
-            let positions: Vec<String> = match self.encoding {
-                Encoding::Inline => indices
-                    .iter()
-                    .map(|&i| {
-                        let a = &annot_type.annotations[i];
-                        format!("{}-{}", a.start + 1, a.length)
-                    })
-                    .collect(),
-                Encoding::Separate => indices
-                    .iter()
-                    .map(|&i| (annot_type.annotations[i].start + 1).to_string())
-                    .collect(),
-            };
-
-            parts.push(format!(
-                "{}:{}",
-                annot_type.type_signature(strand),
-                positions.join(",")
-            ));
+        let mut out = self.read_length.to_string();
+        for p in self.ma_parts_iter() {
+            // `ma_section` already starts with `;` (or is empty for an
+            // empty type — which can't actually happen since
+            // `to_ma_parts` would skip strands with no annotations, but
+            // a type with zero annotations would still hit this).
+            out.push_str(&p.ma_section);
         }
-
-        parts.join(";")
+        out
     }
 
     /// Generate the AL:B:I array (lengths). Order matches MA section order.
+    ///
+    /// Returns lengths for every annotation in every MA-encoded type,
+    /// regardless of the current `ma_encoding` setting. Callers that
+    /// only want lengths when serialized separately (e.g. [`to_tags`])
+    /// filter at the call site.
     pub fn to_al_array(&self) -> Vec<u32> {
-        self.emission_sections()
-            .flat_map(|(t, _strand, indices)| {
-                indices.into_iter().map(move |i| t.annotations[i].length)
-            })
+        // Force the `Separate` layout so per-type `MaParts.al_values` is
+        // populated even when `self.ma_encoding == Inline`. This matches
+        // the pre-refactor behavior of returning lengths unconditionally.
+        self.annotation_types
+            .iter()
+            .filter_map(|t| t.to_ma_parts(MaEncoding::Separate))
+            .flat_map(|p| p.al_values)
             .collect()
     }
 
     /// Generate the AQ:B:C array (None if no annotations have quality).
     /// Order matches MA section order.
     pub fn to_aq_array(&self) -> Option<Vec<u8>> {
-        let qualities: Vec<u8> = self
-            .emission_sections()
-            .filter(|(t, _, _)| t.quality_spec.has_quality())
-            .flat_map(|(t, _strand, indices)| {
-                indices
-                    .into_iter()
-                    .flat_map(move |i| t.annotations[i].qualities.iter().copied())
-            })
-            .collect();
+        let qualities: Vec<u8> = self.ma_parts_iter().flat_map(|p| p.aq_values).collect();
 
         if qualities.is_empty() {
             None
@@ -620,20 +598,14 @@ impl MolecularAnnotations {
         let has_any_names = self
             .annotation_types
             .iter()
+            .filter(|t| matches!(t.encoding, Encoding::Ma))
             .any(|t| t.annotations.iter().any(|a| a.name.is_some()));
 
         if !has_any_names {
             return None;
         }
 
-        let names: Vec<String> = self
-            .emission_sections()
-            .flat_map(|(t, _strand, indices)| {
-                indices
-                    .into_iter()
-                    .map(move |i| t.annotations[i].name.as_deref().unwrap_or("").to_string())
-            })
-            .collect();
+        let names: Vec<String> = self.ma_parts_iter().flat_map(|p| p.an_values).collect();
 
         Some(names.join(","))
     }
@@ -649,7 +621,7 @@ impl MolecularAnnotations {
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
@@ -664,7 +636,7 @@ impl MolecularAnnotations {
     /// ```
     pub fn to_tags(&self) -> (String, Vec<u32>, Option<Vec<u8>>, Option<String>) {
         let ma = self.to_ma_string();
-        let al = if matches!(self.encoding, Encoding::Separate) {
+        let al = if matches!(self.ma_encoding, MaEncoding::Separate) {
             self.to_al_array()
         } else {
             Vec::new()
@@ -689,6 +661,9 @@ impl MolecularAnnotations {
     ///
     /// This sets the MA:Z tag, and optionally AL:B:I, AQ:B:C, and AN:Z tags
     /// depending on the encoding format and whether quality/names are present.
+    /// Annotation types whose encoding is `MmMl` are emitted as MM:Z + ML:B,C
+    /// tags instead; any pre-existing MM/ML on the record are removed first,
+    /// and if there are no MM/ML-encoded types neither tag is emitted.
     ///
     /// # Example
     /// ```ignore
@@ -714,8 +689,7 @@ impl MolecularAnnotations {
 
         // Set AL tag (only for separate encoding)
         if !al.is_empty() {
-            let al_u32: Vec<u32> = al.iter().map(|&v| v as u32).collect();
-            record.push_aux(b"AL", Aux::ArrayU32((&al_u32).into())).ok();
+            record.push_aux(b"AL", Aux::ArrayU32((&al).into())).ok();
         }
 
         // Set AQ tag (if present)
@@ -726,6 +700,51 @@ impl MolecularAnnotations {
         // Set AN tag (if present)
         if let Some(ref an_str) = an {
             record.push_aux(b"AN", Aux::String(an_str)).ok();
+        }
+
+        // --- MM/ML assembly ---
+        let forward_seq: Vec<u8> = if record.is_reverse() {
+            bio::alphabets::dna::revcomp(record.seq().as_bytes())
+        } else {
+            record.seq().as_bytes()
+        };
+
+        // Collect per-type MM parts and pair groups with their ML byte slices.
+        let mut all_groups: Vec<(crate::MmGroup, Vec<u8>)> = Vec::new();
+        for t in self.annotation_types.iter().filter(|t| t.is_mm_ml()) {
+            if let Some(parts) = t.to_mm_ml_parts(&forward_seq) {
+                let mut cursor = 0usize;
+                for g in parts.mm_groups {
+                    let n = g.deltas.len();
+                    let slice = parts.ml_bytes_in_order[cursor..cursor + n].to_vec();
+                    cursor += n;
+                    all_groups.push((g, slice));
+                }
+            }
+        }
+        // Deterministic order: by (skip_base, header).
+        all_groups.sort_by(|(a, _), (b, _)| {
+            a.skip_base.cmp(&b.skip_base).then(a.header.cmp(&b.header))
+        });
+
+        record.remove_aux(b"MM").ok();
+        record.remove_aux(b"ML").ok();
+        if !all_groups.is_empty() {
+            let mut mm_string = String::new();
+            let mut ml_bytes: Vec<u8> = Vec::new();
+            for (group, mls) in all_groups {
+                mm_string.push_str(&group.header);
+                for d in &group.deltas {
+                    mm_string.push(',');
+                    mm_string.push_str(&d.to_string());
+                }
+                mm_string.push(';');
+                ml_bytes.extend(mls);
+            }
+            record.push_aux(b"MM", Aux::String(&mm_string)).ok();
+            record
+                .push_aux(b"ML", Aux::ArrayU8((&ml_bytes).into()))
+                .ok();
         }
     }
 
@@ -945,11 +964,16 @@ impl MolecularAnnotations {
         Some(blocks.lift_to_query(start, end))
     }
 
-    /// Create a new MolecularAnnotations from a BAM record.
+    /// Parse a `MolecularAnnotations` from a BAM record, reading MA/AL/AQ/AN
+    /// tags (if present) and MM/ML tags (if present).
     ///
-    /// This extracts the read length, aligned blocks, and reverse-alignment status
-    /// from the record. Annotation types can then be added manually or parsed
-    /// from tags using methods like `add_annotation_type`.
+    /// Also extracts read length, aligned blocks, and reverse-alignment status
+    /// from the record itself, so liftover-based getters (`ref_coords`, etc.)
+    /// work without additional setup.
+    ///
+    /// **Idempotency:** this is the only public entry point that parses MM/ML.
+    /// Each call constructs a fresh `MolecularAnnotations`; there is no API
+    /// to re-parse into an existing object.
     ///
     /// # Example
     /// ```ignore
@@ -959,19 +983,53 @@ impl MolecularAnnotations {
     /// let mut bam = bam::Reader::from_path("test.bam").unwrap();
     /// for record in bam.records() {
     ///     let record = record.unwrap();
-    ///     let annotations = MolecularAnnotations::from_record(&record);
-    ///     // annotations now has aligned blocks set and is_reverse_aligned configured
+    ///     let annot = MolecularAnnotations::from_record(&record);
+    ///     // Iterate MM/ML-encoded annotation types (basemods):
+    ///     for t in annot.mm_ml_types() {
+    ///         println!("{} has {} calls", t.name, t.annotations.len());
+    ///     }
     /// }
     /// ```
     #[cfg(feature = "htslib")]
     pub fn from_record(record: &rust_htslib::bam::Record) -> Self {
-        Self {
-            read_length: record.seq_len() as u32,
-            annotation_types: Vec::new(),
-            encoding: Encoding::default(),
-            aligned_blocks: Some(AlignedBlocks::from_record(record)),
-            is_reverse_aligned: record.is_reverse(),
-        }
+        use rust_htslib::bam::record::Aux;
+
+        // Pull MA/AL/AQ/AN tags off the record. If MA is present and parses,
+        // start from that; otherwise start from an empty annotation set keyed
+        // off the record's sequence length.
+        let ma_string: Option<String> = match record.aux(b"MA") {
+            Ok(Aux::String(s)) => Some(s.to_string()),
+            _ => None,
+        };
+        let al_vec: Vec<u32> = match record.aux(b"AL") {
+            Ok(Aux::ArrayU32(arr)) => arr.iter().collect(),
+            _ => Vec::new(),
+        };
+        let aq_vec: Option<Vec<u8>> = match record.aux(b"AQ") {
+            Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
+            _ => None,
+        };
+        let an_string: Option<String> = match record.aux(b"AN") {
+            Ok(Aux::String(s)) => Some(s.to_string()),
+            _ => None,
+        };
+
+        let mut annot = match ma_string {
+            Some(ref ma) => Self::from_tags(
+                ma,
+                &al_vec,
+                aq_vec.as_deref(),
+                an_string.as_deref(),
+            )
+            .unwrap_or_else(|_| Self::new(record.seq_len() as u32)),
+            None => Self::new(record.seq_len() as u32),
+        };
+
+        annot.aligned_blocks = Some(AlignedBlocks::from_record(record));
+        annot.is_reverse_aligned = record.is_reverse();
+
+        crate::basemods::parse::parse_into(&mut annot, record);
+        annot
     }
 
     /// Parse from tag values.
@@ -1129,10 +1187,10 @@ impl MolecularAnnotations {
         }
 
         // Detect encoding from input format
-        out.encoding = if al_idx == 0 && !out.annotation_types.is_empty() {
-            Encoding::Inline
+        out.ma_encoding = if al_idx == 0 && !out.annotation_types.is_empty() {
+            MaEncoding::Inline
         } else {
-            Encoding::Separate
+            MaEncoding::Separate
         };
 
         Ok(out)
