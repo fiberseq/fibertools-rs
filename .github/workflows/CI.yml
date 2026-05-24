@@ -21,7 +21,7 @@ jobs:
           components: rustfmt
 
       - name: Check format
-        run: cargo fmt -- --check
+        run: cargo fmt -p fibertools-rs -- --check
 
   Linting:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
           components: clippy
 
       - name: Lint with clippy
-        run: cargo clippy
+        run: cargo clippy -p fibertools-rs
 
   Testing:
     needs: Formatting
@@ -53,4 +53,4 @@ jobs:
           override: true
 
       - name: Run test
-        run: cargo test -- --test-threads=1
+        run: cargo test -p fibertools-rs -- --test-threads=1
