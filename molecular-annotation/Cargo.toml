@@ -13,11 +13,11 @@ separate-lengths = [] # MA contains starts only, lengths in AL array: "1000;msp+
 htslib = ["dep:rust-htslib", "dep:log", "dep:regex", "dep:lazy_static", "dep:bio"]
 
 [dependencies]
-rust-htslib = { version = "0.47", optional = true }
+rust-htslib = { workspace = true, optional = true }
 log = { version = "0.4", optional = true }
 regex = { version = "1", optional = true }
 lazy_static = { version = "1", optional = true }
 bio = { version = "2", optional = true }
 
 [dev-dependencies]
-rust-htslib = "0.47"
+rust-htslib = { workspace = true }
