@@ -12,7 +12,9 @@
 
 use std::path::PathBuf;
 
-use fibertools_rs::utils::ma_io::{read_annotations, write_annotations, MSP_TYPE, NUC_TYPE};
+use fibertools_rs::utils::ma_io::{
+    read_annotations, read_record, write_record, MSP_TYPE, NUC_TYPE,
+};
 use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
@@ -86,13 +88,31 @@ fn legacy_read_matches_raw_tags() {
 fn ma_write_then_read_roundtrips() {
     for fixture in FIXTURES {
         for record in read_records(fixture) {
-            let original = read_annotations(&record).unwrap();
+            // Use the unified codec (read_record + write_record). The legacy
+            // pair (read_annotations + write_annotations) cannot round-trip
+            // MM/ML basemod annotations through MA-only emission; the unified
+            // codec handles both tag sets via the library's from_record /
+            // to_record.
+            let original = read_record(&record).unwrap();
             let mut converted = record.clone();
-            write_annotations(&mut converted, &original);
+            write_record(&mut converted, &original);
 
-            let round = read_annotations(&converted).unwrap();
+            let round = read_record(&converted).unwrap();
+
+            // Compare annotation types as a name-keyed set, not as a Vec —
+            // the library's to_record / from_record pair doesn't guarantee
+            // a stable type ordering across the round-trip (MM/ML-derived
+            // types and MA-tag-derived types interleave differently on the
+            // read side depending on which tags exist on the record).
+            // Per-type content equality is what we actually want to verify.
+            let sort_by_name = |types: &[molecular_annotation::AnnotationType]| {
+                let mut sorted: Vec<_> = types.iter().cloned().collect();
+                sorted.sort_by(|a, b| a.name.cmp(&b.name));
+                sorted
+            };
             assert_eq!(
-                round.annotation_types, original.annotation_types,
+                sort_by_name(&round.annotation_types),
+                sort_by_name(&original.annotation_types),
                 "{fixture}: MA round-trip"
             );
         }
@@ -162,8 +182,22 @@ fn reverse_strand_keeps_molecular_coords() {
 #[test]
 fn missing_annotations_yield_empty_container() {
     let mut blank = read_records("nuc_example.bam").into_iter().next().unwrap();
+    // Strip every annotation source — including MM/ML, which the vendored
+    // library's from_record now parses into m6a/cpg basemod annotations.
+    // Pre-library-upgrade this test stripped only MA + legacy ns/nl/as/al;
+    // MM/ML wasn't read by from_record then, so leaving it in was a no-op.
     for tag in [
-        b"MA", b"AL", b"AQ", b"AN", b"ns", b"nl", b"as", b"al", b"aq",
+        b"MA" as &[u8],
+        b"AL",
+        b"AQ",
+        b"AN",
+        b"ns",
+        b"nl",
+        b"as",
+        b"al",
+        b"aq",
+        b"MM",
+        b"ML",
     ] {
         blank.remove_aux(tag).ok();
     }

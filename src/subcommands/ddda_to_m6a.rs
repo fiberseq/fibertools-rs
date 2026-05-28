@@ -1,5 +1,6 @@
 use crate::cli::DddaToM6aOptions;
 use crate::utils::basemods;
+use crate::utils::ma_io;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;
@@ -62,9 +63,12 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
     // pre-existing m6a (we're replacing it with the Y/R-derived calls),
     // then append the synthesized m6a and write back. Each call gets
     // its canonical MM group header (A+a or T-a) tagged via
-    // `canonical_header` so `write_mm_ml` can emit the right groups.
-    let mut annot = MolecularAnnotations::from_record(record);
-    basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
+    // `canonical_header` so the library's MM/ML serializer emits the
+    // right groups.
+    let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
+        log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+        MolecularAnnotations::from_record(record)
+    });
     annot
         .annotation_types
         .retain(|t| t.name != basemods::M6A_TYPE);
@@ -75,7 +79,8 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
             .expect("ddda_to_m6a only places calls on A/T bases");
         t.add(pos, 1, Strand::Forward, vec![255], Some(header.to_string()));
     }
-    basemods::write_mm_ml(record, &annot);
+    ma_io::ensure_basemod_encoding(&mut annot);
+    ma_io::write_record(record, &annot);
 }
 
 pub fn ddda_to_m6a(opts: &mut DddaToM6aOptions) -> Result<(), Error> {

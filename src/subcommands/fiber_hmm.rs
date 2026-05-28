@@ -1,4 +1,5 @@
 use crate::cli::FiberHmmOptions;
+use crate::utils::basemods::M6A_TYPE;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;
@@ -10,7 +11,7 @@ pub fn run_fiber_hmm(opts: &mut FiberHmmOptions) -> Result<(), Error> {
         // m6a positions on the forward (molecular) strand
         let _m6a: Vec<u32> = fiber
             .annotations
-            .get_forward_coords("m6a")
+            .get_forward_coords(M6A_TYPE)
             .map(|v| v.into_iter().map(|(s, _)| s).collect())
             .unwrap_or_default();
         // forward strand sequence

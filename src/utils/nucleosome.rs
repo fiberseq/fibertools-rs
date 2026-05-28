@@ -187,7 +187,7 @@ pub fn filter_for_end(
 /// Compute nucleosomes + MSPs from `m6a` calls and append them to
 /// `annot` in place. Writing the MA tags onto the record is the
 /// caller's responsibility (typically via [`FiberseqData::serialize_annotations`]
-/// or [`ma_io::write_annotations`]).
+/// or [`ma_io::ensure_basemod_encoding`] + [`ma_io::write_record`]).
 pub fn add_nucleosomes_to_annotations(
     record: &bam::Record,
     annot: &mut MolecularAnnotations,

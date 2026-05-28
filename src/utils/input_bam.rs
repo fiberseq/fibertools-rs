@@ -321,6 +321,7 @@ impl std::default::Default for InputBam {
 mod tests {
     use super::*;
     use crate::fiber::FiberseqData;
+    use crate::utils::basemods::M6A_TYPE;
     use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 
     /// Build a minimal `FiberseqData` shaped only for `passes_fire_filter`.
@@ -337,7 +338,7 @@ mod tests {
             }
         }
         if m6a_count > 0 {
-            let t = annotations.add_annotation_type("m6a", "Q".parse().expect("Q parses"));
+            let t = annotations.add_annotation_type(M6A_TYPE, "Q".parse().expect("Q parses"));
             for i in 0..m6a_count {
                 t.add(i as u32, 1, Strand::Forward, vec![0], None);
             }

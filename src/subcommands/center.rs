@@ -1,6 +1,7 @@
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
 use crate::utils::bamannotations::primary_qual;
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io;
 use crate::*;
 use bio::alphabets::dna::revcomp;
@@ -114,7 +115,7 @@ impl CenteredFiberData {
             .fiber
             .annotations
             .project_query(self.mol_offset, flip)
-            .filter(|p| p.type_name == "m6a")
+            .filter(|p| p.type_name == M6A_TYPE)
             .map(|p| p.start)
             .collect();
         let msp_boundaries: Vec<i64> = self
@@ -264,8 +265,8 @@ impl CenteredFiberData {
         Vec<Option<i64>>,
         Vec<u8>,
     ) {
-        let (m6a, _, m6a_qual) = self.centered_for_type("m6a");
-        let (cpg, _, cpg_qual) = self.centered_for_type("cpg");
+        let (m6a, _, m6a_qual) = self.centered_for_type(M6A_TYPE);
+        let (cpg, _, cpg_qual) = self.centered_for_type(CPG_TYPE);
         let (nuc_st, nuc_en, _) = self.centered_for_type("nuc");
         let (msp_st, msp_en, _) = self.centered_for_type("msp");
         let (fire_st, fire_en, fire_qual) = self.centered_for_type("fire");
