@@ -2,7 +2,7 @@ use super::subcommands::center::CenterPosition;
 use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamannotations::*;
-use crate::utils::basemods::{parse_mm_ml_into_ma, CPG_TYPE, M6A_TYPE};
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
 use crate::utils::ma_io::{FIRE_TYPE, MSP_TYPE, NUC_TYPE};
@@ -33,10 +33,37 @@ impl FiberseqData {
             "."
         }
         .to_string();
-        let mut annotations = crate::utils::ma_io::read_annotations(&record).unwrap_or_else(|e| {
+        let mut annotations = crate::utils::ma_io::read_record(&record).unwrap_or_else(|e| {
             log::warn!("Failed to read annotations: {e}");
             MolecularAnnotations::from_record(&record)
         });
+
+        // Apply read-side basemod filters that parse_mm_ml_into_ma used to do.
+        // The library now populates m6a/cpg in `annotations` directly; here we
+        // just prune by min_ml_score and end-strip distance.
+        if filters.min_ml_score > 0 || filters.strip_starting_basemods > 0 {
+            let seq_len = record.seq_len();
+            let strip = filters.strip_starting_basemods.max(0) as usize;
+            let upper = seq_len.saturating_sub(strip);
+            let min_ml = filters.min_ml_score;
+            for t in annotations.annotation_types.iter_mut() {
+                if !crate::utils::basemods::is_basemod_type(&t.name) {
+                    continue;
+                }
+                t.annotations.retain(|a| {
+                    if a.qualities.first().copied().unwrap_or(0) < min_ml {
+                        return false;
+                    }
+                    if strip > 0 {
+                        let p = a.start as usize;
+                        if p < strip || p >= upper {
+                            return false;
+                        }
+                    }
+                    true
+                });
+            }
+        }
 
         // get the number of passes
         let ec = if let Ok(Aux::Float(f)) = record.aux(b"ec") {
@@ -50,15 +77,6 @@ impl FiberseqData {
             Some(t) => t.clone(),
             None => ".".to_string(),
         };
-
-        // Parse MM/ML directly into the spec object as m6a / cpg types.
-        // No intermediate BaseMods needed on the read side.
-        parse_mm_ml_into_ma(
-            &record,
-            &mut annotations,
-            filters.min_ml_score,
-            filters.strip_starting_basemods,
-        );
 
         let mut fsd = FiberseqData {
             record,
@@ -144,7 +162,9 @@ impl FiberseqData {
     /// annotations should call this and then hand the record to the
     /// BAM writer.
     pub fn serialize_annotations(&mut self) {
-        crate::utils::ma_io::write_annotations(&mut self.record, &self.annotations);
+        let mut annot = self.annotations.clone();
+        crate::utils::ma_io::ensure_basemod_encoding(&mut annot);
+        crate::utils::ma_io::write_record(&mut self.record, &annot);
     }
 
     pub fn get_qname(&self) -> String {

@@ -1,8 +1,8 @@
 use crate::cli::StripBasemodsOptions;
 use crate::utils::bamannotations::primary_qual;
-use crate::utils::basemods;
 use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::BamChunk;
+use crate::utils::ma_io;
 use bio::alphabets::dna::revcomp;
 use molecular_annotation::MolecularAnnotations;
 use rayon::iter::ParallelIterator;
@@ -26,8 +26,10 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
         let records: Vec<&mut Record> = chunk
             .par_iter_mut()
             .map(|record| {
-                let mut annot = MolecularAnnotations::from_record(record);
-                basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
+                let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
+                    log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+                    MolecularAnnotations::from_record(record)
+                });
 
                 // Drop whole annotation types.
                 if filter_mod == "5mC" || filter_mod == "CpG" {
@@ -76,7 +78,8 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
                     });
                 }
 
-                basemods::write_mm_ml(record, &annot);
+                ma_io::ensure_basemod_encoding(&mut annot);
+                ma_io::write_record(record, &annot);
                 record
             })
             .collect();

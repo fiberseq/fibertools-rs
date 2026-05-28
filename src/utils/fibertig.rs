@@ -349,7 +349,8 @@ impl FiberTig {
                 }
             }
 
-            crate::utils::ma_io::write_annotations(&mut record, annotations);
+            crate::utils::ma_io::ensure_basemod_encoding(annotations);
+            crate::utils::ma_io::write_record(&mut record, annotations);
 
             records.push(record);
         }
@@ -587,7 +588,7 @@ impl FiberTig {
             if record.tid() < 0 {
                 continue;
             }
-            let annot = crate::utils::ma_io::read_annotations(&record)?;
+            let annot = crate::utils::ma_io::read_record(&record)?;
             if annot.get_type(FIBERTIG_TYPE).is_none() {
                 continue;
             }

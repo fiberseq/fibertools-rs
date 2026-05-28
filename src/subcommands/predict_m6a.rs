@@ -1,6 +1,7 @@
 use crate::cli::PredictM6AOptions;
 use crate::utils::basemods;
 use crate::utils::bio_io;
+use crate::utils::ma_io;
 use crate::utils::nucleosome;
 use crate::*;
 use bio::alphabets::dna::revcomp;
@@ -219,11 +220,14 @@ where
         assert_eq!(data.len(), records.len());
         let mut cur_predict_st = 0;
         for (option_data, record) in data.iter().zip(records) {
-            // Load existing MM/ML into a MolecularAnnotations, then drop any
-            // pre-existing m6a calls — we're about to replace them with the
-            // model's predictions. CpG / other annotation types are preserved.
-            let mut annot = molecular_annotation::MolecularAnnotations::from_record(record);
-            basemods::parse_mm_ml_into_ma(record, &mut annot, 0, 0);
+            // Load existing annotations (MA tags + MM/ML via library, with
+            // legacy ns/nl/as/al fallback), then drop any pre-existing m6a
+            // calls — we're about to replace them with the model's predictions.
+            // CpG / other annotation types are preserved.
+            let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
+                log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+                molecular_annotation::MolecularAnnotations::from_record(record)
+            });
             annot
                 .annotation_types
                 .retain(|t| t.name != basemods::M6A_TYPE);
@@ -236,8 +240,8 @@ where
             // Iterate over A and then T basemods, collecting their forward
             // positions + ML qualities into a single sorted m6a list. Each
             // call carries its canonical MM group header — A-base calls
-            // are "A+a", T-base calls are "T-a" — so `write_mm_ml` can
-            // emit them under the correct group.
+            // are "A+a", T-base calls are "T-a" — so the library's MM/ML
+            // serializer emits them under the correct group.
             let mut m6a_calls: Vec<(u32, u8, &'static str)> = Vec::new();
             for (data, header) in [(a_data, "A+a"), (t_data, "T-a")] {
                 let cur_predict_en = cur_predict_st + data.count;
@@ -264,9 +268,6 @@ where
                 }
             }
 
-            // write the ml and mm tags
-            basemods::write_mm_ml(record, &annot);
-
             // Compute nucleosomes + MSPs from the forward m6a positions
             // and append them to the same MA object we just built up.
             let modified_bases_forward: Vec<i64> =
@@ -278,10 +279,10 @@ where
                 &opts.nuc_opts,
             );
 
-            // Single MA write — m6a went out via MM/ML above; nuc/msp
-            // (and any pre-existing annotation types we preserved) go
-            // out here.
-            crate::utils::ma_io::write_annotations(record, &annot);
+            // Tag basemod types as MM/ML-encoded so to_record emits them as
+            // MM/ML rather than the MA tag set; nuc/msp/fire stay Encoding::Ma.
+            ma_io::ensure_basemod_encoding(&mut annot);
+            ma_io::write_record(record, &annot);
 
             // clear the existing data
             if !opts.keep {

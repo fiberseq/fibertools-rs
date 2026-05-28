@@ -15,12 +15,12 @@
 //! - `fire` (no strand, `Q` linear precision 0–255)
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
-//! populated by [`crate::utils::basemods::parse_mm_ml_into_ma`], but are
-//! NEVER read or written here: their on-disk source of truth is `MM`/`ML`.
-//! The writer below strips them before emission as a safety net.
+//! populated by the library's MM/ML parser. Their on-disk source of truth
+//! is `MM`/`ML`; [`ensure_basemod_encoding`] flags those types so the
+//! library serializes them into MM/ML rather than the MA tag set.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, SkipFlag, Strand};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -31,6 +31,83 @@ pub const FIRE_TYPE: &str = "fire";
 /// Legacy fibertools-rs tags consumed by the reader as a fallback when no
 /// MA tag is present. These are never emitted; we only ingest them.
 pub const LEGACY_READ_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
+
+/// Reads annotations from a BAM record's tags.
+///
+/// Delegates to the library's combined MA-spec + MM/ML parser. If the
+/// library returns an empty annotation set and the record carries legacy
+/// `ns`/`nl`/`as`/`al`/`aq` tags, falls back to `read_legacy_nuc_msp`.
+/// Tolerant of malformed MM/ML — the library handles those internally
+/// without panicking.
+pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
+    let mut annot = MolecularAnnotations::from_record(record);
+    // If MA tag is absent, also ingest legacy nuc/msp tags. The library
+    // already populates basemod types (m6a/cpg) from MM/ML, so we merge
+    // legacy-derived nuc/msp into whatever the library produced rather
+    // than gating on `annotation_types.is_empty()` (which would skip the
+    // legacy fallback whenever MM/ML is present).
+    let has_ma = matches!(record.aux(b"MA"), Ok(Aux::String(_)));
+    if !has_ma {
+        let has_legacy_nuc = matches!(record.aux(b"ns"), Ok(_));
+        let has_legacy_msp = matches!(record.aux(b"as"), Ok(_));
+        if has_legacy_nuc || has_legacy_msp {
+            let legacy = read_legacy_nuc_msp(record)?;
+            for t in legacy.annotation_types.into_iter() {
+                if annot.get_type(&t.name).is_some() {
+                    continue;
+                }
+                let new_t = annot.add_annotation_type(&t.name, t.quality_spec.clone());
+                for a in t.annotations.into_iter() {
+                    new_t.add(a.start, a.length, a.strand, a.qualities, a.name);
+                }
+            }
+        }
+    }
+    Ok(annot)
+}
+
+/// Writes annotations to a BAM record's tags via the library's `to_record`.
+///
+/// Each `AnnotationType`'s `Encoding` controls which tag set it lands in:
+/// `Encoding::MmMl` types go to MM/ML, `Encoding::Ma` types go to MA/AQ/AN.
+/// Producers must call [`ensure_basemod_encoding`] before this if they
+/// constructed basemod types via `add_annotation_type` (which defaults to
+/// `Encoding::Ma`).
+pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
+    annot.to_record(record);
+}
+
+/// Sets `Encoding::MmMl { skip_flag: SkipFlag::Implicit }` on any basemod
+/// annotation types (`M6A_TYPE`, `CPG_TYPE`) present in `annot`.
+///
+/// Idempotent. Call unconditionally before [`write_record`] to guarantee
+/// m6a / cpg land in MM/ML rather than the MA tag set.
+///
+/// Implementation note: the library's `AnnotationType::set_encoding`
+/// panics on non-empty types (encoding is meant to be locked in at
+/// construction). We work around that by draining the annotations,
+/// flipping `set_encoding` on the empty shell, and re-attaching the
+/// annotations afterwards. Preserves order, qualities, and per-call
+/// names. If the library ever relaxes set_encoding to allow flipping
+/// on populated types, the drain/re-attach can be replaced with a
+/// straight call.
+pub fn ensure_basemod_encoding(annot: &mut MolecularAnnotations) {
+    let target = Encoding::MmMl {
+        skip_flag: SkipFlag::Implicit,
+    };
+    for t in annot.annotation_types.iter_mut() {
+        if !crate::utils::basemods::is_basemod_type(&t.name) {
+            continue;
+        }
+        if t.encoding == target {
+            continue; // idempotent fast path
+        }
+        let drained: Vec<molecular_annotation::Annotation> =
+            std::mem::take(&mut t.annotations);
+        t.set_encoding(target);
+        t.annotations = drained;
+    }
+}
 
 /// Read annotations from a BAM record.
 ///
@@ -130,24 +207,6 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
     Ok(annot)
 }
 
-/// Write annotations to a BAM record.
-///
-/// Emits MA-spec tags only. Base modifications (`m6a`, `cpg`) are stripped
-/// before serialization — their on-disk source of truth is `MM`/`ML`, not
-/// the MA tag set.
-pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations) {
-    // Base modifications (`m6a`, `cpg`) belong in MM/ML — never in the
-    // MA tag set. Drop them before serialization. This is a policy
-    // choice (single on-disk source of truth), not a correctness one;
-    // see the basemods module docs for the tradeoff if you want to
-    // expose basemods in MA tags for downstream MA-native consumers.
-    let mut for_ma = annot.clone();
-    for_ma.annotation_types.retain(|t| {
-        t.name != crate::utils::basemods::M6A_TYPE && t.name != crate::utils::basemods::CPG_TYPE
-    });
-    for_ma.to_record(record);
-}
-
 /// Convenience for callers that still operate on raw `i64` arrays of
 /// nucleosome and MSP coordinates. Returns
 /// `(nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual)` derived
@@ -159,7 +218,7 @@ pub fn write_annotations(record: &mut bam::Record, annot: &MolecularAnnotations)
 pub fn extract_nuc_msp_arrays(
     record: &bam::Record,
 ) -> Result<(Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>, Vec<u8>)> {
-    let annot = read_annotations(record)?;
+    let annot = read_record(record)?;
     let (nuc_starts, nuc_lengths) = annot
         .get_type(NUC_TYPE)
         .map(|t| {
@@ -285,7 +344,7 @@ pub fn build_nuc_msp_annotations(
 /// Returns `(starts, lengths, precisions)`. All three are empty if the record
 /// has no `fire` MA type.
 pub fn extract_fire_arrays(record: &bam::Record) -> Result<(Vec<u32>, Vec<u32>, Vec<u8>)> {
-    let annot = read_annotations(record)?;
+    let annot = read_record(record)?;
     Ok(annot
         .get_type(FIRE_TYPE)
         .map(|t| {
@@ -313,5 +372,109 @@ fn u8_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
     match record.aux(tag) {
         Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+    use rust_htslib::bam::record::Aux;
+
+    /// Build a synthetic record with the given forward sequence. Aligned-blocks
+    /// metadata is not needed for these I/O tests because we only exercise
+    /// tag-level round-trips, not coordinate liftovers.
+    fn synth_record(seq: &[u8]) -> bam::Record {
+        let mut record = bam::Record::new();
+        let qual = vec![60u8; seq.len()];
+        // unmapped record, no cigar — sufficient for tag round-trip
+        record.set(b"test_read", None, seq, &qual);
+        record
+    }
+
+    #[test]
+    fn read_write_record_roundtrips_basemod_and_msp() {
+        use crate::utils::basemods::{canonical_header, M6A_TYPE};
+
+        // 10bp sequence with A's at positions 0, 4, 8
+        let mut record = synth_record(b"ATCGATCGAT");
+
+        // Build annotations: one m6a call at position 0 (A+a header),
+        // one msp annotation 5..8 with quality 200.
+        let mut annot = MolecularAnnotations::from_record(&record);
+        let qspec_q = "Q".parse::<QualitySpec>().expect("Q parses");
+
+        let m6a_type = annot.add_annotation_type(M6A_TYPE, qspec_q.clone());
+        let header = canonical_header(M6A_TYPE, b'A').unwrap().to_string();
+        m6a_type.add(0, 1, Strand::Forward, vec![240], Some(header));
+
+        let msp_type = annot.add_annotation_type(MSP_TYPE, qspec_q);
+        msp_type.add(5, 3, Strand::Unknown, vec![100], None);
+
+        // Producer contract: tag basemod types with Encoding::MmMl before write.
+        ensure_basemod_encoding(&mut annot);
+
+        write_record(&mut record, &annot);
+
+        // Round-trip: read back and assert. After Phase 1's constant flip,
+        // M6A_TYPE == "a" — same name the library uses internally, so no
+        // translation is required at this boundary.
+        let back = read_record(&record).expect("read_record");
+
+        let m6a = back
+            .annotation_types
+            .iter()
+            .find(|t| t.name == M6A_TYPE)
+            .expect("m6a type present after round-trip");
+        assert_eq!(m6a.annotations.len(), 1);
+        assert_eq!(m6a.annotations[0].start, 0);
+        assert_eq!(m6a.annotations[0].qualities, vec![240]);
+
+        let msp = back
+            .annotation_types
+            .iter()
+            .find(|t| t.name == MSP_TYPE)
+            .expect("msp type present after round-trip");
+        assert_eq!(msp.annotations.len(), 1);
+        assert_eq!(msp.annotations[0].start, 5);
+        assert_eq!(msp.annotations[0].length, 3);
+    }
+
+    #[test]
+    fn read_record_falls_back_to_legacy_ns_as() {
+        use rust_htslib::bam::record::Aux;
+
+        let mut record = synth_record(b"ATCGATCGAT");
+
+        // Push legacy `ns`/`nl` (one nuc 2..4) and `as`/`al` (one msp 6..9).
+        // No MA tag, no MM/ML.
+        let ns: Vec<u32> = vec![2];
+        let nl: Vec<u32> = vec![2];
+        let as_starts: Vec<u32> = vec![6];
+        let al: Vec<u32> = vec![3];
+        record.push_aux(b"ns", Aux::ArrayU32((&ns).into())).unwrap();
+        record.push_aux(b"nl", Aux::ArrayU32((&nl).into())).unwrap();
+        record.push_aux(b"as", Aux::ArrayU32((&as_starts).into())).unwrap();
+        record.push_aux(b"al", Aux::ArrayU32((&al).into())).unwrap();
+
+        let annot = read_record(&record).expect("read_record");
+
+        let nuc = annot
+            .annotation_types
+            .iter()
+            .find(|t| t.name == NUC_TYPE)
+            .expect("nuc populated from legacy ns/nl");
+        assert_eq!(nuc.annotations.len(), 1);
+        assert_eq!(nuc.annotations[0].start, 2);
+        assert_eq!(nuc.annotations[0].length, 2);
+
+        let msp = annot
+            .annotation_types
+            .iter()
+            .find(|t| t.name == MSP_TYPE)
+            .expect("msp populated from legacy as/al");
+        assert_eq!(msp.annotations.len(), 1);
+        assert_eq!(msp.annotations[0].start, 6);
+        assert_eq!(msp.annotations[0].length, 3);
     }
 }

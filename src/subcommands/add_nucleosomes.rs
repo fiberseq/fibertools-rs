@@ -1,5 +1,6 @@
 use crate::cli::AddNucleosomeOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::basemods::M6A_TYPE;
 use crate::utils::nucleosome::*;
 use crate::*;
 use rayon::iter::ParallelIterator;
@@ -23,7 +24,7 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
             // m6a positions in molecular (forward) orientation
             let m6a: Vec<i64> = fd
                 .annotations
-                .get_forward_coords("m6a")
+                .get_forward_coords(M6A_TYPE)
                 .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
                 .unwrap_or_default();
             let record = fd.record.clone();

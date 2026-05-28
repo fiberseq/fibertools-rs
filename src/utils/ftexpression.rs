@@ -1,4 +1,5 @@
 use crate::fiber::FiberseqData;
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
@@ -144,8 +145,8 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                 let type_name = match parser.feat_name.as_str() {
                     "msp" => "msp",
                     "nuc" => "nuc",
-                    "m6a" => "m6a",
-                    "5mC" => "cpg",
+                    "m6a" => M6A_TYPE,
+                    "5mC" => CPG_TYPE,
                     other => anyhow::bail!("Unknown feature name: {}", other),
                 };
                 match parser.fn_name.as_str() {
