@@ -10,9 +10,11 @@ cost rather than ML inference or external I/O:
 - `track-decorators` (read-only traversal building a BED12 decorator track)
 - `extract --all` (per-record TSV with every annotation column)
 
-A full `cargo bench --bench subcommands` run takes ~15–20 minutes on a
-warm machine. Individual bench iterations: `pileup` ~8 s, `fire` ~8 s,
-`extract` ~5 s, `track-decorators` ~4 s.
+Every bench uses `sample_size(10)` and otherwise leaves criterion's timing
+defaults alone. Slower benches just take longer to gather their 10 samples;
+criterion may print an "unable to complete 10 samples" note, which is
+harmless. A full `cargo bench --bench subcommands` run takes ~15–20 minutes
+on a warm machine.
 
 ## 1. Fetch the dataset (once)
 
@@ -105,15 +107,3 @@ ops, network I/O) that would swamp the annotation-traversal signal:
 `predict_m6a`, `add_nucleosomes`, and `pg_*` are intentionally not
 benched here — their wall-clock is dominated by ML inference or
 pangenome-graph operations, which would dilute the signal we care about.
-
-## Per-bench configuration
-
-| Bench               | `sample_size` | `measurement_time` |
-|---------------------|---------------|--------------------|
-| `pileup/default`    | 10            | 180 s              |
-| `fire/default`      | 10            | 120 s              |
-| `decorator/default` | 10            | 60 s (default)     |
-| `extract/all`       | 10            | 60 s (default)     |
-
-`pileup` and `fire` have raised budgets because their per-iteration
-wall-clock (~8 s) doesn't fit 10 samples into criterion's default 60 s.
