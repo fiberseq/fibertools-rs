@@ -1,10 +1,12 @@
 use crate::cli::CenterOptions;
 use crate::fiber::FiberseqData;
-use crate::utils::bamlift::*;
+use crate::utils::bamannotations::primary_qual;
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io;
 use crate::*;
 use bio::alphabets::dna::revcomp;
 use indicatif::{style, ProgressBar};
+use molecular_annotation::AlignedBlocks;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
@@ -22,6 +24,8 @@ pub struct CenteredFiberData {
     pub dist: Option<i64>,
     center_position: CenterPosition,
     pub offset: i64,
+    mol_offset: i64,
+    ref_offset: i64,
     pub reference: bool,
     pub simplify: bool,
 }
@@ -38,16 +42,102 @@ impl CenteredFiberData {
             CenteredFiberData::find_offsets(&fiber.record, &center_position);
         let offset = if reference { ref_offset } else { mol_offset };
 
-        let fiber = fiber.center(&center_position)?;
-
-        Some(CenteredFiberData {
+        let cfd = CenteredFiberData {
             fiber,
             dist,
             center_position,
             offset,
+            mol_offset,
+            ref_offset,
             reference,
             simplify,
-        })
+        };
+        cfd.validate_msp_m6a_alignment();
+        Some(cfd)
+    }
+
+    /// Project this fiber's annotations of `type_name` into the active
+    /// frame (query when `!self.reference`, reference when `self.reference`)
+    /// via the spec library's `project_query` / `project_reference`. Returns
+    /// (centered_starts, centered_ends, quals) in lockstep.
+    ///
+    /// In query frame every annotation yields a row. In reference frame
+    /// annotations that don't lift are dropped (the spec's
+    /// `project_reference` filters them out); this matches the legacy
+    /// output which skipped `None` ref coords in `write_long`.
+    ///
+    /// Output is reversed when `flip != is_reverse_aligned` so the centered
+    /// coords come out ascending — matching the legacy `apply_offset` which
+    /// reversed the annotations vec for minus-strand centers.
+    fn centered_for_type(&self, type_name: &str) -> (Vec<Option<i64>>, Vec<Option<i64>>, Vec<u8>) {
+        let flip = self.center_position.strand == '-';
+        let mut starts = Vec::new();
+        let mut ends = Vec::new();
+        let mut quals = Vec::new();
+        if self.reference {
+            for p in self
+                .fiber
+                .annotations
+                .project_reference(self.ref_offset, flip)
+            {
+                if p.type_name != type_name {
+                    continue;
+                }
+                starts.push(Some(p.start));
+                ends.push(Some(p.end));
+                quals.push(primary_qual(p.qualities, p.type_name));
+            }
+        } else {
+            for p in self.fiber.annotations.project_query(self.mol_offset, flip) {
+                if p.type_name != type_name {
+                    continue;
+                }
+                starts.push(Some(p.start));
+                ends.push(Some(p.end));
+                quals.push(primary_qual(p.qualities, p.type_name));
+            }
+        }
+        if flip != self.fiber.annotations.is_reverse_aligned() {
+            starts.reverse();
+            ends.reverse();
+            quals.reverse();
+        }
+        (starts, ends, quals)
+    }
+
+    /// Validate that all MSP boundaries align with m6A positions after
+    /// centering. Operates on the centered (query-frame) coordinates the
+    /// short-form writer would emit, so the warning catches the same
+    /// misalignments the legacy in-place mutation did.
+    fn validate_msp_m6a_alignment(&self) {
+        let flip = self.center_position.strand == '-';
+        let m6a_positions: Vec<i64> = self
+            .fiber
+            .annotations
+            .project_query(self.mol_offset, flip)
+            .filter(|p| p.type_name == M6A_TYPE)
+            .map(|p| p.start)
+            .collect();
+        let msp_boundaries: Vec<i64> = self
+            .fiber
+            .annotations
+            .project_query(self.mol_offset, flip)
+            .filter(|p| p.type_name == "msp")
+            .flat_map(|p| [p.start, p.end - 1])
+            .collect();
+
+        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
+            return;
+        }
+        for msp_pos in &msp_boundaries {
+            if !m6a_positions.contains(msp_pos) {
+                log::warn!(
+                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
+                    msp_pos,
+                    String::from_utf8_lossy(self.fiber.record.qname())
+                );
+            }
+        }
     }
     /// find both the ref and mol offsets
     pub fn find_offsets(record: &bam::Record, center_position: &CenterPosition) -> (i64, i64) {
@@ -57,25 +147,31 @@ impl CenteredFiberData {
         (ref_offset, mol_offset)
     }
 
-    /// find the query position that corresponds to the central reference position
+    /// find the query position that corresponds to the central reference position.
+    ///
+    /// Uses the spec library's exact-1bp `lift_to_query`. Builds
+    /// `AlignedBlocks` from `aligned_block_pairs` directly so synthetic
+    /// records with `is_unmapped()`-leaning flag combinations still get
+    /// their CIGAR-derived blocks.
     pub fn find_offset(record: &bam::Record, reference_position: i64) -> Option<i64> {
-        let read_center: Vec<i64> = lift_query_positions_exact(record, &[reference_position])
-            .ok()?
-            .into_iter()
-            .flatten()
-            .collect();
+        if reference_position < 0 {
+            return None;
+        }
+        let pairs = record
+            .aligned_block_pairs()
+            .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
+        let blocks = AlignedBlocks::from_pairs(pairs, record.seq_len() as u32);
+        let (q_start, _) =
+            blocks.lift_to_query(reference_position as u32, reference_position as u32 + 1);
+        let qp = q_start.map(|x| x as i64);
         log::debug!(
             "{}, {}, {}, {:?}",
             reference_position,
             record.reference_start(),
             record.reference_end(),
-            read_center
+            qp
         );
-        if read_center.is_empty() {
-            None
-        } else {
-            Some(read_center[0])
-        }
+        qp
     }
 
     /// Get the sequence
@@ -165,39 +261,37 @@ impl CenteredFiberData {
         Vec<Option<i64>>,
         Vec<Option<i64>>,
         Vec<Option<i64>>,
+        Vec<Option<i64>>,
+        Vec<Option<i64>>,
         Vec<u8>,
     ) {
-        if self.reference {
-            (
-                self.fiber.m6a.reference_starts(),
-                self.fiber.m6a.qual(),
-                self.fiber.cpg.reference_starts(),
-                self.fiber.cpg.qual(),
-                self.fiber.nuc.reference_starts(),
-                self.fiber.nuc.reference_ends(),
-                self.fiber.msp.reference_starts(),
-                self.fiber.msp.reference_ends(),
-                self.fiber.msp.qual(),
-            )
-        } else {
-            (
-                self.fiber.m6a.option_starts(),
-                self.fiber.m6a.qual(),
-                self.fiber.cpg.option_starts(),
-                self.fiber.cpg.qual(),
-                self.fiber.nuc.option_starts(),
-                self.fiber.nuc.option_ends(),
-                self.fiber.msp.option_starts(),
-                self.fiber.msp.option_ends(),
-                self.fiber.msp.qual(),
-            )
-        }
+        let (m6a, _, m6a_qual) = self.centered_for_type(M6A_TYPE);
+        let (cpg, _, cpg_qual) = self.centered_for_type(CPG_TYPE);
+        let (nuc_st, nuc_en, _) = self.centered_for_type("nuc");
+        let (msp_st, msp_en, _) = self.centered_for_type("msp");
+        let (fire_st, fire_en, fire_qual) = self.centered_for_type("fire");
+        (
+            m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire_st, fire_en,
+            fire_qual,
+        )
     }
 
     pub fn write(&self) -> String {
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
+        let (
+            m6a,
+            m6a_qual,
+            cpg,
+            cpg_qual,
+            nuc_st,
+            nuc_en,
+            msp_st,
+            msp_en,
+            fire_st,
+            fire_en,
+            fire_qual,
+        ) = self.grab_data();
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             self.leading_columns(),
             join_by_str_option(&m6a, ","),
             join_by_str(&m6a_qual, ","),
@@ -207,7 +301,9 @@ impl CenteredFiberData {
             join_by_str_option(&nuc_en, ","),
             join_by_str_option(&msp_st, ","),
             join_by_str_option(&msp_en, ","),
-            join_by_str(&fire, ","),
+            join_by_str_option(&fire_st, ","),
+            join_by_str_option(&fire_en, ","),
+            join_by_str(&fire_qual, ","),
             self.get_sequence(),
         )
     }
@@ -231,7 +327,7 @@ impl CenteredFiberData {
     }
     pub fn header() -> String {
         format!(
-            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             CenteredFiberData::leading_header(),
             "centered_m6a_positions",
             "m6a_qual",
@@ -241,6 +337,8 @@ impl CenteredFiberData {
             "centered_nuc_ends",
             "centered_msp_starts",
             "centered_msp_ends",
+            "centered_fire_starts",
+            "centered_fire_ends",
             "fire_qual",
             "query_sequence"
         )
@@ -259,12 +357,25 @@ impl CenteredFiberData {
 
     pub fn write_long(&self) -> String {
         let mut rtn = String::new();
-        let (m6a, m6a_qual, cpg, cpg_qual, nuc_st, nuc_en, msp_st, msp_en, fire) = self.grab_data();
+        let (
+            m6a,
+            m6a_qual,
+            cpg,
+            cpg_qual,
+            nuc_st,
+            nuc_en,
+            msp_st,
+            msp_en,
+            fire_st,
+            fire_en,
+            fire_qual,
+        ) = self.grab_data();
         for (t, vals) in [
             ("m6a", (m6a, None, Some(m6a_qual))),
             ("5mC", (cpg, None, Some(cpg_qual))),
             ("nuc", (nuc_st, Some(nuc_en), None)),
-            ("msp", (msp_st, Some(msp_en), Some(fire))),
+            ("msp", (msp_st, Some(msp_en), None)),
+            ("fire", (fire_st, Some(fire_en), Some(fire_qual))),
         ] {
             let starts = vals.0.iter().collect::<Vec<_>>();
             let ends: Vec<Option<i64>> = match vals.1 {

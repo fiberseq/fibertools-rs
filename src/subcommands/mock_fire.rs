@@ -1,8 +1,10 @@
 use crate::cli::MockFireOptions;
 use crate::utils::bio_io::{self, read_bed_regions, BedRecord};
+use crate::utils::ma_io;
 use anyhow::{Context, Result};
+use molecular_annotation::MolecularAnnotations;
 use rust_htslib::bam::header::HeaderRecord;
-use rust_htslib::bam::record::{Aux, Cigar, CigarString};
+use rust_htslib::bam::record::{Cigar, CigarString};
 use rust_htslib::bam::{Header, HeaderView, Record};
 use std::collections::HashMap;
 
@@ -120,20 +122,16 @@ fn create_mock_fire_record(
         quals.push(quality);
     }
 
-    // Add the MSP start positions (as tag)
-    record
-        .push_aux(b"as", Aux::ArrayU32((&starts).into()))
-        .context("Failed to add 'as' tag (MSP starts)")?;
-
-    // Add the MSP lengths (al tag)
-    record
-        .push_aux(b"al", Aux::ArrayU32((&lengths).into()))
-        .context("Failed to add 'al' tag (MSP lengths)")?;
-
-    // Add the FIRE quality scores (aq tag) - this is what makes them FIRE elements
-    record
-        .push_aux(b"aq", Aux::ArrayU8((&quals).into()))
-        .context("Failed to add 'aq' tag (FIRE quality scores)")?;
+    // Build MA-spec annotations and emit. Mock FIRE only produces MSPs with
+    // the FIRE precision (Q-scaled) quality; no nucleosomes are populated.
+    // Direct `ensure_basemod_encoding` + `ma_io::write_record` (rather than
+    // the `FiberseqData::serialize_annotations` path used elsewhere) is
+    // intentional here — we're synthesizing a record from BED, so there's no
+    // `FiberseqData` to round-trip through.
+    let mut annot = MolecularAnnotations::from_record(&record);
+    ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
+    ma_io::ensure_basemod_encoding(&mut annot);
+    ma_io::write_record(&mut record, &annot);
 
     Ok(record)
 }

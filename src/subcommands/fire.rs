@@ -1,10 +1,9 @@
 use super::decorator::get_fire_color;
 use crate::cli::FireOptions;
 use crate::fiber::FiberseqData;
-use crate::utils::bio_io;
+use crate::utils::{bio_io, ma_io};
 use crate::*;
 use anyhow;
-use bam::record::{Aux, AuxArray};
 use gbdt::gradient_boost::GBDT;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -18,15 +17,51 @@ pub fn add_fire_to_rec(
 ) {
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
+    // FIRE produces precisions in MSP-iteration (BAM) order. Convert to
+    // molecular orientation so they pair with the molecular-ordered MSP
+    // coords that go into the MA tag.
     if rec.record.is_reverse() {
         precisions.reverse();
     }
-    let aux_array: AuxArray<u8> = (&precisions).into();
-    let aux_array_field = Aux::ArrayU8(aux_array);
-    rec.record.remove_aux(b"aq").unwrap_or(()); // remove any existing ML field
-    rec.record
-        .push_aux(b"aq", aux_array_field)
-        .expect("Cannot add FIRE precision to bam");
+
+    // FIRE is the filtered subset of MSPs with non-zero precision —
+    // the MSPs whose XGB prediction crossed the "this is a regulatory
+    // element" threshold. Build that subset from the per-MSP coords
+    // and their paired precisions, keeping only entries with p > 0.
+    let (fire_starts, fire_lens, fire_quals): (Vec<u32>, Vec<u32>, Vec<u8>) = {
+        let Some(msp) = rec.annotations.get_type(ma_io::MSP_TYPE) else {
+            log::warn!("FIRE: no msp annotations on record; skipping");
+            return;
+        };
+        if msp.annotations.len() != precisions.len() {
+            log::warn!(
+                "FIRE precision count ({}) does not match MSP count ({}); skipping",
+                precisions.len(),
+                msp.annotations.len(),
+            );
+            return;
+        }
+        let mut s = Vec::new();
+        let mut l = Vec::new();
+        let mut q = Vec::new();
+        for (a, &p) in msp.annotations.iter().zip(precisions.iter()) {
+            if p > 0 {
+                s.push(a.start);
+                l.push(a.length);
+                q.push(p);
+            }
+        }
+        (s, l, q)
+    };
+    // Drop any pre-existing fire annotations so a re-run replaces, rather
+    // than appends to, the previous call.
+    rec.annotations
+        .annotation_types
+        .retain(|t| t.name != ma_io::FIRE_TYPE);
+    ma_io::add_fire_annotations(&mut rec.annotations, &fire_starts, &fire_lens, &fire_quals);
+
+    rec.serialize_annotations();
+
     log::trace!("precisions: {precisions:?}");
 }
 
@@ -84,15 +119,17 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
     //out_buffer.write_all(header.as_bytes())?;
 
     for rec in fibers {
-        let msp_starts = rec.msp.reference_starts();
-        let nuc_starts = rec.nuc.reference_starts();
+        let msp = rec.msp();
+        let nuc = rec.nuc();
+        let msp_starts = msp.reference_starts();
+        let nuc_starts = nuc.reference_starts();
         let start_iter = msp_starts.iter().chain(nuc_starts.iter());
 
-        let msp_ends = rec.msp.reference_ends();
-        let nuc_ends = rec.nuc.reference_ends();
+        let msp_ends = msp.reference_ends();
+        let nuc_ends = nuc.reference_ends();
         let end_iter = msp_ends.iter().chain(nuc_ends.iter());
-        let msp_qual = rec.msp.qual();
-        let nuc_qual = rec.nuc.qual();
+        let msp_qual = msp.qual();
+        let nuc_qual = nuc.qual();
         let qual_iter = msp_qual.iter().chain(nuc_qual.iter());
         let n_msps = msp_starts.len();
         for (count, ((start, end), qual)) in start_iter.zip(end_iter).zip(qual_iter).enumerate() {

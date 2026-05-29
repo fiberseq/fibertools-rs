@@ -147,17 +147,18 @@ impl FiberFilters {
         if !self.fire_filter_active() {
             return true;
         }
-        let n_msps = rec.msp.annotations.len();
+        let msp = rec.msp();
+        let n_msps = msp.len();
         if n_msps == 0 {
             return false;
         }
-        if self.resolved_skip_no_m6a() && rec.m6a.annotations.is_empty() {
+        if self.resolved_skip_no_m6a() && rec.m6a().is_empty() {
             return false;
         }
         if n_msps < self.resolved_min_msp() {
             return false;
         }
-        let ave_msp_size = rec.msp.lengths().iter().sum::<i64>() / n_msps as i64;
+        let ave_msp_size = msp.lengths().iter().sum::<i64>() / n_msps as i64;
         if ave_msp_size < self.resolved_min_ave_msp_size() {
             return false;
         }
@@ -320,47 +321,31 @@ impl std::default::Default for InputBam {
 mod tests {
     use super::*;
     use crate::fiber::FiberseqData;
-    use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
-    use crate::utils::basemods::BaseMods;
+    use crate::utils::basemods::M6A_TYPE;
+    use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 
     /// Build a minimal `FiberseqData` shaped only for `passes_fire_filter`.
-    /// `msp_lengths` populates `rec.msp.annotations` (each entry contributes
-    /// to count and average size). `m6a_count` controls whether `m6a`
-    /// annotations are empty or present (only emptiness matters for the
-    /// filter).
+    /// `msp_lengths` populates the `msp` annotation type (each entry
+    /// contributes to count and average size). `m6a_count` controls whether
+    /// the `m6a` annotation type is empty or present (only emptiness
+    /// matters for the filter).
     fn make_fsd(msp_lengths: &[i64], m6a_count: usize) -> FiberseqData {
-        let msp_anns: Vec<FiberAnnotation> = msp_lengths
-            .iter()
-            .map(|&len| FiberAnnotation {
-                start: 0,
-                end: len,
-                length: len,
-                qual: 0,
-                reference_start: None,
-                reference_end: None,
-                reference_length: None,
-                extra_columns: None,
-            })
-            .collect();
-        let m6a_anns: Vec<FiberAnnotation> = (0..m6a_count)
-            .map(|i| FiberAnnotation {
-                start: i as i64,
-                end: i as i64 + 1,
-                length: 1,
-                qual: 0,
-                reference_start: None,
-                reference_end: None,
-                reference_length: None,
-                extra_columns: None,
-            })
-            .collect();
+        let mut annotations = MolecularAnnotations::new(1000);
+        if !msp_lengths.is_empty() {
+            let t = annotations.add_annotation_type("msp", QualitySpec::none());
+            for &len in msp_lengths {
+                t.add(0, len as u32, Strand::Forward, vec![], None);
+            }
+        }
+        if m6a_count > 0 {
+            let t = annotations.add_annotation_type(M6A_TYPE, "Q".parse().expect("Q parses"));
+            for i in 0..m6a_count {
+                t.add(i as u32, 1, Strand::Forward, vec![0], None);
+            }
+        }
         FiberseqData {
             record: rust_htslib::bam::Record::new(),
-            msp: FiberAnnotations::from_annotations(msp_anns, 1000, false),
-            nuc: FiberAnnotations::from_annotations(vec![], 1000, false),
-            m6a: FiberAnnotations::from_annotations(m6a_anns, 1000, false),
-            cpg: FiberAnnotations::from_annotations(vec![], 1000, false),
-            base_mods: BaseMods { base_mods: vec![] },
+            annotations,
             ec: 0.0,
             target_name: ".".to_string(),
             rg: ".".to_string(),

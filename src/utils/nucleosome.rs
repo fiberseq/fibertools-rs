@@ -1,8 +1,7 @@
 use crate::cli::NucleosomeParameters;
-use rust_htslib::{
-    bam,
-    bam::record::{Aux, AuxArray},
-};
+use crate::utils::ma_io;
+use molecular_annotation::MolecularAnnotations;
+use rust_htslib::bam;
 
 pub fn find_nucleosomes(m6a: &[i64], options: &NucleosomeParameters) -> Vec<(i64, i64)> {
     let mut nucs = vec![];
@@ -185,17 +184,16 @@ pub fn filter_for_end(
         .unzip()
 }
 
-pub fn add_nucleosomes_to_record(
-    record: &mut bam::Record,
+/// Compute nucleosomes + MSPs from `m6a` calls and append them to
+/// `annot` in place. Writing the MA tags onto the record is the
+/// caller's responsibility (typically via [`FiberseqData::serialize_annotations`]
+/// or [`ma_io::ensure_basemod_encoding`] + [`ma_io::write_record`]).
+pub fn add_nucleosomes_to_annotations(
+    record: &bam::Record,
+    annot: &mut MolecularAnnotations,
     m6a: &[i64],
     options: &NucleosomeParameters,
 ) {
-    record.remove_aux(b"ns").unwrap_or(());
-    record.remove_aux(b"nl").unwrap_or(());
-    record.remove_aux(b"as").unwrap_or(());
-    record.remove_aux(b"al").unwrap_or(());
-    record.remove_aux(b"aq").unwrap_or(());
-
     let nucs = if options.allowed_m6a_skips < 0 {
         find_nucleosomes(m6a, options)
     } else {
@@ -205,18 +203,15 @@ pub fn add_nucleosomes_to_record(
     let (nuc_starts, nuc_lengths) = filter_for_end(record, &nucs, options.distance_from_end);
     let (msp_starts, msp_lengths) = filter_for_end(record, &msps, options.distance_from_end);
 
-    for (&tag, array) in
-        [b"ns", b"nl", b"as", b"al"]
-            .iter()
-            .zip([nuc_starts, nuc_lengths, msp_starts, msp_lengths])
-    {
-        if array.is_empty() {
-            continue;
-        }
-        let aux_array: AuxArray<u32> = (&array).into();
-        let aux_array_field = Aux::ArrayU32(aux_array);
-        record.push_aux(tag, aux_array_field).unwrap();
-    }
+    // Drop any pre-existing nuc/msp/fire annotations so a re-run replaces
+    // the previous call rather than appending. fire is paired 1:1 with msp
+    // by construction, so leaving fire behind while replacing msp would
+    // strand fire precisions against unrelated MSPs.
+    annot.annotation_types.retain(|t| {
+        t.name != ma_io::NUC_TYPE && t.name != ma_io::MSP_TYPE && t.name != ma_io::FIRE_TYPE
+    });
+    ma_io::add_nuc_annotations(annot, &nuc_starts, &nuc_lengths);
+    ma_io::add_msp_annotations(annot, &msp_starts, &msp_lengths, None);
 }
 
 #[cfg(test)]

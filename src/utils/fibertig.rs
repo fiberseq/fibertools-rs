@@ -1,12 +1,29 @@
 use crate::cli::PgInjectOptions;
 use crate::subcommands::pg_pansn;
-pub use crate::utils::bamannotations::{FiberAnnotation, FiberAnnotations};
 use crate::utils::bio_io;
 use anyhow::{Context, Result};
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::{Header, HeaderView, Read, Record};
 use std::collections::HashMap;
+
+/// Annotation type name used by the fibertig BED ↔ BAM pipeline.
+pub const FIBERTIG_TYPE: &str = "fibertig";
+
+/// Percent-encode `,` (and `%` itself) on the way into `Annotation.name`,
+/// so BED column 4+ values containing `,` survive the MA-spec `AN` tag's
+/// non-escapable `,` separator. The `%` -> `%25` step has to happen first
+/// so the encoding is round-trippable.
+fn encode_name_field(field: &str) -> String {
+    field.replace('%', "%25").replace(',', "%2C")
+}
+
+/// Reverse of [`encode_name_field`]. `%2C` decodes first so a literal
+/// `%25%2C` round-trips to `%,` rather than being mis-bracketed.
+fn decode_name_field(field: &str) -> String {
+    field.replace("%2C", ",").replace("%25", "%")
+}
 
 pub struct FiberTig {
     pub header: Header,
@@ -15,18 +32,32 @@ pub struct FiberTig {
 }
 
 impl FiberTig {
-    /// Read BED file and return a mapping from contig name to FiberAnnotations and the header line if present
+    /// Read a BED file and return per-contig [`MolecularAnnotations`] plus
+    /// the BED header line if present. Each BED row becomes one annotation
+    /// in the [`FIBERTIG_TYPE`] type; extra columns (4..N) are percent-
+    /// encoded (only `,` -> `%2C` and `%` -> `%25`) and then `;`-joined
+    /// into [`Annotation::name`]. The encoding is necessary because the
+    /// MA-spec `AN` tag uses `,` as a non-escapable separator; without it,
+    /// a comma in a BED name would silently split into a second AN entry
+    /// and break the MA↔AN count balance on read-back. `extract_to_bed`
+    /// decodes the fields back before writing.
+    ///
+    /// Annotations within each contig are sorted by molecular start, and
+    /// each [`MolecularAnnotations`]'s `read_length` is set to that
+    /// contig's length from the BAM header (no aligned blocks are needed
+    /// here — ref coords for identity-aligned records are derived later).
     pub fn read_bed_annotations(
         bed_path: &str,
         header_view: &HeaderView,
-    ) -> Result<(HashMap<String, FiberAnnotations>, Option<String>)> {
+    ) -> Result<(HashMap<String, MolecularAnnotations>, Option<String>)> {
         use std::io::BufRead;
 
         let reader = bio_io::buffer_from(bed_path).context("Failed to open BED file")?;
-        let mut contig_annotations: HashMap<String, Vec<FiberAnnotation>> = HashMap::new();
+        // Per-contig (start, length, name) tuples collected first so we can
+        // sort by start before pushing into MolecularAnnotations.
+        let mut contig_rows: HashMap<String, Vec<(u32, u32, Option<String>)>> = HashMap::new();
         let mut bed_header: Option<String> = None;
 
-        // Parse BED file line by line (simple approach)
         for (line_num, line) in reader.lines().enumerate() {
             let line = line?;
             if line.starts_with('#') && line_num == 0 {
@@ -34,70 +65,62 @@ impl FiberTig {
                 continue;
             }
             if line.starts_with('#') || line.trim().is_empty() {
-                continue; // Skip comments and empty lines
+                continue;
             }
 
             let fields: Vec<&str> = line.split('\t').collect();
             if fields.len() < 3 {
-                continue; // Skip malformed lines
+                continue;
             }
 
             let contig_name = fields[0].to_string();
-            let start: i64 = fields[1]
+            let start: u32 = fields[1]
                 .parse()
                 .context("Failed to parse start position")?;
-            let end: i64 = fields[2].parse().context("Failed to parse end position")?;
+            let end: u32 = fields[2].parse().context("Failed to parse end position")?;
             let length = end - start;
 
-            // Capture extra columns if they exist (columns 4 and beyond)
-            let extra_columns = if fields.len() > 3 {
-                Some(fields[3..].iter().map(|s| s.to_string()).collect())
+            // BED columns 4+ → `Annotation.name`. Each field is percent-
+            // encoded so commas survive the MA-spec AN tag's hard ','
+            // separator, then ';'-joined into a single name string.
+            // `extract_to_bed` reverses this on the way out.
+            let name = if fields.len() > 3 {
+                let encoded: Vec<String> =
+                    fields[3..].iter().map(|f| encode_name_field(f)).collect();
+                Some(encoded.join(";"))
             } else {
                 None
             };
 
-            let annotation = FiberAnnotation {
-                start,
-                end,
-                length,
-                qual: 0,
-                reference_start: Some(start),
-                reference_end: Some(end),
-                reference_length: Some(length),
-                extra_columns,
-            };
-
-            contig_annotations
+            contig_rows
                 .entry(contig_name)
                 .or_default()
-                .push(annotation);
+                .push((start, length, name));
         }
 
-        // Convert to FiberAnnotations for each contig
-        let mut fiber_annotations_map = HashMap::new();
-        for (contig_name, mut annotations) in contig_annotations {
-            // Sort annotations by start position for this contig
-            annotations.sort_by_key(|a| a.start);
+        let mut out = HashMap::new();
+        for (contig_name, mut rows) in contig_rows {
+            rows.sort_by_key(|(s, _, _)| *s);
 
-            // Get sequence length for this contig
             let tid = header_view
                 .tid(contig_name.as_bytes())
                 .with_context(|| format!("Contig '{contig_name}' not found in BAM header"))?;
             let seq_len = header_view
                 .target_len(tid)
                 .with_context(|| format!("Failed to get length for contig '{contig_name}'"))?
-                as i64;
+                as u32;
 
-            let fiber_annotations = FiberAnnotations::from_annotations(
-                annotations,
-                seq_len,
-                false, // BED coordinates are always forward
-            );
-
-            fiber_annotations_map.insert(contig_name, fiber_annotations);
+            let mut annot = MolecularAnnotations::new(seq_len);
+            if !rows.is_empty() {
+                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+                for (s, l, name) in rows {
+                    t.add(s, l, Strand::Forward, vec![], name);
+                }
+            }
+            out.insert(contig_name, annot);
         }
 
-        Ok((fiber_annotations_map, bed_header))
+        Ok((out, bed_header))
     }
 
     pub fn read_fasta_into_vec(fasta_path: &str) -> Result<Vec<(String, fasta::record::Record)>> {
@@ -163,6 +186,11 @@ impl FiberTig {
         record.set_tid(tid);
         record.set_pos(pos);
         record.set_mapq(60); // High mapping quality
+        // `Record::new()` starts with the unmapped flag set. These records
+        // have tid/pos/CIGAR — they are mapped — so clear it. Otherwise the
+        // MA-spec reader's `AlignedBlocks::from_record` early-returns and
+        // ref coords come back as `None` on the round-trip read.
+        record.unset_unmapped();
         record.unset_paired(); // Unpaired read
         record.set_mtid(-1); // No mate ID for unpaired read
         record.set_mpos(-1); // No mate position
@@ -170,76 +198,85 @@ impl FiberTig {
         record
     }
 
-    /// Determine split points based on BED annotations
-    /// For each sequence, find the first annotation that ends past split_size and use that as split point
+    /// Determine split points based on BED annotations.
+    /// For each sequence, find the first annotation that ends past
+    /// `split_size` and use that as the split boundary. The split bound
+    /// extends out past `split_size` if needed so no annotation is cut
+    /// in half.
+    ///
+    /// Returns `((window_start, window_end), per-window MolecularAnnotations)`.
+    /// Coordinates in the returned annotations are still contig-absolute;
+    /// `create_annotated_records_from_splits` shifts them record-relative
+    /// when serializing the record's MA-spec tags.
     pub fn approximately_divide_annotations_by_window_size(
         seq_len: i64,
         split_size: i64,
-        annotations: &FiberAnnotations,
-    ) -> Vec<((i64, i64), FiberAnnotations)> {
-        let mut split_to_annotations: Vec<((i64, i64), FiberAnnotations)> = Vec::new();
+        annotations: &MolecularAnnotations,
+    ) -> Vec<((i64, i64), MolecularAnnotations)> {
+        let read_length = annotations.read_length;
+        let peaks: Vec<(u32, u32, Option<String>)> = annotations
+            .get_type(FIBERTIG_TYPE)
+            .map(|t| {
+                t.annotations
+                    .iter()
+                    .map(|a| (a.start, a.length, a.name.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
         if split_size >= seq_len {
-            split_to_annotations.push(((0, seq_len), annotations.clone()));
-            return split_to_annotations;
+            return vec![((0, seq_len), annotations.clone())];
         }
 
-        let mut current_start = 0;
-        let mut current_target_end = std::cmp::min(split_size, seq_len);
-        let mut current_annotations = Vec::new();
-        let mut anno_index = 0;
+        let mut out: Vec<((i64, i64), MolecularAnnotations)> = Vec::new();
+        let mut current_start: i64 = 0;
+        let mut current_target_end: i64 = std::cmp::min(split_size, seq_len);
+        let mut current_peaks: Vec<(u32, u32, Option<String>)> = Vec::new();
 
-        while anno_index < annotations.annotations.len() {
-            let anno = &annotations.annotations[anno_index];
-            // If the annotation starts after the current target end, we need to split
-            if anno.start >= current_target_end {
-                // Save the current split
-                split_to_annotations.push((
-                    (current_start, current_target_end),
-                    FiberAnnotations::from_annotations(
-                        current_annotations.clone(),
-                        seq_len,
-                        false, // BED coordinates are always forward
-                    ),
-                ));
+        let mut push_window = |start: i64, end: i64, peaks: Vec<(u32, u32, Option<String>)>| {
+            let mut annot = MolecularAnnotations::new(read_length);
+            if !peaks.is_empty() {
+                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+                for (s, l, name) in peaks {
+                    t.add(s, l, Strand::Forward, vec![], name);
+                }
+            }
+            out.push(((start, end), annot));
+        };
 
-                // Move to the next split
-                current_start = anno.start;
+        for (s, l, name) in peaks {
+            let s_i = s as i64;
+            let e_i = (s + l) as i64;
+            if s_i >= current_target_end {
+                // close the current window before starting a new one
+                push_window(
+                    current_start,
+                    current_target_end,
+                    std::mem::take(&mut current_peaks),
+                );
+                current_start = s_i;
                 current_target_end = std::cmp::min(current_start + split_size, seq_len);
-                current_annotations.clear();
             }
-
-            // if the annotation ends after the current target end, we need to extend the target end
-            if anno.end > current_target_end {
-                current_target_end = anno.end;
+            if e_i > current_target_end {
+                current_target_end = e_i;
             }
-            // Add the annotation to the current annotations
-            current_annotations.push(anno.clone());
-            anno_index += 1;
+            current_peaks.push((s, l, name));
         }
 
-        // If we have any remaining annotations after the last split, add them
-        if !current_annotations.is_empty() {
-            current_target_end = std::cmp::min(seq_len, current_target_end);
-            split_to_annotations.push((
-                (current_start, current_target_end),
-                FiberAnnotations::from_annotations(
-                    current_annotations,
-                    seq_len,
-                    false, // BED coordinates are always forward
-                ),
-            ));
+        if !current_peaks.is_empty() {
+            let end = std::cmp::min(seq_len, current_target_end);
+            push_window(current_start, end, current_peaks);
         }
 
-        split_to_annotations
+        out
     }
 
-    /// Create BAM records from split annotations and sequence
-    /// This combines record creation and annotation in one step
+    /// Create BAM records from split annotations and sequence.
+    /// Combines record creation and annotation in one step.
     pub fn create_annotated_records_from_splits(
         contig_name: &str,
         fasta_record: &fasta::record::Record,
-        split_annotations: &mut [((i64, i64), FiberAnnotations)],
+        split_annotations: &mut [((i64, i64), MolecularAnnotations)],
         header_view: &HeaderView,
     ) -> Result<Vec<Record>> {
         let mut records = Vec::new();
@@ -302,20 +339,18 @@ impl FiberTig {
                 .push_aux(b"xe", rust_htslib::bam::record::Aux::U32(end_pos as u32))
                 .context("Failed to add xe tag")?;
 
-            // Apply annotations to this record
-            // Adjust annotation coordinates to be relative to record start
-            for annotation in annotations.annotations.iter_mut() {
-                annotation.start -= start_pos as i64;
-                annotation.end -= start_pos as i64;
+            // Apply annotations to this record. Coordinates in `annotations`
+            // are still contig-absolute (per
+            // `approximately_divide_annotations_by_window_size`), so shift
+            // them record-relative before serializing.
+            if let Some(t) = annotations.get_type_mut(FIBERTIG_TYPE) {
+                for a in t.annotations.iter_mut() {
+                    a.start = a.start.saturating_sub(start_pos as u32);
+                }
             }
 
-            // Write annotations to BAM tags
-            annotations.write_to_bam_tags(
-                &mut record,
-                b"fs",       // feature starts
-                b"fl",       // feature lengths
-                Some(b"fa"), // feature annotations (extra columns)
-            )?;
+            crate::utils::ma_io::ensure_basemod_encoding(annotations);
+            crate::utils::ma_io::write_record(&mut record, annotations);
 
             records.push(record);
         }
@@ -465,7 +500,7 @@ impl FiberTig {
                     // Determine split points based on annotations
                     let mut split_annotations =
                         Self::approximately_divide_annotations_by_window_size(
-                            annotations.seq_len,
+                            annotations.read_length as i64,
                             split_size as i64,
                             annotations,
                         );
@@ -531,65 +566,46 @@ impl FiberTig {
     // IO functions
     //
 
-    /// Extract BED annotations from an annotated BAM file using FiberAnnotations
+    /// Extract BED annotations from an annotated BAM file using the
+    /// MA-spec tags and the record's aligned blocks (for ref coords).
     pub fn extract_to_bed(opts: &PgInjectOptions) -> Result<()> {
         use crate::utils::bio_io;
         use std::io::Write;
 
-        // Open the BAM file (using the reference field as the input BAM)
         let mut reader = bio_io::bam_reader(&opts.reference);
         let mut header = Header::from_template(reader.header());
         pg_pansn::apply_pansn_transformations(&mut header, &opts.pansn)?;
         let header_view = HeaderView::from_header(&header);
 
-        // Open output file for BED data
         let mut writer = bio_io::writer(&opts.out)?;
 
-        // Extract and write BED header if present
         if let Some(bed_header) = Self::extract_bed_header_from_bam_header(&header) {
             writeln!(writer, "{}", bed_header)?;
         }
 
-        // Read through BAM records and extract annotations
         for result in reader.records() {
             let record = result?;
-
-            // Skip unmapped reads
             if record.tid() < 0 {
                 continue;
             }
+            let annot = crate::utils::ma_io::read_record(&record)?;
+            if annot.get_type(FIBERTIG_TYPE).is_none() {
+                continue;
+            }
+            let contig_name =
+                std::str::from_utf8(header_view.tid2name(record.tid() as u32))?.to_string();
 
-            // Try to extract annotations using the standard fs/fl/fa tags
-            if let Some(fiber_annotations) = FiberAnnotations::from_bam_tags(
-                &record,
-                b"fs",       // feature starts
-                b"fl",       // feature lengths
-                Some(b"fa"), // feature annotations
-            )? {
-                // Get contig name from header
-                let contig_name =
-                    std::str::from_utf8(header_view.tid2name(record.tid() as u32))?.to_string();
-
-                // Write each annotation as a BED line
-                for annotation in &fiber_annotations.annotations {
-                    // Skip if reference coordinates are None
-                    let (ref_start, ref_end) =
-                        match (annotation.reference_start, annotation.reference_end) {
-                            (Some(start), Some(end)) => (start, end),
-                            _ => continue, // Skip this annotation if coordinates are missing
-                        };
-
-                    // Write basic BED format (chrom, start, end)
-                    write!(writer, "{contig_name}\t{ref_start}\t{ref_end}")?;
-
-                    // Add extra columns if they exist
-                    if let Some(ref extra_cols) = annotation.extra_columns {
-                        for col in extra_cols {
-                            write!(writer, "\t{col}")?;
-                        }
+            for info in annot.iter_type(FIBERTIG_TYPE).into_iter().flatten() {
+                let (Some(ref_start), Some(ref_end)) = (info.ref_start, info.ref_end) else {
+                    continue;
+                };
+                write!(writer, "{contig_name}\t{ref_start}\t{ref_end}")?;
+                if let Some(name) = info.name {
+                    for col in name.split(';') {
+                        write!(writer, "\t{}", decode_name_field(col))?;
                     }
-                    writeln!(writer)?;
                 }
+                writeln!(writer)?;
             }
         }
 

@@ -18,6 +18,9 @@ exclude = ["py-ft/", "tests/data/", "Train-FIRE/"]
 members = ["molecular-annotation"]
 exclude = ["py-ft", "molecular-annotation/python"]
 
+[workspace.dependencies]
+rust-htslib = "0.46"
+
 [[bin]]
 name = "ft"
 path = "src/main.rs"
@@ -50,7 +53,7 @@ ordered-float = "3.4.0"
 rayon = "1.10"
 linear-map = "1.2.0"
 regex = "1.9.1"
-rust-htslib = "0.46"
+rust-htslib = { workspace = true }
 
 
 serde = { version = "1.0.104", features = ["derive"], optional = false }
@@ -69,6 +72,7 @@ burn = { version = "0.18.0", optional = true, features = [
 num = "0.4.3"
 rand = "0.8.5"
 noodles = { version = "0.100.0", features = ["fasta", "bed"] }
+molecular-annotation = { path = "molecular-annotation", features = ["htslib"] }
 
 [build-dependencies]
 burn-import = { version = "0.18.0", default-features = false, features = [

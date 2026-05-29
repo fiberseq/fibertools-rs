@@ -1,9 +1,10 @@
 use crate::cli::DddaToM6aOptions;
 use crate::utils::basemods;
-use crate::utils::basemods::BaseMods;
+use crate::utils::ma_io;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;
+use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rust_htslib::bam::Record;
@@ -21,18 +22,21 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
         forward_seq = revcomp(&forward_seq);
     }
 
-    // get the bases that will be modified
-    let mut modified_bases_forward = vec![];
+    // Positions to mark as m6a, paired with the canonical post-Y/R base
+    // they land on (T for Y, A for R) in molecular orientation. We carry
+    // the base alongside the position so the write path knows the right
+    // MM group header without re-indexing the (possibly revcomp'd) seq.
+    let mut modified_bases_forward: Vec<(u32, u8)> = vec![];
     let mut y_count = 0;
     let mut r_count = 0;
     let mut new_forward_seq = vec![];
     for (idx, bp) in forward_seq.iter().enumerate() {
         if bp == &b'Y' {
-            modified_bases_forward.push(idx as i64);
+            modified_bases_forward.push((idx as u32, b'T'));
             y_count += 1;
             new_forward_seq.push(b'T');
         } else if bp == &b'R' {
-            modified_bases_forward.push(idx as i64);
+            modified_bases_forward.push((idx as u32, b'A'));
             r_count += 1;
             new_forward_seq.push(b'A');
         } else {
@@ -47,16 +51,6 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
         return;
     }
 
-    // check if we should set the read to the top or bottom strand
-    let is_top_strand = y_count > 0;
-
-    // set things up for the bottom strand
-    // let is_bottom_strand = !is_top_strand;
-    //if is_bottom_strand {
-    //    flag |= 1 << 4;
-    //    record.set_flags(flag);
-    //    record.set_reverse();
-    //}
     if was_reverse {
         // must reverse complement the new sequence if we are on the bottom strand
         new_forward_seq = revcomp(&new_forward_seq);
@@ -65,31 +59,28 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
     // set values for the new modified record
     record.set(&q_name, Some(&cigar), &new_forward_seq, &qual);
 
-    // set up the fake base mods
-    let (modified_base, strand) = if is_top_strand {
-        (b'T', '-')
-    } else {
-        (b'A', '+')
-    };
-    let modification_type = 'a';
-    let modified_probabilities_forward = vec![255; modified_bases_forward.len()];
-
-    let fake_base_mods = basemods::BaseMod::new(
-        record,
-        modified_base,
-        strand,
-        modification_type,
-        modified_bases_forward,
-        modified_probabilities_forward,
-    );
-
-    // add to the record
-    let mut base_mods = basemods::BaseMods::new(record, 0);
-    base_mods.base_mods.push(fake_base_mods);
-    base_mods.add_mm_and_ml_tags(record);
-
-    // validates that the base mods were added correctly
-    let _ = BaseMods::new(record, 0);
+    // Load existing MM/ML into a MolecularAnnotations, drop any
+    // pre-existing m6a (we're replacing it with the Y/R-derived calls),
+    // then append the synthesized m6a and write back. Each call gets
+    // its canonical MM group header (A+a or T-a) tagged via
+    // `canonical_header` so the library's MM/ML serializer emits the
+    // right groups.
+    let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
+        log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+        MolecularAnnotations::from_record(record)
+    });
+    annot
+        .annotation_types
+        .retain(|t| t.name != basemods::M6A_TYPE);
+    let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
+    let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
+    for (pos, base) in modified_bases_forward {
+        let header = basemods::canonical_header(basemods::M6A_TYPE, base)
+            .expect("ddda_to_m6a only places calls on A/T bases");
+        t.add(pos, 1, Strand::Forward, vec![255], Some(header.to_string()));
+    }
+    ma_io::ensure_basemod_encoding(&mut annot);
+    ma_io::write_record(record, &annot);
 }
 
 pub fn ddda_to_m6a(opts: &mut DddaToM6aOptions) -> Result<(), Error> {

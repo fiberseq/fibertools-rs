@@ -1,4 +1,5 @@
 use crate::cli::FiberHmmOptions;
+use crate::utils::basemods::M6A_TYPE;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;
@@ -7,8 +8,12 @@ pub fn run_fiber_hmm(opts: &mut FiberHmmOptions) -> Result<(), Error> {
     let mut bam = opts.input.bam_reader();
     let mut out = opts.input.bam_writer(&opts.out);
     for fiber in opts.input.fibers(&mut bam) {
-        // m6a positions on the forward strand
-        let _m6a = fiber.m6a.forward_starts();
+        // m6a positions on the forward (molecular) strand
+        let _m6a: Vec<u32> = fiber
+            .annotations
+            .get_forward_coords(M6A_TYPE)
+            .map(|v| v.into_iter().map(|(s, _)| s).collect())
+            .unwrap_or_default();
         // forward strand sequence
         let mut seq = fiber.record.seq().as_bytes();
         if fiber.record.is_reverse() {
