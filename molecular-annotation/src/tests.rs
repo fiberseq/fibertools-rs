@@ -1761,7 +1761,7 @@ fn round_trip_basic() {
     let mut out = record.clone();
     out.remove_aux(b"MM").unwrap();
     out.remove_aux(b"ML").unwrap();
-    annot.to_record(&mut out);
+    annot.write_mm_ml(&mut out);
 
     let mm = match out.aux(b"MM").unwrap() {
         Aux::String(s) => s.to_string(),
@@ -1793,6 +1793,7 @@ fn round_trip_ma_and_mm_ml_no_cross_contamination() {
     let mut out = Record::new();
     out.set(b"r", None, b"AAAA", &vec![255u8; 4]);
     annot.to_record(&mut out);
+    annot.write_mm_ml(&mut out);
 
     let ma = match out.aux(b"MA").unwrap() {
         Aux::String(s) => s.to_string(),
@@ -1823,12 +1824,12 @@ fn round_trip_is_fixed_point() {
     let annot1 = MolecularAnnotations::from_record(&r1);
     let mut r2 = Record::new();
     r2.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
-    annot1.to_record(&mut r2);
+    annot1.write_mm_ml(&mut r2);
 
     let annot2 = MolecularAnnotations::from_record(&r2);
     let mut r3 = Record::new();
     r3.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
-    annot2.to_record(&mut r3);
+    annot2.write_mm_ml(&mut r3);
 
     let mm2 = match r2.aux(b"MM").unwrap() {
         Aux::String(s) => s.to_string(),
@@ -1850,7 +1851,253 @@ fn round_trip_empty_basemods_no_mm_emitted() {
     let mut r = Record::new();
     r.set(b"r", None, b"AAAA", &vec![255u8; 4]);
     let annot = MolecularAnnotations::new(4);
-    annot.to_record(&mut r);
+    annot.write_mm_ml(&mut r);
     assert!(r.aux(b"MM").is_err());
     assert!(r.aux(b"ML").is_err());
+}
+
+/// Reverse-aligned read: MM/ML is expressed against the forward (template)
+/// sequence, which is the revcomp of the stored BAM sequence. Parse revcomps
+/// to recover forward coords; write revcomps again to re-emit. The stored seq
+/// "TTCTGT" has revcomp "ACAGAA", so "A+a,1,0,0;" must survive untouched.
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_reverse_strand() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"TTCTGT", &vec![255u8; 6]);
+    record.set_flags(0x10); // BAM_FREVERSE
+    record.push_aux(b"MM", Aux::String("A+a,1,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    assert!(annot.is_reverse_aligned());
+
+    let mut out = Record::new();
+    out.set(b"r", None, b"TTCTGT", &vec![255u8; 6]);
+    out.set_flags(0x10);
+    annot.write_mm_ml(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    let ml: Vec<u8> = match out.aux(b"ML").unwrap() {
+        Aux::ArrayU8(a) => a.iter().collect(),
+        _ => panic!("ML not u8 array"),
+    };
+    assert_eq!(mm, "A+a,1,0,0;");
+    assert_eq!(ml, vec![200, 150, 100]);
+}
+
+/// The `.` skip-flag (low-probability-implies-canonical) must survive the
+/// round trip in the MM header.
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_skip_flag_dot_preserved() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAGT", &vec![255u8; 4]);
+    record.push_aux(b"MM", Aux::String("A+a.,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![100u8, 200][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    let mut out = record.clone();
+    out.remove_aux(b"MM").unwrap();
+    out.remove_aux(b"ML").unwrap();
+    annot.write_mm_ml(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    assert_eq!(mm, "A+a.,0,0;");
+}
+
+/// Two independent mod types over different skip bases (m6a `A+a` and cpg
+/// `C+m`) must round-trip with the deterministic `(skip_base, header)`
+/// ordering — 'A' (0x41) sorts before 'C' (0x43), so the group order and the
+/// concatenated ML byte order are stable.
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_m6a_and_cpg_groups() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"ACAGAA", &vec![255u8; 6]);
+    record
+        .push_aux(b"MM", Aux::String("A+a,1,0,0;C+m,0;"))
+        .unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![200u8, 150, 100, 80][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    let mut out = record.clone();
+    out.remove_aux(b"MM").unwrap();
+    out.remove_aux(b"ML").unwrap();
+    annot.write_mm_ml(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    let ml: Vec<u8> = match out.aux(b"ML").unwrap() {
+        Aux::ArrayU8(a) => a.iter().collect(),
+        _ => panic!("ML not u8 array"),
+    };
+    assert_eq!(mm, "A+a,1,0,0;C+m,0;");
+    assert_eq!(ml, vec![200, 150, 100, 80]);
+}
+
+/// Numeric ChEBI mod codes are treated as a single opaque code (not split
+/// per-char like alphabetic codes) and must round-trip intact.
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_numeric_chebi_code() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"CCGT", &vec![255u8; 4]);
+    record.push_aux(b"MM", Aux::String("C+76792,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![50u8, 60][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+    let mut out = record.clone();
+    out.remove_aux(b"MM").unwrap();
+    out.remove_aux(b"ML").unwrap();
+    annot.write_mm_ml(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    let ml: Vec<u8> = match out.aux(b"ML").unwrap() {
+        Aux::ArrayU8(a) => a.iter().collect(),
+        _ => panic!("ML not u8 array"),
+    };
+    assert_eq!(mm, "C+76792,0,0;");
+    assert_eq!(ml, vec![50, 60]);
+}
+
+/// A multi-mod code (`C+mh`) is decomposed on parse into independent `m` and
+/// `h` types, and the writer re-emits them as *separate* groups (`C+h;C+m`,
+/// sorted by header) with grouped — not per-position interleaved — ML. The
+/// trip is therefore NOT a byte-level fixed point, but it IS semantically
+/// lossless: re-parsing the output recovers the same (position, quality) set
+/// for each mod code. This test pins that contract.
+#[cfg(feature = "htslib")]
+#[test]
+fn round_trip_multimod_decomposes_but_preserves_semantics() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"CCGT", &vec![255u8; 4]);
+    record.push_aux(b"MM", Aux::String("C+mh,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![10u8, 20, 30, 40][..]).into()))
+        .unwrap();
+
+    // Per-code (start, qual) sets from the first parse.
+    let annot1 = MolecularAnnotations::from_record(&record);
+    let code_calls = |a: &MolecularAnnotations, code: &str| -> Vec<(u32, u8)> {
+        let t = a.get_type(code).unwrap();
+        let mut v: Vec<(u32, u8)> = t
+            .annotations
+            .iter()
+            .map(|an| (an.start, an.qualities.first().copied().unwrap_or(0)))
+            .collect();
+        v.sort();
+        v
+    };
+    let m1 = code_calls(&annot1, "m");
+    let h1 = code_calls(&annot1, "h");
+    assert_eq!(m1, vec![(0, 10), (1, 30)]);
+    assert_eq!(h1, vec![(0, 20), (1, 40)]);
+
+    // Write, then re-parse.
+    let mut out = record.clone();
+    out.remove_aux(b"MM").unwrap();
+    out.remove_aux(b"ML").unwrap();
+    annot1.write_mm_ml(&mut out);
+
+    // Output is the decomposed, header-sorted form — NOT the input string.
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    assert_eq!(mm, "C+h,0,0;C+m,0,0;");
+
+    // ...but the semantics survive: same per-code (start, qual) sets.
+    let annot2 = MolecularAnnotations::from_record(&out);
+    assert_eq!(code_calls(&annot2, "m"), m1);
+    assert_eq!(code_calls(&annot2, "h"), h1);
+}
+
+/// Read/passthrough path: `to_record` writes only MA-family tags and must
+/// leave the record's MM/ML bytes untouched. This is what guarantees a
+/// byte-identical round trip for spec-legal encodings the normalized model
+/// can't represent — here a grouped multi-code `C+mh`, which `write_mm_ml`
+/// would canonically decompose to `C+h;C+m`. A path that doesn't produce or
+/// modify base mods never re-encodes, so the original bytes survive verbatim.
+#[cfg(feature = "htslib")]
+#[test]
+fn passthrough_to_record_preserves_mm_ml_byte_identical() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    let mut record = Record::new();
+    record.set(b"r", None, b"CCGT", &vec![255u8; 4]);
+    record.push_aux(b"MM", Aux::String("C+mh,0,0;")).unwrap();
+    record
+        .push_aux(b"ML", Aux::ArrayU8((&vec![10u8, 20, 30, 40][..]).into()))
+        .unwrap();
+
+    let annot = MolecularAnnotations::from_record(&record);
+
+    // Read path: write MA-family tags only, leaving MM/ML alone.
+    let mut out = record.clone();
+    annot.to_record(&mut out);
+
+    let mm = match out.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    let ml: Vec<u8> = match out.aux(b"ML").unwrap() {
+        Aux::ArrayU8(a) => a.iter().collect(),
+        _ => panic!("ML not u8 array"),
+    };
+    // Byte-identical to input — NOT the decomposed `C+h,0,0;C+m,0,0;` form.
+    assert_eq!(mm, "C+mh,0,0;");
+    assert_eq!(ml, vec![10, 20, 30, 40]);
+
+    // Contrast: the producer path (`write_mm_ml`) decomposes the same input.
+    let mut reenc = Record::new();
+    reenc.set(b"r", None, b"CCGT", &vec![255u8; 4]);
+    annot.write_mm_ml(&mut reenc);
+    let mm_reenc = match reenc.aux(b"MM").unwrap() {
+        Aux::String(s) => s.to_string(),
+        _ => panic!("MM not string"),
+    };
+    assert_eq!(mm_reenc, "C+h,0,0;C+m,0,0;");
+    assert_ne!(mm, mm_reenc);
 }

@@ -282,7 +282,7 @@ where
             // Tag basemod types as MM/ML-encoded so to_record emits them as
             // MM/ML rather than the MA tag set; nuc/msp/fire stay Encoding::Ma.
             ma_io::ensure_basemod_encoding(&mut annot);
-            ma_io::write_record(record, &annot);
+            ma_io::write_record_with_basemods(record, &annot);
 
             // clear the existing data
             if !opts.keep {

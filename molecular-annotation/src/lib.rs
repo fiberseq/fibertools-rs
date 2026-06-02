@@ -657,13 +657,15 @@ impl MolecularAnnotations {
         }
     }
 
-    /// Write annotations to a BAM record.
+    /// Write MA-family annotations (MA:Z, and optionally AL:B:I, AQ:B:C,
+    /// AN:Z) to a BAM record.
     ///
-    /// This sets the MA:Z tag, and optionally AL:B:I, AQ:B:C, and AN:Z tags
-    /// depending on the encoding format and whether quality/names are present.
-    /// Annotation types whose encoding is `MmMl` are emitted as MM:Z + ML:B,C
-    /// tags instead; any pre-existing MM/ML on the record are removed first,
-    /// and if there are no MM/ML-encoded types neither tag is emitted.
+    /// This writes only `Encoding::Ma` annotation types. It deliberately does
+    /// NOT touch the record's MM/ML tags: base-modification types
+    /// (`Encoding::MmMl`) are left to [`write_mm_ml`](Self::write_mm_ml),
+    /// which producers call explicitly. Leaving MM/ML untouched here means any
+    /// read/edit path that doesn't change base mods preserves the record's
+    /// original MM/ML bytes verbatim.
     ///
     /// # Example
     /// ```ignore
@@ -701,6 +703,20 @@ impl MolecularAnnotations {
         if let Some(ref an_str) = an {
             record.push_aux(b"AN", Aux::String(an_str)).ok();
         }
+    }
+
+    /// Emit `MmMl`-encoded annotation types as MM:Z + ML:B,C tags.
+    ///
+    /// Any pre-existing MM/ML on the record are removed first; if there are no
+    /// MM/ML-encoded types, neither tag is emitted. This is a destructive,
+    /// canonical re-encode intended only for callers that actually produce or
+    /// modify base modifications. Read/edit paths that don't change base mods
+    /// must NOT call this: leaving the record's original MM/ML bytes untouched
+    /// preserves them byte-identically, including spec-legal encodings the
+    /// normalized model cannot represent (e.g. grouped multi-code `C+mh`).
+    #[cfg(feature = "htslib")]
+    pub fn write_mm_ml(&self, record: &mut rust_htslib::bam::Record) {
+        use rust_htslib::bam::record::Aux;
 
         // --- MM/ML assembly ---
         let forward_seq: Vec<u8> = if record.is_reverse() {

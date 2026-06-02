@@ -350,7 +350,7 @@ impl FiberTig {
             }
 
             crate::utils::ma_io::ensure_basemod_encoding(annotations);
-            crate::utils::ma_io::write_record(&mut record, annotations);
+            crate::utils::ma_io::write_record_with_basemods(&mut record, annotations);
 
             records.push(record);
         }

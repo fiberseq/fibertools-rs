@@ -131,7 +131,7 @@ fn create_mock_fire_record(
     let mut annot = MolecularAnnotations::from_record(&record);
     ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
     ma_io::ensure_basemod_encoding(&mut annot);
-    ma_io::write_record(&mut record, &annot);
+    ma_io::write_record_with_basemods(&mut record, &annot);
 
     Ok(record)
 }

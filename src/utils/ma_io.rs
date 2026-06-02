@@ -66,15 +66,37 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     Ok(annot)
 }
 
-/// Writes annotations to a BAM record's tags via the library's `to_record`.
+/// Writes MA-family tags (MA/AL/AQ/AN) to a BAM record, **preserving the
+/// record's existing MM/ML bytes**.
 ///
-/// Each `AnnotationType`'s `Encoding` controls which tag set it lands in:
-/// `Encoding::MmMl` types go to MM/ML, `Encoding::Ma` types go to MA/AQ/AN.
-/// Producers must call [`ensure_basemod_encoding`] before this if they
-/// constructed basemod types via `add_annotation_type` (which defaults to
-/// `Encoding::Ma`).
+/// This is the read/edit write path: it does not re-encode base modifications,
+/// so any MM/ML present on the input survives byte-identically (including
+/// spec-legal encodings the normalized model can't represent, such as grouped
+/// multi-code `C+mh`). Use this for subcommands that add or edit non-basemod
+/// annotations (nuc/msp/fire) but do not themselves produce or remove base
+/// mods.
+///
+/// Producers that create or modify base mods must instead call
+/// [`write_record_with_basemods`], which canonically re-emits MM/ML.
 pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
     annot.to_record(record);
+}
+
+/// Writes MA-family tags **and** canonically re-encodes MM/ML from the
+/// annotation model.
+///
+/// For producers/synthesizers (`predict_m6a`, `ddda_to_m6a`, `strip_basemods`,
+/// and record-synthesizing paths) that genuinely create, modify, or remove
+/// base modifications. Any pre-existing MM/ML on the record is replaced by the
+/// canonical encoding of the model's `Encoding::MmMl` types; if the model has
+/// none, MM/ML are removed.
+///
+/// Call [`ensure_basemod_encoding`] first so basemod types are tagged
+/// `Encoding::MmMl` (they default to `Encoding::Ma` when built via
+/// `add_annotation_type`).
+pub fn write_record_with_basemods(record: &mut bam::Record, annot: &MolecularAnnotations) {
+    annot.to_record(record);
+    annot.write_mm_ml(record);
 }
 
 /// Sets `Encoding::MmMl { skip_flag: SkipFlag::Implicit }` on any basemod
@@ -414,7 +436,7 @@ mod tests {
         // Producer contract: tag basemod types with Encoding::MmMl before write.
         ensure_basemod_encoding(&mut annot);
 
-        write_record(&mut record, &annot);
+        write_record_with_basemods(&mut record, &annot);
 
         // Round-trip: read back and assert. After Phase 1's constant flip,
         // M6A_TYPE == "a" — same name the library uses internally, so no
