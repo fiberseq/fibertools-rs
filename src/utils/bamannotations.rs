@@ -1,4 +1,5 @@
 use molecular_annotation::{AnnotationInfo, MolecularAnnotations};
+use std::cell::OnceCell;
 
 /// Extract the single per-annotation quality fibertools expects, returning
 /// 0 when the annotation has none. Debug-asserts that the type carries at
@@ -29,14 +30,25 @@ pub fn primary_qual(qualities: &[u8], type_name: &str) -> u8 {
 /// **BAM-orient ascending** order. The spec stores annotations in
 /// molecular order; for reverse-aligned reads we reverse so consumers
 /// (BED12 blocks, pileup intervals, TSV columns) get ascending output.
+#[derive(Debug)]
 pub struct AnnotationTypeView<'a> {
     annot: &'a MolecularAnnotations,
     type_name: &'a str,
+    /// Memoizes [`Self::bam_ordered`]. Reference-coordinate liftover for
+    /// every annotation runs in `iter_type`, so without this cache each
+    /// accessor (and each call in a hot loop) re-lifts the whole set. The
+    /// cell is per-view, so callers that reuse one view across many calls
+    /// (e.g. the FIRE per-base windowing loop) pay the liftover once.
+    ordered: OnceCell<Vec<AnnotationInfo<'a>>>,
 }
 
 impl<'a> AnnotationTypeView<'a> {
     pub(crate) fn new(annot: &'a MolecularAnnotations, type_name: &'a str) -> Self {
-        Self { annot, type_name }
+        Self {
+            annot,
+            type_name,
+            ordered: OnceCell::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -50,52 +62,74 @@ impl<'a> AnnotationTypeView<'a> {
     }
 
     /// Materialize the annotation infos for this type in BAM-orient
-    /// ascending order. Computes reference coords once and amortizes that
-    /// cost across all column accessors and iter consumers.
-    fn bam_ordered(&self) -> Vec<AnnotationInfo<'a>> {
-        let Some(it) = self.annot.iter_type(self.type_name) else {
-            return Vec::new();
-        };
-        let mut v: Vec<AnnotationInfo<'a>> = it.collect();
-        if self.annot.is_reverse_aligned() {
-            v.reverse();
-        }
-        v
+    /// ascending order, memoized for the life of the view. Reference-coord
+    /// liftover happens here (in `iter_type`), so caching is what keeps
+    /// repeated accessor / per-call use from re-lifting the whole set.
+    fn bam_ordered(&self) -> &[AnnotationInfo<'a>] {
+        self.ordered.get_or_init(|| {
+            let Some(it) = self.annot.iter_type(self.type_name) else {
+                return Vec::new();
+            };
+            let mut v: Vec<AnnotationInfo<'a>> = it.collect();
+            if self.annot.is_reverse_aligned() {
+                v.reverse();
+            }
+            v
+        })
+    }
+
+    /// Borrow the memoized infos directly, BAM-orient ascending. Lets hot
+    /// loops scan query coordinates without the per-call `Vec` allocation
+    /// that the column accessors incur.
+    pub fn infos(&self) -> &[AnnotationInfo<'a>] {
+        self.bam_ordered()
+    }
+
+    /// Count annotations whose BAM-orient `query_start` falls in
+    /// `[start, end)`. Allocation-free over the memoized infos.
+    pub fn count_query_in(&self, start: i64, end: i64) -> usize {
+        self.bam_ordered()
+            .iter()
+            .filter(|a| {
+                let pos = a.query_start as i64;
+                pos >= start && pos < end
+            })
+            .count()
     }
 
     pub fn starts(&self) -> Vec<i64> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| a.query_start as i64)
             .collect()
     }
     pub fn ends(&self) -> Vec<i64> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| a.query_end as i64)
             .collect()
     }
     pub fn option_starts(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| Some(a.query_start as i64))
             .collect()
     }
     pub fn option_ends(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| Some(a.query_end as i64))
             .collect()
     }
     pub fn option_lengths(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| Some((a.query_end - a.query_start) as i64))
             .collect()
     }
     pub fn lengths(&self) -> Vec<i64> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| (a.query_end - a.query_start) as i64)
             .collect()
     }
@@ -122,7 +156,7 @@ impl<'a> AnnotationTypeView<'a> {
     /// `QualitySpec`.
     pub fn qual_at(&self, idx: usize) -> Vec<u8> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| {
                 debug_assert!(
                     idx > 0 || a.qualities.len() <= 1,
@@ -137,19 +171,19 @@ impl<'a> AnnotationTypeView<'a> {
 
     pub fn reference_starts(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| a.ref_start.map(|x| x as i64))
             .collect()
     }
     pub fn reference_ends(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| a.ref_end.map(|x| x as i64))
             .collect()
     }
     pub fn reference_lengths(&self) -> Vec<Option<i64>> {
         self.bam_ordered()
-            .into_iter()
+            .iter()
             .map(|a| match (a.ref_start, a.ref_end) {
                 (Some(s), Some(e)) => Some((e - s) as i64),
                 _ => None,
@@ -161,7 +195,7 @@ impl<'a> AnnotationTypeView<'a> {
     /// library's [`AnnotationInfo`] view directly. Call sites read fields
     /// like `info.query_start`, `info.ref_start`, `info.qualities`.
     pub fn iter(&self) -> std::vec::IntoIter<AnnotationInfo<'a>> {
-        self.bam_ordered().into_iter()
+        self.bam_ordered().to_vec().into_iter()
     }
 }
 

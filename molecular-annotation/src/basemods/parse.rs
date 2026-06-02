@@ -2,6 +2,7 @@
 
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::Arc;
 
 lazy_static! {
     /// Matches one MM group: `[ACGTUN][-+]([a-z]+|[0-9]+)[.?]?(,[0-9]+)*;`.
@@ -81,12 +82,14 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
             _ => SkipFlag::Implicit,
         };
 
-        let deltas: Vec<i64> = delta_list
-            .trim_start_matches(',')
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .filter_map(|s| s.parse().ok())
-            .collect();
+        let mut deltas: Vec<i64> = Vec::with_capacity(delta_list.bytes().filter(|&b| b == b',').count());
+        deltas.extend(
+            delta_list
+                .trim_start_matches(',')
+                .split(',')
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| s.parse::<i64>().ok()),
+        );
 
         if deltas.is_empty() {
             continue;
@@ -164,11 +167,18 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
                 }
             }
 
-            let skip_base_str = (skip_base as char).to_string();
+            let skip_base_name: Arc<str> = Arc::from((skip_base as char).to_string().as_str());
+            t.annotations.reserve(resolved);
             for pos_idx in 0..resolved {
                 let pos = positions[pos_idx];
                 let ml_val = group_ml[pos_idx * codes_per_pos + c_idx];
-                t.add(pos, 1, strand, vec![ml_val], Some(skip_base_str.clone()));
+                t.add_shared(
+                    pos,
+                    1,
+                    strand,
+                    smallvec::smallvec![ml_val],
+                    Some(skip_base_name.clone()),
+                );
             }
         }
     }

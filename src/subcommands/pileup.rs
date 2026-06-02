@@ -295,7 +295,7 @@ impl<'a> FireTrack<'a> {
         cur_offset: i64,
         chrom_start: usize,
     ) {
-        for info in view {
+        for info in view.infos() {
             match (info.ref_start, info.ref_end) {
                 (Some(rs), Some(re)) => {
                     let rs = rs as i64;
@@ -324,13 +324,13 @@ impl<'a> FireTrack<'a> {
         }
         let mut start = i64::MAX;
         let mut end = i64::MIN;
-        for info in &fiber.msp() {
+        for info in fiber.msp().infos() {
             if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
                 start = std::cmp::min(start, rs as i64);
                 end = std::cmp::max(end, re as i64);
             }
         }
-        for info in &fiber.nuc() {
+        for info in fiber.nuc().infos() {
             if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
                 start = std::cmp::min(start, rs as i64);
                 end = std::cmp::max(end, re as i64);
@@ -349,8 +349,8 @@ impl<'a> FireTrack<'a> {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
         if self.fire_track_opts.fiber_coverage
-            && fiber.msp().reference_starts().is_empty()
-            && fiber.nuc().reference_starts().is_empty()
+            && fiber.msp().is_empty()
+            && fiber.nuc().is_empty()
         {
             return;
         }
@@ -403,7 +403,7 @@ impl<'a> FireTrack<'a> {
         // calculate the fire coverage and fire score. FIRE is its own
         // annotation type — already filtered to non-zero precision in
         // add_fire_to_rec. MIN_FIRE_QUAL is the stricter pileup-level gate.
-        for info in &fiber.fire() {
+        for info in fiber.fire().infos() {
             let (rs, re) = match (info.ref_start, info.ref_end) {
                 (Some(rs), Some(re)) => (rs as i64, re as i64),
                 _ => continue,

@@ -217,7 +217,7 @@ fn test_from_tags_simple() {
     assert_eq!(msp.annotations[0].start, 99);   // 1-based 100 -> 0-based 99
     assert_eq!(msp.annotations[0].length, 50);
     assert_eq!(msp.annotations[0].end(), 149);  // 0-based half-open: 99 + 50 = 149
-    assert_eq!(msp.annotations[0].qualities, vec![40]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40]);
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn test_from_tags_no_quality() {
     let annotations = MolecularAnnotations::from_tags(ma, &al, None, None).unwrap();
 
     assert_eq!(annotations.annotation_types[0].quality_spec, QualitySpec::none());
-    assert_eq!(annotations.annotation_types[0].annotations[0].qualities, vec![]);
+    assert_eq!(annotations.annotation_types[0].annotations[0].qualities.to_vec(), vec![]);
 }
 
 #[test]
@@ -261,15 +261,15 @@ fn test_from_tags_mixed_quality() {
     assert_eq!(annotations.annotation_types.len(), 3);
 
     // msp has phred quality
-    assert_eq!(annotations.annotation_types[0].annotations[0].qualities, vec![40]);
-    assert_eq!(annotations.annotation_types[0].annotations[1].qualities, vec![35]);
+    assert_eq!(annotations.annotation_types[0].annotations[0].qualities.to_vec(), vec![40]);
+    assert_eq!(annotations.annotation_types[0].annotations[1].qualities.to_vec(), vec![35]);
 
     // nuc has no quality
-    assert_eq!(annotations.annotation_types[1].annotations[0].qualities, vec![]);
-    assert_eq!(annotations.annotation_types[1].annotations[1].qualities, vec![]);
+    assert_eq!(annotations.annotation_types[1].annotations[0].qualities.to_vec(), vec![]);
+    assert_eq!(annotations.annotation_types[1].annotations[1].qualities.to_vec(), vec![]);
 
     // fire has linear quality
-    assert_eq!(annotations.annotation_types[2].annotations[0].qualities, vec![200]);
+    assert_eq!(annotations.annotation_types[2].annotations[0].qualities.to_vec(), vec![200]);
 }
 
 #[test]
@@ -282,8 +282,8 @@ fn test_from_tags_multi_quality() {
 
     let msp = &annotations.annotation_types[0];
     assert_eq!(msp.quality_spec, QualitySpec::from_str("PQ").unwrap());
-    assert_eq!(msp.annotations[0].qualities, vec![40, 255]);
-    assert_eq!(msp.annotations[1].qualities, vec![30, 200]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40, 255]);
+    assert_eq!(msp.annotations[1].qualities.to_vec(), vec![30, 200]);
 }
 
 #[test]
@@ -295,10 +295,10 @@ fn test_from_tags_with_names() {
 
     let annotations = MolecularAnnotations::from_tags(ma, &al, Some(&aq), Some(an)).unwrap();
 
-    assert_eq!(annotations.annotation_types[0].annotations[0].name, Some("msp1".to_string()));
+    assert_eq!(annotations.annotation_types[0].annotations[0].name.as_deref(), Some("msp1"));
     assert_eq!(annotations.annotation_types[0].annotations[1].name, None);
     assert_eq!(annotations.annotation_types[1].annotations[0].name, None);
-    assert_eq!(annotations.annotation_types[1].annotations[1].name, Some("nuc2".to_string()));
+    assert_eq!(annotations.annotation_types[1].annotations[1].name.as_deref(), Some("nuc2"));
 }
 
 #[test]
@@ -396,8 +396,8 @@ fn test_roundtrip_multi_quality() {
     .unwrap();
 
     assert_eq!(parsed.annotation_types[0].quality_spec, QualitySpec::from_str("PQ").unwrap());
-    assert_eq!(parsed.annotation_types[0].annotations[0].qualities, vec![40, 255]);
-    assert_eq!(parsed.annotation_types[0].annotations[1].qualities, vec![30, 200]);
+    assert_eq!(parsed.annotation_types[0].annotations[0].qualities.to_vec(), vec![40, 255]);
+    assert_eq!(parsed.annotation_types[0].annotations[1].qualities.to_vec(), vec![30, 200]);
 }
 
 #[test]
@@ -680,7 +680,7 @@ fn test_add_annotations_batch() {
     let msp = annotations.get_type("msp").unwrap();
     assert_eq!(msp.annotations[0].start, 100);
     assert_eq!(msp.annotations[0].length, 50);
-    assert_eq!(msp.annotations[0].qualities, vec![40]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40]);
     assert_eq!(msp.annotations[2].start, 300);
     assert_eq!(msp.annotations[2].length, 70);
 }
@@ -702,8 +702,8 @@ fn test_add_annotations_batch_multi_quality() {
 
     assert_eq!(annotations.total_annotation_count(), 2);
     let msp = annotations.get_type("msp").unwrap();
-    assert_eq!(msp.annotations[0].qualities, vec![40, 255]);
-    assert_eq!(msp.annotations[1].qualities, vec![30, 200]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40, 255]);
+    assert_eq!(msp.annotations[1].qualities.to_vec(), vec![30, 200]);
 }
 
 #[test]
@@ -1140,10 +1140,10 @@ fn test_from_tags_merges_strand_split_sections_into_one_type() {
     assert_eq!(ctcf.annotations.len(), 2);
     assert_eq!(ctcf.annotations[0].start, 0);   // 1-based 1 → 0-based 0
     assert_eq!(ctcf.annotations[0].strand, Strand::Forward);
-    assert_eq!(ctcf.annotations[0].qualities, vec![200]);
+    assert_eq!(ctcf.annotations[0].qualities.to_vec(), vec![200]);
     assert_eq!(ctcf.annotations[1].start, 5);   // 1-based 6 → 0-based 5
     assert_eq!(ctcf.annotations[1].strand, Strand::Reverse);
-    assert_eq!(ctcf.annotations[1].qualities, vec![180]);
+    assert_eq!(ctcf.annotations[1].qualities.to_vec(), vec![180]);
 }
 
 #[test]
@@ -1226,8 +1226,8 @@ fn test_retain_filters_by_quality() {
 
     let msp = annotations.get_type("msp").unwrap();
     assert_eq!(msp.annotations.len(), 2);
-    assert_eq!(msp.annotations[0].qualities, vec![40]);
-    assert_eq!(msp.annotations[1].qualities, vec![200]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40]);
+    assert_eq!(msp.annotations[1].qualities.to_vec(), vec![200]);
 }
 
 #[test]
@@ -1382,8 +1382,8 @@ fn test_retain_preserves_multi_quality_values() {
 
     let msp = annotations.get_type("msp").unwrap();
     assert_eq!(msp.annotations.len(), 2);
-    assert_eq!(msp.annotations[0].qualities, vec![40, 255]);
-    assert_eq!(msp.annotations[1].qualities, vec![30, 200]);
+    assert_eq!(msp.annotations[0].qualities.to_vec(), vec![40, 255]);
+    assert_eq!(msp.annotations[1].qualities.to_vec(), vec![30, 200]);
 }
 
 #[test]
@@ -1667,7 +1667,7 @@ fn parse_n_wildcard_skip_base() {
     let names: Vec<String> = t
         .annotations
         .iter()
-        .map(|a| a.name.clone().unwrap())
+        .map(|a| a.name.as_deref().unwrap().to_string())
         .collect();
     assert_eq!(names, vec!["N".to_string(), "N".to_string()]);
 }

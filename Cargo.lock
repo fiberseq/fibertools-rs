@@ -4131,6 +4131,7 @@ dependencies = [
  "log",
  "regex",
  "rust-htslib",
+ "smallvec",
 ]
 
 [[package]]

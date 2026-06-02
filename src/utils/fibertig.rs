@@ -219,7 +219,7 @@ impl FiberTig {
             .map(|t| {
                 t.annotations
                     .iter()
-                    .map(|a| (a.start, a.length, a.name.clone()))
+                    .map(|a| (a.start, a.length, a.name.as_deref().map(String::from)))
                     .collect()
             })
             .unwrap_or_default();

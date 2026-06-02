@@ -58,7 +58,7 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
                 }
                 let new_t = annot.add_annotation_type(&t.name, t.quality_spec.clone());
                 for a in t.annotations.into_iter() {
-                    new_t.add(a.start, a.length, a.strand, a.qualities, a.name);
+                    new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
                 }
             }
         }
@@ -428,7 +428,7 @@ mod tests {
             .expect("m6a type present after round-trip");
         assert_eq!(m6a.annotations.len(), 1);
         assert_eq!(m6a.annotations[0].start, 0);
-        assert_eq!(m6a.annotations[0].qualities, vec![240]);
+        assert_eq!(m6a.annotations[0].qualities.to_vec(), vec![240]);
 
         let msp = back
             .annotation_types

@@ -13,8 +13,16 @@
 
 use std::fmt;
 use std::str::FromStr;
+use std::sync::Arc;
+
+use smallvec::SmallVec;
 
 use crate::liftover::AlignedBlocks;
+
+/// Per-annotation quality storage. Inline-optimized for the common case of
+/// at most one quality value (basemods, fire, msp), spilling to the heap only
+/// for genuinely multi-quality annotations.
+pub type Qualities = SmallVec<[u8; 1]>;
 
 /// Lifted annotation coordinates: (query_start, query_end, ref_start, ref_end)
 /// All coordinates are 0-based half-open [start, end)
@@ -346,10 +354,15 @@ pub struct Annotation {
     /// Strand of this annotation. Describes the biology of the feature, not
     /// the alignment orientation.
     pub strand: Strand,
-    /// Quality scores (one per quality spec character, empty if type has no quality)
-    pub qualities: Vec<u8>,
-    /// Optional name/label for this annotation
-    pub name: Option<String>,
+    /// Quality scores (one per quality spec character, empty if type has no
+    /// quality). Inline-stored for the common single-quality case; see
+    /// [`Qualities`].
+    pub qualities: Qualities,
+    /// Optional name/label for this annotation. Reference-counted so callers
+    /// constructing many annotations that share one label (e.g. the MM/ML
+    /// parser, where every basemod of a group carries the same skip-base
+    /// name) can clone the `Arc` instead of re-allocating the string.
+    pub name: Option<Arc<str>>,
 }
 
 impl Annotation {
@@ -361,6 +374,25 @@ impl Annotation {
     /// Panics in debug mode if:
     /// - `start + length` would overflow u32
     pub fn new(start: u32, length: u32, strand: Strand, qualities: Vec<u8>, name: Option<String>) -> Self {
+        Self::with_shared(
+            start,
+            length,
+            strand,
+            SmallVec::from_vec(qualities),
+            name.map(Arc::from),
+        )
+    }
+
+    /// Like [`new`](Self::new) but takes already-converted inline qualities and
+    /// a shared name `Arc`. Lets hot constructors (the MM/ML parser) avoid a
+    /// per-annotation heap allocation for both the quality byte and the name.
+    pub fn with_shared(
+        start: u32,
+        length: u32,
+        strand: Strand,
+        qualities: Qualities,
+        name: Option<Arc<str>>,
+    ) -> Self {
         debug_assert!(
             start.checked_add(length).is_some(),
             "Annotation coordinate overflow: start={} + length={} exceeds u32",
@@ -476,6 +508,23 @@ impl AnnotationType {
         name: Option<String>,
     ) -> &mut Self {
         self.annotations.push(Annotation::new(start, length, strand, qualities, name));
+        self
+    }
+
+    /// Add an annotation with already-inline qualities and a shared name
+    /// `Arc`. Intended for hot constructors that build many annotations
+    /// sharing one name (e.g. the MM/ML parser): callers clone the `Arc`
+    /// (a refcount bump) rather than allocating a fresh `String` per call.
+    pub fn add_shared(
+        &mut self,
+        start: u32,
+        length: u32,
+        strand: Strand,
+        qualities: Qualities,
+        name: Option<Arc<str>>,
+    ) -> &mut Self {
+        self.annotations
+            .push(Annotation::with_shared(start, length, strand, qualities, name));
         self
     }
     /// Drop annotations for which `predicate` returns false.
