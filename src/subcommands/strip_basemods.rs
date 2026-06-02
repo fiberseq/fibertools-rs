@@ -27,7 +27,10 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
             .par_iter_mut()
             .map(|record| {
                 let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
-                    log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+                    log::warn!(
+                        "read_record failed for {:?}: {e}",
+                        String::from_utf8_lossy(record.qname())
+                    );
                     MolecularAnnotations::from_record(record)
                 });
 

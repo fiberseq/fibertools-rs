@@ -162,10 +162,8 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                         // with retain's iteration, then drop msp and fire
                         // in lockstep.
                         let primary = crate::utils::bamannotations::primary_qual;
-                        let mol_quals: Vec<u8> = if let Some(f) = fsd
-                            .annotations
-                            .get_type("fire")
-                            .filter(|f| {
+                        let mol_quals: Vec<u8> = if let Some(f) =
+                            fsd.annotations.get_type("fire").filter(|f| {
                                 fsd.annotations
                                     .get_type("msp")
                                     .is_some_and(|m| m.annotations.len() == f.annotations.len())

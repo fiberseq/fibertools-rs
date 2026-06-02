@@ -225,7 +225,10 @@ where
             // calls — we're about to replace them with the model's predictions.
             // CpG / other annotation types are preserved.
             let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
-                log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+                log::warn!(
+                    "read_record failed for {:?}: {e}",
+                    String::from_utf8_lossy(record.qname())
+                );
                 molecular_annotation::MolecularAnnotations::from_record(record)
             });
             annot

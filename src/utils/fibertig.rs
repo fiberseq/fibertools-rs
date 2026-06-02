@@ -186,10 +186,10 @@ impl FiberTig {
         record.set_tid(tid);
         record.set_pos(pos);
         record.set_mapq(60); // High mapping quality
-        // `Record::new()` starts with the unmapped flag set. These records
-        // have tid/pos/CIGAR — they are mapped — so clear it. Otherwise the
-        // MA-spec reader's `AlignedBlocks::from_record` early-returns and
-        // ref coords come back as `None` on the round-trip read.
+                             // `Record::new()` starts with the unmapped flag set. These records
+                             // have tid/pos/CIGAR — they are mapped — so clear it. Otherwise the
+                             // MA-spec reader's `AlignedBlocks::from_record` early-returns and
+                             // ref coords come back as `None` on the round-trip read.
         record.unset_unmapped();
         record.unset_paired(); // Unpaired read
         record.set_mtid(-1); // No mate ID for unpaired read

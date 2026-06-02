@@ -66,7 +66,10 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
     // `canonical_header` so the library's MM/ML serializer emits the
     // right groups.
     let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
-        log::warn!("read_record failed for {:?}: {e}", String::from_utf8_lossy(record.qname()));
+        log::warn!(
+            "read_record failed for {:?}: {e}",
+            String::from_utf8_lossy(record.qname())
+        );
         MolecularAnnotations::from_record(record)
     });
     annot

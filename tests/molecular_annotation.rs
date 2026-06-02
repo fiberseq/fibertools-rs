@@ -206,7 +206,6 @@ fn missing_annotations_yield_empty_container() {
     assert_eq!(annot.read_length, blank.seq_len() as u32);
 }
 
-
 #[test]
 fn add_nucleosomes_is_idempotent_on_rerun() {
     // Running `ft add-nucleosomes` (or `ft predict-m6a` with --nucleosomes)
@@ -301,15 +300,11 @@ fn add_fire_is_idempotent_on_rerun() {
     // Mimic what `fire::add_fire_to_rec` does post-fix: retain off any
     // pre-existing fire type, then add. The first call seeds the type; the
     // second call demonstrates idempotency.
-    annot
-        .annotation_types
-        .retain(|t| t.name != FIRE_TYPE);
+    annot.annotation_types.retain(|t| t.name != FIRE_TYPE);
     add_fire_annotations(&mut annot, &starts, &lens, &precisions);
     let first_len = annot.get_type(FIRE_TYPE).unwrap().annotations.len();
 
-    annot
-        .annotation_types
-        .retain(|t| t.name != FIRE_TYPE);
+    annot.annotation_types.retain(|t| t.name != FIRE_TYPE);
     add_fire_annotations(&mut annot, &starts, &lens, &precisions);
     let second_len = annot.get_type(FIRE_TYPE).unwrap().annotations.len();
 

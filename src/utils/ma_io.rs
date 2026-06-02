@@ -124,8 +124,7 @@ pub fn ensure_basemod_encoding(annot: &mut MolecularAnnotations) {
         if t.encoding == target {
             continue; // idempotent fast path
         }
-        let drained: Vec<molecular_annotation::Annotation> =
-            std::mem::take(&mut t.annotations);
+        let drained: Vec<molecular_annotation::Annotation> = std::mem::take(&mut t.annotations);
         t.set_encoding(target);
         t.annotations = drained;
     }
@@ -476,7 +475,9 @@ mod tests {
         let al: Vec<u32> = vec![3];
         record.push_aux(b"ns", Aux::ArrayU32((&ns).into())).unwrap();
         record.push_aux(b"nl", Aux::ArrayU32((&nl).into())).unwrap();
-        record.push_aux(b"as", Aux::ArrayU32((&as_starts).into())).unwrap();
+        record
+            .push_aux(b"as", Aux::ArrayU32((&as_starts).into()))
+            .unwrap();
         record.push_aux(b"al", Aux::ArrayU32((&al).into())).unwrap();
 
         let annot = read_record(&record).expect("read_record");

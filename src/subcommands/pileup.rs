@@ -348,10 +348,7 @@ impl<'a> FireTrack<'a> {
     pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
-        if self.fire_track_opts.fiber_coverage
-            && fiber.msp().is_empty()
-            && fiber.nuc().is_empty()
-        {
+        if self.fire_track_opts.fiber_coverage && fiber.msp().is_empty() && fiber.nuc().is_empty() {
             return;
         }
 
