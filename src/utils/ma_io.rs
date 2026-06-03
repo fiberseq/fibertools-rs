@@ -438,9 +438,8 @@ mod tests {
 
         write_record_with_basemods(&mut record, &annot);
 
-        // Round-trip: read back and assert. After Phase 1's constant flip,
-        // M6A_TYPE == "a" — same name the library uses internally, so no
-        // translation is required at this boundary.
+        // Round-trip: read back and assert. M6A_TYPE is "a", the library's
+        // internal name, so no translation is needed at this boundary.
         let back = read_record(&record).expect("read_record");
 
         let m6a = back

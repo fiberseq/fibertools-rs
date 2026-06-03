@@ -220,10 +220,8 @@ where
         assert_eq!(data.len(), records.len());
         let mut cur_predict_st = 0;
         for (option_data, record) in data.iter().zip(records) {
-            // Load existing annotations (MA tags + MM/ML via library, with
-            // legacy ns/nl/as/al fallback), then drop any pre-existing m6a
-            // calls — we're about to replace them with the model's predictions.
-            // CpG / other annotation types are preserved.
+            // Load existing annotations, then drop any prior m6a calls (the
+            // model's predictions replace them); cpg and other types are kept.
             let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
                 log::warn!(
                     "read_record failed for {:?}: {e}",
@@ -271,8 +269,7 @@ where
                 }
             }
 
-            // Compute nucleosomes + MSPs from the forward m6a positions
-            // and append them to the same MA object we just built up.
+            // Compute nucleosomes + MSPs from the forward m6a positions.
             let modified_bases_forward: Vec<i64> =
                 m6a_calls.iter().map(|&(p, _, _)| p as i64).collect();
             nucleosome::add_nucleosomes_to_annotations(
