@@ -102,17 +102,13 @@ pub fn write_record_with_basemods(record: &mut bam::Record, annot: &MolecularAnn
 /// Sets `Encoding::MmMl { skip_flag: SkipFlag::Implicit }` on any basemod
 /// annotation types (`M6A_TYPE`, `CPG_TYPE`) present in `annot`.
 ///
-/// Idempotent. Call unconditionally before [`write_record`] to guarantee
-/// m6a / cpg land in MM/ML rather than the MA tag set.
+/// Idempotent. Call before [`write_record`] so m6a/cpg land in MM/ML rather
+/// than the MA tag set.
 ///
-/// Implementation note: the library's `AnnotationType::set_encoding`
-/// panics on non-empty types (encoding is meant to be locked in at
-/// construction). We work around that by draining the annotations,
-/// flipping `set_encoding` on the empty shell, and re-attaching the
-/// annotations afterwards. Preserves order, qualities, and per-call
-/// names. If the library ever relaxes set_encoding to allow flipping
-/// on populated types, the drain/re-attach can be replaced with a
-/// straight call.
+/// `AnnotationType::set_encoding` panics on a non-empty type (encoding is
+/// meant to be fixed at construction), so we drain the annotations, flip the
+/// encoding on the empty shell, then re-attach — preserving order, qualities,
+/// and per-call names.
 pub fn ensure_basemod_encoding(annot: &mut MolecularAnnotations) {
     let target = Encoding::MmMl {
         skip_flag: SkipFlag::Implicit,

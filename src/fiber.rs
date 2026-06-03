@@ -38,9 +38,9 @@ impl FiberseqData {
             MolecularAnnotations::from_record(&record)
         });
 
-        // Apply read-side basemod filters that parse_mm_ml_into_ma used to do.
-        // The library now populates m6a/cpg in `annotations` directly; here we
-        // just prune by min_ml_score and end-strip distance.
+        // The library populates m6a/cpg from MM/ML on read; apply the
+        // fibertools read-side basemod filters (min ML score, end-strip
+        // distance) on top of that here.
         if filters.min_ml_score > 0 || filters.strip_starting_basemods > 0 {
             let seq_len = record.seq_len();
             let strip = filters.strip_starting_basemods.max(0) as usize;
@@ -157,10 +157,16 @@ impl FiberseqData {
         AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
     }
 
-    /// Flush `self.annotations` onto the underlying record's MA aux
-    /// tags. The single write path — every subcommand that mutates
-    /// annotations should call this and then hand the record to the
-    /// BAM writer.
+    /// Flush `self.annotations` onto the record's MA-family aux tags. The
+    /// single write path for subcommands that edit nuc/msp/fire annotations;
+    /// call this, then hand the record to the BAM writer.
+    ///
+    /// MM/ML are deliberately left untouched: this is an edit path, not a
+    /// basemod producer, so the record's original MM/ML bytes pass through
+    /// byte-identically. `ensure_basemod_encoding` flags m6a/cpg as
+    /// `Encoding::MmMl` so `write_record` excludes them from the MA tag rather
+    /// than writing basemod calls there too. Producers that synthesize or
+    /// modify basemods must use `ma_io::write_record_with_basemods` instead.
     pub fn serialize_annotations(&mut self) {
         let mut annot = self.annotations.clone();
         crate::utils::ma_io::ensure_basemod_encoding(&mut annot);
