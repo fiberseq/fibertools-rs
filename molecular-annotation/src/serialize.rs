@@ -145,20 +145,21 @@ impl MolecularAnnotations {
 
         let (ma, al, aq, an) = self.to_tags();
 
-        // Set MA tag (always)
-        record.push_aux(b"MA", Aux::String(&ma)).ok();
+        // push_aux refuses to overwrite an existing tag, so remove first:
+        // re-writing a record that already carries MA-family tags must replace
+        // them, not silently no-op and leave the stale values in place.
+        record.remove_aux(b"MA").ok();
+        record.remove_aux(b"AL").ok();
+        record.remove_aux(b"AQ").ok();
+        record.remove_aux(b"AN").ok();
 
-        // Set AL tag (only for separate encoding)
+        record.push_aux(b"MA", Aux::String(&ma)).ok();
         if !al.is_empty() {
             record.push_aux(b"AL", Aux::ArrayU32((&al).into())).ok();
         }
-
-        // Set AQ tag (if present)
         if let Some(ref aq_arr) = aq {
             record.push_aux(b"AQ", Aux::ArrayU8(aq_arr.into())).ok();
         }
-
-        // Set AN tag (if present)
         if let Some(ref an_str) = an {
             record.push_aux(b"AN", Aux::String(an_str)).ok();
         }

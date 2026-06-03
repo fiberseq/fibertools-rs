@@ -500,4 +500,41 @@ mod tests {
         assert_eq!(msp.annotations[0].start, 6);
         assert_eq!(msp.annotations[0].length, 3);
     }
+
+    #[test]
+    fn rewrite_replaces_ma_tag_instead_of_appending() {
+        let mut record = synth_record(b"ATCGATCGAT");
+        let qspec_q = "Q".parse::<QualitySpec>().unwrap();
+
+        // First write: one msp at 100..150.
+        let mut v1 = MolecularAnnotations::from_record(&record);
+        v1.add_annotation_type(MSP_TYPE, qspec_q.clone())
+            .add(100, 50, Strand::Unknown, vec![10], None);
+        write_record(&mut record, &v1);
+
+        // Second write to the SAME record: a different msp at 200..260.
+        let mut v2 = MolecularAnnotations::from_record(&record);
+        v2.annotation_types.clear();
+        v2.add_annotation_type(MSP_TYPE, qspec_q)
+            .add(200, 60, Strand::Unknown, vec![20], None);
+        write_record(&mut record, &v2);
+
+        // Structural invariant: exactly one MA tag on the record.
+        let ma_count = record
+            .aux_iter()
+            .filter_map(Result::ok)
+            .filter(|(tag, _)| *tag == b"MA")
+            .count();
+        assert_eq!(ma_count, 1, "expected exactly one MA tag, found {ma_count}");
+
+        // Behavioral invariant: we read back v2, not the stale v1.
+        let back = read_record(&record).expect("read_record");
+        let msp = back
+            .annotation_types
+            .iter()
+            .find(|t| t.name == MSP_TYPE)
+            .expect("msp present");
+        assert_eq!(msp.annotations.len(), 1);
+        assert_eq!(msp.annotations[0].start, 200, "read back stale MA tag");
+    }
 }
