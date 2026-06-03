@@ -48,6 +48,11 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     // legacy fallback whenever MM/ML is present).
     let has_ma = matches!(record.aux(b"MA"), Ok(Aux::String(_)));
     if !has_ma {
+        // Provenance caveat: presence of `ns`/`as` is treated as evidence of
+        // fibertools-legacy data with no further validation. This path is
+        // read-only — we never delete these tags — so a foreign tool reusing
+        // those names is at worst mis-parsed here, never destroyed. Any future
+        // code that *removes* legacy tags must verify provenance first.
         let has_legacy_nuc = matches!(record.aux(b"ns"), Ok(_));
         let has_legacy_msp = matches!(record.aux(b"as"), Ok(_));
         if has_legacy_nuc || has_legacy_msp {
