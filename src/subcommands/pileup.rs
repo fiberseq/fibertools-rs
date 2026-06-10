@@ -87,23 +87,26 @@ impl PartialEq for FireRow<'_> {
 
 impl std::fmt::Display for FireRow<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut rtn = format!(
-            "\t{}\t{}\t{}",
-            self.coverage, self.fire_coverage, self.score
-        );
+        // Write each field straight into the formatter target. When called
+        // via `write!(buf, "{row}")` this appends into the caller's reused
+        // buffer with no intermediate allocation (the previous version built
+        // and concatenated a fresh `String` per optional column, per row).
+        write!(f, "\t{}\t{}\t{}", self.coverage, self.fire_coverage, self.score)?;
         if !self.fire_track_opts.no_nuc {
-            rtn += &format!("\t{}", self.nuc_coverage);
+            write!(f, "\t{}", self.nuc_coverage)?;
         }
         if !self.fire_track_opts.no_msp {
-            rtn += &format!("\t{}", self.msp_coverage);
+            write!(f, "\t{}", self.msp_coverage)?;
         }
         if self.fire_track_opts.m6a {
-            rtn += &format!("\t{}", self.m6a_coverage);
+            write!(f, "\t{}", self.m6a_coverage)?;
         }
         if self.fire_track_opts.cpg {
-            rtn += &format!("\t{}", self.cpg_coverage);
+            write!(f, "\t{}", self.cpg_coverage)?;
         }
-        write!(f, "{rtn}")
+        // NB: `anyhow::Ok` is imported at the top of this module and shadows
+        // the prelude `Ok`, so qualify the fmt success value explicitly.
+        std::result::Result::Ok(())
     }
 }
 
@@ -951,6 +954,25 @@ impl<'a> FiberseqPileup<'a> {
         if self.shuffled_data.is_some() {
             self.log_stats();
         }
+        // `write!` into a String needs the fmt::Write trait in scope; alias it
+        // so it doesn't collide with the io::Write bound on `out`.
+        use std::fmt::Write as _;
+
+        // The set of data tracks is constant across rows — only the row index
+        // changes — so build it once instead of allocating a Vec per position.
+        let mut data_tracks = vec![&self.all_data];
+        if self.pileup_opts.haps {
+            data_tracks.push(self.hap1_data.as_ref().unwrap());
+            data_tracks.push(self.hap2_data.as_ref().unwrap());
+        }
+        if self.shuffled_data.is_some() {
+            data_tracks.push(self.shuffled_data.as_ref().unwrap());
+        }
+
+        // One reusable line buffer for the whole track: cleared and refilled
+        // per emitted row rather than reallocated. Output bytes are identical
+        // to the previous per-row `format!`/`to_string()` construction.
+        let mut line = String::with_capacity(256);
         let mut write_start_index = 0;
         let mut write_end_index = 1;
         for i in 1..self.track_len {
@@ -958,34 +980,31 @@ impl<'a> FiberseqPileup<'a> {
             if self.wait_to_write(i) {
                 write_end_index = i + 1;
             } else {
-                let mut line = format!(
+                line.clear();
+                write!(
+                    line,
                     "{}\t{}\t{}",
                     self.chrom,
                     write_start_index + self.chrom_start,
                     write_end_index + self.chrom_start
-                );
+                )
+                .expect("writing to a String cannot fail");
 
-                let mut data_tracks = vec![&self.all_data];
-                if self.pileup_opts.haps {
-                    data_tracks.push(self.hap1_data.as_ref().unwrap());
-                    data_tracks.push(self.hap2_data.as_ref().unwrap());
-                }
-                if self.shuffled_data.is_some() {
-                    data_tracks.push(self.shuffled_data.as_ref().unwrap());
-                }
-
-                for data in data_tracks {
-                    line += data.row(write_start_index).to_string().as_str();
+                for data in &data_tracks {
+                    write!(line, "{}", data.row(write_start_index))
+                        .expect("writing to a String cannot fail");
                 }
                 if self.pileup_opts.rolling_max.is_some() {
-                    line += &format!(
+                    write!(
+                        line,
                         "\t{}",
                         self.rolling_max.as_ref().unwrap()[write_start_index]
-                    );
+                    )
+                    .expect("writing to a String cannot fail");
                 }
                 // Add name column at the end to minimize breaking downstream tools
                 if let Some(name) = &self.region_name {
-                    line += &format!("\t{}", name);
+                    write!(line, "\t{}", name).expect("writing to a String cannot fail");
                 }
                 // don't write empty lines unless keep_zeros is set
                 let mut cov = self.all_data.coverage[write_start_index];
@@ -993,7 +1012,7 @@ impl<'a> FiberseqPileup<'a> {
                     cov += shuffled_data.coverage[write_start_index];
                 }
                 if self.pileup_opts.keep_zeros || cov > 0 {
-                    line += "\n";
+                    line.push('\n');
                     bio_io::write_to_file(&line, out);
                 }
                 // reset the write indexes
