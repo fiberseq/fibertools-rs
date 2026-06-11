@@ -61,10 +61,9 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
 
     // Load existing MM/ML into a MolecularAnnotations, drop any
     // pre-existing m6a (we're replacing it with the Y/R-derived calls),
-    // then append the synthesized m6a and write back. Each call gets
-    // its canonical MM group header (A+a or T-a) tagged via
-    // `canonical_header` so the library's MM/ML serializer emits the
-    // right groups.
+    // then append the synthesized m6a and write back. Each call stores its
+    // canonical (skip-base, strand) via `canonical_basemod` so the library's
+    // MM/ML serializer emits the right group (A+a or T-a).
     let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
         log::warn!(
             "read_record failed for {:?}: {e}",

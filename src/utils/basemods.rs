@@ -18,25 +18,23 @@ pub fn is_basemod_type(name: &str) -> bool {
     matches!(name, M6A_TYPE | CPG_TYPE)
 }
 
-/// Header for a canonical basemod call landing on `base` (read in
-/// forward-strand orientation). Returns `&'static str` for the four
-/// possible canonical headers; `None` if the (type, base) pair isn't a
-/// canonical fiberseq combination. Used by programmatic producers
-/// (`predict_m6a`, `ddda_to_m6a`) to label calls with the right MM
-/// group header so the library's MM/ML serializer emits them under the
-/// correct group.
+/// Canonical MM group header for an m6a call landing on `base` (read in
+/// forward-strand orientation): `A+a` on A, `T-a` on T. `None` for any other
+/// (type, base) pair.
+///
+/// m6a only — cpg (5mC) is never producer-synthesized; it travels the
+/// read→write passthrough, which preserves the input's MM group verbatim, so
+/// no canonical cpg header is ever needed here.
 pub fn canonical_header(type_name: &str, base: u8) -> Option<&'static str> {
     match (type_name, base) {
         (M6A_TYPE, b'A') => Some("A+a"),
         (M6A_TYPE, b'T') => Some("T-a"),
-        (CPG_TYPE, b'C') => Some("C+m"),
-        (CPG_TYPE, b'G') => Some("G+m"),
         _ => None,
     }
 }
 
-/// Decomposed form of [`canonical_header`]: the `(skip_base, strand)` a
-/// canonical call serializes under.
+/// Decomposed form of [`canonical_header`]: the `(skip_base, strand)` an m6a
+/// call serializes under (`("A", Forward)` on A, `("T", Reverse)` on T).
 ///
 /// Producers must store these on the annotation — `name` = skip-base,
 /// `strand` = strand — NOT the full header string (e.g. `"T-a"`) in `name`
@@ -45,6 +43,8 @@ pub fn canonical_header(type_name: &str, base: u8) -> Option<&'static str> {
 /// placeholder silently turns a minus-strand call (`T-a`) into `T+a`. This
 /// mirrors the parse path, which stores the skip-base in `name` and the strand
 /// in `strand`.
+///
+/// m6a only — cpg is passthrough (see [`canonical_header`]).
 pub fn canonical_basemod(
     type_name: &str,
     base: u8,
@@ -53,8 +53,6 @@ pub fn canonical_basemod(
     match (type_name, base) {
         (M6A_TYPE, b'A') => Some(("A", Strand::Forward)),
         (M6A_TYPE, b'T') => Some(("T", Strand::Reverse)),
-        (CPG_TYPE, b'C') => Some(("C", Strand::Forward)),
-        (CPG_TYPE, b'G') => Some(("G", Strand::Forward)),
         _ => None,
     }
 }
