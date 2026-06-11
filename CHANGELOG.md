@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- **Annotations now use the [MolecularAnnotation (MA) spec](https://github.com/fiberseq/Molecular-annotation-spec).**
+  Nucleosomes, MSPs, and FIRE elements are written as MA-spec aux tags
+  (`MA`/`AL`/`AQ`/`AN`) instead of the legacy lowercase tags, so any MA-aware
+  reader can consume fibertools output without a fibertools-specific parser.
+- **Legacy lowercase tags (`ns`/`nl`, `as`/`al`/`aq`, FIRE-specific tags) are no
+  longer emitted.** Tools that read them must switch to the MA tag set. Legacy
+  tags are still *read* as a fallback when MA tags are absent.
+- **Block-boundary liftovers no longer stretch MSPs/nucleosomes into adjacent
+  reference blocks** (#90); intervals snap inward, per the MA library's liftover
+  semantics.
+- **`MM`/`ML` base-modification tags round-trip byte-identically** on read/edit
+  paths. Producer paths re-emit canonical fiberseq MM groups (`A+a`/`T-a` for
+  m6a, `C+m`/`G+m` for 5mC); positions and `ML` qualities are preserved exactly,
+  but grouped multi-code encodings (e.g. `C+mh`) are normalized to separate groups.
+
+### 🔧 Internal
+
+- All annotations share one in-memory `MolecularAnnotations` container; reads
+  funnel through a single path (`ma_io::read_record`); liftover is unified on the
+  MA library's single implementation.
+
 ## [0.9.0] - 2026-05-21
 
 ### 🚀 New subcommands
