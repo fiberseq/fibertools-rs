@@ -101,6 +101,16 @@ pub enum Encoding {
     },
 }
 
+impl Encoding {
+    /// `MmMl` with the default (implicit) skip flag — the common case for
+    /// producers synthesizing base modifications.
+    pub fn mm_ml() -> Self {
+        Encoding::MmMl {
+            skip_flag: SkipFlag::Implicit,
+        }
+    }
+}
+
 /// Scaling type for a single quality value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QualityScaling {

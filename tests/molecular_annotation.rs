@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use fibertools_rs::utils::ma_io::{
     read_annotations, read_record, write_record, MSP_TYPE, NUC_TYPE,
 };
-use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
 
@@ -129,7 +129,7 @@ fn ma_takes_precedence_over_legacy() {
 
     // Construct a different MA payload; write it without stripping legacy.
     let mut alt = MolecularAnnotations::new(read_length);
-    alt.add_annotation_type(MSP_TYPE, QualitySpec::none())
+    alt.add_annotation_type(MSP_TYPE, QualitySpec::none(), Encoding::Ma)
         .add(0, 10, Strand::Forward, vec![], None)
         .add(50, 5, Strand::Forward, vec![], None);
     alt.to_record(&mut record);

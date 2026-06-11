@@ -2,7 +2,7 @@ use anyhow::Result;
 use fibertools_rs::cli::{GlobalOpts, PansnParameters, PgInjectOptions};
 use fibertools_rs::utils::fibertig::{FiberTig, FIBERTIG_TYPE};
 use fibertools_rs::utils::ma_io;
-use molecular_annotation::{AlignedBlocks, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{AlignedBlocks, Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::HeaderView;
 use std::io::Write;
@@ -134,7 +134,7 @@ fn test_bed_annotations_sorted() -> Result<()> {
 fn test_approximately_divide_annotations_by_window_size() -> Result<()> {
     let mut annot = MolecularAnnotations::new(100);
     {
-        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
         t.add(5, 10, Strand::Forward, vec![], Some("feature1".into()));
         t.add(25, 10, Strand::Forward, vec![], Some("feature2".into()));
         t.add(45, 10, Strand::Forward, vec![], Some("feature3".into()));
@@ -181,14 +181,14 @@ fn test_create_annotated_records_from_splits() -> Result<()> {
     // First split: 0-20
     let mut split1 = MolecularAnnotations::new(36);
     split1
-        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none())
+        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma)
         .add(5, 10, Strand::Forward, vec![], Some("feature1".into()));
     split_annotations.push(((0, 20), split1));
 
     // Second split: 20-36
     let mut split2 = MolecularAnnotations::new(36);
     split2
-        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none())
+        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma)
         .add(25, 10, Strand::Forward, vec![], Some("feature2".into()));
     split_annotations.push(((20, 36), split2));
 
@@ -539,7 +539,7 @@ fn build_tagged_record(
         record.is_reverse(),
     );
     {
-        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
         for ((s, l), name) in fs.iter().zip(fl.iter()).zip(names.into_iter()) {
             t.add(*s, *l, Strand::Forward, vec![], name);
         }

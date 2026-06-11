@@ -16,11 +16,12 @@
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
 //! populated by the library's MM/ML parser. Their on-disk source of truth
-//! is `MM`/`ML`; [`ensure_basemod_encoding`] flags those types so the
+//! is `MM`/`ML`; they carry `Encoding::MmMl` (set at construction, whether read
+//! by the parser or built by a producer via `Encoding::mm_ml()`), so the
 //! library serializes them into MM/ML rather than the MA tag set.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, SkipFlag, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -61,7 +62,8 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
                 if annot.get_type(&t.name).is_some() {
                     continue;
                 }
-                let new_t = annot.add_annotation_type(&t.name, t.quality_spec.clone());
+                let new_t =
+                    annot.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
                 for a in t.annotations.into_iter() {
                     new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
                 }
@@ -96,39 +98,11 @@ pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
 /// canonical encoding of the model's `Encoding::MmMl` types; if the model has
 /// none, MM/ML are removed.
 ///
-/// Call [`ensure_basemod_encoding`] first so basemod types are tagged
-/// `Encoding::MmMl` (they default to `Encoding::Ma` when built via
-/// `add_annotation_type`).
+/// Basemod types must already be `Encoding::MmMl` — they are when read from a
+/// record, and producers create them that way (e.g. `Encoding::mm_ml()`).
 pub fn write_record_with_basemods(record: &mut bam::Record, annot: &MolecularAnnotations) {
     annot.to_record(record);
     annot.write_mm_ml(record);
-}
-
-/// Sets `Encoding::MmMl { skip_flag: SkipFlag::Implicit }` on any basemod
-/// annotation types (`M6A_TYPE`, `CPG_TYPE`) present in `annot`.
-///
-/// Idempotent. Call before [`write_record`] so m6a/cpg land in MM/ML rather
-/// than the MA tag set.
-///
-/// `AnnotationType::set_encoding` panics on a non-empty type (encoding is
-/// meant to be fixed at construction), so we drain the annotations, flip the
-/// encoding on the empty shell, then re-attach — preserving order, qualities,
-/// and per-call names.
-pub fn ensure_basemod_encoding(annot: &mut MolecularAnnotations) {
-    let target = Encoding::MmMl {
-        skip_flag: SkipFlag::Implicit,
-    };
-    for t in annot.annotation_types.iter_mut() {
-        if !crate::utils::basemods::is_basemod_type(&t.name) {
-            continue;
-        }
-        if t.encoding == target {
-            continue; // idempotent fast path
-        }
-        let drained: Vec<molecular_annotation::Annotation> = std::mem::take(&mut t.annotations);
-        t.set_encoding(target);
-        t.annotations = drained;
-    }
 }
 
 /// Read annotations from a BAM record.
@@ -188,7 +162,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
             );
         }
         if !ns.is_empty() {
-            let nuc = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
+            let nuc = annot.add_annotation_type(NUC_TYPE, QualitySpec::none(), Encoding::Ma);
             for (s, l) in ns.iter().zip(nl.iter()) {
                 nuc.add(*s, *l, Strand::Unknown, vec![], None);
             }
@@ -218,7 +192,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
             }
         }
         if !starts.is_empty() {
-            let msp = annot.add_annotation_type(MSP_TYPE, q_spec);
+            let msp = annot.add_annotation_type(MSP_TYPE, q_spec, Encoding::Ma);
             for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
                 let qualities = aq.as_ref().map(|q| vec![q[i]]).unwrap_or_default();
                 msp.add(*s, *l, Strand::Unknown, qualities, None);
@@ -277,7 +251,7 @@ pub fn add_nuc_annotations(annot: &mut MolecularAnnotations, starts: &[u32], len
     if starts.is_empty() {
         return;
     }
-    let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none());
+    let t = annot.add_annotation_type(NUC_TYPE, QualitySpec::none(), Encoding::Ma);
     for (s, l) in starts.iter().zip(lens.iter()) {
         t.add(*s, *l, Strand::Unknown, vec![], None);
     }
@@ -301,7 +275,7 @@ pub fn add_msp_annotations(
         Some(_) => "Q".parse::<QualitySpec>().expect("Q parses"),
         None => QualitySpec::none(),
     };
-    let t = annot.add_annotation_type(MSP_TYPE, qspec);
+    let t = annot.add_annotation_type(MSP_TYPE, qspec, Encoding::Ma);
     for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
         let qv = qualities.map(|q| vec![q[i]]).unwrap_or_default();
         t.add(*s, *l, Strand::Unknown, qv, None);
@@ -321,7 +295,11 @@ pub fn add_fire_annotations(
     if starts.is_empty() {
         return;
     }
-    let t = annot.add_annotation_type(FIRE_TYPE, "Q".parse::<QualitySpec>().expect("Q parses"));
+    let t = annot.add_annotation_type(
+        FIRE_TYPE,
+        "Q".parse::<QualitySpec>().expect("Q parses"),
+        Encoding::Ma,
+    );
     for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
         t.add(*s, *l, Strand::Unknown, vec![precisions[i]], None);
     }
@@ -401,7 +379,6 @@ fn u8_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
-    use rust_htslib::bam::record::Aux;
 
     /// Build a synthetic record with the given forward sequence. Aligned-blocks
     /// metadata is not needed for these I/O tests because we only exercise
@@ -426,15 +403,12 @@ mod tests {
         let mut annot = MolecularAnnotations::from_record(&record);
         let qspec_q = "Q".parse::<QualitySpec>().expect("Q parses");
 
-        let m6a_type = annot.add_annotation_type(M6A_TYPE, qspec_q.clone());
+        let m6a_type = annot.add_annotation_type(M6A_TYPE, qspec_q.clone(), Encoding::mm_ml());
         let header = canonical_header(M6A_TYPE, b'A').unwrap().to_string();
         m6a_type.add(0, 1, Strand::Forward, vec![240], Some(header));
 
-        let msp_type = annot.add_annotation_type(MSP_TYPE, qspec_q);
+        let msp_type = annot.add_annotation_type(MSP_TYPE, qspec_q, Encoding::Ma);
         msp_type.add(5, 3, Strand::Unknown, vec![100], None);
-
-        // Producer contract: tag basemod types with Encoding::MmMl before write.
-        ensure_basemod_encoding(&mut annot);
 
         write_record_with_basemods(&mut record, &annot);
 
@@ -508,14 +482,14 @@ mod tests {
 
         // First write: one msp at 100..150.
         let mut v1 = MolecularAnnotations::from_record(&record);
-        v1.add_annotation_type(MSP_TYPE, qspec_q.clone())
+        v1.add_annotation_type(MSP_TYPE, qspec_q.clone(), Encoding::Ma)
             .add(100, 50, Strand::Unknown, vec![10], None);
         write_record(&mut record, &v1);
 
         // Second write to the SAME record: a different msp at 200..260.
         let mut v2 = MolecularAnnotations::from_record(&record);
         v2.annotation_types.clear();
-        v2.add_annotation_type(MSP_TYPE, qspec_q)
+        v2.add_annotation_type(MSP_TYPE, qspec_q, Encoding::Ma)
             .add(200, 60, Strand::Unknown, vec![20], None);
         write_record(&mut record, &v2);
 

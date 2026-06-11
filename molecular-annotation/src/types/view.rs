@@ -59,11 +59,11 @@ pub struct AnnotationInfo<'a> {
 ///
 /// # Example
 /// ```
-/// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+/// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
 ///
 /// let mut annotations = MolecularAnnotations::new(1000);
 /// annotations
-///     .add_annotation_type("msp", "P".parse().unwrap())
+///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
 ///     .add(100, 50, Strand::Forward, vec![40], None);  // [100, 150)
 ///
 /// // Project around query position 120: annotation lands at [-20, 30).

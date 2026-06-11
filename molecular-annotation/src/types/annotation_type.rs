@@ -24,13 +24,14 @@ pub struct AnnotationType {
 }
 
 impl AnnotationType {
-    /// Create a new annotation type.
-    pub fn new(name: impl Into<String>, quality_spec: QualitySpec) -> Self {
+    /// Create a new annotation type with an explicit on-disk encoding
+    /// (`Encoding::Ma` for structural types, `Encoding::MmMl` for basemods).
+    pub fn new(name: impl Into<String>, quality_spec: QualitySpec, encoding: Encoding) -> Self {
         Self {
             name: name.into(),
             quality_spec,
             annotations: Vec::new(),
-            encoding: Encoding::default(),
+            encoding,
         }
     }
 

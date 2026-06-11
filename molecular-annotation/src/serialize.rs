@@ -91,11 +91,11 @@ impl MolecularAnnotations {
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(99, 50, Strand::Forward, vec![40], None);  // 0-based
     ///
     /// let (ma, al, aq, an) = annotations.to_tags();
@@ -129,12 +129,12 @@ impl MolecularAnnotations {
     /// # Example
     /// ```ignore
     /// use rust_htslib::bam::{self, Read};
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
     ///
     /// let mut record = /* from BAM file */;
     /// let mut annotations = MolecularAnnotations::from_record(&record);
     /// annotations
-    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// annotations.to_record(&mut record);

@@ -81,7 +81,6 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
                     });
                 }
 
-                ma_io::ensure_basemod_encoding(&mut annot);
                 ma_io::write_record_with_basemods(record, &annot);
                 record
             })

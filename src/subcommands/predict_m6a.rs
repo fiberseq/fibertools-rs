@@ -263,7 +263,11 @@ where
                 let qspec = "Q"
                     .parse::<molecular_annotation::QualitySpec>()
                     .expect("Q parses");
-                let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
+                let t = annot.add_annotation_type(
+                    basemods::M6A_TYPE,
+                    qspec,
+                    molecular_annotation::Encoding::mm_ml(),
+                );
                 for (pos, qual, skip_base, strand) in &m6a_calls {
                     t.add(*pos, 1, *strand, vec![*qual], Some(skip_base.to_string()));
                 }
@@ -279,9 +283,6 @@ where
                 &opts.nuc_opts,
             );
 
-            // Tag basemod types as MM/ML-encoded so to_record emits them as
-            // MM/ML rather than the MA tag set; nuc/msp/fire stay Encoding::Ma.
-            ma_io::ensure_basemod_encoding(&mut annot);
             ma_io::write_record_with_basemods(record, &annot);
 
             // clear the existing data

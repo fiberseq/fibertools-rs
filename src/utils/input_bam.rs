@@ -322,7 +322,7 @@ mod tests {
     use super::*;
     use crate::fiber::FiberseqData;
     use crate::utils::basemods::M6A_TYPE;
-    use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+    use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 
     /// Build a minimal `FiberseqData` shaped only for `passes_fire_filter`.
     /// `msp_lengths` populates the `msp` annotation type (each entry
@@ -332,13 +332,13 @@ mod tests {
     fn make_fsd(msp_lengths: &[i64], m6a_count: usize) -> FiberseqData {
         let mut annotations = MolecularAnnotations::new(1000);
         if !msp_lengths.is_empty() {
-            let t = annotations.add_annotation_type("msp", QualitySpec::none());
+            let t = annotations.add_annotation_type("msp", QualitySpec::none(), Encoding::Ma);
             for &len in msp_lengths {
                 t.add(0, len as u32, Strand::Forward, vec![], None);
             }
         }
         if m6a_count > 0 {
-            let t = annotations.add_annotation_type(M6A_TYPE, "Q".parse().expect("Q parses"));
+            let t = annotations.add_annotation_type(M6A_TYPE, "Q".parse().expect("Q parses"), Encoding::mm_ml());
             for i in 0..m6a_count {
                 t.add(i as u32, 1, Strand::Forward, vec![0], None);
             }

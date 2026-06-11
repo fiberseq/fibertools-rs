@@ -38,7 +38,7 @@
 //!
 //! # Example
 //! ```
-//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding};
+//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding, Encoding};
 //!
 //! // Build annotations programmatically. Annotation type identity is keyed
 //! // on `name` alone — strand is a per-annotation property.
@@ -46,19 +46,19 @@
 //!
 //! // Add MSP annotations with phred quality scores
 //! annotations
-//!     .add_annotation_type("msp", "P".parse().unwrap())
+//!     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
 //!     .add(100, 50, Strand::Forward, vec![40], None)
 //!     .add(200, 60, Strand::Forward, vec![35], None);
 //!
 //! // Add nucleosome annotations without quality scores
 //! annotations
-//!     .add_annotation_type("nuc", QualitySpec::none())
+//!     .add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma)
 //!     .add(150, 147, Strand::Forward, vec![], None)
 //!     .add(350, 147, Strand::Forward, vec![], None);
 //!
 //! // Add FIRE annotation with linear quality
 //! annotations
-//!     .add_annotation_type("fire", "Q".parse().unwrap())
+//!     .add_annotation_type("fire", "Q".parse().unwrap(), Encoding::Ma)
 //!     .add(500, 75, Strand::Unknown, vec![200], Some("enhancer1".to_string()));
 //!
 //! // Add annotation type with multiple quality values per annotation (PQQP = 4 values each)
@@ -68,7 +68,7 @@
 //!     QualityScaling::Linear, QualityScaling::Phred,
 //! ]);
 //! annotations
-//!     .add_annotation_type("ctcf", pqqp)
+//!     .add_annotation_type("ctcf", pqqp, Encoding::Ma)
 //!     .add(600, 20, Strand::Forward, vec![40, 200, 180, 35], None);
 //!
 //! // Serialize with inline encoding (start-length pairs in MA string).
@@ -102,12 +102,12 @@
 //! **0-based half-open intervals** `[start, end)`.
 //!
 //! ```
-//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
 //! use molecular_annotation::liftover::AlignedBlocks;
 //!
 //! let mut annotations = MolecularAnnotations::new(1000);
 //! annotations
-//!     .add_annotation_type("msp", "P".parse().unwrap())
+//!     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
 //!     .add(100, 50, Strand::Forward, vec![40], None);  // query [100, 150) in 0-based half-open
 //!
 //! // Set aligned blocks for liftover (query positions are forward-oriented)

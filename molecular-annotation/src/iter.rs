@@ -34,11 +34,11 @@ impl MolecularAnnotations {
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// // Collect into a Vec to avoid lifetime issues
@@ -107,11 +107,11 @@ impl MolecularAnnotations {
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
-    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// for info in annotations.iter_full() {

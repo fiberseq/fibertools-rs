@@ -1,6 +1,8 @@
 //! Type management and bulk insertion for [`MolecularAnnotations`].
 
-use crate::{Annotation, AnnotationType, MolecularAnnotations, ParseError, QualitySpec, Strand};
+use crate::{
+    Annotation, AnnotationType, Encoding, MolecularAnnotations, ParseError, QualitySpec, Strand,
+};
 
 impl MolecularAnnotations {
     /// Get-or-create the annotation type with the given name.
@@ -13,8 +15,12 @@ impl MolecularAnnotations {
     /// Annotation type identity is keyed on `name` alone — strand is a
     /// per-annotation property, supplied via [`AnnotationType::add`].
     ///
+    /// `encoding` declares where this type serializes: `Encoding::Ma` for
+    /// structural types (nuc/msp/fire → MA tag), `Encoding::MmMl` for
+    /// base modifications (→ MM/ML).
+    ///
     /// ```ignore
-    /// annotations.add_annotation_type("msp", "P".parse().unwrap())
+    /// annotations.add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(100, 50, Strand::Forward, vec![40], None)
     ///     .add(200, 60, Strand::Reverse, vec![35], None);
     /// ```
@@ -22,36 +28,61 @@ impl MolecularAnnotations {
         &mut self,
         name: &str,
         quality_spec: QualitySpec,
+        encoding: Encoding,
     ) -> &mut AnnotationType {
-        self.try_add_annotation_type(name, quality_spec)
-            .expect("conflicting quality_spec for existing annotation type")
+        self.try_add_annotation_type(name, quality_spec, encoding)
+            .expect("conflicting quality_spec or encoding for existing annotation type")
     }
 
     /// Fallible variant of [`add_annotation_type`](Self::add_annotation_type).
     ///
     /// Returns the existing type if `name` is already present with a matching
-    /// `quality_spec`. Returns [`ParseError::ConflictingAnnotationType`] if
-    /// the existing type has a different `quality_spec`. Otherwise creates
-    /// a new type and returns a mutable reference to it.
+    /// `quality_spec` and compatible `encoding`. Returns
+    /// [`ParseError::ConflictingAnnotationType`] if the existing type has a
+    /// different `quality_spec` or a different encoding *kind* (`Ma` vs
+    /// `MmMl`). Two `MmMl` encodings that differ only in their MM skip flag are
+    /// compatible — the first one seen wins (a warning is logged), matching the
+    /// SAM spec's allowance for the same mod code to appear in multiple groups.
+    /// Otherwise creates a new type and returns a mutable reference to it.
     pub fn try_add_annotation_type(
         &mut self,
         name: &str,
         quality_spec: QualitySpec,
+        encoding: Encoding,
     ) -> Result<&mut AnnotationType, ParseError> {
         if let Some(idx) = self.annotation_types.iter().position(|t| t.name == name) {
-            if self.annotation_types[idx].quality_spec != quality_spec {
+            let existing = &self.annotation_types[idx];
+            if existing.quality_spec != quality_spec {
                 return Err(ParseError::ConflictingAnnotationType {
                     name: name.to_string(),
                     reason: format!(
                         "existing quality_spec {} differs from requested {}",
-                        self.annotation_types[idx].quality_spec, quality_spec
+                        existing.quality_spec, quality_spec
                     ),
                 });
+            }
+            match (existing.encoding, encoding) {
+                // Same kind, same skip flag (or both Ma): compatible.
+                (a, b) if a == b => {}
+                // Both MmMl but skip flags differ: keep the first, warn.
+                (Encoding::MmMl { skip_flag: kept }, Encoding::MmMl { skip_flag: ignored }) => {
+                    log::warn!(
+                        "annotation type {name:?}: conflicting MM skip flag, keeping first \
+                         ({kept:?}), ignoring {ignored:?}"
+                    );
+                }
+                // Ma vs MmMl: a real structural conflict.
+                (a, b) => {
+                    return Err(ParseError::ConflictingAnnotationType {
+                        name: name.to_string(),
+                        reason: format!("existing encoding {a:?} differs from requested {b:?}"),
+                    });
+                }
             }
             return Ok(&mut self.annotation_types[idx]);
         }
         self.annotation_types
-            .push(AnnotationType::new(name, quality_spec));
+            .push(AnnotationType::new(name, quality_spec, encoding));
         Ok(self.annotation_types.last_mut().unwrap())
     }
 
@@ -59,11 +90,11 @@ impl MolecularAnnotations {
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, QualitySpec, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
-    /// annotations.add_annotation_type("msp", "P".parse().unwrap());
-    /// annotations.add_annotation_type("nuc", QualitySpec::none());
+    /// annotations.add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma);
+    /// annotations.add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma);
     ///
     /// assert_eq!(annotations.annotation_type_names(), vec!["msp", "nuc"]);
     /// ```
@@ -94,6 +125,8 @@ impl MolecularAnnotations {
     /// # Arguments
     /// * `name` - Name of the annotation type (e.g., "msp", "nuc", "fire")
     /// * `quality_spec` - Quality specification
+    /// * `encoding` - On-disk encoding (`Encoding::Ma` for structural types,
+    ///   `Encoding::MmMl` for base modifications)
     /// * `starts` - 0-based start positions
     /// * `lengths` - Lengths of the annotations in base pairs
     /// * `strand` - Strand applied to every annotation in this batch
@@ -103,16 +136,17 @@ impl MolecularAnnotations {
     ///
     /// # Errors
     /// Returns an error if array lengths don't match, or if `name` already
-    /// exists with a different `quality_spec`.
+    /// exists with a different `quality_spec` or encoding kind.
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations.add_annotations(
     ///     "msp",
     ///     "P".parse().unwrap(),
+    ///     Encoding::Ma,
     ///     &[100, 200, 300],
     ///     &[50, 60, 70],
     ///     Strand::Forward,
@@ -127,6 +161,7 @@ impl MolecularAnnotations {
         &mut self,
         name: &str,
         quality_spec: QualitySpec,
+        encoding: Encoding,
         starts: &[u32],
         lengths: &[u32],
         strand: Strand,
@@ -158,7 +193,7 @@ impl MolecularAnnotations {
             }
         }
 
-        let at = self.try_add_annotation_type(name, quality_spec)?;
+        let at = self.try_add_annotation_type(name, quality_spec, encoding)?;
 
         for i in 0..starts.len() {
             let q = if num_q > 0 {

@@ -12,7 +12,7 @@
 //! Or with a custom input file:
 //!   cargo run --example fiberseq_to_ma -- path/to/file.cram
 
-use molecular_annotation::{MaEncoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{Encoding, MaEncoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
 use std::env;
@@ -45,7 +45,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
     if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
-                annotations.add_annotation_type("nuc", QualitySpec::none());
+                annotations.add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma);
             for (start, length) in ns.iter().zip(nl.iter()) {
                 // API uses 0-based internally, converts to 1-based when writing MA tag
                 nuc_type.add(*start, *length, Strand::Forward, vec![], None);
@@ -70,7 +70,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
                 QualitySpec::none()
             };
 
-            let msp_type = annotations.add_annotation_type("msp", quality_spec);
+            let msp_type = annotations.add_annotation_type("msp", quality_spec, Encoding::Ma);
             for (i, (start, length)) in a_starts.iter().zip(al.iter()).enumerate() {
                 let qualities = if has_quality {
                     aq.as_ref()

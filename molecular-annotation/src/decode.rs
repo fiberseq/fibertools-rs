@@ -156,8 +156,11 @@ impl MolecularAnnotations {
                 })
                 .collect::<Result<Vec<_>, ParseError>>()?;
 
-            // Get-or-merge into the existing AnnotationType for `name`.
-            let at = out.try_add_annotation_type(&name, quality_spec.clone())?;
+            // Get-or-merge into the existing AnnotationType for `name`. The MA
+            // tag only carries structural (Ma-encoded) types; basemods live in
+            // MM/ML and are decoded separately.
+            let at =
+                out.try_add_annotation_type(&name, quality_spec.clone(), crate::Encoding::Ma)?;
 
             for (pos, inline_length) in position_length_pairs {
                 // Get length: from inline format or from AL array

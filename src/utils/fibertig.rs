@@ -2,7 +2,7 @@ use crate::cli::PgInjectOptions;
 use crate::subcommands::pg_pansn;
 use crate::utils::bio_io;
 use anyhow::{Context, Result};
-use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use noodles::fasta;
 use rust_htslib::bam::header::HeaderRecord;
 use rust_htslib::bam::{Header, HeaderView, Read, Record};
@@ -112,7 +112,7 @@ impl FiberTig {
 
             let mut annot = MolecularAnnotations::new(seq_len);
             if !rows.is_empty() {
-                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
                 for (s, l, name) in rows {
                     t.add(s, l, Strand::Forward, vec![], name);
                 }
@@ -236,7 +236,7 @@ impl FiberTig {
         let mut push_window = |start: i64, end: i64, peaks: Vec<(u32, u32, Option<String>)>| {
             let mut annot = MolecularAnnotations::new(read_length);
             if !peaks.is_empty() {
-                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none());
+                let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
                 for (s, l, name) in peaks {
                     t.add(s, l, Strand::Forward, vec![], name);
                 }
@@ -349,7 +349,6 @@ impl FiberTig {
                 }
             }
 
-            crate::utils::ma_io::ensure_basemod_encoding(annotations);
             crate::utils::ma_io::write_record_with_basemods(&mut record, annotations);
 
             records.push(record);

@@ -163,14 +163,12 @@ impl FiberseqData {
     ///
     /// MM/ML are deliberately left untouched: this is an edit path, not a
     /// basemod producer, so the record's original MM/ML bytes pass through
-    /// byte-identically. `ensure_basemod_encoding` flags m6a/cpg as
-    /// `Encoding::MmMl` so `write_record` excludes them from the MA tag rather
+    /// byte-identically. Basemod types (m6a/cpg) are `Encoding::MmMl` (set when
+    /// they were read), so `write_record` excludes them from the MA tag rather
     /// than writing basemod calls there too. Producers that synthesize or
     /// modify basemods must use `ma_io::write_record_with_basemods` instead.
     pub fn serialize_annotations(&mut self) {
-        let mut annot = self.annotations.clone();
-        crate::utils::ma_io::ensure_basemod_encoding(&mut annot);
-        crate::utils::ma_io::write_record(&mut self.record, &annot);
+        crate::utils::ma_io::write_record(&mut self.record, &self.annotations);
     }
 
     pub fn get_qname(&self) -> String {
