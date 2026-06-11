@@ -338,7 +338,11 @@ mod tests {
             }
         }
         if m6a_count > 0 {
-            let t = annotations.add_annotation_type(M6A_TYPE, "Q".parse().expect("Q parses"), Encoding::mm_ml());
+            let t = annotations.add_annotation_type(
+                M6A_TYPE,
+                "Q".parse().expect("Q parses"),
+                Encoding::mm_ml(),
+            );
             for i in 0..m6a_count {
                 t.add(i as u32, 1, Strand::Forward, vec![0], None);
             }

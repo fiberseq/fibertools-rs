@@ -255,8 +255,11 @@ where
                     opts.basemod_from_ml(record, cur_predictions, &data.positions, &data.base_mod);
                 let (skip_base, strand) = basemods::canonical_basemod(basemods::M6A_TYPE, base)
                     .expect("A/T are canonical m6a bases");
-                m6a_calls
-                    .extend(poss.into_iter().zip(quals).map(|(p, q)| (p, q, skip_base, strand)));
+                m6a_calls.extend(
+                    poss.into_iter()
+                        .zip(quals)
+                        .map(|(p, q)| (p, q, skip_base, strand)),
+                );
             }
             if !m6a_calls.is_empty() {
                 m6a_calls.sort_by_key(|&(p, _, _, _)| p);

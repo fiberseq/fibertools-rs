@@ -62,8 +62,7 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
                 if annot.get_type(&t.name).is_some() {
                     continue;
                 }
-                let new_t =
-                    annot.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
+                let new_t = annot.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
                 for a in t.annotations.into_iter() {
                     new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
                 }
@@ -489,8 +488,13 @@ mod tests {
         // Second write to the SAME record: a different msp at 200..260.
         let mut v2 = MolecularAnnotations::from_record(&record);
         v2.annotation_types.clear();
-        v2.add_annotation_type(MSP_TYPE, qspec_q, Encoding::Ma)
-            .add(200, 60, Strand::Unknown, vec![20], None);
+        v2.add_annotation_type(MSP_TYPE, qspec_q, Encoding::Ma).add(
+            200,
+            60,
+            Strand::Unknown,
+            vec![20],
+            None,
+        );
         write_record(&mut record, &v2);
 
         // Structural invariant: exactly one MA tag on the record.
