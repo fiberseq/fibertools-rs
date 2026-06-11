@@ -134,8 +134,8 @@ impl MolecularAnnotations {
     /// let mut record = /* from BAM file */;
     /// let mut annotations = MolecularAnnotations::from_record(&record);
     /// annotations
-    ///     .add_annotation_type("msp", Strand::Forward, "P".parse().unwrap())
-    ///     .add(100, 50, vec![40], None);
+    ///     .add_annotation_type("msp", "P".parse().unwrap())
+    ///     .add(100, 50, Strand::Forward, vec![40], None);
     ///
     /// annotations.to_record(&mut record);
     /// ```
