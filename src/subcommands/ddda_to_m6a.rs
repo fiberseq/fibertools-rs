@@ -4,7 +4,7 @@ use crate::utils::ma_io;
 use crate::*;
 use anyhow::Error;
 use bio::alphabets::dna::revcomp;
-use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{MolecularAnnotations, QualitySpec};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rust_htslib::bam::Record;
@@ -78,9 +78,12 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
     let qspec = "Q".parse::<QualitySpec>().expect("Q parses");
     let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
     for (pos, base) in modified_bases_forward {
-        let header = basemods::canonical_header(basemods::M6A_TYPE, base)
+        // Store the call's true (skip-base, strand): A-base m6a is `A+a`
+        // (forward), T-base is `T-a` (reverse). The strand must live in
+        // `Strand` so the MM/ML writer emits the right group sign.
+        let (skip_base, strand) = basemods::canonical_basemod(basemods::M6A_TYPE, base)
             .expect("ddda_to_m6a only places calls on A/T bases");
-        t.add(pos, 1, Strand::Forward, vec![255], Some(header.to_string()));
+        t.add(pos, 1, strand, vec![255], Some(skip_base.to_string()));
     }
     ma_io::ensure_basemod_encoding(&mut annot);
     ma_io::write_record_with_basemods(record, &annot);

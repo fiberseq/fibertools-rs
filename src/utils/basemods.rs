@@ -34,3 +34,27 @@ pub fn canonical_header(type_name: &str, base: u8) -> Option<&'static str> {
         _ => None,
     }
 }
+
+/// Decomposed form of [`canonical_header`]: the `(skip_base, strand)` a
+/// canonical call serializes under.
+///
+/// Producers must store these on the annotation — `name` = skip-base,
+/// `strand` = strand — NOT the full header string (e.g. `"T-a"`) in `name`
+/// with a `Strand::Forward` placeholder. The MM/ML writer derives the group's
+/// `+`/`-` sign from `strand`, not from `name`, so a `Strand::Forward`
+/// placeholder silently turns a minus-strand call (`T-a`) into `T+a`. This
+/// mirrors the parse path, which stores the skip-base in `name` and the strand
+/// in `strand`.
+pub fn canonical_basemod(
+    type_name: &str,
+    base: u8,
+) -> Option<(&'static str, molecular_annotation::Strand)> {
+    use molecular_annotation::Strand;
+    match (type_name, base) {
+        (M6A_TYPE, b'A') => Some(("A", Strand::Forward)),
+        (M6A_TYPE, b'T') => Some(("T", Strand::Reverse)),
+        (CPG_TYPE, b'C') => Some(("C", Strand::Forward)),
+        (CPG_TYPE, b'G') => Some(("G", Strand::Forward)),
+        _ => None,
+    }
+}

@@ -239,39 +239,39 @@ where
                 None => continue,
             };
             // Iterate over A and then T basemods, collecting their forward
-            // positions + ML qualities into a single sorted m6a list. Each
-            // call carries its canonical MM group header — A-base calls
-            // are "A+a", T-base calls are "T-a" — so the library's MM/ML
-            // serializer emits them under the correct group.
-            let mut m6a_calls: Vec<(u32, u8, &'static str)> = Vec::new();
-            for (data, header) in [(a_data, "A+a"), (t_data, "T-a")] {
+            // positions + ML qualities into a single sorted m6a list. Each call
+            // carries its canonical (skip-base, strand) so the library's MM/ML
+            // serializer emits it under the right group: A-base m6a is `A+a`
+            // (forward), T-base is `T-a` (reverse). The strand must live in
+            // `Strand` — the writer derives the group `+`/`-` from it, not from
+            // the skip-base name.
+            let mut m6a_calls: Vec<(u32, u8, &'static str, molecular_annotation::Strand)> =
+                Vec::new();
+            for (data, base) in [(a_data, b'A'), (t_data, b'T')] {
                 let cur_predict_en = cur_predict_st + data.count;
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
                 cur_predict_st += data.count;
                 let (poss, quals) =
                     opts.basemod_from_ml(record, cur_predictions, &data.positions, &data.base_mod);
-                m6a_calls.extend(poss.into_iter().zip(quals).map(|(p, q)| (p, q, header)));
+                let (skip_base, strand) = basemods::canonical_basemod(basemods::M6A_TYPE, base)
+                    .expect("A/T are canonical m6a bases");
+                m6a_calls
+                    .extend(poss.into_iter().zip(quals).map(|(p, q)| (p, q, skip_base, strand)));
             }
             if !m6a_calls.is_empty() {
-                m6a_calls.sort_by_key(|&(p, _, _)| p);
+                m6a_calls.sort_by_key(|&(p, _, _, _)| p);
                 let qspec = "Q"
                     .parse::<molecular_annotation::QualitySpec>()
                     .expect("Q parses");
                 let t = annot.add_annotation_type(basemods::M6A_TYPE, qspec);
-                for (pos, qual, header) in &m6a_calls {
-                    t.add(
-                        *pos,
-                        1,
-                        molecular_annotation::Strand::Forward,
-                        vec![*qual],
-                        Some(header.to_string()),
-                    );
+                for (pos, qual, skip_base, strand) in &m6a_calls {
+                    t.add(*pos, 1, *strand, vec![*qual], Some(skip_base.to_string()));
                 }
             }
 
             // Compute nucleosomes + MSPs from the forward m6a positions.
             let modified_bases_forward: Vec<i64> =
-                m6a_calls.iter().map(|&(p, _, _)| p as i64).collect();
+                m6a_calls.iter().map(|&(p, _, _, _)| p as i64).collect();
             nucleosome::add_nucleosomes_to_annotations(
                 record,
                 &mut annot,
