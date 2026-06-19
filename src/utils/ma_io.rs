@@ -176,11 +176,6 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
                 lens.len()
             );
         }
-        let q_spec = if aq.is_some() {
-            "Q".parse::<QualitySpec>()?
-        } else {
-            QualitySpec::none()
-        };
         if let Some(ref q) = aq {
             if q.len() != starts.len() {
                 bail!(
@@ -190,11 +185,31 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
                 );
             }
         }
+        // MSPs always ingest without quality: the legacy `aq` byte is the FIRE
+        // precision, which now lives on a separate `fire` type
         if !starts.is_empty() {
-            let msp = annot.add_annotation_type(MSP_TYPE, q_spec, Encoding::Ma);
-            for (i, (s, l)) in starts.iter().zip(lens.iter()).enumerate() {
-                let qualities = aq.as_ref().map(|q| vec![q[i]]).unwrap_or_default();
-                msp.add(*s, *l, Strand::Unknown, qualities, None);
+            let msp = annot.add_annotation_type(MSP_TYPE, QualitySpec::none(), Encoding::Ma);
+            for (s, l) in starts.iter().zip(lens.iter()) {
+                msp.add(*s, *l, Strand::Unknown, vec![], None);
+            }
+        }
+        // FIRE is the subset of MSPs whose legacy precision crossed the
+        // regulatory-element threshold (precision > 0), carrying that precision
+        // as the `fire` quality — the same `p > 0` rule the FIRE producer uses.
+        if let Some(ref q) = aq {
+            let fire: Vec<(u32, u32, u8)> = starts
+                .iter()
+                .zip(lens.iter())
+                .zip(q.iter())
+                .filter(|(_, &p)| p > 0)
+                .map(|((s, l), &p)| (*s, *l, p))
+                .collect();
+            if !fire.is_empty() {
+                let q_spec = "Q".parse::<QualitySpec>()?;
+                let fire_t = annot.add_annotation_type(FIRE_TYPE, q_spec, Encoding::Ma);
+                for (s, l, p) in fire {
+                    fire_t.add(s, l, Strand::Unknown, vec![p], None);
+                }
             }
         }
     }
@@ -472,6 +487,53 @@ mod tests {
         assert_eq!(msp.annotations.len(), 1);
         assert_eq!(msp.annotations[0].start, 6);
         assert_eq!(msp.annotations[0].length, 3);
+    }
+
+    #[test]
+    fn read_record_splits_legacy_aq_into_msp_and_fire() {
+        use rust_htslib::bam::record::Aux;
+
+        let mut record = synth_record(b"ATCGATCGATCGATCGATCG"); // 20bp
+
+        // Two MSPs via legacy `as`/`al`; `aq` gives the per-MSP precision that
+        // legacy FIRE wrote. First MSP has precision 200 (>0 => a fire call);
+        // second has precision 0 (=> an MSP that is not a regulatory element).
+        let as_starts: Vec<u32> = vec![2, 10];
+        let al: Vec<u32> = vec![3, 4];
+        let aq: Vec<u8> = vec![200, 0];
+        record
+            .push_aux(b"as", Aux::ArrayU32((&as_starts).into()))
+            .unwrap();
+        record.push_aux(b"al", Aux::ArrayU32((&al).into())).unwrap();
+        record.push_aux(b"aq", Aux::ArrayU8((&aq).into())).unwrap();
+
+        let annot = read_record(&record).expect("read_record");
+
+        // msp: both entries, and NO quality — the precision moved to `fire`.
+        let msp = annot
+            .annotation_types
+            .iter()
+            .find(|t| t.name == MSP_TYPE)
+            .expect("msp populated from legacy as/al");
+        assert!(
+            !msp.quality_spec.has_quality(),
+            "msp must carry no quality after legacy ingest"
+        );
+        assert_eq!(msp.annotations.len(), 2);
+        assert_eq!(msp.annotations[0].start, 2);
+        assert_eq!(msp.annotations[1].start, 10);
+
+        // fire: only the aq>0 subset, carrying aq as the precision quality.
+        let fire = annot
+            .annotation_types
+            .iter()
+            .find(|t| t.name == FIRE_TYPE)
+            .expect("fire synthesized from the aq>0 MSP subset");
+        assert!(fire.quality_spec.has_quality());
+        assert_eq!(fire.annotations.len(), 1);
+        assert_eq!(fire.annotations[0].start, 2);
+        assert_eq!(fire.annotations[0].length, 3);
+        assert_eq!(fire.annotations[0].qualities.to_vec(), vec![200]);
     }
 
     #[test]
