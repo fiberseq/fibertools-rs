@@ -77,6 +77,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::ClearKinetics(clear_kinetics_opts)) => {
             subcommands::clear_kinetics::clear_kinetics(clear_kinetics_opts);
         }
+        Some(Commands::ConvertTags(convert_tags_opts)) => {
+            subcommands::convert_tags::convert_tags(convert_tags_opts);
+        }
         Some(Commands::StripBasemods(strip_basemods_opts)) => {
             subcommands::strip_basemods::strip_base_mods(strip_basemods_opts);
         }

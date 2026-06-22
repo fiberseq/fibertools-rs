@@ -8,6 +8,7 @@ mod benchmark_opts;
 mod call_peaks_opts;
 mod center_opts;
 mod clear_kinetics_opts;
+mod convert_tags_opts;
 mod ddda_to_m6a_opts;
 mod decorator_opts;
 mod extract_opts;
@@ -30,6 +31,7 @@ pub use benchmark_opts::*;
 pub use call_peaks_opts::*;
 pub use center_opts::*;
 pub use clear_kinetics_opts::*;
+pub use convert_tags_opts::*;
 pub use ddda_to_m6a_opts::*;
 pub use decorator_opts::*;
 pub use extract_opts::*;
@@ -141,6 +143,8 @@ pub enum Commands {
     Pileup(PileupOptions),
     /// Remove HiFi kinetics tags from the input bam file
     ClearKinetics(ClearKineticsOptions),
+    /// Convert legacy (lowercase) fiberseq tags to MA spec
+    ConvertTags(ConvertTagsOptions),
     /// Strip out select base modifications
     StripBasemods(StripBasemodsOptions),
     /// Convert a DddA BAM file to pseudo m6A BAM file

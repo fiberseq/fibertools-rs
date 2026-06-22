@@ -36,3 +36,5 @@ pub mod pg_lift;
 pub mod pg_pansn;
 
 pub mod validate;
+// Convert legacy annotation tags to MA
+pub mod convert_tags;
