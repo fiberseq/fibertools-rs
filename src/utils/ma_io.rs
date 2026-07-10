@@ -75,6 +75,30 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
 /// Writes MA-family tags (MA/AL/AQ/AN) to a BAM record, **preserving the
 /// record's existing MM/ML bytes**.
 ///
+/// # Which write function do I call?
+///
+/// The two write paths differ only in how they treat base modifications
+/// (MM/ML). Pick by asking: *does this code path create, modify, or remove
+/// base mods?*
+///
+/// | Your code path | Call | MM/ML behavior |
+/// |---|---|---|
+/// | Edits only nuc/msp/fire (structural annotations) | [`write_record`] | preserved byte-identically |
+/// | Creates / modifies / removes base mods | [`write_record_with_basemods`] | canonically re-encoded from the model |
+///
+/// The distinction exists because the in-memory model **normalizes** MM/ML on
+/// read (splits grouped codes, canonicalizes skip flags), so re-encoding from
+/// the model is lossy for spec-legal but non-canonical encodings (grouped
+/// multi-code `C+mh`, `N+a` wildcards). Leaving MM/ML untouched is therefore
+/// the only way to guarantee byte-identical round-trips for structural editors.
+/// Calling the wrong one is silently wrong: a structural editor that re-encodes
+/// corrupts non-canonical MM/ML; a producer that preserves emits stale mods.
+///
+/// A future refactor (see `molecular-annotation/docs/mm-ml-per-group-passthrough.md`)
+/// would collapse these into one function by tracking dirtiness per MM group.
+///
+/// ---
+///
 /// This is the read/edit write path: it does not re-encode base modifications,
 /// so any MM/ML present on the input survives byte-identically (including
 /// spec-legal encodings the normalized model can't represent, such as grouped
@@ -90,6 +114,9 @@ pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
 
 /// Writes MA-family tags **and** canonically re-encodes MM/ML from the
 /// annotation model.
+///
+/// See [`write_record`] for the "which write function do I call?" contract;
+/// this is the base-mod-producer path.
 ///
 /// For producers/synthesizers (`predict_m6a`, `ddda_to_m6a`, `strip_basemods`,
 /// and record-synthesizing paths) that genuinely create, modify, or remove
