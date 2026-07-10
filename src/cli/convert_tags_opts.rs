@@ -6,7 +6,7 @@ use std::fmt::Debug;
 pub struct ConvertTagsOptions {
     #[clap(flatten)]
     pub input: InputBam,
-    /// Output bam file without hifi kinetics
+    /// Output bam file with MA spec tags
     #[clap(default_value = "-")]
     pub out: String,
 }
