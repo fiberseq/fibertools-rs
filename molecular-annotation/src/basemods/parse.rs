@@ -82,7 +82,8 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
             _ => SkipFlag::Implicit,
         };
 
-        let mut deltas: Vec<i64> = Vec::with_capacity(delta_list.bytes().filter(|&b| b == b',').count());
+        let mut deltas: Vec<i64> =
+            Vec::with_capacity(delta_list.bytes().filter(|&b| b == b',').count());
         deltas.extend(
             delta_list
                 .trim_start_matches(',')
