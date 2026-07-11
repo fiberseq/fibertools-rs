@@ -13,7 +13,7 @@
 use std::path::PathBuf;
 
 use fibertools_rs::utils::ma_io::{
-    read_annotations, read_record, write_record, MSP_TYPE, NUC_TYPE,
+    read_annotations, read_record, write_record, FIRE_TYPE, MSP_TYPE, NUC_TYPE,
 };
 use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
@@ -72,12 +72,39 @@ fn legacy_read_matches_raw_tags() {
                 assert_eq!(starts, raw_as, "{fixture}: msp starts");
                 assert_eq!(lens, raw_al, "{fixture}: msp lengths");
 
+                // MSPs no longer carry quality. The legacy `aq` byte is the FIRE
+                // precision, which now lives on the separate `fire` type: FIRE is
+                // the subset of MSPs whose precision is > 0, carrying it as the
+                // `fire` quality.
+                assert!(!msp.quality_spec.has_quality(), "{fixture}: msp has no Q");
+                assert!(
+                    msp.annotations.iter().all(|a| a.qualities.is_empty()),
+                    "{fixture}: msp qualities empty"
+                );
+
                 if let Some(q) = raw_aq {
-                    let qs: Vec<u8> = msp.annotations.iter().map(|a| a.qualities[0]).collect();
-                    assert_eq!(qs, q, "{fixture}: msp qualities");
-                    assert!(msp.quality_spec.has_quality(), "{fixture}: aq → Q-spec");
-                } else {
-                    assert!(!msp.quality_spec.has_quality(), "{fixture}: no aq → no Q");
+                    let expected_fire: Vec<(u32, u8)> = raw_as
+                        .iter()
+                        .zip(&q)
+                        .filter(|(_, &p)| p > 0)
+                        .map(|(&s, &p)| (s, p))
+                        .collect();
+                    let fire = annot.get_type(FIRE_TYPE);
+                    if expected_fire.is_empty() {
+                        assert!(
+                            fire.is_none_or(|f| f.annotations.is_empty()),
+                            "{fixture}: no fire when all aq == 0"
+                        );
+                    } else {
+                        let fire = fire.expect("fire type present when aq > 0");
+                        let got: Vec<(u32, u8)> = fire
+                            .annotations
+                            .iter()
+                            .map(|a| (a.start, a.qualities[0]))
+                            .collect();
+                        assert_eq!(got, expected_fire, "{fixture}: fire starts + quals");
+                        assert!(fire.quality_spec.has_quality(), "{fixture}: fire has Q");
+                    }
                 }
             }
         }
