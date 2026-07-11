@@ -12,5 +12,7 @@ mod fire;
 mod footprint;
 #[path = "regression/pileup.rs"]
 mod pileup;
+#[path = "regression/predict_m6a.rs"]
+mod predict_m6a;
 #[path = "regression/qc.rs"]
 mod qc;

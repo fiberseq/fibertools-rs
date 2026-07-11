@@ -1,0 +1,8 @@
+---
+source: tests/regression/predict_m6a.rs
+assertion_line: 50
+expression: projection
+---
+A+a
+C+m
+T-a
