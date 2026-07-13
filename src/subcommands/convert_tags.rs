@@ -24,7 +24,7 @@ pub fn convert_tags(opts: &mut cli::ConvertTagsOptions) {
 
     for rec in bam.records() {
         let mut record = rec.expect("failed to read BAM record");
-        let had_ma = matches!(record.aux(b"MA"), Ok(_));
+        let had_ma = record.aux(b"MA").is_ok();
         let annot = ma_io::read_record(&record)
             .unwrap_or_else(|e| panic!("failed to read annotations: {e}"));
 

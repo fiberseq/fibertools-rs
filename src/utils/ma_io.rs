@@ -33,6 +33,15 @@ pub const FIRE_TYPE: &str = "fire";
 /// MA tag is present. These are never emitted; we only ingest them.
 pub const LEGACY_READ_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
 
+/// Molecular-orientation nuc/msp arrays returned by [`extract_nuc_msp_arrays`]:
+/// `(nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual)`. `msp_qual`
+/// is empty when there are no MSP qualities (pre-FIRE state).
+type NucMspArrays = (Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>, Vec<u8>);
+
+/// MSP input to [`build_annotations`]: `(starts, lengths, optional qualities)`
+/// borrowed from caller-owned slices.
+type MspInput<'a> = (&'a [u32], &'a [u32], Option<&'a [u8]>);
+
 /// Reads annotations from a BAM record's tags.
 ///
 /// Delegates to the library's combined MA-spec + MM/ML parser. If the
@@ -54,8 +63,8 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
         // read-only — we never delete these tags — so a foreign tool reusing
         // those names is at worst mis-parsed here, never destroyed. Any future
         // code that *removes* legacy tags must verify provenance first.
-        let has_legacy_nuc = matches!(record.aux(b"ns"), Ok(_));
-        let has_legacy_msp = matches!(record.aux(b"as"), Ok(_));
+        let has_legacy_nuc = record.aux(b"ns").is_ok();
+        let has_legacy_msp = record.aux(b"as").is_ok();
         if has_legacy_nuc || has_legacy_msp {
             let legacy = read_legacy_nuc_msp(record)?;
             for t in legacy.annotation_types.into_iter() {
@@ -252,9 +261,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
 /// Coordinates are in molecular orientation — the same convention as the
 /// legacy `ns`/`nl`/`as`/`al` tags. `msp_qual` is empty when there are no
 /// MSP qualities (pre-FIRE state); otherwise one byte per MSP.
-pub fn extract_nuc_msp_arrays(
-    record: &bam::Record,
-) -> Result<(Vec<i64>, Vec<i64>, Vec<i64>, Vec<i64>, Vec<u8>)> {
+pub fn extract_nuc_msp_arrays(record: &bam::Record) -> Result<NucMspArrays> {
     let annot = read_record(record)?;
     let (nuc_starts, nuc_lengths) = annot
         .get_type(NUC_TYPE)
@@ -349,7 +356,7 @@ pub fn add_fire_annotations(
 pub fn build_annotations(
     record: &bam::Record,
     nuc: Option<(&[u32], &[u32])>,
-    msp: Option<(&[u32], &[u32], Option<&[u8]>)>,
+    msp: Option<MspInput>,
     fire: Option<(&[u32], &[u32], &[u8])>,
 ) -> MolecularAnnotations {
     let mut annot = MolecularAnnotations::from_record(record);

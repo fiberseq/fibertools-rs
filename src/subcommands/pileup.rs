@@ -522,7 +522,7 @@ impl<'a> FireTrack<'a> {
 
         coverages.sort_unstable();
 
-        let median = if coverages.len() % 2 == 0 {
+        let median = if coverages.len().is_multiple_of(2) {
             let mid = coverages.len() / 2;
             (coverages[mid - 1] as f64 + coverages[mid] as f64) / 2.0
         } else {
@@ -907,9 +907,8 @@ impl<'a> FiberseqPileup<'a> {
             } else {
                 true
             };
-            let shuffled_same = if self.shuffled_data.is_some() {
-                self.shuffled_data.as_ref().unwrap().row(i)
-                    == self.shuffled_data.as_ref().unwrap().row(i - 1)
+            let shuffled_same = if let Some(shuffled) = self.shuffled_data.as_ref() {
+                shuffled.row(i) == shuffled.row(i - 1)
             } else {
                 true
             };
@@ -931,8 +930,8 @@ impl<'a> FiberseqPileup<'a> {
             data_tracks.push(self.hap1_data.as_ref().unwrap());
             data_tracks.push(self.hap2_data.as_ref().unwrap());
         }
-        if self.shuffled_data.is_some() {
-            data_tracks.push(self.shuffled_data.as_ref().unwrap());
+        if let Some(shuffled) = self.shuffled_data.as_ref() {
+            data_tracks.push(shuffled);
         }
         for data in data_tracks {
             let total_coverage: i64 = data.coverage.iter().map(|x| *x as i64).sum();
@@ -970,8 +969,8 @@ impl<'a> FiberseqPileup<'a> {
                     data_tracks.push(self.hap1_data.as_ref().unwrap());
                     data_tracks.push(self.hap2_data.as_ref().unwrap());
                 }
-                if self.shuffled_data.is_some() {
-                    data_tracks.push(self.shuffled_data.as_ref().unwrap());
+                if let Some(shuffled) = self.shuffled_data.as_ref() {
+                    data_tracks.push(shuffled);
                 }
 
                 for data in data_tracks {
