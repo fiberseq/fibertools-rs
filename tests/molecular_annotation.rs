@@ -46,7 +46,10 @@ fn raw_u8(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
-const FIXTURES: &[&str] = &["msp_nuc.bam", "nuc_example.bam", "all.bam"];
+// Fixtures kept on the legacy tag set (ns/nl/as/al/aq) specifically to exercise
+// the legacy read path. The MA read path is covered by the migrated fixtures
+// (all/ctcf/center/NAPA) via the snapshot/behavior tests.
+const FIXTURES: &[&str] = &["msp_nuc.bam", "nuc_example.bam"];
 
 #[test]
 fn legacy_read_matches_raw_tags() {
@@ -177,11 +180,16 @@ fn ma_takes_precedence_over_legacy() {
 
 #[test]
 fn reverse_strand_keeps_molecular_coords() {
-    let reverse: Vec<_> = read_records("all.bam")
+    // Legacy-read correctness: raw `ns` is the ground truth, so this stays on a
+    // legacy fixture (msp_nuc.bam) with a reverse-strand, nuc-bearing record.
+    let reverse: Vec<_> = read_records("msp_nuc.bam")
         .into_iter()
         .filter(|r| r.is_reverse())
         .collect();
-    assert!(!reverse.is_empty(), "expected reverse records in all.bam");
+    assert!(
+        !reverse.is_empty(),
+        "expected reverse records in msp_nuc.bam"
+    );
 
     for record in reverse {
         let raw_ns = raw_u32(&record, b"ns").unwrap_or_default();
@@ -314,9 +322,16 @@ fn add_fire_is_idempotent_on_rerun() {
     // annotation list.
     use fibertools_rs::utils::ma_io::{add_fire_annotations, FIRE_TYPE, MSP_TYPE};
 
+    // Select an MSP-bearing record via the MA-aware read path (NAPA.bam now
+    // carries MA tags, not legacy `as`).
     let record = read_records("NAPA.bam")
         .into_iter()
-        .find(|r| raw_u32(r, b"as").is_some_and(|v| !v.is_empty()))
+        .find(|r| {
+            read_annotations(r)
+                .ok()
+                .and_then(|a| a.get_type(MSP_TYPE).map(|t| !t.annotations.is_empty()))
+                .unwrap_or(false)
+        })
         .expect("NAPA.bam should have an MSP-bearing record");
     let mut annot = read_annotations(&record).unwrap();
     let msp = annot.get_type(MSP_TYPE).unwrap();

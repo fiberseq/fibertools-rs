@@ -44,12 +44,12 @@ fn ma(rec: &bam::Record) -> Option<String> {
     }
 }
 
-// `all.bam` carries legacy nuc/msp tags (ns/nl/as/al/aq) and MM/ML base mods.
-// convert-tags should: drop the legacy tags, emit an MA tag, and leave MM/ML
-// byte-identical (it never touches base modifications).
+// `msp_nuc.bam` carries legacy nuc/msp tags (ns/nl/as/al/aq) and MM/ML base
+// mods. convert-tags should: drop the legacy tags, emit an MA tag, and leave
+// MM/ML byte-identical (it never touches base modifications).
 #[test]
 fn convert_tags_rewrites_legacy_as_ma() {
-    let input = fixture("all.bam");
+    let input = fixture("msp_nuc.bam");
     let out = NamedTempFile::new().unwrap();
     convert(&input, out.path());
 
@@ -75,7 +75,7 @@ fn convert_tags_rewrites_legacy_as_ma() {
 // unchanged and no legacy tags are (re)introduced.
 #[test]
 fn convert_tags_is_idempotent() {
-    let input = fixture("all.bam");
+    let input = fixture("msp_nuc.bam");
     let once = NamedTempFile::new().unwrap();
     let twice = NamedTempFile::new().unwrap();
     convert(&input, once.path());

@@ -3,7 +3,7 @@ use rust_htslib::{bam, bam::Read};
 
 #[test]
 pub fn test_msp_nuc_tags() {
-    let mut bam = bam::Reader::from_path("tests/data/all.bam").unwrap();
+    let mut bam = bam::Reader::from_path("tests/data/msp_nuc.bam").unwrap();
     for record in bam.records() {
         let record = record.unwrap();
         let _n_s = bio_io::get_u32_tag(&record, b"ns");
