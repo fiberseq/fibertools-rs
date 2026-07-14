@@ -27,8 +27,7 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
                 .get_forward_coords(M6A_TYPE)
                 .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
                 .unwrap_or_default();
-            let record = fd.record.clone();
-            add_nucleosomes_to_annotations(&record, &mut fd.annotations, &m6a, &nuc_opts.nuc);
+            add_nucleosomes_to_annotations(&fd.record, &mut fd.annotations, &m6a, &nuc_opts.nuc);
             fd.serialize_annotations();
         });
 
