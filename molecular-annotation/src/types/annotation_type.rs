@@ -2,7 +2,7 @@
 //! helpers and their output structs.
 
 use super::Qualities;
-use crate::{Annotation, Encoding, MaEncoding, QualitySpec, Strand};
+use crate::{Annotation, Encoding, QualitySpec, Strand};
 
 /// A group of annotations of the same type.
 ///
@@ -107,7 +107,7 @@ impl AnnotationType {
     /// Within the returned `MaParts`, sections are grouped by strand in
     /// `[Forward, Reverse, Unknown]` order. Within a section, annotation
     /// order follows insertion order in `self.annotations`.
-    pub fn to_ma_parts(&self, layout: MaEncoding) -> Option<MaParts> {
+    pub fn to_ma_parts(&self) -> Option<MaParts> {
         if !matches!(self.encoding, Encoding::Ma) {
             return None;
         }
@@ -115,7 +115,6 @@ impl AnnotationType {
         const STRANDS: [Strand; 3] = [Strand::Forward, Strand::Reverse, Strand::Unknown];
 
         let mut ma_section = String::new();
-        let mut al_values = Vec::new();
         let mut aq_values = Vec::new();
         let mut an_values = Vec::new();
 
@@ -131,28 +130,19 @@ impl AnnotationType {
                 continue;
             }
 
-            let positions: Vec<String> = match layout {
-                MaEncoding::Inline => indices
-                    .iter()
-                    .map(|&i| {
-                        let a = &self.annotations[i];
-                        format!("{}-{}", a.start + 1, a.length)
-                    })
-                    .collect(),
-                MaEncoding::Separate => indices
-                    .iter()
-                    .map(|&i| (self.annotations[i].start + 1).to_string())
-                    .collect(),
-            };
+            let positions: Vec<String> = indices
+                .iter()
+                .map(|&i| {
+                    let a = &self.annotations[i];
+                    format!("{}-{}", a.start + 1, a.length)
+                })
+                .collect();
 
             ma_section.push(';');
             ma_section.push_str(&self.type_signature(strand));
             ma_section.push(':');
             ma_section.push_str(&positions.join(","));
 
-            if matches!(layout, MaEncoding::Separate) {
-                al_values.extend(indices.iter().map(|&i| self.annotations[i].length));
-            }
             if self.quality_spec.has_quality() {
                 for &i in &indices {
                     aq_values.extend(self.annotations[i].qualities.iter().copied());
@@ -171,7 +161,6 @@ impl AnnotationType {
 
         Some(MaParts {
             ma_section,
-            al_values,
             aq_values,
             an_values,
         })
@@ -258,13 +247,11 @@ impl AnnotationType {
     }
 }
 
-/// One AnnotationType's contribution to MA/AL/AQ/AN tag output.
+/// One AnnotationType's contribution to MA/AQ/AN tag output.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaParts {
     /// MA tag fragment for this type, e.g. ";msp+P:101-50,201-60".
     pub ma_section: String,
-    /// AL values (empty for Inline layout).
-    pub al_values: Vec<u32>,
     /// AQ values (empty if `quality_spec` is None).
     pub aq_values: Vec<u8>,
     /// AN values (one per annotation; empty `String` if annotation has no name).

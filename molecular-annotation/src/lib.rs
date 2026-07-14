@@ -32,13 +32,13 @@
 //! the [`MolecularAnnotations`] impl is split by responsibility:
 //! - [`build`] - type management and bulk insertion
 //! - [`iter`] - iteration and coordinate projection
-//! - [`serialize`] - MA/AL/AQ/AN and MM/ML tag emission
+//! - [`serialize`] - MA/AQ/AN and MM/ML tag emission
 //! - [`decode`] - parsing from tags / BAM records
 //! - [`coords`] - aligned-blocks and liftover delegation
 //!
 //! # Example
 //! ```
-//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding, Encoding};
+//! use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
 //!
 //! // Build annotations programmatically. Annotation type identity is keyed
 //! // on `name` alone — strand is a per-annotation property.
@@ -71,19 +71,11 @@
 //!     .add_annotation_type("ctcf", pqqp, Encoding::Ma)
 //!     .add(600, 20, Strand::Forward, vec![40, 200, 180, 35], None);
 //!
-//! // Serialize with inline encoding (start-length pairs in MA string).
+//! // Serialize the MA string (start-length pairs, 1-based positions).
 //! // Sections are emitted per (name, strand): types with annotations on
 //! // multiple strands produce multiple sections sharing the same name.
-//! annotations.set_ma_encoding(MaEncoding::Inline);
-//! let ma_inline = annotations.to_ma_string();
-//! assert_eq!(ma_inline, "1000;msp+P:101-50,201-60;nuc+:151-147,351-147;fire.Q:501-75;ctcf+PQQP:601-20");
-//!
-//! // Serialize with separate encoding (starts in MA, lengths in AL array)
-//! annotations.set_ma_encoding(MaEncoding::Separate);
-//! let ma_separate = annotations.to_ma_string();
-//! let al_array = annotations.to_al_array();
-//! assert_eq!(ma_separate, "1000;msp+P:101,201;nuc+:151,351;fire.Q:501;ctcf+PQQP:601");
-//! assert_eq!(al_array, vec![50, 60, 147, 147, 75, 20]);
+//! let ma = annotations.to_ma_string();
+//! assert_eq!(ma, "1000;msp+P:101-50,201-60;nuc+:151-147,351-147;fire.Q:501-75;ctcf+PQQP:601-20");
 //!
 //! // AQ tag: quality scores (only for types with quality spec)
 //! // Values are grouped per-annotation: msp(40, 35), fire(200), ctcf(40, 200, 180, 35)
@@ -139,7 +131,7 @@ mod basemods;
 
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
-    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaEncoding, MaParts,
+    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaParts,
     MmGroup, MmMlParts, ParseError, ProjectedAnnotation, QualityScaling, QualitySpec, SkipFlag,
     Strand,
 };
@@ -157,8 +149,6 @@ pub struct MolecularAnnotations {
     pub read_length: u32,
     /// All annotation types on this read
     pub annotation_types: Vec<AnnotationType>,
-    /// Encoding format for MA tag serialization
-    ma_encoding: MaEncoding,
     /// Optional aligned blocks for liftover calculations (private)
     aligned_blocks: Option<AlignedBlocks>,
     /// Whether the read is reverse-aligned. When true, MA coordinates
@@ -173,21 +163,9 @@ impl MolecularAnnotations {
         Self {
             read_length,
             annotation_types: Vec::new(),
-            ma_encoding: MaEncoding::default(),
             aligned_blocks: None,
             is_reverse_aligned: false,
         }
-    }
-
-    /// Get the current MA tag encoding format
-    pub fn ma_encoding(&self) -> MaEncoding {
-        self.ma_encoding
-    }
-
-    /// Set the MA tag encoding format for serialization (returns &mut Self for chaining)
-    pub fn set_ma_encoding(&mut self, encoding: MaEncoding) -> &mut Self {
-        self.ma_encoding = encoding;
-        self
     }
 }
 

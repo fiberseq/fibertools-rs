@@ -4,7 +4,6 @@
 //! - [`Strand`] - Strand orientation (+, -, .)
 //! - [`QualityScaling`] - Scaling type for a single quality value (Phred or Linear)
 //! - [`QualitySpec`] - Quality specification for an annotation type (zero or more scaling types)
-//! - [`MaEncoding`] - MA tag encoding format (inline vs separate)
 //! - [`SkipFlag`] - MM "skip flag" (`.` / `?`)
 //! - [`Encoding`] - How an `AnnotationType`'s data lives on disk
 
@@ -50,34 +49,6 @@ impl FromStr for Strand {
             "-" => Ok(Strand::Reverse),
             "." => Ok(Strand::Unknown),
             _ => Err(ParseError::InvalidFormat(format!("Invalid strand: {}", s))),
-        }
-    }
-}
-
-/// Encoding format for the MA tag
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MaEncoding {
-    /// Lengths inline in MA string: "1000;msp+:100-50,200-60"
-    /// No separate AL array needed
-    Inline,
-    /// Lengths in separate AL array: MA="1000;msp+:100,200" AL=[50,60]
-    Separate,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for MaEncoding {
-    fn default() -> Self {
-        #[cfg(feature = "inline-lengths")]
-        {
-            MaEncoding::Inline
-        }
-        #[cfg(all(feature = "separate-lengths", not(feature = "inline-lengths")))]
-        {
-            MaEncoding::Separate
-        }
-        #[cfg(not(any(feature = "inline-lengths", feature = "separate-lengths")))]
-        {
-            MaEncoding::Inline
         }
     }
 }

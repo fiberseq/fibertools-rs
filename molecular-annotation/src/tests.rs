@@ -104,37 +104,12 @@ fn test_builder_pattern() {
 fn test_to_ma_string_inline() {
     // Internal coords are 0-based, MA tag uses 1-based
     let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_ma_encoding(MaEncoding::Inline);
     annotations
         .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
         .add(99, 50, Strand::Forward, vec![40], None) // 0-based 99 -> 1-based 100 in tag
         .add(199, 60, Strand::Forward, vec![35], None); // 0-based 199 -> 1-based 200 in tag
 
     assert_eq!(annotations.to_ma_string(), "1000;msp+P:100-50,200-60");
-}
-
-#[test]
-fn test_to_ma_string_separate() {
-    // Internal coords are 0-based, MA tag uses 1-based
-    let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_ma_encoding(MaEncoding::Separate);
-    annotations
-        .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
-        .add(99, 50, Strand::Forward, vec![40], None) // 0-based 99 -> 1-based 100 in tag
-        .add(199, 60, Strand::Forward, vec![35], None); // 0-based 199 -> 1-based 200 in tag
-
-    assert_eq!(annotations.to_ma_string(), "1000;msp+P:100,200");
-}
-
-#[test]
-fn test_to_al_array() {
-    let mut annotations = MolecularAnnotations::new(1000);
-    annotations
-        .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
-        .add(100, 50, Strand::Forward, vec![40], None)
-        .add(200, 60, Strand::Forward, vec![35], None);
-
-    assert_eq!(annotations.to_al_array(), vec![50, 60]);
 }
 
 #[test]
@@ -209,11 +184,10 @@ fn test_to_an_string() {
 #[test]
 fn test_from_tags_simple() {
     // MA tag uses 1-based, internally we use 0-based
-    let ma = "1000;msp+P:100,200"; // 1-based positions in tag
-    let al: Vec<u32> = vec![50, 60];
+    let ma = "1000;msp+P:100-50,200-60"; // 1-based positions with inline lengths
     let aq = vec![40, 35];
 
-    let annotations = MolecularAnnotations::from_tags(ma, &al, Some(&aq), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, Some(&aq), None).unwrap();
 
     assert_eq!(annotations.read_length, 1000);
     assert_eq!(annotations.annotation_types.len(), 1);
@@ -235,10 +209,9 @@ fn test_from_tags_inline() {
     let ma = "1000;msp+P:100-50,200-60"; // 1-based positions with inline lengths
     let aq = vec![40, 35];
 
-    let annotations = MolecularAnnotations::from_tags(ma, &[], Some(&aq), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, Some(&aq), None).unwrap();
 
     assert_eq!(annotations.read_length, 1000);
-    assert_eq!(annotations.ma_encoding(), MaEncoding::Inline);
 
     let msp = &annotations.annotation_types[0];
     assert_eq!(msp.annotations.len(), 2);
@@ -250,10 +223,9 @@ fn test_from_tags_inline() {
 
 #[test]
 fn test_from_tags_no_quality() {
-    let ma = "1000;msp+:100,200";
-    let al: Vec<u32> = vec![50, 60];
+    let ma = "1000;msp+:100-50,200-60";
 
-    let annotations = MolecularAnnotations::from_tags(ma, &al, None, None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, None, None).unwrap();
 
     assert_eq!(
         annotations.annotation_types[0].quality_spec,
@@ -269,11 +241,10 @@ fn test_from_tags_no_quality() {
 
 #[test]
 fn test_from_tags_mixed_quality() {
-    let ma = "1000;msp+P:100,200;nuc+:150,300;fire.Q:500";
-    let al: Vec<u32> = vec![50, 60, 103, 100, 75];
+    let ma = "1000;msp+P:100-50,200-60;nuc+:150-103,300-100;fire.Q:500-75";
     let aq = vec![40, 35, 200];
 
-    let annotations = MolecularAnnotations::from_tags(ma, &al, Some(&aq), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, Some(&aq), None).unwrap();
 
     assert_eq!(annotations.annotation_types.len(), 3);
 
@@ -320,7 +291,7 @@ fn test_from_tags_multi_quality() {
     let ma = "1000;msp+PQ:100-50,200-60";
     let aq = vec![40, 255, 30, 200]; // [msp1_P, msp1_Q, msp2_P, msp2_Q]
 
-    let annotations = MolecularAnnotations::from_tags(ma, &[], Some(&aq), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, Some(&aq), None).unwrap();
 
     let msp = &annotations.annotation_types[0];
     assert_eq!(msp.quality_spec, QualitySpec::from_str("PQ").unwrap());
@@ -330,12 +301,11 @@ fn test_from_tags_multi_quality() {
 
 #[test]
 fn test_from_tags_with_names() {
-    let ma = "1000;msp+P:100,200;nuc+:150,300";
-    let al: Vec<u32> = vec![50, 60, 103, 100];
+    let ma = "1000;msp+P:100-50,200-60;nuc+:150-103,300-100";
     let aq = vec![40, 35];
     let an = "msp1,,,nuc2";
 
-    let annotations = MolecularAnnotations::from_tags(ma, &al, Some(&aq), Some(an)).unwrap();
+    let annotations = MolecularAnnotations::from_tags(ma, Some(&aq), Some(an)).unwrap();
 
     assert_eq!(
         annotations.annotation_types[0].annotations[0]
@@ -354,55 +324,8 @@ fn test_from_tags_with_names() {
 }
 
 #[test]
-fn test_roundtrip_separate() {
-    let mut original = MolecularAnnotations::new(1000);
-    original.set_ma_encoding(MaEncoding::Separate);
-    original
-        .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
-        .add(99, 50, Strand::Forward, vec![40], Some("first".to_string()))
-        .add(199, 60, Strand::Forward, vec![35], None);
-    original
-        .add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma)
-        .add(149, 103, Strand::Forward, vec![], None)
-        .add(299, 100, Strand::Forward, vec![], Some("nuc2".to_string()));
-
-    let ma = original.to_ma_string();
-    let al = original.to_al_array();
-    let aq = original.to_aq_array();
-    let an = original.to_an_string();
-
-    let parsed = MolecularAnnotations::from_tags(&ma, &al, aq.as_deref(), an.as_deref()).unwrap();
-
-    assert_eq!(original.read_length, parsed.read_length);
-    assert_eq!(
-        original.annotation_types.len(),
-        parsed.annotation_types.len()
-    );
-
-    for (orig_type, parsed_type) in original
-        .annotation_types
-        .iter()
-        .zip(parsed.annotation_types.iter())
-    {
-        assert_eq!(orig_type.name, parsed_type.name);
-        assert_eq!(orig_type.quality_spec, parsed_type.quality_spec);
-        assert_eq!(orig_type.annotations.len(), parsed_type.annotations.len());
-        for (orig_annot, parsed_annot) in orig_type
-            .annotations
-            .iter()
-            .zip(parsed_type.annotations.iter())
-        {
-            assert_eq!(orig_annot.start, parsed_annot.start);
-            assert_eq!(orig_annot.length, parsed_annot.length);
-            assert_eq!(orig_annot.strand, parsed_annot.strand);
-        }
-    }
-}
-
-#[test]
 fn test_roundtrip_inline() {
     let mut original = MolecularAnnotations::new(1000);
-    original.set_ma_encoding(MaEncoding::Inline);
     original
         .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
         .add(99, 50, Strand::Forward, vec![40], None)
@@ -411,10 +334,9 @@ fn test_roundtrip_inline() {
     let ma = original.to_ma_string();
     let aq = original.to_aq_array();
 
-    let parsed = MolecularAnnotations::from_tags(&ma, &[], aq.as_deref(), None).unwrap();
+    let parsed = MolecularAnnotations::from_tags(&ma, aq.as_deref(), None).unwrap();
 
     assert_eq!(original.read_length, parsed.read_length);
-    assert_eq!(parsed.ma_encoding(), MaEncoding::Inline);
 
     let orig_msp = &original.annotation_types[0];
     let parsed_msp = &parsed.annotation_types[0];
@@ -431,7 +353,6 @@ fn test_roundtrip_inline() {
 #[test]
 fn test_roundtrip_multi_quality() {
     let mut original = MolecularAnnotations::new(1000);
-    original.set_ma_encoding(MaEncoding::Inline);
     let pq = QualitySpec::from_str("PQ").unwrap();
     original
         .add_annotation_type("msp", pq, Encoding::Ma)
@@ -444,7 +365,7 @@ fn test_roundtrip_multi_quality() {
     assert_eq!(ma, "1000;msp+PQ:100-50,200-60");
     assert_eq!(aq, Some(vec![40, 255, 30, 200]));
 
-    let parsed = MolecularAnnotations::from_tags(&ma, &[], aq.as_deref(), None).unwrap();
+    let parsed = MolecularAnnotations::from_tags(&ma, aq.as_deref(), None).unwrap();
 
     assert_eq!(
         parsed.annotation_types[0].quality_spec,
@@ -1036,7 +957,6 @@ fn test_empty_annotations_serialization() {
     let annotations = MolecularAnnotations::new(1000);
 
     assert_eq!(annotations.to_ma_string(), "1000");
-    assert_eq!(annotations.to_al_array(), vec![]);
     assert_eq!(annotations.to_aq_array(), None);
     assert_eq!(annotations.to_an_string(), None);
 }
@@ -1201,7 +1121,7 @@ fn test_from_tags_merges_strand_split_sections_into_one_type() {
     // Spec example: ctcf+Q and ctcf-Q on disk → one in-memory ctcf type
     // with two annotations of differing strand.
     let annotations =
-        MolecularAnnotations::from_tags("10;ctcf+Q:1-4;ctcf-Q:6-3", &[], Some(&[200, 180]), None)
+        MolecularAnnotations::from_tags("10;ctcf+Q:1-4;ctcf-Q:6-3", Some(&[200, 180]), None)
             .expect("strand-split same-name sections must merge");
 
     assert_eq!(annotations.annotation_types.len(), 1);
@@ -1219,7 +1139,6 @@ fn test_from_tags_merges_strand_split_sections_into_one_type() {
 fn test_from_tags_conflicting_quality_spec_for_same_name_errors() {
     let result = MolecularAnnotations::from_tags(
         "1000;msp+P:100-50;msp+Q:200-60",
-        &[],
         Some(&[40, 35]),
         None,
     );
@@ -1237,8 +1156,8 @@ fn test_round_trip_strand_split_preserves_on_disk_form() {
     // canonical on-disk shape.
     let original = "10;ctcf+Q:1-4;ctcf-Q:6-3";
     let annotations =
-        MolecularAnnotations::from_tags(original, &[], Some(&[200, 180]), None).unwrap();
-    let (ma, _al, aq, _an) = annotations.to_tags();
+        MolecularAnnotations::from_tags(original, Some(&[200, 180]), None).unwrap();
+    let (ma, aq, _an) = annotations.to_tags();
     assert_eq!(ma, original);
     assert_eq!(aq, Some(vec![200, 180]));
 }
@@ -1452,10 +1371,9 @@ fn test_retain_preserves_multi_quality_values() {
 
 #[test]
 fn test_retain_updates_serialization() {
-    // After retain, the on-disk MA/AL/AQ tags should reflect only the
+    // After retain, the on-disk MA/AQ tags should reflect only the
     // surviving annotations and respect strand-grouped section order.
     let mut annotations = MolecularAnnotations::new(1000);
-    annotations.set_ma_encoding(MaEncoding::Inline);
     annotations
         .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
         .add(99, 50, Strand::Forward, vec![40], None) // MA tag pos 100
@@ -1600,26 +1518,25 @@ fn mm_ml_types_filters_correctly() {
 
 #[test]
 fn to_ma_parts_inline() {
-    use crate::{AnnotationType, MaEncoding, QualitySpec, Strand};
+    use crate::{AnnotationType, QualitySpec, Strand};
     let mut at = AnnotationType::new("msp", "P".parse::<QualitySpec>().unwrap(), Encoding::Ma);
     at.add(99, 50, Strand::Forward, vec![40], None);
     at.add(199, 60, Strand::Forward, vec![35], None);
 
-    let parts = at.to_ma_parts(MaEncoding::Inline).unwrap();
+    let parts = at.to_ma_parts().unwrap();
     assert_eq!(parts.ma_section, ";msp+P:100-50,200-60");
-    assert!(parts.al_values.is_empty());
     assert_eq!(parts.aq_values, vec![40, 35]);
     assert_eq!(parts.an_values, vec![String::new(), String::new()]);
 }
 
 #[test]
 fn to_ma_parts_returns_none_for_mm_ml_type() {
-    use crate::{AnnotationType, Encoding, MaEncoding, QualitySpec, SkipFlag};
+    use crate::{AnnotationType, Encoding, QualitySpec, SkipFlag};
     let mut at = AnnotationType::new("a", "Q".parse::<QualitySpec>().unwrap(), Encoding::Ma);
     at.set_encoding(Encoding::MmMl {
         skip_flag: SkipFlag::Implicit,
     });
-    assert!(at.to_ma_parts(MaEncoding::Inline).is_none());
+    assert!(at.to_ma_parts().is_none());
 }
 
 #[cfg(feature = "htslib")]

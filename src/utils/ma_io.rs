@@ -1,6 +1,6 @@
 //! MA-spec annotation I/O bridge for fibertools-rs.
 //!
-//! Reading: prefers MA/AL/AQ/AN; falls back to legacy `ns/nl/as/al/aq` if no
+//! Reading: prefers MA/AQ/AN; falls back to legacy `ns/nl/as/al/aq` if no
 //! MA tag is present. Returns a populated [`MolecularAnnotations`] (read
 //! length and aligned blocks set) even when no annotation tags exist.
 //!
@@ -165,12 +165,7 @@ fn read_ma_tags(record: &bam::Record) -> Result<Option<MolecularAnnotations>> {
         Ok(Aux::String(s)) => Some(s.to_string()),
         _ => None,
     };
-    let al: Vec<u32> = match record.aux(b"AL") {
-        Ok(Aux::ArrayU32(arr)) => arr.iter().collect(),
-        Ok(Aux::ArrayI32(arr)) => arr.iter().map(|v| v as u32).collect(),
-        _ => Vec::new(),
-    };
-    let mut annot = MolecularAnnotations::from_tags(&ma, &al, aq.as_deref(), an.as_deref())
+    let mut annot = MolecularAnnotations::from_tags(&ma, aq.as_deref(), an.as_deref())
         .map_err(|e| anyhow::anyhow!("MA tag parse error: {e}"))?;
     annot.set_aligned_blocks_raw(
         molecular_annotation::AlignedBlocks::from_record(record),

@@ -1,11 +1,11 @@
-//! Parsing [`MolecularAnnotations`] from MA/AL/AQ/AN tags and BAM records.
+//! Parsing [`MolecularAnnotations`] from MA/AQ/AN tags and BAM records.
 
 use std::str::FromStr;
 
-use crate::{MaEncoding, MolecularAnnotations, ParseError, QualitySpec, Strand};
+use crate::{MolecularAnnotations, ParseError, QualitySpec, Strand};
 
 impl MolecularAnnotations {
-    /// Parse a `MolecularAnnotations` from a BAM record, reading MA/AL/AQ/AN
+    /// Parse a `MolecularAnnotations` from a BAM record, reading MA/AQ/AN
     /// tags (if present) and MM/ML tags (if present).
     ///
     /// Also extracts read length, aligned blocks, and reverse-alignment status
@@ -35,16 +35,12 @@ impl MolecularAnnotations {
     pub fn from_record(record: &rust_htslib::bam::Record) -> Self {
         use rust_htslib::bam::record::Aux;
 
-        // Pull MA/AL/AQ/AN tags off the record. If MA is present and parses,
+        // Pull MA/AQ/AN tags off the record. If MA is present and parses,
         // start from that; otherwise start from an empty annotation set keyed
         // off the record's sequence length.
         let ma_string: Option<String> = match record.aux(b"MA") {
             Ok(Aux::String(s)) => Some(s.to_string()),
             _ => None,
-        };
-        let al_vec: Vec<u32> = match record.aux(b"AL") {
-            Ok(Aux::ArrayU32(arr)) => arr.iter().collect(),
-            _ => Vec::new(),
         };
         let aq_vec: Option<Vec<u8>> = match record.aux(b"AQ") {
             Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
@@ -56,7 +52,7 @@ impl MolecularAnnotations {
         };
 
         let mut annot = match ma_string {
-            Some(ref ma) => Self::from_tags(ma, &al_vec, aq_vec.as_deref(), an_string.as_deref())
+            Some(ref ma) => Self::from_tags(ma, aq_vec.as_deref(), an_string.as_deref())
                 .unwrap_or_else(|_| Self::new(record.seq_len() as u32)),
             None => Self::new(record.seq_len() as u32),
         };
@@ -74,16 +70,11 @@ impl MolecularAnnotations {
     /// (MA tag `100` → internal `start=99`).
     ///
     /// # Arguments
-    /// * `ma` - The MA:Z tag value (e.g., "1000;msp+P:100,200"). Positions are 1-based.
-    /// * `al` - The AL:B:I array values (lengths). Empty if using inline format.
+    /// * `ma` - The MA:Z tag value (e.g., "1000;msp+P:100-50,200-60"). Positions
+    ///   are 1-based and each carries its length inline as `start-length`.
     /// * `aq` - Optional AQ:B:C array values (qualities).
     /// * `an` - Optional AN:Z tag value (names).
-    pub fn from_tags(
-        ma: &str,
-        al: &[u32],
-        aq: Option<&[u8]>,
-        an: Option<&str>,
-    ) -> Result<Self, ParseError> {
+    pub fn from_tags(ma: &str, aq: Option<&[u8]>, an: Option<&str>) -> Result<Self, ParseError> {
         // Parse MA tag
         let parts: Vec<&str> = ma.split(';').collect();
         if parts.is_empty() {
@@ -98,8 +89,7 @@ impl MolecularAnnotations {
         // Parse annotation type names (optional, from AN tag)
         let names: Vec<&str> = an.map(|s| s.split(',').collect()).unwrap_or_default();
 
-        // Track position in AL and AQ arrays
-        let mut al_idx = 0usize;
+        // Track position in the AQ array
         let mut aq_idx = 0usize;
         let mut name_idx = 0usize;
 
@@ -132,27 +122,26 @@ impl MolecularAnnotations {
             let (name, strand, quality_spec) = parse_type_info(type_info)?;
             let num_q = quality_spec.num_qualities();
 
-            // Parse positions (and optionally lengths if inline format)
-            // Detect format: "100-50,200-60" (inline) vs "100,200" (separate)
-            // MA tag uses 1-based positions, convert to 0-based internally
-            let position_length_pairs: Vec<(u32, Option<u32>)> = positions_str
+            // Parse positions as 1-based `start-length` pairs, converting start
+            // to 0-based internally. A bare start without a length is rejected:
+            // lengths are always stored inline in the MA tag.
+            let position_length_pairs: Vec<(u32, u32)> = positions_str
                 .split(',')
                 .filter(|s| !s.is_empty())
                 .map(|s| {
-                    if let Some((start_str, len_str)) = s.split_once('-') {
-                        let start: u32 = start_str.parse().map_err(|_| {
-                            ParseError::InvalidCoordinate(format!("Invalid start: {}", start_str))
-                        })?;
-                        let len: u32 = len_str.parse().map_err(|_| {
-                            ParseError::InvalidCoordinate(format!("Invalid length: {}", len_str))
-                        })?;
-                        Ok((start - 1, Some(len))) // Convert 1-based to 0-based
-                    } else {
-                        let start: u32 = s.parse().map_err(|_| {
-                            ParseError::InvalidCoordinate(format!("Invalid position: {}", s))
-                        })?;
-                        Ok((start - 1, None)) // Convert 1-based to 0-based
-                    }
+                    let (start_str, len_str) = s.split_once('-').ok_or_else(|| {
+                        ParseError::InvalidFormat(format!(
+                            "MA position {:?} has no inline length (expected start-length)",
+                            s
+                        ))
+                    })?;
+                    let start: u32 = start_str.parse().map_err(|_| {
+                        ParseError::InvalidCoordinate(format!("Invalid start: {}", start_str))
+                    })?;
+                    let len: u32 = len_str.parse().map_err(|_| {
+                        ParseError::InvalidCoordinate(format!("Invalid length: {}", len_str))
+                    })?;
+                    Ok((start - 1, len)) // Convert 1-based to 0-based
                 })
                 .collect::<Result<Vec<_>, ParseError>>()?;
 
@@ -162,22 +151,7 @@ impl MolecularAnnotations {
             let at =
                 out.try_add_annotation_type(&name, quality_spec.clone(), crate::Encoding::Ma)?;
 
-            for (pos, inline_length) in position_length_pairs {
-                // Get length: from inline format or from AL array
-                let length = if let Some(len) = inline_length {
-                    len
-                } else {
-                    if al_idx >= al.len() {
-                        return Err(ParseError::MismatchedArrayLengths {
-                            expected: al_idx + 1,
-                            got: al.len(),
-                        });
-                    }
-                    let len = al[al_idx];
-                    al_idx += 1;
-                    len
-                };
-
+            for (pos, length) in position_length_pairs {
                 // Get quality values if this type has quality scores
                 let qualities = if num_q > 0 {
                     if let Some(aq_arr) = aq {
@@ -216,21 +190,6 @@ impl MolecularAnnotations {
                 at.add(pos, length, strand, qualities, annot_name);
             }
         }
-
-        // Validate that we consumed all AL values (only if using separate format)
-        if al_idx > 0 && al_idx != al.len() {
-            return Err(ParseError::MismatchedArrayLengths {
-                expected: al_idx,
-                got: al.len(),
-            });
-        }
-
-        // Detect encoding from input format
-        out.ma_encoding = if al_idx == 0 && !out.annotation_types.is_empty() {
-            MaEncoding::Inline
-        } else {
-            MaEncoding::Separate
-        };
 
         Ok(out)
     }

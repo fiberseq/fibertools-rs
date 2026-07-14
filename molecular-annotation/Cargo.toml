@@ -6,10 +6,6 @@ description = "Library for molecular annotations in SAM/BAM files"
 license = "MIT"
 
 [features]
-default = ["inline-lengths"]
-# Encoding format for MA tag - only one should be enabled
-inline-lengths = []   # MA contains start-length pairs: "1000;msp+:100-50,200-60"
-separate-lengths = [] # MA contains starts only, lengths in AL array: "1000;msp+:100,200"
 htslib = ["dep:rust-htslib", "dep:regex", "dep:lazy_static", "dep:bio"]
 
 [dependencies]

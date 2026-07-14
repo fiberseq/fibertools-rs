@@ -1,6 +1,6 @@
-//! MA/AL/AQ/AN and MM/ML tag emission for [`MolecularAnnotations`].
+//! MA/AQ/AN and MM/ML tag emission for [`MolecularAnnotations`].
 
-use crate::{Encoding, MaEncoding, MaParts, MolecularAnnotations};
+use crate::{Encoding, MaParts, MolecularAnnotations};
 
 impl MolecularAnnotations {
     /// Iterator over per-type [`MaParts`] for every MA-encoded annotation type.
@@ -8,10 +8,9 @@ impl MolecularAnnotations {
     /// Types whose encoding is not `Encoding::Ma` are skipped (they don't
     /// participate in MA-tag emission).
     fn ma_parts_iter(&self) -> impl Iterator<Item = MaParts> + '_ {
-        let layout = self.ma_encoding;
         self.annotation_types
             .iter()
-            .filter_map(move |t| t.to_ma_parts(layout))
+            .filter_map(|t| t.to_ma_parts())
     }
 
     /// Generate the MA:Z tag string.
@@ -31,23 +30,6 @@ impl MolecularAnnotations {
             out.push_str(&p.ma_section);
         }
         out
-    }
-
-    /// Generate the AL:B:I array (lengths). Order matches MA section order.
-    ///
-    /// Returns lengths for every annotation in every MA-encoded type,
-    /// regardless of the current `ma_encoding` setting. Callers that
-    /// only want lengths when serialized separately (e.g. [`to_tags`](Self::to_tags))
-    /// filter at the call site.
-    pub fn to_al_array(&self) -> Vec<u32> {
-        // Force the `Separate` layout so per-type `MaParts.al_values` is
-        // populated even when `self.ma_encoding == Inline`. This matches
-        // the pre-refactor behavior of returning lengths unconditionally.
-        self.annotation_types
-            .iter()
-            .filter_map(|t| t.to_ma_parts(MaEncoding::Separate))
-            .flat_map(|p| p.al_values)
-            .collect()
     }
 
     /// Generate the AQ:B:C array (None if no annotations have quality).
@@ -83,41 +65,35 @@ impl MolecularAnnotations {
     /// Generate all BAM tag values at once.
     ///
     /// This is the recommended method for serializing annotations to BAM tags.
-    /// Returns a tuple of (MA, AL, AQ, AN) where:
-    /// - MA: The MA:Z tag string (always present)
-    /// - AL: The AL:B:I array (lengths, empty if using inline encoding)
+    /// Returns a tuple of (MA, AQ, AN) where:
+    /// - MA: The MA:Z tag string (always present; lengths inline as `start-length`)
     /// - AQ: The AQ:B:C array (qualities, None if no annotations have quality)
     /// - AN: The AN:Z tag string (names, None if no annotations have names)
     ///
     /// # Example
     /// ```
-    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, MaEncoding, Encoding};
+    /// use molecular_annotation::{MolecularAnnotations, Strand, QualitySpec, Encoding};
     ///
     /// let mut annotations = MolecularAnnotations::new(1000);
     /// annotations
     ///     .add_annotation_type("msp", "P".parse().unwrap(), Encoding::Ma)
     ///     .add(99, 50, Strand::Forward, vec![40], None);  // 0-based
     ///
-    /// let (ma, al, aq, an) = annotations.to_tags();
+    /// let (ma, aq, an) = annotations.to_tags();
     /// assert_eq!(ma, "1000;msp+P:100-50");  // 1-based in tag
-    /// assert!(al.is_empty());  // Inline encoding doesn't need AL
     /// assert_eq!(aq, Some(vec![40]));
     /// assert_eq!(an, None);
     /// ```
-    pub fn to_tags(&self) -> (String, Vec<u32>, Option<Vec<u8>>, Option<String>) {
+    pub fn to_tags(&self) -> (String, Option<Vec<u8>>, Option<String>) {
         let ma = self.to_ma_string();
-        let al = if matches!(self.ma_encoding, MaEncoding::Separate) {
-            self.to_al_array()
-        } else {
-            Vec::new()
-        };
         let aq = self.to_aq_array();
         let an = self.to_an_string();
-        (ma, al, aq, an)
+        (ma, aq, an)
     }
 
-    /// Write MA-family annotations (MA:Z, and optionally AL:B:I, AQ:B:C,
-    /// AN:Z) to a BAM record.
+    /// Write MA-family annotations (MA:Z, and optionally AQ:B:C, AN:Z) to a
+    /// BAM record. Lengths are always inline in MA:Z; any stale AL tag left by
+    /// the retired separate-length encoding is stripped, never written.
     ///
     /// This writes only `Encoding::Ma` annotation types. It deliberately does
     /// NOT touch the record's MM/ML tags: base-modification types
@@ -143,20 +119,19 @@ impl MolecularAnnotations {
     pub fn to_record(&self, record: &mut rust_htslib::bam::Record) {
         use rust_htslib::bam::record::Aux;
 
-        let (ma, al, aq, an) = self.to_tags();
+        let (ma, aq, an) = self.to_tags();
 
         // push_aux refuses to overwrite an existing tag, so remove first:
         // re-writing a record that already carries MA-family tags must replace
-        // them, not silently no-op and leave the stale values in place.
+        // them, not silently no-op and leave the stale values in place. AL is
+        // stripped but never re-written: lengths are inline now, so any AL on
+        // the record is a leftover that must not survive the rewrite.
         record.remove_aux(b"MA").ok();
         record.remove_aux(b"AL").ok();
         record.remove_aux(b"AQ").ok();
         record.remove_aux(b"AN").ok();
 
         record.push_aux(b"MA", Aux::String(&ma)).ok();
-        if !al.is_empty() {
-            record.push_aux(b"AL", Aux::ArrayU32((&al).into())).ok();
-        }
         if let Some(ref aq_arr) = aq {
             record.push_aux(b"AQ", Aux::ArrayU8(aq_arr.into())).ok();
         }
