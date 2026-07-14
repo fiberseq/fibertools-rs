@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.10.0] - 2026-07-13
 
 - **Annotations now use the [MolecularAnnotation (MA) spec](https://github.com/fiberseq/Molecular-annotation-spec).**
   Nucleosomes, MSPs, and FIRE elements are written as MA-spec aux tags
@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 - **Legacy lowercase tags (`ns`/`nl`, `as`/`al`/`aq`, FIRE-specific tags) are no
   longer emitted.** Tools that read them must switch to the MA tag set. Legacy
   tags are still *read* as a fallback when MA tags are absent.
+- **New `convert-tags` subcommand** rewrites a BAM's legacy lowercase tags to
+  MA-spec tags in place (MSP quality drops out to the `fire` type; `MM`/`ML` are
+  left byte-identical), for migrating existing BAMs to the new tag set.
 - **Block-boundary liftovers no longer stretch MSPs/nucleosomes into adjacent
   reference blocks** (#90); intervals snap inward, per the MA library's liftover
   semantics.

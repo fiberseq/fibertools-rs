@@ -8,9 +8,10 @@ Integration of this spec or a similar one into the SAM/BAM/CRAM is needed to sta
 
 ### Structure
 
-The molecular annotation format uses three related tags:
+The molecular annotation format uses up to four related tags:
 
-- **MA:Z:** - Read length followed by annotation positions with lengths (required)
+- **MA:Z:** - Read length followed by annotation positions (with lengths inline, unless the separate-length encoding is used — see [Length encoding](#length-encoding)) (required)
+- **AL:B:I** - Annotation Lengths (optional, u32 array; present only when the separate-length encoding is used, in which case the MA tag carries starts alone)
 - **AQ:B:C** - Annotation Quality scores (optional, u8 array; only present if any annotation type specifies P or Q)
 - **AN:Z:** - Annotation Names (optional labels for individual annotations)
 
@@ -20,10 +21,11 @@ AQ:B:C,qual1,qual2
 AN:Z:name1,name2,name3
 ```
 
-Regex for MA tag:
+Regex for MA tag (a position is `start` or `start-length`, so the same
+expression matches both length encodings):
 
 ```
-^\d+;(([a-zA-Z0-9_]+)[+-.][PQ]*:((\d+-\d+)(,\d+-\d+)*);?)+$
+^\d+;([a-zA-Z0-9_]+[-+.][PQ]*:(\d+(-\d+)?)(,\d+(-\d+)?)*;?)+$
 ```
 
 ### Read Length
@@ -54,11 +56,33 @@ All coordinates in the MA tag are "molecular coordinates" meaning:
 | `,`       | Separates annotations within a type          | `100-50,200-60,300-70`                  |
 | `-`       | Separates start position from length         | `100-50` (start 100, length 50)         |
 
-**AQ, AN tag delimiters:**
+**AL, AQ, AN tag delimiters:**
 
 | Delimiter | Purpose          | Example    |
 | --------- | ---------------- | ---------- |
 | `,`       | Separates values | `40,35,200` |
+
+### Length encoding
+
+Annotation lengths may be stored in one of two equivalent encodings. Both
+represent the same annotations; they differ only in where the length values
+live. A producer picks one encoding for the whole record; a parser MUST accept
+either and infer which was used from the tags present.
+
+| Encoding     | MA positions        | Lengths                          | Example                                   |
+| ------------ | ------------------- | -------------------------------- | ----------------------------------------- |
+| **Inline**   | `start-length`      | inline in the MA tag             | `MA:Z:1000;msp+:100-50,200-60`            |
+| **Separate** | `start` (bare)      | in the `AL:B:I` array, MA order  | `MA:Z:1000;msp+:100,200` + `AL:B:I,50,60` |
+
+- **Inline** is the default and needs no `AL` tag.
+- **Separate** omits the `-length` from every MA position and instead lists the
+  lengths in an `AL:B:I` (u32) array. `AL` values are ordered to match MA
+  section order, exactly like `AQ` and `AN` (see [Annotation Data](#annotation-data)):
+  one length per annotation, following the MA tag's left-to-right order.
+- A parser detects the encoding per record: if an `AL` array is present and its
+  values are consumed by bare-start positions, the record uses the separate
+  encoding; otherwise it is inline. The two forms MUST NOT be mixed within a
+  single MA tag — either every position carries an inline length, or none do.
 
 ### Annotation Type within the MA Tag
 
@@ -116,11 +140,12 @@ Producers MUST NOT emit two sections with the same `name` and conflicting `quali
 
 Each annotation is represented with the following components:
 
-1. **MA tag** - Read length (first value) followed by annotations in `start-length` format (1-based coordinates)
-2. **AQ tag** - Quality scores (0-255, u8; only present if any annotation type has a quality indicator)
-3. **AN tag** - Optional name/label for the annotation (string)
+1. **MA tag** - Read length (first value) followed by annotation positions (1-based coordinates). With the inline encoding each position is `start-length`; with the separate encoding each position is a bare `start` and the length comes from the `AL` tag (see [Length encoding](#length-encoding)).
+2. **AL tag** - Lengths (u32; present only with the separate encoding). One value per annotation, in MA tag order.
+3. **AQ tag** - Quality scores (0-255, u8; only present if any annotation type has a quality indicator)
+4. **AN tag** - Optional name/label for the annotation (string)
 
-The values in AN tags correspond positionally to all annotations defined in the MA tag. The AQ tag contains values only for annotation types that specify quality indicators. For each such type, each annotation contributes as many quality values as there are characters in the quality indicator. Values are grouped per-annotation: all quality values for one annotation appear consecutively, then all values for the next annotation, and so on, following MA tag order.
+The values in AL (when present) and AN tags correspond positionally to all annotations defined in the MA tag. The AQ tag contains values only for annotation types that specify quality indicators. For each such type, each annotation contributes as many quality values as there are characters in the quality indicator. Values are grouped per-annotation: all quality values for one annotation appear consecutively, then all values for the next annotation, and so on, following MA tag order.
 
 For example, if the MA tag contains `1000;msp+PQ:100-50,200-60;nuc+:150-103`, the AQ tag would contain 4 values: 2 per MSP annotation (phred then linear), and none for nuc (no quality indicator). The AQ array would be `[msp1_P, msp1_Q, msp2_P, msp2_Q]`.
 
@@ -165,6 +190,20 @@ MA:Z:1000;msp+:100-50,200-60
 - First MSP: start position 100, length 50
 - Second MSP: start position 200, length 60
 - No AQ tag since no quality indicator was specified
+
+### Same Annotations, Separate Length Encoding
+
+The identical two MSP annotations above, encoded with lengths in a separate
+`AL` array instead of inline (see [Length encoding](#length-encoding)):
+
+```
+MA:Z:1000;msp+:100,200
+AL:B:I,50,60
+```
+
+- MA positions are bare starts (100 and 200); the trailing `-length` is omitted
+- `AL` supplies the lengths in MA order: 50 for the first MSP, 60 for the second
+- This decodes to exactly the same annotations as the inline form above
 
 ### Single Annotation Type (Linear Quality)
 
