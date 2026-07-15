@@ -20,6 +20,13 @@ exclude = ["py-ft", "molecular-annotation/python"]
 
 [workspace.dependencies]
 rust-htslib = "0.46"
+# molecular-annotation is versioned independently of fibertools-rs and kept at
+# a low 0.0.x "internal crate" version (bump only when its code changes). The
+# `path` builds against local source; the `version` is written into the
+# published fibertools-rs manifest. For 0.0.x crates a caret requirement is an
+# exact pin (^0.0.1 == 0.0.1), so this welds each fibertools-rs release to the
+# specific molecular-annotation release it was built against.
+molecular-annotation = { path = "molecular-annotation", version = "0.0.1" }
 
 [[bin]]
 name = "ft"
@@ -72,7 +79,7 @@ burn = { version = "0.18.0", optional = true, features = [
 num = "0.4.3"
 rand = "0.8.5"
 noodles = { version = "0.100.0", features = ["fasta", "bed"] }
-molecular-annotation = { path = "molecular-annotation", features = ["htslib"] }
+molecular-annotation = { workspace = true, features = ["htslib"] }
 
 [build-dependencies]
 burn-import = { version = "0.18.0", default-features = false, features = [
