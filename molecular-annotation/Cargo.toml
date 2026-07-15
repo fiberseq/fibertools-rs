@@ -1,9 +1,11 @@
 [package]
 name = "molecular-annotation"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 description = "Library for molecular annotations in SAM/BAM files"
 license = "MIT"
+repository = "https://github.com/fiberseq/fibertools-rs"
+homepage = "https://fiberseq.github.io/"
 
 [features]
 htslib = ["dep:rust-htslib", "dep:regex", "dep:lazy_static", "dep:bio"]
@@ -20,3 +22,8 @@ smallvec = "1.15.1"
 
 [dev-dependencies]
 rust-htslib = { workspace = true }
+
+# molecular-annotation is a library with no binaries; cargo-dist should ignore
+# it so its release-please tag/release is a clean no-op.
+[package.metadata.dist]
+dist = false
