@@ -2,6 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "plugins": ["cargo-workspace"],
   "force-tag-creation": true,
+  "bootstrap-sha": "f6efebc81e0f4aa380f7169ee1a4f1e894024453",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
   "packages": {
     ".": {
       "release-type": "rust",
