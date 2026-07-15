@@ -2413,7 +2413,7 @@ checksum = "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da"
 
 [[package]]
 name = "fibertools-rs"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anstyle",
  "anyhow",
@@ -4124,7 +4124,7 @@ checksum = "4e519fd9c6131c1c9a4a67f8bdc4f32eb4105b16c1468adea1b8e68c98c85ec4"
 
 [[package]]
 name = "molecular-annotation"
-version = "0.0.1"
+version = "1.0.0"
 dependencies = [
  "bio 2.3.0",
  "lazy_static",
