@@ -43,7 +43,8 @@
       "release-type": "rust",
       "component": "fibertools-rs",
       "include-component-in-tag": false,
-      "exclude-paths": ["molecular-annotation"]
+      "exclude-paths": ["molecular-annotation"],
+      "draft": true
     },
     "molecular-annotation": {
       "release-type": "rust",
@@ -340,13 +341,18 @@ Expected: `molecular-annotation 0.0.1` appears on crates.io.
 
 Merge the release PR. Watch the Actions tab.
 Expected, in order:
-1. release-please creates tag `v0.X.Y` + a GitHub Release with notes.
+1. release-please creates tag `v0.X.Y` + a **draft** GitHub Release with notes
+   (verifies `"draft": true` on the fibertools component). The MA release (if
+   MA changed) is created **published**, not draft.
 2. `release.yml` (cargo-dist) runs on the tag, builds `ft` binaries + installer,
-   and uploads them to that Release (does NOT create a second Release).
+   uploads them to that draft Release, then un-drafts it (does NOT create a
+   second Release). Confirm the Release ends up published with binaries
+   attached — verifies the draft handshake.
 3. The `molecular-annotation-*` tag/release (if MA changed) is a cargo-dist
    no-op (no artifacts, no errored jobs) — verifies `dist = false`.
-4. `publish-crates.yml` runs on the published Release and publishes fibertools
-   (and MA if changed) to crates.io; already-published versions are skipped.
+4. `publish-crates.yml` runs when the fibertools release is un-drafted (and
+   immediately for MA) and publishes fibertools (and MA if changed) to
+   crates.io; already-published versions are skipped.
 
 - [ ] **Step 6: Confirm the release artifacts and crates**
 

@@ -63,7 +63,8 @@ paths**, not commit scopes.
       "release-type": "rust",
       "component": "fibertools-rs",
       "include-component-in-tag": false,
-      "exclude-paths": ["molecular-annotation"]
+      "exclude-paths": ["molecular-annotation"],
+      "draft": true
     },
     "molecular-annotation": {
       "release-type": "rust",
@@ -101,6 +102,17 @@ Key points:
   the fibertools tag as **`v0.X.Y`** (unchanged from today), so cargo-dist's
   trigger and `publish-crates.yml` need no changes. MA tags as
   `molecular-annotation-v0.0.x`.
+- **Draft handshake:** the fibertools component sets `"draft": true`. With
+  `create-release = false`, cargo-dist 0.30.3 generates a workflow that
+  `gh release upload`s binaries to the existing release and then
+  `gh release edit --draft=false` to publish it. So release-please must create
+  the fibertools release as a **draft**; cargo-dist attaches binaries and
+  un-drafts it. Un-drafting emits `release: published`, which is what triggers
+  `publish-crates.yml` — so crates.io publish happens only after binaries are
+  attached. `molecular-annotation` deliberately has **no** `draft` (default
+  `false`): it has no cargo-dist step to un-draft it, so it must publish
+  immediately, which fires `release: published` and lets `publish-crates.yml`
+  push it to crates.io.
 
 ### 2. New workflow `.github/workflows/release-please.yml`
 
@@ -116,13 +128,14 @@ Key points:
 1. Contributors merge Conventional-Commit PRs to `main` (squash recommended:
    one commit per PR == one clean logical change to route by path).
 2. release-please keeps a release PR open with pending bumps + changelog.
-3. Merging the release PR → release-please creates tag(s) + GitHub Release(s)
-   with notes.
+3. Merging the release PR → release-please creates tag(s) + GitHub Release(s):
+   the fibertools release as a **draft**, the MA release published immediately.
 4. The fibertools `v0.X.Y` tag triggers cargo-dist → builds binaries + installer
-   → uploads them to the release-please-created Release (because
+   → uploads them to the draft Release, then un-drafts it (because
    `create-release = false`).
-5. `release: published` triggers `publish-crates.yml` → publishes MA (if
-   changed) then fibertools to crates.io (idempotent; unchanged crates skipped).
+5. `release: published` fires when the fibertools release is un-drafted (and
+   immediately for MA) → `publish-crates.yml` publishes MA (if changed) then
+   fibertools to crates.io (idempotent; unchanged crates skipped).
 
 ### 4. cargo-dist changes
 

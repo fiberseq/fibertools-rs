@@ -6,7 +6,8 @@
       "release-type": "rust",
       "component": "fibertools-rs",
       "include-component-in-tag": false,
-      "exclude-paths": ["molecular-annotation"]
+      "exclude-paths": ["molecular-annotation"],
+      "draft": true
     },
     "molecular-annotation": {
       "release-type": "rust",
