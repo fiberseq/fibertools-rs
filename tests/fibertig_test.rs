@@ -1,9 +1,21 @@
 use anyhow::Result;
 use fibertools_rs::cli::{GlobalOpts, PansnParameters, PgInjectOptions};
-use fibertools_rs::utils::fibertig::{FiberAnnotation, FiberAnnotations, FiberTig};
+use fibertools_rs::utils::fibertig::{FiberTig, FIBERTIG_TYPE};
+use fibertools_rs::utils::ma_io;
+use molecular_annotation::{AlignedBlocks, Encoding, MolecularAnnotations, QualitySpec, Strand};
+use rust_htslib::bam::ext::BamRecordExtensions;
 use rust_htslib::bam::HeaderView;
 use std::io::Write;
 use tempfile::NamedTempFile;
+
+/// Convenience: borrow the `fibertig` annotation type out of a
+/// MolecularAnnotations, panicking if it isn't present.
+fn fibertig_anns(annot: &MolecularAnnotations) -> &[molecular_annotation::Annotation] {
+    &annot
+        .get_type(FIBERTIG_TYPE)
+        .expect("fibertig annotation type missing")
+        .annotations
+}
 
 #[test]
 fn test_from_fasta_simple() -> Result<()> {
@@ -65,19 +77,20 @@ fn test_read_bed_annotations() -> Result<()> {
     // Verify annotations were parsed correctly
     assert_eq!(annotations.len(), 1);
     let chr1_annotations = annotations.get("chr1").unwrap();
-    assert_eq!(chr1_annotations.annotations.len(), 2);
-    assert_eq!(chr1_annotations.seq_len, 20);
+    let anns = fibertig_anns(chr1_annotations);
+    assert_eq!(anns.len(), 2);
+    assert_eq!(chr1_annotations.read_length, 20);
 
     // Check first annotation
-    let first_ann = &chr1_annotations.annotations[0];
+    let first_ann = &anns[0];
     assert_eq!(first_ann.start, 5);
-    assert_eq!(first_ann.end, 10);
+    assert_eq!(first_ann.end(), 10);
     assert_eq!(first_ann.length, 5);
 
     // Check second annotation
-    let second_ann = &chr1_annotations.annotations[1];
+    let second_ann = &anns[1];
     assert_eq!(second_ann.start, 15);
-    assert_eq!(second_ann.end, 18);
+    assert_eq!(second_ann.end(), 18);
     assert_eq!(second_ann.length, 3);
 
     Ok(())
@@ -107,56 +120,28 @@ fn test_bed_annotations_sorted() -> Result<()> {
         FiberTig::read_bed_annotations(bed_file.path().to_str().unwrap(), &header_view)?;
 
     let chr1_annotations = annotations.get("chr1").unwrap();
-    assert_eq!(chr1_annotations.annotations.len(), 2);
+    let anns = fibertig_anns(chr1_annotations);
+    assert_eq!(anns.len(), 2);
 
     // Should be sorted by start position
-    assert_eq!(chr1_annotations.annotations[0].start, 5);
-    assert_eq!(chr1_annotations.annotations[1].start, 15);
+    assert_eq!(anns[0].start, 5);
+    assert_eq!(anns[1].start, 15);
 
     Ok(())
 }
 
 #[test]
 fn test_approximately_divide_annotations_by_window_size() -> Result<()> {
-    // Create test annotations
-    let annotations = vec![
-        FiberAnnotation {
-            start: 5,
-            end: 15,
-            length: 10,
-            qual: 0,
-            reference_start: Some(5),
-            reference_end: Some(15),
-            reference_length: Some(10),
-            extra_columns: Some(vec!["feature1".to_string()]),
-        },
-        FiberAnnotation {
-            start: 25,
-            end: 35,
-            length: 10,
-            qual: 0,
-            reference_start: Some(25),
-            reference_end: Some(35),
-            reference_length: Some(10),
-            extra_columns: Some(vec!["feature2".to_string()]),
-        },
-        FiberAnnotation {
-            start: 45,
-            end: 55,
-            length: 10,
-            qual: 0,
-            reference_start: Some(45),
-            reference_end: Some(55),
-            reference_length: Some(10),
-            extra_columns: Some(vec!["feature3".to_string()]),
-        },
-    ];
-
-    let fiber_annotations = FiberAnnotations::from_annotations(annotations, 100, false);
+    let mut annot = MolecularAnnotations::new(100);
+    {
+        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
+        t.add(5, 10, Strand::Forward, vec![], Some("feature1".into()));
+        t.add(25, 10, Strand::Forward, vec![], Some("feature2".into()));
+        t.add(45, 10, Strand::Forward, vec![], Some("feature3".into()));
+    }
 
     // Test with split size 30 - should create splits that respect annotation boundaries
-    let splits =
-        FiberTig::approximately_divide_annotations_by_window_size(100, 30, &fiber_annotations);
+    let splits = FiberTig::approximately_divide_annotations_by_window_size(100, 30, &annot);
 
     // Should have multiple splits
     assert!(splits.len() > 1);
@@ -166,7 +151,10 @@ fn test_approximately_divide_annotations_by_window_size() -> Result<()> {
     for ((start, end), split_annotations) in &splits {
         assert!(*start < *end);
         assert!(*end <= 100);
-        total_annotations += split_annotations.annotations.len();
+        total_annotations += split_annotations
+            .get_type(FIBERTIG_TYPE)
+            .map(|t| t.annotations.len())
+            .unwrap_or(0);
     }
 
     // Should have all 3 annotations distributed across splits
@@ -191,36 +179,18 @@ fn test_create_annotated_records_from_splits() -> Result<()> {
     let mut split_annotations = Vec::new();
 
     // First split: 0-20
-    let split1_anns = vec![FiberAnnotation {
-        start: 5,
-        end: 15,
-        length: 10,
-        qual: 0,
-        reference_start: Some(5),
-        reference_end: Some(15),
-        reference_length: Some(10),
-        extra_columns: Some(vec!["feature1".to_string()]),
-    }];
-    split_annotations.push((
-        (0, 20),
-        FiberAnnotations::from_annotations(split1_anns, 36, false),
-    ));
+    let mut split1 = MolecularAnnotations::new(36);
+    split1
+        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma)
+        .add(5, 10, Strand::Forward, vec![], Some("feature1".into()));
+    split_annotations.push(((0, 20), split1));
 
     // Second split: 20-36
-    let split2_anns = vec![FiberAnnotation {
-        start: 25,
-        end: 35,
-        length: 10,
-        qual: 0,
-        reference_start: Some(25),
-        reference_end: Some(35),
-        reference_length: Some(10),
-        extra_columns: Some(vec!["feature2".to_string()]),
-    }];
-    split_annotations.push((
-        (20, 36),
-        FiberAnnotations::from_annotations(split2_anns, 36, false),
-    ));
+    let mut split2 = MolecularAnnotations::new(36);
+    split2
+        .add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma)
+        .add(25, 10, Strand::Forward, vec![], Some("feature2".into()));
+    split_annotations.push(((20, 36), split2));
 
     // Create records from splits
     let records = FiberTig::create_annotated_records_from_splits(
@@ -262,14 +232,14 @@ fn test_create_annotated_records_from_splits() -> Result<()> {
     assert_eq!(second_record.pos(), 20);
     assert_eq!(second_record.seq_len(), 16);
 
-    // Verify both records have fs/fl/fa tags
-    assert!(first_record.aux(b"fs").is_ok());
-    assert!(first_record.aux(b"fl").is_ok());
-    assert!(first_record.aux(b"fa").is_ok());
+    // Verify both records have MA-spec tags. MA is always emitted; AN
+    // tags along because the fixtures supply names. AL is only emitted
+    // under the Separate encoding, which isn't the spec default.
+    assert!(first_record.aux(b"MA").is_ok());
+    assert!(first_record.aux(b"AN").is_ok());
 
-    assert!(second_record.aux(b"fs").is_ok());
-    assert!(second_record.aux(b"fl").is_ok());
-    assert!(second_record.aux(b"fa").is_ok());
+    assert!(second_record.aux(b"MA").is_ok());
+    assert!(second_record.aux(b"AN").is_ok());
 
     Ok(())
 }
@@ -307,13 +277,12 @@ fn test_inject_with_bed_annotations() -> Result<()> {
     // Should have created records based on bed annotations
     assert!(!fiber_tig.records.is_empty());
 
-    // Verify records have annotations
+    // Verify records have MA-spec annotation tags. Records that carry any
+    // fibertig annotations must have MA; AN tags along because the BED
+    // supplies feature names.
     for record in &fiber_tig.records {
-        // All records should have fs/fl/fa tags since we have annotations
-        if record.aux(b"fs").is_ok() {
-            // If fs tag exists, fl and fa should also exist
-            assert!(record.aux(b"fl").is_ok(), "fl tag missing when fs exists");
-            assert!(record.aux(b"fa").is_ok(), "fa tag missing when fs exists");
+        if record.aux(b"MA").is_ok() {
+            assert!(record.aux(b"AN").is_ok(), "AN tag missing when MA exists");
         }
     }
 
@@ -343,6 +312,72 @@ fn test_bed_annotations_with_unknown_contig() {
     assert!(result.is_err());
     let error_msg = format!("{}", result.unwrap_err());
     assert!(error_msg.contains("Contig 'unknown_chr' not found in BAM header"));
+}
+
+#[test]
+fn test_bed_annotations_comma_in_extra_columns_roundtrips() -> Result<()> {
+    // BED column 4+ values containing the MA-spec AN separator (',') —
+    // and the percent-escape character itself — must round-trip through
+    // inject → extract unchanged. The percent encoding is applied at the
+    // BED↔in-memory boundary; on disk the AN tag is plain ASCII with
+    // commas escaped as %2C.
+    use fibertools_rs::cli::{GlobalOpts, PansnParameters};
+    use std::io::BufRead;
+
+    let mut fasta_file = NamedTempFile::new()?;
+    writeln!(fasta_file, ">chr1")?;
+    writeln!(fasta_file, "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG")?; // 40bp
+    fasta_file.flush()?;
+
+    // Two BED rows with commas (and one with a literal `%`) in column 4+.
+    let mut bed_file = NamedTempFile::new()?;
+    writeln!(bed_file, "chr1\t5\t15\tfoo,bar\t100")?;
+    writeln!(bed_file, "chr1\t20\t30\t50%complete\tx,y,z")?;
+    bed_file.flush()?;
+
+    let temp_bam = NamedTempFile::new()?;
+    let inject_opts = PgInjectOptions {
+        global: GlobalOpts::default(),
+        reference: fasta_file.path().to_str().unwrap().to_string(),
+        out: temp_bam.path().to_str().unwrap().to_string(),
+        bed: Some(bed_file.path().to_str().unwrap().to_string()),
+        split_size: 100_000,
+        uncompressed: false,
+        extract: false,
+        header_out: None,
+        pansn: PansnParameters::default(),
+    };
+    let fiber_tig = FiberTig::from_inject_opts(&inject_opts)?;
+    fiber_tig.write_to_bam(&inject_opts)?;
+
+    let temp_bed_output = NamedTempFile::new()?;
+    let extract_opts = PgInjectOptions {
+        global: GlobalOpts::default(),
+        reference: temp_bam.path().to_str().unwrap().to_string(),
+        out: temp_bed_output.path().to_str().unwrap().to_string(),
+        bed: None,
+        split_size: 100_000,
+        uncompressed: false,
+        extract: true,
+        header_out: None,
+        pansn: PansnParameters::default(),
+    };
+    FiberTig::extract_to_bed(&extract_opts)?;
+
+    let lines: Vec<String> =
+        fibertools_rs::utils::bio_io::buffer_from(temp_bed_output.path().to_str().unwrap())?
+            .lines()
+            .collect::<std::io::Result<Vec<_>>>()?;
+
+    let body: Vec<&String> = lines
+        .iter()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .collect();
+    assert_eq!(body.len(), 2, "expected two BED rows, got: {lines:?}");
+    assert_eq!(body[0], "chr1\t5\t15\tfoo,bar\t100");
+    assert_eq!(body[1], "chr1\t20\t30\t50%complete\tx,y,z");
+
+    Ok(())
 }
 
 #[test]
@@ -451,8 +486,10 @@ fn test_extract_to_bed_with_pansn_strip() -> Result<()> {
     Ok(())
 }
 
-// Build a minimal mapped record with fs/fl/fa tags in forward/contig order,
-// then optionally flip it to reverse-strand to simulate what an aligner would emit.
+// Build a minimal mapped record with MA-spec annotation tags in
+// forward/molecular order, then optionally flip it to reverse-strand to
+// simulate what an aligner would emit. Names are taken pairwise from `fa`
+// (`|`-separated); use the empty string for an unnamed annotation.
 fn build_tagged_record(
     seq_len: u32,
     fs: &[u32],
@@ -460,7 +497,7 @@ fn build_tagged_record(
     fa: &str,
     reverse: bool,
 ) -> rust_htslib::bam::Record {
-    use rust_htslib::bam::record::{Aux, Cigar, CigarString};
+    use rust_htslib::bam::record::{Cigar, CigarString};
     use rust_htslib::bam::Record;
 
     let seq: Vec<u8> = vec![b'A'; seq_len as usize];
@@ -472,174 +509,163 @@ fn build_tagged_record(
     record.set_tid(0);
     record.set_pos(0);
     record.set_mapq(60);
+    // `Record::new()` starts in the unmapped state; clear it so
+    // `AlignedBlocks::from_record` (used by `ma_io::read_annotations`)
+    // actually lifts the CIGAR-derived blocks instead of bailing early.
+    record.unset_unmapped();
     if reverse {
         record.set_reverse();
     }
 
-    record
-        .push_aux(b"fs", Aux::ArrayU32((&fs.to_vec()).into()))
-        .unwrap();
-    record
-        .push_aux(b"fl", Aux::ArrayU32((&fl.to_vec()).into()))
-        .unwrap();
-    record.push_aux(b"fa", Aux::String(fa)).unwrap();
+    assert_eq!(fs.len(), fl.len(), "fs/fl length mismatch in fixture");
+    let names: Vec<Option<String>> = fa
+        .split('|')
+        .map(|p| {
+            if p.is_empty() {
+                None
+            } else {
+                Some(p.to_string())
+            }
+        })
+        .collect();
+    assert_eq!(names.len(), fs.len(), "fa/fs length mismatch in fixture");
+
+    let mut annot = MolecularAnnotations::new(seq_len);
+    let pairs = record
+        .aligned_block_pairs()
+        .map(|([qs, qe], [rs, re])| ([qs as u32, qe as u32], [rs as u32, re as u32]));
+    annot.set_aligned_blocks_raw(
+        AlignedBlocks::from_pairs(pairs, seq_len),
+        record.is_reverse(),
+    );
+    {
+        let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
+        for ((s, l), name) in fs.iter().zip(fl.iter()).zip(names.into_iter()) {
+            t.add(*s, *l, Strand::Forward, vec![], name);
+        }
+    }
+    ma_io::write_record(&mut record, &annot);
 
     record
 }
 
 #[test]
-fn test_from_bam_tags_fa_pairing_forward_strand() -> Result<()> {
-    // Forward-strand sanity: no flip happens, extras must pair with the same-index peaks.
-    // Four non-overlapping peaks with distinguishable sizes and distinguishable fa values.
+fn test_read_fibertig_forward_strand() -> Result<()> {
+    // Forward-strand sanity: storage order matches input order; iter_type
+    // gives BAM-orient query coords that for a forward identity-aligned record
+    // equal molecular coords, and ref_start/ref_end equal query_start/query_end.
     let seq_len: u32 = 10_000;
     let fs: Vec<u32> = vec![100, 1_000, 3_000, 6_000];
     let fl: Vec<u32> = vec![100, 300, 500, 700];
     let fa = "peakA|peakB|peakC|peakD";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, false);
+    let annot = ma_io::read_annotations(&record)?;
+    let anns = fibertig_anns(&annot);
+    assert_eq!(anns.len(), 4);
+    assert!(!annot.is_reverse_aligned());
 
-    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
-        .expect("tags should parse");
-
-    assert_eq!(anns.annotations.len(), 4);
-    assert!(!anns.reverse);
-
-    // Pure-match CIGAR at pos 0, forward: ref coords == query coords == fs/fl
+    // Storage = molecular ascending = fs input order.
     let expected = [
-        (100_i64, 200_i64, "peakA"),
+        (100_u32, 200_u32, "peakA"),
         (1_000, 1_300, "peakB"),
         (3_000, 3_500, "peakC"),
         (6_000, 6_700, "peakD"),
     ];
-    for (ann, (exp_start, exp_end, exp_tag)) in anns.annotations.iter().zip(expected.iter()) {
-        assert_eq!(ann.reference_start, Some(*exp_start));
-        assert_eq!(ann.reference_end, Some(*exp_end));
-        assert_eq!(
-            ann.extra_columns.as_ref().map(|c| c.join(";")),
-            Some((*exp_tag).to_string()),
-        );
+    let infos: Vec<_> = annot.iter_type(FIBERTIG_TYPE).unwrap().collect();
+    for (info, (exp_start, exp_end, exp_name)) in infos.iter().zip(expected.iter()) {
+        assert_eq!(info.ref_start, Some(*exp_start));
+        assert_eq!(info.ref_end, Some(*exp_end));
+        assert_eq!(info.name, Some(*exp_name));
     }
     Ok(())
 }
 
 #[test]
-fn test_from_bam_tags_fa_pairing_reverse_strand_multi_peak() -> Result<()> {
-    // Reverse-strand regression test for the fa-swap bug. Five peaks with distinguishable
-    // sizes ensures that any off-by-one pairing error (pairwise swap, full reversal, etc.)
-    // is caught. Last two peaks OVERLAP in forward/contig coords, matching the original
-    // reported symptom where adjacent overlapping peaks had extras swapped.
+fn test_read_fibertig_reverse_strand_multi_peak() -> Result<()> {
+    // Reverse-strand parsing: storage holds molecular coords as written.
+    // iter_type then yields AnnotationInfo with BAM-orient query coords
+    // (= read_len - molecular_end / read_len - molecular_start), and
+    // ref_start/ref_end via the record's aligned blocks. Storage order
+    // stays molecular ascending; each annotation keeps its own name slot,
+    // so pairing can't be scrambled by sorting.
     let seq_len: u32 = 10_000;
     let fs: Vec<u32> = vec![100, 1_000, 3_000, 6_000, 6_500];
     let fl: Vec<u32> = vec![100, 300, 500, 700, 900];
     let fa = "peakA|peakB|peakC|peakD|peakE";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
+    let annot = ma_io::read_annotations(&record)?;
+    let anns = fibertig_anns(&annot);
+    assert_eq!(anns.len(), 5);
+    assert!(annot.is_reverse_aligned());
 
-    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
-        .expect("tags should parse");
-
-    assert_eq!(anns.annotations.len(), 5);
-    assert!(anns.reverse);
-
-    // On reverse-strand with pure-match CIGAR at pos 0:
-    //   forward peak [s, s+l) --> ref peak [seq_len - (s+l), seq_len - s)
-    // Peaks in ascending ref-start order after flip:
-    //   peakE forward [6500, 7400)  -> ref [2600, 3500), len 900
-    //   peakD forward [6000, 6700)  -> ref [3300, 4000), len 700
-    //   peakC forward [3000, 3500)  -> ref [6500, 7000), len 500
-    //   peakB forward [1000, 1300)  -> ref [8700, 9000), len 300
-    //   peakA forward [100, 200)    -> ref [9800, 9900), len 100
+    // BAM-orient: forward [s, s+l) maps to ref [seq_len - (s+l), seq_len - s).
+    // Storage order is molecular ascending, so iter_type yields:
+    //   peakA forward [100, 200)    -> ref [9800, 9900)
+    //   peakB forward [1000, 1300)  -> ref [8700, 9000)
+    //   peakC forward [3000, 3500)  -> ref [6500, 7000)
+    //   peakD forward [6000, 6700)  -> ref [3300, 4000)
+    //   peakE forward [6500, 7400)  -> ref [2600, 3500)
     let expected = [
-        (2_600_i64, 3_500_i64, 900_i64, "peakE"),
-        (3_300, 4_000, 700, "peakD"),
-        (6_500, 7_000, 500, "peakC"),
-        (8_700, 9_000, 300, "peakB"),
-        (9_800, 9_900, 100, "peakA"),
+        (9_800_u32, 9_900_u32, "peakA"),
+        (8_700, 9_000, "peakB"),
+        (6_500, 7_000, "peakC"),
+        (3_300, 4_000, "peakD"),
+        (2_600, 3_500, "peakE"),
     ];
-    for (i, (ann, (exp_start, exp_end, exp_len, exp_tag))) in
-        anns.annotations.iter().zip(expected.iter()).enumerate()
+    let infos: Vec<_> = annot.iter_type(FIBERTIG_TYPE).unwrap().collect();
+    for (i, (info, (exp_start, exp_end, exp_name))) in infos.iter().zip(expected.iter()).enumerate()
     {
         assert_eq!(
-            ann.reference_start,
+            info.ref_start,
             Some(*exp_start),
-            "ref_start mismatch at index {i}"
+            "ref_start mismatch at {i}"
         );
-        assert_eq!(
-            ann.reference_end,
-            Some(*exp_end),
-            "ref_end mismatch at index {i}"
-        );
-        assert_eq!(
-            ann.reference_length,
-            Some(*exp_len),
-            "ref_length mismatch at index {i}"
-        );
-        assert_eq!(
-            ann.extra_columns.as_ref().map(|c| c.join(";")),
-            Some((*exp_tag).to_string()),
-            "fa-extras pairing wrong at index {i} (size {exp_len}): got {:?}",
-            ann.extra_columns,
-        );
+        assert_eq!(info.ref_end, Some(*exp_end), "ref_end mismatch at {i}");
+        assert_eq!(info.name, Some(*exp_name), "name mismatch at {i}");
     }
     Ok(())
 }
 
 #[test]
-fn test_from_bam_tags_fa_pairing_reverse_strand_shared_start() -> Result<()> {
-    // Regression test for Anna's fibertig peak-length scrambling: two peaks share
-    // forward-strand start position 0 (fs=0), and all four peaks overlap heavily.
-    // After flipping to aligned coordinates the sort by aligned start is no longer
-    // equivalent to reversing the input order, so a naive `ann_vals.reverse()`
-    // breaks the extras pairing. The extras must be carried through the sort.
+fn test_read_fibertig_reverse_strand_shared_start() -> Result<()> {
+    // Regression test for name-pairing scrambling under shared/overlapping
+    // start positions. With the MA-spec model each Annotation owns its own
+    // name, so there is no sort-induced pairing problem to begin with —
+    // storage order matches input order regardless of overlap.
     let seq_len: u32 = 1_000;
     let fs: Vec<u32> = vec![0, 0, 12, 159];
     let fl: Vec<u32> = vec![263, 124, 209, 305];
     let fa = "peakA|peakB|peakC|peakD";
 
     let record = build_tagged_record(seq_len, &fs, &fl, fa, true);
+    let annot = ma_io::read_annotations(&record)?;
+    let anns = fibertig_anns(&annot);
+    assert_eq!(anns.len(), 4);
+    assert!(annot.is_reverse_aligned());
 
-    let anns = FiberAnnotations::from_bam_tags(&record, b"fs", b"fl", Some(b"fa"))?
-        .expect("tags should parse");
-
-    assert_eq!(anns.annotations.len(), 4);
-    assert!(anns.reverse);
-
-    // forward peak [s, s+l) -> ref peak [seq_len - (s+l), seq_len - s)
-    //   peakA forward [0, 263)   -> ref [737, 1000), len 263
-    //   peakB forward [0, 124)   -> ref [876, 1000), len 124
-    //   peakC forward [12, 221)  -> ref [779, 988),  len 209
-    //   peakD forward [159, 464) -> ref [536, 841),  len 305
-    // Ref-start ascending: D, A, C, B.
+    // Storage order = fs input order, ref coords lifted via flip_range for reverse.
+    //   peakA forward [0, 263)   -> ref [737, 1000)
+    //   peakB forward [0, 124)   -> ref [876, 1000)
+    //   peakC forward [12, 221)  -> ref [779, 988)
+    //   peakD forward [159, 464) -> ref [536, 841)
     let expected = [
-        (536_i64, 841_i64, 305_i64, "peakD"),
-        (737, 1_000, 263, "peakA"),
-        (779, 988, 209, "peakC"),
-        (876, 1_000, 124, "peakB"),
+        (737_u32, 1_000_u32, "peakA"),
+        (876, 1_000, "peakB"),
+        (779, 988, "peakC"),
+        (536, 841, "peakD"),
     ];
-    for (i, (ann, (exp_start, exp_end, exp_len, exp_tag))) in
-        anns.annotations.iter().zip(expected.iter()).enumerate()
+    let infos: Vec<_> = annot.iter_type(FIBERTIG_TYPE).unwrap().collect();
+    for (i, (info, (exp_start, exp_end, exp_name))) in infos.iter().zip(expected.iter()).enumerate()
     {
         assert_eq!(
-            ann.reference_start,
+            info.ref_start,
             Some(*exp_start),
-            "ref_start mismatch at index {i}"
+            "ref_start mismatch at {i}"
         );
-        assert_eq!(
-            ann.reference_end,
-            Some(*exp_end),
-            "ref_end mismatch at index {i}"
-        );
-        assert_eq!(
-            ann.reference_length,
-            Some(*exp_len),
-            "ref_length mismatch at index {i}"
-        );
-        assert_eq!(
-            ann.extra_columns.as_ref().map(|c| c.join(";")),
-            Some((*exp_tag).to_string()),
-            "fa-extras pairing wrong at index {i} (size {exp_len}): got {:?}",
-            ann.extra_columns,
-        );
+        assert_eq!(info.ref_end, Some(*exp_end), "ref_end mismatch at {i}");
+        assert_eq!(info.name, Some(*exp_name), "name mismatch at {i}");
     }
     Ok(())
 }

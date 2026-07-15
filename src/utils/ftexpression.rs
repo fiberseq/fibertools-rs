@@ -1,5 +1,5 @@
 use crate::fiber::FiberseqData;
-use crate::utils::bamannotations;
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::input_bam::FiberFilters;
 
 #[derive(Debug)]
@@ -138,122 +138,79 @@ pub fn parse_filter(filter_orig: &str) -> ParsedExpr {
     }
 }
 
-pub fn apply_filter_to_range(
-    parsed: &ParsedExpr,
-    range: &mut bamannotations::Ranges,
-) -> Result<(), anyhow::Error> {
-    let starting_len = range.annotations.len();
-
-    let to_keep: Vec<bool> = if parsed.fn_name == "len" {
-        range
-            .annotations
-            .iter()
-            .map(|annotation| len(annotation.length, &parsed.op, &parsed.threshold))
-            .collect()
-    } else if parsed.fn_name == "qual" {
-        range
-            .annotations
-            .iter()
-            .map(|annotation| qual(annotation.qual, &parsed.op, &parsed.threshold))
-            .collect()
-    } else {
-        anyhow::bail!("Invalid function name: {}", &parsed.fn_name);
-    };
-
-    // Filter annotations based on the to_keep boolean vector
-    range.annotations = range
-        .annotations
-        .iter()
-        .zip(to_keep.iter())
-        .filter_map(|(annotation, &keep)| if keep { Some(annotation.clone()) } else { None })
-        .collect();
-
-    // check we dropped the right number of values
-    let n_dropped = to_keep.iter().filter(|&x| !x).count();
-    assert_eq!(starting_len, range.annotations.len() + n_dropped);
-
-    Ok(())
-}
-
 pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(), anyhow::Error> {
     if let Some(s) = filt.filter_expression.as_ref() {
         if !s.is_empty() {
-            let parsers = parse_filter_all(s.as_str());
-            for parser in parsers.iter() {
-                match parser.feat_name.as_str() {
-                    "msp" => apply_filter_to_range(parser, &mut fsd.msp)?,
-                    "nuc" => apply_filter_to_range(parser, &mut fsd.nuc)?,
-                    "m6a" => apply_filter_to_range(parser, &mut fsd.m6a)?,
-                    "5mC" => apply_filter_to_range(parser, &mut fsd.cpg)?,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Unknown feature name: {}",
-                            parser.feat_name
-                        ));
+            for parser in parse_filter_all(s.as_str()) {
+                let type_name = match parser.feat_name.as_str() {
+                    "msp" => "msp",
+                    "nuc" => "nuc",
+                    "m6a" => M6A_TYPE,
+                    "5mC" => CPG_TYPE,
+                    other => anyhow::bail!("Unknown feature name: {}", other),
+                };
+                match parser.fn_name.as_str() {
+                    "len" => fsd.annotations.retain(type_name, |a| {
+                        len(a.length as i64, &parser.op, &parser.threshold)
+                    }),
+                    "qual" if type_name == "msp" => {
+                        // qual(msp) historically meant "filter MSPs by FIRE
+                        // precision" (legacy fibertools wrote FIRE precisions
+                        // onto the MSP `aq` tag). Post-MA, that quality lives
+                        // on the `fire` annotation type instead. Collect
+                        // per-MSP precisions in *molecular* order to align
+                        // with retain's iteration, then drop msp and fire
+                        // in lockstep.
+                        let primary = crate::utils::bamannotations::primary_qual;
+                        let mol_quals: Vec<u8> = if let Some(f) =
+                            fsd.annotations.get_type("fire").filter(|f| {
+                                fsd.annotations
+                                    .get_type("msp")
+                                    .is_some_and(|m| m.annotations.len() == f.annotations.len())
+                            }) {
+                            f.annotations
+                                .iter()
+                                .map(|a| primary(&a.qualities, "fire"))
+                                .collect()
+                        } else if let Some(m) = fsd.annotations.get_type("msp") {
+                            m.annotations
+                                .iter()
+                                .map(|a| primary(&a.qualities, "msp"))
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+                        let keep: Vec<bool> = mol_quals
+                            .iter()
+                            .map(|q| qual(*q, &parser.op, &parser.threshold))
+                            .collect();
+                        let has_fire = fsd.annotations.get_type("fire").is_some();
+                        let mut i = 0;
+                        fsd.annotations.retain("msp", |_| {
+                            let k = keep.get(i).copied().unwrap_or(false);
+                            i += 1;
+                            k
+                        });
+                        if has_fire {
+                            let mut i = 0;
+                            fsd.annotations.retain("fire", |_| {
+                                let k = keep.get(i).copied().unwrap_or(false);
+                                i += 1;
+                                k
+                            });
+                        }
                     }
+                    "qual" => fsd.annotations.retain(type_name, |a| {
+                        qual(
+                            crate::utils::bamannotations::primary_qual(&a.qualities, type_name),
+                            &parser.op,
+                            &parser.threshold,
+                        )
+                    }),
+                    other => anyhow::bail!("Invalid function name: {}", other),
                 }
             }
         }
     }
     Ok(())
-}
-
-/// tests
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::utils::bamannotations;
-
-    fn make_fake_range() -> bamannotations::Ranges {
-        use bamannotations::{FiberAnnotation, FiberAnnotations};
-
-        let annotations = vec![
-            FiberAnnotation {
-                start: 0,
-                end: 5,
-                length: 5,
-                qual: 0,
-                reference_start: Some(0),
-                reference_end: Some(5),
-                reference_length: Some(5),
-                extra_columns: None,
-            },
-            FiberAnnotation {
-                start: 10,
-                end: 15,
-                length: 5,
-                qual: 255,
-                reference_start: Some(10),
-                reference_end: Some(15),
-                reference_length: Some(5),
-                extra_columns: None,
-            },
-            FiberAnnotation {
-                start: 17,
-                end: 20,
-                length: 3,
-                qual: 181,
-                reference_start: Some(17),
-                reference_end: Some(20),
-                reference_length: Some(3),
-                extra_columns: None,
-            },
-        ];
-
-        FiberAnnotations {
-            annotations,
-            seq_len: 100,
-            reverse: false,
-        }
-    }
-
-    #[test]
-    fn test_this_one() {
-        let filter = "len(msp)=50:100";
-        let mut range = make_fake_range();
-        let parser = parse_filter(filter);
-        eprintln!("{:?}", range.annotations.len());
-        apply_filter_to_range(&parser, &mut range).unwrap();
-        eprintln!("{:?}", range.annotations.len());
-    }
 }

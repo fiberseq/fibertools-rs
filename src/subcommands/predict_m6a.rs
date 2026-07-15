@@ -1,6 +1,7 @@
 use crate::cli::PredictM6AOptions;
 use crate::utils::basemods;
 use crate::utils::bio_io;
+use crate::utils::ma_io;
 use crate::utils::nucleosome;
 use crate::*;
 use bio::alphabets::dna::revcomp;
@@ -53,6 +54,7 @@ impl<B> PredictOptions<B>
 where
     B: Backend<Device = m6a_burn::BurnDevice>,
 {
+    #[allow(clippy::too_many_arguments)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         keep: bool,
@@ -218,36 +220,73 @@ where
         assert_eq!(data.len(), records.len());
         let mut cur_predict_st = 0;
         for (option_data, record) in data.iter().zip(records) {
-            // base mods in the exiting record
-            let mut cur_basemods = basemods::BaseMods::new(record, 0);
-            cur_basemods.drop_m6a();
-            log::trace!("Number of base mod types {}", cur_basemods.base_mods.len());
+            // Load existing annotations, then drop any prior m6a calls (the
+            // model's predictions replace them); cpg and other types are kept.
+            let mut annot = ma_io::read_record(record).unwrap_or_else(|e| {
+                log::warn!(
+                    "read_record failed for {:?}: {e}",
+                    String::from_utf8_lossy(record.qname())
+                );
+                molecular_annotation::MolecularAnnotations::from_record(record)
+            });
+            annot
+                .annotation_types
+                .retain(|t| t.name != basemods::M6A_TYPE);
+
             // check if there is any data
             let (a_data, t_data) = match option_data {
                 Some((a_data, t_data)) => (a_data, t_data),
                 None => continue,
             };
-            // iterate over A and then T basemods
-            for data in &[a_data, t_data] {
+            // Iterate over A and then T basemods, collecting their forward
+            // positions + ML qualities into a single sorted m6a list. Each call
+            // carries its canonical (skip-base, strand) so the library's MM/ML
+            // serializer emits it under the right group: A-base m6a is `A+a`
+            // (forward), T-base is `T-a` (reverse). The strand must live in
+            // `Strand` — the writer derives the group `+`/`-` from it, not from
+            // the skip-base name.
+            let mut m6a_calls: Vec<(u32, u8, &'static str, molecular_annotation::Strand)> =
+                Vec::new();
+            for (data, base) in [(a_data, b'A'), (t_data, b'T')] {
                 let cur_predict_en = cur_predict_st + data.count;
                 let cur_predictions = &predictions[cur_predict_st..cur_predict_en];
-
                 cur_predict_st += data.count;
-                cur_basemods.base_mods.push(opts.basemod_from_ml(
-                    record,
-                    cur_predictions,
-                    &data.positions,
-                    &data.base_mod,
-                ));
+                let (poss, quals) =
+                    opts.basemod_from_ml(record, cur_predictions, &data.positions, &data.base_mod);
+                let (skip_base, strand) = basemods::canonical_basemod(basemods::M6A_TYPE, base)
+                    .expect("A/T are canonical m6a bases");
+                m6a_calls.extend(
+                    poss.into_iter()
+                        .zip(quals)
+                        .map(|(p, q)| (p, q, skip_base, strand)),
+                );
             }
-            // write the ml and mm tags
-            cur_basemods.add_mm_and_ml_tags(record);
+            if !m6a_calls.is_empty() {
+                m6a_calls.sort_by_key(|&(p, _, _, _)| p);
+                let qspec = "Q"
+                    .parse::<molecular_annotation::QualitySpec>()
+                    .expect("Q parses");
+                let t = annot.add_annotation_type(
+                    basemods::M6A_TYPE,
+                    qspec,
+                    molecular_annotation::Encoding::mm_ml(),
+                );
+                for (pos, qual, skip_base, strand) in &m6a_calls {
+                    t.add(*pos, 1, *strand, vec![*qual], Some(skip_base.to_string()));
+                }
+            }
 
-            //let modified_bases_forward = cur_basemods.forward_m6a().0;
-            let modified_bases_forward = cur_basemods.m6a().forward_starts();
+            // Compute nucleosomes + MSPs from the forward m6a positions.
+            let modified_bases_forward: Vec<i64> =
+                m6a_calls.iter().map(|&(p, _, _, _)| p as i64).collect();
+            nucleosome::add_nucleosomes_to_annotations(
+                record,
+                &mut annot,
+                &modified_bases_forward,
+                &opts.nuc_opts,
+            );
 
-            // adding the nucleosomes
-            nucleosome::add_nucleosomes_to_record(record, &modified_bases_forward, &opts.nuc_opts);
+            ma_io::write_record_with_basemods(record, &annot);
 
             // clear the existing data
             if !opts.keep {
@@ -261,56 +300,48 @@ where
         data.iter().flatten().count()
     }
 
-    /// Create a basemod object form our predictions
+    /// Filter raw model predictions into (forward_position, ML_quality)
+    /// pairs suitable for adding to a `MolecularAnnotations` m6a
+    /// annotation type. Drops predictions below the ML threshold and
+    /// within the first/last `WINDOW/2` bases of the read.
     pub fn basemod_from_ml(
         &self,
         record: &mut bam::Record,
         predictions: &[f32],
         positions: &[usize],
-        base_mod: &str,
-    ) -> basemods::BaseMod {
+        _base_mod: &str,
+    ) -> (Vec<u32>, Vec<u8>) {
         // do not report predictions for the first and last 7 bases
         let min_pos = (WINDOW / 2) as i64;
         let max_pos = (record.seq_len() - WINDOW / 2) as i64;
-        let (modified_probabilities_forward, full_probabilities_forward, modified_bases_forward): (
-            Vec<u8>,
-            Vec<f32>,
-            Vec<i64>,
-        ) = predictions
-            .iter()
-            .zip(positions.iter())
-            .map(|(&x, &pos)| (self.float_to_u8(x), x, pos as i64))
-            .filter(|(ml, _, pos)| *ml >= self.min_ml_value() && *pos >= min_pos && *pos < max_pos)
-            .multiunzip();
+
+        let mut poss: Vec<u32> = Vec::new();
+        let mut quals: Vec<u8> = Vec::new();
+        let mut low_nonzero = 0usize;
+        let mut zero = 0usize;
+        for (&pred, &pos) in predictions.iter().zip(positions.iter()) {
+            let ml = self.float_to_u8(pred);
+            let pos_i = pos as i64;
+            if pred > 0.0 && pred <= 1.0 / 255.0 {
+                low_nonzero += 1;
+            }
+            if pred <= 0.0 && pred > -0.00000001 {
+                zero += 1;
+            }
+            if ml >= self.min_ml_value() && pos_i >= min_pos && pos_i < max_pos {
+                poss.push(pos as u32);
+                quals.push(ml);
+            }
+        }
 
         log::debug!(
             "Low but non zero values: {:?}\tZero values: {:?}\tlength:{:?}",
-            full_probabilities_forward
-                .iter()
-                .filter(|&x| *x <= 1.0 / 255.0)
-                .filter(|&x| *x > 0.0)
-                .count(),
-            full_probabilities_forward
-                .iter()
-                .filter(|&x| *x <= 0.0)
-                .filter(|&x| *x > -0.00000001)
-                .count(),
+            low_nonzero,
+            zero,
             predictions.len()
         );
 
-        let base_mod = base_mod.as_bytes();
-        let modified_base = base_mod[0];
-        let strand = base_mod[1] as char;
-        let modification_type = base_mod[2] as char;
-
-        basemods::BaseMod::new(
-            record,
-            modified_base,
-            strand,
-            modification_type,
-            modified_bases_forward,
-            modified_probabilities_forward,
-        )
+        (poss, quals)
     }
 
     pub fn apply_model(&self, windows: &[f32], count: usize) -> Vec<f32> {

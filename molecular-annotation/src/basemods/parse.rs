@@ -2,6 +2,7 @@
 
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::Arc;
 
 lazy_static! {
     /// Matches one MM group: `[ACGTUN][-+]([a-z]+|[0-9]+)[.?]?(,[0-9]+)*;`.
@@ -81,12 +82,15 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
             _ => SkipFlag::Implicit,
         };
 
-        let deltas: Vec<i64> = delta_list
-            .trim_start_matches(',')
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .filter_map(|s| s.parse().ok())
-            .collect();
+        let mut deltas: Vec<i64> =
+            Vec::with_capacity(delta_list.bytes().filter(|&b| b == b',').count());
+        deltas.extend(
+            delta_list
+                .trim_start_matches(',')
+                .split(',')
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| s.parse::<i64>().ok()),
+        );
 
         if deltas.is_empty() {
             continue;
@@ -149,26 +153,28 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
 
         // Bucket ML per code: ML[i*codes + c] is for code c at position i.
         for (c_idx, code) in mod_codes.iter().enumerate() {
-            let t: &mut AnnotationType =
-                annot.add_annotation_type(code, "Q".parse::<QualitySpec>().unwrap());
-            if matches!(t.encoding, Encoding::Ma) {
-                t.set_encoding(Encoding::MmMl { skip_flag });
-            } else if let Encoding::MmMl { skip_flag: existing } = t.encoding {
-                if existing != skip_flag {
-                    log::warn!(
-                        "MM/ML parser: conflicting skip_flag for mod code {:?}: keeping first ({:?}), ignoring {:?}",
-                        code,
-                        existing,
-                        skip_flag
-                    );
-                }
-            }
+            // Basemod types are MmMl-encoded. If this code already exists with
+            // a different skip flag, `add_annotation_type` keeps the first and
+            // warns (the SAM spec lets the same mod code appear in multiple
+            // groups).
+            let t: &mut AnnotationType = annot.add_annotation_type(
+                code,
+                "Q".parse::<QualitySpec>().unwrap(),
+                Encoding::MmMl { skip_flag },
+            );
 
-            let skip_base_str = (skip_base as char).to_string();
+            let skip_base_name: Arc<str> = Arc::from((skip_base as char).to_string().as_str());
+            t.annotations.reserve(resolved);
             for pos_idx in 0..resolved {
                 let pos = positions[pos_idx];
                 let ml_val = group_ml[pos_idx * codes_per_pos + c_idx];
-                t.add(pos, 1, strand, vec![ml_val], Some(skip_base_str.clone()));
+                t.add_shared(
+                    pos,
+                    1,
+                    strand,
+                    smallvec::smallvec![ml_val],
+                    Some(skip_base_name.clone()),
+                );
             }
         }
     }

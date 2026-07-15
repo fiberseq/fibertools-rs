@@ -273,17 +273,41 @@ impl AlignedBlocks {
     }
 
     // --- Helper methods ---
+    //
+    // All of these rely on `blocks` being sorted ascending and non-overlapping
+    // in *both* coordinate systems. That invariant holds for every constructor:
+    // alignment is monotonic, so `aligned_block_pairs()` (and the BAM-derived
+    // pairs callers pass to `new`/`from_pairs`) yield blocks in increasing
+    // query *and* reference order with no overlaps. Given that, the unique
+    // candidate block for any position is found by binary search instead of a
+    // linear scan — the difference between O(B) and O(log B) per lift, which
+    // matters because callers lift every annotation on a read.
+
+    /// Index of the first block whose query interval ends after `pos`
+    /// (`query_end > pos`). Because blocks are disjoint and ascending, this is
+    /// the only block that can contain `pos` or be the first to overlap a range
+    /// starting at `pos`.
+    #[inline]
+    fn first_query_end_after(&self, pos: u32) -> usize {
+        self.blocks.partition_point(|b| b.query_end <= pos)
+    }
+
+    /// Index of the first block whose reference interval ends after `pos`.
+    #[inline]
+    fn first_ref_end_after(&self, pos: u32) -> usize {
+        self.blocks.partition_point(|b| b.ref_end <= pos)
+    }
 
     /// Check if a query range overlaps any aligned block.
     fn has_query_overlap(&self, start: u32, end: u32) -> bool {
-        self.blocks
-            .iter()
-            .any(|b| b.overlaps_query_range(start, end))
+        let i = self.first_query_end_after(start);
+        self.blocks.get(i).is_some_and(|b| b.query_start < end)
     }
 
     /// Check if a reference range overlaps any aligned block.
     fn has_ref_overlap(&self, start: u32, end: u32) -> bool {
-        self.blocks.iter().any(|b| b.overlaps_ref_range(start, end))
+        let i = self.first_ref_end_after(start);
+        self.blocks.get(i).is_some_and(|b| b.ref_start < end)
     }
 
     /// Lift start position to reference, snapping forward if needed.
@@ -294,15 +318,13 @@ impl AlignedBlocks {
             return Some(ref_pos);
         }
 
-        // Start is in a gap - find the first aligned block that overlaps [start, end)
-        // and return its ref_start (clipped to the overlap)
-        for block in &self.blocks {
-            if block.overlaps_query_range(start, end) {
-                // The overlap starts at max(start, block.query_start)
-                let overlap_start = start.max(block.query_start);
-                let offset = overlap_start - block.query_start;
-                return Some(block.ref_start + offset);
-            }
+        // Start is in a gap - the first block ending after `start` is the first
+        // one that can overlap [start, end). Snap forward into it.
+        let i = self.first_query_end_after(start);
+        let block = self.blocks.get(i)?;
+        if block.overlaps_query_range(start, end) {
+            let overlap_start = start.max(block.query_start);
+            return Some(block.ref_start + (overlap_start - block.query_start));
         }
         None
     }
@@ -316,15 +338,13 @@ impl AlignedBlocks {
             return Some(ref_pos + 1); // Convert back to exclusive
         }
 
-        // End is in a gap - find the last aligned block that overlaps [start, end)
-        // and return its ref_end (clipped to the overlap)
-        for block in self.blocks.iter().rev() {
-            if block.overlaps_query_range(start, end) {
-                // The overlap ends at min(end, block.query_end)
-                let overlap_end = end.min(block.query_end);
-                let offset = overlap_end - block.query_start;
-                return Some(block.ref_start + offset);
-            }
+        // End is in a gap - the last block starting before `end` is the last one
+        // that can overlap [start, end). Snap backward into it.
+        let j = self.blocks.partition_point(|b| b.query_start < end);
+        let block = self.blocks.get(j.checked_sub(1)?)?;
+        if block.overlaps_query_range(start, end) {
+            let overlap_end = end.min(block.query_end);
+            return Some(block.ref_start + (overlap_end - block.query_start));
         }
         None
     }
@@ -336,13 +356,12 @@ impl AlignedBlocks {
             return Some(query_pos);
         }
 
-        // Start is in a gap - find the first aligned block that overlaps [start, end)
-        for block in &self.blocks {
-            if block.overlaps_ref_range(start, end) {
-                let overlap_start = start.max(block.ref_start);
-                let offset = overlap_start - block.ref_start;
-                return Some(block.query_start + offset);
-            }
+        // Start is in a gap - first block ending after `start` in ref space.
+        let i = self.first_ref_end_after(start);
+        let block = self.blocks.get(i)?;
+        if block.overlaps_ref_range(start, end) {
+            let overlap_start = start.max(block.ref_start);
+            return Some(block.query_start + (overlap_start - block.ref_start));
         }
         None
     }
@@ -355,37 +374,32 @@ impl AlignedBlocks {
             return Some(query_pos + 1);
         }
 
-        // End is in a gap - find the last aligned block that overlaps [start, end)
-        for block in self.blocks.iter().rev() {
-            if block.overlaps_ref_range(start, end) {
-                let overlap_end = end.min(block.ref_end);
-                let offset = overlap_end - block.ref_start;
-                return Some(block.query_start + offset);
-            }
+        // End is in a gap - last block starting before `end` in ref space.
+        let j = self.blocks.partition_point(|b| b.ref_start < end);
+        let block = self.blocks.get(j.checked_sub(1)?)?;
+        if block.overlaps_ref_range(start, end) {
+            let overlap_end = end.min(block.ref_end);
+            return Some(block.query_start + (overlap_end - block.ref_start));
         }
         None
     }
 
     /// Exact liftover from query to reference (0-based coordinates).
     fn lift_exact_to_reference(&self, pos: u32) -> Option<u32> {
-        for block in &self.blocks {
-            if block.contains_query(pos) {
-                let offset = pos - block.query_start;
-                return Some(block.ref_start + offset);
-            }
-        }
-        None
+        let i = self.first_query_end_after(pos);
+        let block = self.blocks.get(i)?;
+        block
+            .contains_query(pos)
+            .then(|| block.ref_start + (pos - block.query_start))
     }
 
     /// Exact liftover from reference to query (0-based coordinates).
     fn lift_exact_to_query(&self, pos: u32) -> Option<u32> {
-        for block in &self.blocks {
-            if block.contains_ref(pos) {
-                let offset = pos - block.ref_start;
-                return Some(block.query_start + offset);
-            }
-        }
-        None
+        let i = self.first_ref_end_after(pos);
+        let block = self.blocks.get(i)?;
+        block
+            .contains_ref(pos)
+            .then(|| block.query_start + (pos - block.ref_start))
     }
 }
 

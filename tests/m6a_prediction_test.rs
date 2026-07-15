@@ -14,12 +14,16 @@ fn sum_qual(bam: &mut Reader) -> usize {
         let max_pos = (fiber.record.seq_len() - WINDOW / 2) as i64;
         let mut this_count = 0;
         let this_qual_sum = fiber
-            .m6a
+            .m6a()
             .into_iter()
-            .filter(|annotation| annotation.start >= min_pos && annotation.end < max_pos)
-            .map(|annotation| {
+            .filter(|info| {
+                let s = info.query_start as i64;
+                let e = info.query_end as i64;
+                s >= min_pos && e < max_pos
+            })
+            .map(|info| {
                 this_count += 1;
-                annotation.qual as usize
+                info.qualities.first().copied().unwrap_or(0) as usize
             })
             .sum::<usize>();
         sum += this_qual_sum;

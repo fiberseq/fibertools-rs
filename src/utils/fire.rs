@@ -1,5 +1,6 @@
 use crate::cli::FireOptions;
 use crate::fiber::FiberseqData;
+use crate::utils::bamannotations::AnnotationTypeView;
 use crate::*;
 use anyhow;
 use derive_builder::Builder;
@@ -87,15 +88,20 @@ pub fn get_bins(mid_point: i64, bin_num: i64, bin_width: i64, max_end: i64) -> V
 }
 
 /// get the maximum and median rle of m6a in a window
-fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
+fn get_m6a_rle_data(m6a_view: &AnnotationTypeView, start: i64, end: i64) -> (f32, f32) {
     let mut m6a_rles = vec![];
     let mut max = 0;
     let mut _max_pos = 0;
     // if you are a position, on average you will be in an rle length of weighted_rle
     let mut weighted_rle = 0.0;
-    for (m6a_1, m6a_2) in rec.m6a.starts().iter().tuple_windows() {
+    for (m6a_1, m6a_2) in m6a_view
+        .infos()
+        .iter()
+        .map(|a| a.query_start as i64)
+        .tuple_windows()
+    {
         // we only want m6a in the window
-        if *m6a_1 < start || *m6a_1 > end || *m6a_2 < start || *m6a_2 > end {
+        if m6a_1 < start || m6a_1 > end || m6a_2 < start || m6a_2 > end {
             continue;
         }
         // distance between m6a sites
@@ -104,7 +110,7 @@ fn get_m6a_rle_data(rec: &FiberseqData, start: i64, end: i64) -> (f32, f32) {
         // update max
         if rle > max {
             max = rle;
-            _max_pos = ((*m6a_1 + *m6a_2) / 2 - (end + start) / 2).abs();
+            _max_pos = ((m6a_1 + m6a_2) / 2 - (end + start) / 2).abs();
         }
         // update weighted rle
         weighted_rle += (rle * rle) as f32;
@@ -155,6 +161,11 @@ impl FireFeatsInRange {
 #[derive(Debug)]
 pub struct FireFeats<'a> {
     rec: &'a FiberseqData,
+    /// Views built once per record. Memoize their lifted infos, so the
+    /// per-base windowing loop in `msp_get_fire_features` scans cached
+    /// query coordinates instead of re-lifting every annotation per call.
+    m6a_view: AnnotationTypeView<'a>,
+    cpg_view: AnnotationTypeView<'a>,
     #[allow(unused)]
     at_count: usize,
     m6a_count: usize,
@@ -172,6 +183,8 @@ impl<'a> FireFeats<'a> {
 
         let mut rtn = Self {
             rec,
+            m6a_view: rec.m6a(),
+            cpg_view: rec.cpg(),
             at_count: 0,
             m6a_count: 0,
             frac_m6a: 0.0,
@@ -203,8 +216,9 @@ impl<'a> FireFeats<'a> {
         } else {
             b'A'
         };
-        for m6a_st in self.rec.m6a.starts().iter() {
-            let m6a_bp = self.seq[*m6a_st as usize];
+        for info in self.m6a_view.infos() {
+            let m6a_st = info.query_start as i64;
+            let m6a_bp = self.seq[m6a_st as usize];
             if m6a_bp != sequenced_bp {
                 log::warn!(
                     "m6A site at {} is not the same as the sequenced base {}",
@@ -225,22 +239,11 @@ impl<'a> FireFeats<'a> {
     }
 
     fn get_5mc_count(&self, start: i64, end: i64) -> usize {
-        self.rec
-            .cpg
-            .starts()
-            .iter()
-            .filter(|&&pos| pos >= start && pos < end)
-            .count()
+        self.cpg_view.count_query_in(start, end)
     }
 
     fn get_m6a_count(&self, start: i64, end: i64) -> usize {
-        let mut m6a_count = self
-            .rec
-            .m6a
-            .starts()
-            .iter()
-            .filter(|&&pos| pos >= start && pos < end)
-            .count();
+        let mut m6a_count = self.m6a_view.count_query_in(start, end);
 
         // estimate what the count would be if we sequenced the other strand
         if self.fire_opts.ont {
@@ -282,7 +285,7 @@ impl<'a> FireFeats<'a> {
             0.0
         };
         let m6a_fc = self.m6a_fc_over_expected(m6a_count, at_count);
-        let (weighted_m6a_rle, median_m6a_rle) = get_m6a_rle_data(self.rec, start, end);
+        let (weighted_m6a_rle, median_m6a_rle) = get_m6a_rle_data(&self.m6a_view, start, end);
 
         FireFeatsInRange {
             m6a_count: m6a_count as f32,
@@ -387,19 +390,15 @@ impl<'a> FireFeats<'a> {
     }
 
     pub fn get_fire_features(&mut self) {
-        let msp_data = self.rec.msp.into_iter().collect_vec();
+        let msp_data: Vec<_> = self.rec.msp().into_iter().collect();
         self.fire_feats = msp_data
             .into_iter()
             .map(|annotation| {
-                let s = annotation.start;
-                let e = annotation.end;
-                let (rs, re, _rl) = match (
-                    annotation.reference_start,
-                    annotation.reference_end,
-                    annotation.reference_length,
-                ) {
-                    (Some(rs), Some(re), Some(rl)) => (rs, re, rl),
-                    _ => (0, 0, 0),
+                let s = annotation.query_start as i64;
+                let e = annotation.query_end as i64;
+                let (rs, re) = match (annotation.ref_start, annotation.ref_end) {
+                    (Some(rs), Some(re)) => (rs as i64, re as i64),
+                    _ => (0, 0),
                 };
                 (rs, re, self.msp_get_fire_features(s, e))
             })

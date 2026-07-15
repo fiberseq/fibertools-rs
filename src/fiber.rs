@@ -1,11 +1,12 @@
 use super::subcommands::center::CenterPosition;
-use super::subcommands::center::CenteredFiberData;
 use super::utils::input_bam::FiberFilters;
 use super::*;
 use crate::utils::bamannotations::*;
-use crate::utils::basemods::BaseMods;
+use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
+use crate::utils::ma_io::{FIRE_TYPE, MSP_TYPE, NUC_TYPE};
+use molecular_annotation::MolecularAnnotations;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions, bam::record::Aux, bam::HeaderView};
@@ -15,11 +16,7 @@ use std::fmt::Write;
 #[derive(Debug, Clone, PartialEq)]
 pub struct FiberseqData {
     pub record: bam::Record,
-    pub msp: Ranges,
-    pub nuc: Ranges,
-    pub m6a: Ranges,
-    pub cpg: Ranges,
-    pub base_mods: BaseMods,
+    pub annotations: MolecularAnnotations,
     pub ec: f32,
     pub target_name: String,
     pub rg: String,
@@ -36,16 +33,36 @@ impl FiberseqData {
             "."
         }
         .to_string();
+        let mut annotations = crate::utils::ma_io::read_record(&record).unwrap_or_else(|e| {
+            log::warn!("Failed to read annotations: {e}");
+            MolecularAnnotations::from_record(&record)
+        });
 
-        let nuc_starts = get_u32_tag(&record, b"ns");
-        let msp_starts = get_u32_tag(&record, b"as");
-        let nuc_length = get_u32_tag(&record, b"nl");
-        let msp_length = get_u32_tag(&record, b"al");
-        let nuc = Ranges::new(&record, nuc_starts, None, Some(nuc_length));
-        let mut msp = Ranges::new(&record, msp_starts, None, Some(msp_length));
-        let msp_qual = get_u8_tag(&record, b"aq");
-        if !msp_qual.is_empty() {
-            msp.set_qual(msp_qual);
+        // The library populates m6a/cpg from MM/ML on read; apply the
+        // fibertools read-side basemod filters (min ML score, end-strip
+        // distance) on top of that here.
+        if filters.min_ml_score > 0 || filters.strip_starting_basemods > 0 {
+            let seq_len = record.seq_len();
+            let strip = filters.strip_starting_basemods.max(0) as usize;
+            let upper = seq_len.saturating_sub(strip);
+            let min_ml = filters.min_ml_score;
+            for t in annotations.annotation_types.iter_mut() {
+                if !crate::utils::basemods::is_basemod_type(&t.name) {
+                    continue;
+                }
+                t.annotations.retain(|a| {
+                    if a.qualities.first().copied().unwrap_or(0) < min_ml {
+                        return false;
+                    }
+                    if strip > 0 {
+                        let p = a.start as usize;
+                        if p < strip || p >= upper {
+                            return false;
+                        }
+                    }
+                    true
+                });
+            }
         }
 
         // get the number of passes
@@ -61,21 +78,9 @@ impl FiberseqData {
             None => ".".to_string(),
         };
 
-        // get fiberseq basemods
-        let mut base_mods = BaseMods::new(&record, filters.min_ml_score);
-        base_mods.filter_at_read_ends(filters.strip_starting_basemods);
-
-        //let (m6a, cpg) = FiberMods::new(&base_mods);
-        let m6a = base_mods.m6a();
-        let cpg = base_mods.cpg();
-
         let mut fsd = FiberseqData {
             record,
-            msp,
-            nuc,
-            m6a,
-            base_mods,
-            cpg,
+            annotations,
             ec,
             target_name,
             rg,
@@ -127,6 +132,45 @@ impl FiberseqData {
     // GET FUNCTIONS
     //
 
+    /// View over `msp` annotations derived from `self.annotations`.
+    pub fn msp(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, MSP_TYPE)
+    }
+
+    /// View over `nuc` annotations derived from `self.annotations`.
+    pub fn nuc(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, NUC_TYPE)
+    }
+
+    /// View over `m6a` annotations derived from `self.annotations`.
+    pub fn m6a(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, M6A_TYPE)
+    }
+
+    /// View over `cpg` annotations derived from `self.annotations`.
+    pub fn cpg(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, CPG_TYPE)
+    }
+
+    /// View over `fire` annotations derived from `self.annotations`.
+    pub fn fire(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
+    }
+
+    /// Flush `self.annotations` onto the record's MA-family aux tags. The
+    /// single write path for subcommands that edit nuc/msp/fire annotations;
+    /// call this, then hand the record to the BAM writer.
+    ///
+    /// MM/ML are deliberately left untouched: this is an edit path, not a
+    /// basemod producer, so the record's original MM/ML bytes pass through
+    /// byte-identically. Basemod types (m6a/cpg) are `Encoding::MmMl` (set when
+    /// they were read), so `write_record` excludes them from the MA tag rather
+    /// than writing basemod calls there too. Producers that synthesize or
+    /// modify basemods must use `ma_io::write_record_with_basemods` instead.
+    pub fn serialize_annotations(&mut self) {
+        crate::utils::ma_io::write_record(&mut self.record, &self.annotations);
+    }
+
     pub fn get_qname(&self) -> String {
         String::from_utf8_lossy(self.record.qname()).to_string()
     }
@@ -151,106 +195,54 @@ impl FiberseqData {
         }
     }
 
-    /// Center all coordinates on the read using the offset attribute.
-    pub fn center(&self, center_position: &CenterPosition) -> Option<Self> {
-        // setup new fiberseq data object to return
-        let mut new = self.clone();
-        let (ref_offset, mol_offset) =
-            CenteredFiberData::find_offsets(&self.record, center_position);
-
-        // Apply offsets to all annotations using the new methods
-        new.m6a
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.cpg
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.msp
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-        new.nuc
-            .apply_offset(mol_offset, ref_offset, center_position.strand);
-
-        // Validate that MSPs still start and end on m6A marks after centering
-        new.validate_msp_m6a_alignment();
-
-        Some(new)
-    }
-
-    /// Validate that all MSP boundaries align with m6A positions after centering
-    fn validate_msp_m6a_alignment(&self) {
-        let m6a_positions = self.m6a.starts();
-        let msp_boundaries: Vec<i64> = self
-            .msp
-            .starts()
-            .into_iter()
-            .chain(self.msp.ends().into_iter().map(|x| x - 1))
-            .collect();
-
-        if m6a_positions.is_empty() || msp_boundaries.is_empty() {
-            return; // Skip validation if no data
-        }
-
-        for msp_pos in &msp_boundaries {
-            if !m6a_positions.contains(msp_pos) {
-                log::warn!(
-                    "MSP boundary at position {} does not align with m6A mark after centering in read {}",
-                    msp_pos,
-                    String::from_utf8_lossy(self.record.qname())
-                );
-            }
-        }
-    }
-
     //
     //  WRITE BED12 FUNCTIONS
     //
     pub fn write_msp(&self, reference: bool) -> String {
+        let msp = self.msp();
         let (starts, _ends, lengths) = if reference {
             (
-                self.msp.reference_starts(),
-                self.msp.reference_ends(),
-                self.msp.reference_lengths(),
+                msp.reference_starts(),
+                msp.reference_ends(),
+                msp.reference_lengths(),
             )
         } else {
-            (
-                self.msp.option_starts(),
-                self.msp.option_ends(),
-                self.msp.option_lengths(),
-            )
+            (msp.option_starts(), msp.option_ends(), msp.option_lengths())
         };
         self.to_bed12(reference, &starts, &lengths, LINKER_COLOR)
     }
 
     pub fn write_nuc(&self, reference: bool) -> String {
+        let nuc = self.nuc();
         let (starts, _ends, lengths) = if reference {
             (
-                self.nuc.reference_starts(),
-                self.nuc.reference_ends(),
-                self.nuc.reference_lengths(),
+                nuc.reference_starts(),
+                nuc.reference_ends(),
+                nuc.reference_lengths(),
             )
         } else {
-            (
-                self.nuc.option_starts(),
-                self.nuc.option_ends(),
-                self.nuc.option_lengths(),
-            )
+            (nuc.option_starts(), nuc.option_ends(), nuc.option_lengths())
         };
         self.to_bed12(reference, &starts, &lengths, NUC_COLOR)
     }
 
     pub fn write_m6a(&self, reference: bool) -> String {
+        let m6a = self.m6a();
         let starts = if reference {
-            self.m6a.reference_starts()
+            m6a.reference_starts()
         } else {
-            self.m6a.option_starts()
+            m6a.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, M6A_COLOR)
     }
 
     pub fn write_cpg(&self, reference: bool) -> String {
+        let cpg = self.cpg();
         let starts = if reference {
-            self.cpg.reference_starts()
+            cpg.reference_starts()
         } else {
-            self.cpg.option_starts()
+            cpg.option_starts()
         };
         let lengths = vec![Some(1); starts.len()];
         self.to_bed12(reference, &starts, &lengths, CPG_COLOR)
@@ -351,7 +343,7 @@ impl FiberseqData {
             x.push_str("fiber_qual\t")
         }
         x.push_str(&format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             "ec",
             "rq",
             "total_AT_bp",
@@ -365,9 +357,13 @@ impl FiberseqData {
             "ref_nuc_lengths",
             "msp_starts",
             "msp_lengths",
-            "fire",
             "ref_msp_starts",
             "ref_msp_lengths",
+            "fire_starts",
+            "fire_lengths",
+            "fire_qual",
+            "ref_fire_starts",
+            "ref_fire_lengths",
             "m6a",
             "ref_m6a",
             "m6a_qual",
@@ -415,11 +411,16 @@ impl FiberseqData {
             .count() as i64;
 
         // get the info
-        let m6a_count = self.m6a.annotations.len();
-        let m6a_qual = self.m6a.qual().iter().map(|a| Some(*a as i64)).collect();
-        let cpg_count = self.cpg.annotations.len();
-        let cpg_qual = self.cpg.qual().iter().map(|a| Some(*a as i64)).collect();
-        let fire = self.msp.qual().iter().map(|a| Some(*a as i64)).collect();
+        let m6a = self.m6a();
+        let cpg = self.cpg();
+        let msp = self.msp();
+        let nuc = self.nuc();
+        let fire = self.fire();
+        let m6a_count = m6a.len();
+        let m6a_qual = m6a.qual().iter().map(|a| Some(*a as i64)).collect();
+        let cpg_count = cpg.len();
+        let cpg_qual = cpg.qual().iter().map(|a| Some(*a as i64)).collect();
+        let fire_qual: Vec<Option<i64>> = fire.qual().iter().map(|a| Some(*a as i64)).collect();
 
         // write the features
         let mut rtn = String::with_capacity(0);
@@ -453,29 +454,34 @@ impl FiberseqData {
             .unwrap();
         }
         // add PB features
-        let total_nuc_bp = self.nuc.lengths().iter().sum::<i64>();
-        let total_msp_bp = self.msp.lengths().iter().sum::<i64>();
+        let total_nuc_bp = nuc.lengths().iter().sum::<i64>();
+        let total_msp_bp = msp.lengths().iter().sum::<i64>();
         rtn.write_fmt(format_args!(
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t",
             self.ec, rq, at_count, m6a_count, total_nuc_bp, total_msp_bp, cpg_count
         ))
         .unwrap();
-        // add fiber features
+        // add fiber features. FIRE is its own coord group (parallel to
+        // nuc/m6a/cpg) — not wedged into the MSP columns.
         let vecs = [
-            self.nuc.option_starts(),
-            self.nuc.option_lengths(),
-            self.nuc.reference_starts(),
-            self.nuc.reference_lengths(),
-            self.msp.option_starts(),
-            self.msp.option_lengths(),
-            fire,
-            self.msp.reference_starts(),
-            self.msp.reference_lengths(),
-            self.m6a.option_starts(),
-            self.m6a.reference_starts(),
+            nuc.option_starts(),
+            nuc.option_lengths(),
+            nuc.reference_starts(),
+            nuc.reference_lengths(),
+            msp.option_starts(),
+            msp.option_lengths(),
+            msp.reference_starts(),
+            msp.reference_lengths(),
+            fire.option_starts(),
+            fire.option_lengths(),
+            fire_qual,
+            fire.reference_starts(),
+            fire.reference_lengths(),
+            m6a.option_starts(),
+            m6a.reference_starts(),
             m6a_qual,
-            self.cpg.option_starts(),
-            self.cpg.reference_starts(),
+            cpg.option_starts(),
+            cpg.reference_starts(),
             cpg_qual,
         ];
         for vec in &vecs {

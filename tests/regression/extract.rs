@@ -76,7 +76,9 @@ fn extract_all_napa() {
             "nuc_lengths",
             "msp_starts",
             "msp_lengths",
-            "fire",
+            "fire_starts",
+            "fire_lengths",
+            "fire_qual",
             "m6a",
         ]
     ));

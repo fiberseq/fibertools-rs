@@ -291,17 +291,15 @@ impl<'a> FireTrack<'a> {
     //#[inline]
     fn add_range_set(
         array: &mut [i32],
-        ranges: &bamannotations::Ranges,
+        view: &bamannotations::AnnotationTypeView<'_>,
         cur_offset: i64,
         chrom_start: usize,
     ) {
-        for annotation in ranges {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
+        for info in view.infos() {
+            match (info.ref_start, info.ref_end) {
+                (Some(rs), Some(re)) => {
+                    let rs = rs as i64;
+                    let re = re as i64;
                     let re = if rs == re { re + 1 } else { re };
                     for i in rs..re {
                         let pos = i + cur_offset - chrom_start as i64;
@@ -326,30 +324,16 @@ impl<'a> FireTrack<'a> {
         }
         let mut start = i64::MAX;
         let mut end = i64::MIN;
-        for annotation in &fiber.msp {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    start = std::cmp::min(start, rs);
-                    end = std::cmp::max(end, re);
-                }
-                _ => continue,
+        for info in fiber.msp().infos() {
+            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
+                start = std::cmp::min(start, rs as i64);
+                end = std::cmp::max(end, re as i64);
             }
         }
-        for annotation in &fiber.nuc {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    start = std::cmp::min(start, rs);
-                    end = std::cmp::max(end, re);
-                }
-                _ => continue,
+        for info in fiber.nuc().infos() {
+            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
+                start = std::cmp::min(start, rs as i64);
+                end = std::cmp::max(end, re as i64);
             }
         }
         if start == i64::MAX {
@@ -364,10 +348,7 @@ impl<'a> FireTrack<'a> {
     pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
         // skip this fiber if it has no MSP/NUC information
         // and we are looking at fiber_coverage
-        if self.fire_track_opts.fiber_coverage
-            && fiber.msp.reference_starts().is_empty()
-            && fiber.nuc.reference_starts().is_empty()
-        {
+        if self.fire_track_opts.fiber_coverage && fiber.msp().is_empty() && fiber.nuc().is_empty() {
             return;
         }
 
@@ -416,73 +397,69 @@ impl<'a> FireTrack<'a> {
             self.coverage[pos as usize] += 1;
         }
 
-        // calculate the fire coverage and fire score
-        for annotation in &fiber.msp {
-            match (
-                annotation.reference_start,
-                annotation.reference_end,
-                annotation.reference_length,
-            ) {
-                (Some(rs), Some(re), Some(_)) => {
-                    if annotation.qual < MIN_FIRE_QUAL {
-                        continue;
-                    }
-                    // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
-                    let capped_qual = annotation.qual.min(253) as f32;
-                    let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
-
-                    // If tracking FIRE elements, create a FireElement for this MSP
-                    let fire_element = if self.fire_track_opts.track_fire_elements {
-                        let elem_start = rs + self.cur_offset;
-                        let elem_end = re + self.cur_offset;
-                        let fire_id = self.next_fire_id;
-                        self.next_fire_id += 1;
-                        Some(FireElement {
-                            start: elem_start,
-                            end: elem_end,
-                            id: fire_id,
-                        })
-                    } else {
-                        None
-                    };
-
-                    for i in rs..re {
-                        let pos = i + self.cur_offset - self.chrom_start as i64;
-                        if pos < 0 || pos >= self.track_len as i64 {
-                            continue;
-                        }
-                        self.fire_coverage[pos as usize] += 1;
-                        self.raw_scores[pos as usize] += score_update;
-
-                        // Store the FIRE element at this position if tracking is enabled
-                        if let (Some(fire_elements), Some(elem)) =
-                            (&mut self.fire_elements, fire_element)
-                        {
-                            fire_elements[pos as usize].push(elem);
-                        }
-                    }
-                }
+        // calculate the fire coverage and fire score. FIRE is its own
+        // annotation type — already filtered to non-zero precision in
+        // add_fire_to_rec. MIN_FIRE_QUAL is the stricter pileup-level gate.
+        for info in fiber.fire().infos() {
+            let (rs, re) = match (info.ref_start, info.ref_end) {
+                (Some(rs), Some(re)) => (rs as i64, re as i64),
                 _ => continue,
+            };
+            let qual = info.qualities.first().copied().unwrap_or(0);
+            if qual < MIN_FIRE_QUAL {
+                continue;
+            }
+            // Cap quality at 253 to avoid log10(0) issues, and cap score at 100
+            let capped_qual = qual.min(253) as f32;
+            let score_update = ((1.0 - capped_qual / 255.0).log10() * -50.0).min(100.0);
+
+            // If tracking FIRE elements, create a FireElement for this MSP
+            let fire_element = if self.fire_track_opts.track_fire_elements {
+                let elem_start = rs + self.cur_offset;
+                let elem_end = re + self.cur_offset;
+                let fire_id = self.next_fire_id;
+                self.next_fire_id += 1;
+                Some(FireElement {
+                    start: elem_start,
+                    end: elem_end,
+                    id: fire_id,
+                })
+            } else {
+                None
+            };
+
+            for i in rs..re {
+                let pos = i + self.cur_offset - self.chrom_start as i64;
+                if pos < 0 || pos >= self.track_len as i64 {
+                    continue;
+                }
+                self.fire_coverage[pos as usize] += 1;
+                self.raw_scores[pos as usize] += score_update;
+
+                // Store the FIRE element at this position if tracking is enabled
+                if let (Some(fire_elements), Some(elem)) = (&mut self.fire_elements, fire_element) {
+                    fire_elements[pos as usize].push(elem);
+                }
             }
         }
 
         // add other sets of data to the FireTrack depending on CLI opts
         let mut pairs = vec![];
         if !self.fire_track_opts.no_nuc {
-            pairs.push((&mut self.nuc_coverage, &fiber.nuc));
+            pairs.push((&mut self.nuc_coverage, fiber.nuc()));
         }
         if !self.fire_track_opts.no_msp {
-            pairs.push((&mut self.msp_coverage, &fiber.msp));
+            pairs.push((&mut self.msp_coverage, fiber.msp()));
         }
         if self.fire_track_opts.m6a {
-            pairs.push((&mut self.m6a_coverage, &fiber.m6a));
+            pairs.push((&mut self.m6a_coverage, fiber.m6a()));
         }
         if self.fire_track_opts.cpg {
-            pairs.push((&mut self.cpg_coverage, &fiber.cpg));
+            pairs.push((&mut self.cpg_coverage, fiber.cpg()));
         }
 
-        for (array, ranges) in pairs {
-            Self::add_range_set(array, ranges, self.cur_offset, self.chrom_start);
+        for (array, view) in pairs {
+            Self::add_range_set(array, &view, self.cur_offset, self.chrom_start);
         }
     }
 
@@ -545,7 +522,7 @@ impl<'a> FireTrack<'a> {
 
         coverages.sort_unstable();
 
-        let median = if coverages.len() % 2 == 0 {
+        let median = if coverages.len().is_multiple_of(2) {
             let mid = coverages.len() / 2;
             (coverages[mid - 1] as f64 + coverages[mid] as f64) / 2.0
         } else {
@@ -930,9 +907,8 @@ impl<'a> FiberseqPileup<'a> {
             } else {
                 true
             };
-            let shuffled_same = if self.shuffled_data.is_some() {
-                self.shuffled_data.as_ref().unwrap().row(i)
-                    == self.shuffled_data.as_ref().unwrap().row(i - 1)
+            let shuffled_same = if let Some(shuffled) = self.shuffled_data.as_ref() {
+                shuffled.row(i) == shuffled.row(i - 1)
             } else {
                 true
             };
@@ -954,8 +930,8 @@ impl<'a> FiberseqPileup<'a> {
             data_tracks.push(self.hap1_data.as_ref().unwrap());
             data_tracks.push(self.hap2_data.as_ref().unwrap());
         }
-        if self.shuffled_data.is_some() {
-            data_tracks.push(self.shuffled_data.as_ref().unwrap());
+        if let Some(shuffled) = self.shuffled_data.as_ref() {
+            data_tracks.push(shuffled);
         }
         for data in data_tracks {
             let total_coverage: i64 = data.coverage.iter().map(|x| *x as i64).sum();
@@ -993,8 +969,8 @@ impl<'a> FiberseqPileup<'a> {
                     data_tracks.push(self.hap1_data.as_ref().unwrap());
                     data_tracks.push(self.hap2_data.as_ref().unwrap());
                 }
-                if self.shuffled_data.is_some() {
-                    data_tracks.push(self.shuffled_data.as_ref().unwrap());
+                if let Some(shuffled) = self.shuffled_data.as_ref() {
+                    data_tracks.push(shuffled);
                 }
 
                 for data in data_tracks {

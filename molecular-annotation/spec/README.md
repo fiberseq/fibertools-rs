@@ -10,9 +10,14 @@ Integration of this spec or a similar one into the SAM/BAM/CRAM is needed to sta
 
 The molecular annotation format uses three related tags:
 
-- **MA:Z:** - Read length followed by annotation positions with lengths (required)
+- **MA:Z:** - Read length followed by annotation positions, each written as `start-length` (required)
 - **AQ:B:C** - Annotation Quality scores (optional, u8 array; only present if any annotation type specifies P or Q)
 - **AN:Z:** - Annotation Names (optional labels for individual annotations)
+
+Every annotation length MUST be stored inline in the MA tag as part of its
+`start-length` position. Lengths MUST NOT be stored in any separate tag or
+array — there is no length-only companion tag. A parser MUST reject an MA
+position that gives a start without a length.
 
 ```
 MA:Z:read_length;annotation_type1+P:start1-len1,start2-len2;annotation_type2-:start1-len1
@@ -20,10 +25,10 @@ AQ:B:C,qual1,qual2
 AN:Z:name1,name2,name3
 ```
 
-Regex for MA tag:
+Regex for MA tag (every position is a `start-length` pair):
 
 ```
-^\d+;(([a-zA-Z0-9_]+)[+-.][PQ]*:((\d+-\d+)(,\d+-\d+)*);?)+$
+^\d+;([a-zA-Z0-9_]+[-+.][PQ]*:(\d+-\d+)(,\d+-\d+)*;?)+$
 ```
 
 ### Read Length

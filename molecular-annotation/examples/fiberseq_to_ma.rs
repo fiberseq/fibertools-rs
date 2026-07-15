@@ -12,7 +12,7 @@
 //! Or with a custom input file:
 //!   cargo run --example fiberseq_to_ma -- path/to/file.cram
 
-use molecular_annotation::{MaEncoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::record::Aux;
 use rust_htslib::bam::{self, Read};
 use std::env;
@@ -45,7 +45,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
     if let (Some(ns), Some(nl)) = (get_u32_array(record, b"ns"), get_u32_array(record, b"nl")) {
         if ns.len() == nl.len() {
             let nuc_type =
-                annotations.add_annotation_type("nuc", QualitySpec::none());
+                annotations.add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma);
             for (start, length) in ns.iter().zip(nl.iter()) {
                 // API uses 0-based internally, converts to 1-based when writing MA tag
                 nuc_type.add(*start, *length, Strand::Forward, vec![], None);
@@ -70,7 +70,7 @@ fn fiberseq_to_molecular_annotations(record: &bam::Record) -> Option<MolecularAn
                 QualitySpec::none()
             };
 
-            let msp_type = annotations.add_annotation_type("msp", quality_spec);
+            let msp_type = annotations.add_annotation_type("msp", quality_spec, Encoding::Ma);
             for (i, (start, length)) in a_starts.iter().zip(al.iter()).enumerate() {
                 let qualities = if has_quality {
                     aq.as_ref()
@@ -127,7 +127,7 @@ fn main() {
         let mut record = result.expect("Failed to read record");
         total += 1;
 
-        if let Some(mut annotations) = fiberseq_to_molecular_annotations(&record) {
+        if let Some(annotations) = fiberseq_to_molecular_annotations(&record) {
             // Remove old fiber-seq tags
             record.remove_aux(b"ns").ok();
             record.remove_aux(b"nl").ok();
@@ -147,17 +147,6 @@ fn main() {
                     .push_aux(b"AQ", Aux::ArrayU8((&aq_array).into()))
                     .expect("Failed to write AQ tag");
             }
-
-            // M2/AL tags: alternative separate format for compression comparison
-            annotations.set_ma_encoding(MaEncoding::Separate);
-            let m2_string = annotations.to_ma_string();
-            let al_array: Vec<u32> = annotations.to_al_array();
-            record
-                .push_aux(b"M2", Aux::String(&m2_string))
-                .expect("Failed to write M2 tag");
-            record
-                .push_aux(b"AL", Aux::ArrayU32((&al_array).into()))
-                .expect("Failed to write AL tag");
 
             converted += 1;
         }
