@@ -102,17 +102,28 @@ Key points:
   the fibertools tag as **`v0.X.Y`** (unchanged from today), so cargo-dist's
   trigger and `publish-crates.yml` need no changes. MA tags as
   `molecular-annotation-v0.0.x`.
-- **Draft handshake:** the fibertools component sets `"draft": true`. With
+- **Draft handshake:** the fibertools component sets `"draft": true`, and the
+  manifest sets top-level `"force-tag-creation": true`. With
   `create-release = false`, cargo-dist 0.30.3 generates a workflow that
   `gh release upload`s binaries to the existing release and then
   `gh release edit --draft=false` to publish it. So release-please must create
   the fibertools release as a **draft**; cargo-dist attaches binaries and
   un-drafts it. Un-drafting emits `release: published`, which is what triggers
   `publish-crates.yml` — so crates.io publish happens only after binaries are
-  attached. `molecular-annotation` deliberately has **no** `draft` (default
-  `false`): it has no cargo-dist step to un-draft it, so it must publish
-  immediately, which fires `release: published` and lets `publish-crates.yml`
-  push it to crates.io.
+  attached.
+  - **`force-tag-creation` is required, not optional:** GitHub uses "lazy tag
+    creation" — it does NOT create the git tag ref for a *draft* release until
+    the release is published. But cargo-dist's `release.yml` triggers only on
+    tag push. Without `force-tag-creation`, a draft fibertools release would
+    never push its tag, cargo-dist would never run, the release would never be
+    un-drafted, and nothing would publish it — a deadlock. `force-tag-creation`
+    forces the tag ref immediately so cargo-dist fires. It is top-level (applies
+    to the whole manifest) and is a harmless no-op for the non-draft MA
+    component (non-draft releases create their tag anyway).
+  - `molecular-annotation` deliberately has **no** `draft` (default `false`): it
+    has no cargo-dist step to un-draft it, so it must publish immediately, which
+    fires `release: published` and lets `publish-crates.yml` push it to
+    crates.io.
 
 ### 2. New workflow `.github/workflows/release-please.yml`
 

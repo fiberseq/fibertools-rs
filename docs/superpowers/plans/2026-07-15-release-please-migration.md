@@ -38,6 +38,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "plugins": ["cargo-workspace"],
+  "force-tag-creation": true,
   "packages": {
     ".": {
       "release-type": "rust",
