@@ -17,3 +17,6 @@ pr-run-mode = "plan"
 install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = true
+# release-please creates the GitHub Release; cargo-dist only uploads
+# artifacts to it rather than creating its own.
+create-release = false

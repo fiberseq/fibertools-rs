@@ -22,3 +22,8 @@ smallvec = "1.15.1"
 
 [dev-dependencies]
 rust-htslib = { workspace = true }
+
+# molecular-annotation is a library with no binaries; cargo-dist should ignore
+# it so its release-please tag/release is a clean no-op.
+[package.metadata.dist]
+dist = false
