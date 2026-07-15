@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1](https://github.com/fiberseq/fibertools-rs/compare/v0.10.0...v0.10.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* group mock-fire intervals by chromosome and name ([0fc262e](https://github.com/fiberseq/fibertools-rs/commit/0fc262e02951af1c32297e0f62444d00133b8865))
+
 ## [0.10.0] - 2026-07-13
 
 - **Annotations now use the [MolecularAnnotation (MA) spec](https://github.com/fiberseq/Molecular-annotation-spec).**
