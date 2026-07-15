@@ -1,8 +1,9 @@
 //! MA-spec annotation I/O bridge for fibertools-rs.
 //!
-//! Reading: prefers MA/AQ/AN; falls back to legacy `ns/nl/as/al/aq` if no
-//! MA tag is present. Returns a populated [`MolecularAnnotations`] (read
-//! length and aligned blocks set) even when no annotation tags exist.
+//! Reading: prefers MA/AQ/AN; falls back to legacy `ns/nl/as/al/aq` (nuc/msp)
+//! and legacy `fs/fl/fa` (fibertig) if no MA tag is present. Returns a
+//! populated [`MolecularAnnotations`] (read length and aligned blocks set)
+//! even when no annotation tags exist.
 //!
 //! Writing: emits MA-spec tags only. Legacy `ns/nl/as/al/aq` emission is
 //! intentionally not supported — the new FIRE-as-subset semantics is
@@ -58,27 +59,41 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     // legacy fallback whenever MM/ML is present).
     let has_ma = matches!(record.aux(b"MA"), Ok(Aux::String(_)));
     if !has_ma {
-        // Provenance caveat: presence of `ns`/`as` is treated as evidence of
-        // fibertools-legacy data with no further validation. This path is
+        // Provenance caveat: presence of `ns`/`as`/`fs` is treated as evidence
+        // of fibertools-legacy data with no further validation. This path is
         // read-only — we never delete these tags — so a foreign tool reusing
         // those names is at worst mis-parsed here, never destroyed. Any future
         // code that *removes* legacy tags must verify provenance first.
         let has_legacy_nuc = record.aux(b"ns").is_ok();
         let has_legacy_msp = record.aux(b"as").is_ok();
         if has_legacy_nuc || has_legacy_msp {
-            let legacy = read_legacy_nuc_msp(record)?;
-            for t in legacy.annotation_types.into_iter() {
-                if annot.get_type(&t.name).is_some() {
-                    continue;
-                }
-                let new_t = annot.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
-                for a in t.annotations.into_iter() {
-                    new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
-                }
-            }
+            merge_missing_types(&mut annot, read_legacy_nuc_msp(record)?);
+        }
+        // Legacy fibertig (`fs`/`fl`/`fa`): the pre-MA fibertig wire format,
+        // dropped from the writer in favour of the MA-spec `AN` tag. Kept
+        // read-only so older fibertig BAMs stay consumable by `extract`.
+        if record.aux(b"fs").is_ok() {
+            merge_missing_types(&mut annot, read_legacy_fibertig(record)?);
         }
     }
     Ok(annot)
+}
+
+/// Merge every annotation type from `src` into `dst`, skipping any type whose
+/// name already exists on `dst`. Lets the legacy-tag fallbacks layer their
+/// annotations on top of whatever the MA/MM/ML library parser already produced
+/// rather than clobbering it (e.g. legacy nuc/msp alongside library-parsed
+/// base mods).
+fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations) {
+    for t in src.annotation_types.into_iter() {
+        if dst.get_type(&t.name).is_some() {
+            continue;
+        }
+        let new_t = dst.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
+        for a in t.annotations.into_iter() {
+            new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
+        }
+    }
 }
 
 /// Writes MA-family tags (MA/AL/AQ/AN) to a BAM record, **preserving the
@@ -245,6 +260,63 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
         }
     }
 
+    Ok(annot)
+}
+
+/// Read the legacy fibertig `fs`/`fl`/`fa` tags into a [`FIBERTIG_TYPE`]
+/// annotation type.
+///
+/// Pre-MA fibertig BAMs stored contig annotations in three tags: `fs`
+/// (molecular starts), `fl` (lengths), and `fa` (a single `|`-separated string
+/// of names, where an empty segment means "unnamed"). Emission of these was
+/// dropped in favour of the MA-spec `AN` tag; this read-only fallback keeps
+/// those older BAMs consumable. Mirrors the in-memory shape the MA path
+/// produces (`Strand::Forward`, no quality, `Encoding::Ma`) so downstream
+/// liftover to reference coordinates is identical either way.
+fn read_legacy_fibertig(record: &bam::Record) -> Result<MolecularAnnotations> {
+    use crate::utils::fibertig::FIBERTIG_TYPE;
+
+    let mut annot = MolecularAnnotations::from_record(record);
+
+    let (Some(fs), Some(fl)) = (u32_array(record, b"fs"), u32_array(record, b"fl")) else {
+        return Ok(annot);
+    };
+    if fs.len() != fl.len() {
+        bail!(
+            "legacy fibertig fs ({}) and fl ({}) length mismatch",
+            fs.len(),
+            fl.len()
+        );
+    }
+    if fs.is_empty() {
+        return Ok(annot);
+    }
+
+    // `fa` is optional; when present it must have one `|`-separated segment per
+    // annotation. An empty segment decodes to `None` (an unnamed annotation).
+    let names: Option<Vec<Option<String>>> = match record.aux(b"fa") {
+        Ok(Aux::String(s)) => {
+            let parts: Vec<Option<String>> = s
+                .split('|')
+                .map(|p| (!p.is_empty()).then(|| p.to_string()))
+                .collect();
+            if parts.len() != fs.len() {
+                bail!(
+                    "legacy fibertig fa ({}) and fs ({}) length mismatch",
+                    parts.len(),
+                    fs.len()
+                );
+            }
+            Some(parts)
+        }
+        _ => None,
+    };
+
+    let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
+    for (i, (s, l)) in fs.iter().zip(fl.iter()).enumerate() {
+        let name = names.as_ref().and_then(|v| v[i].clone());
+        t.add(*s, *l, Strand::Forward, vec![], name);
+    }
     Ok(annot)
 }
 
@@ -563,6 +635,55 @@ mod tests {
         assert_eq!(fire.annotations[0].start, 2);
         assert_eq!(fire.annotations[0].length, 3);
         assert_eq!(fire.annotations[0].qualities.to_vec(), vec![200]);
+    }
+
+    #[test]
+    fn read_record_falls_back_to_legacy_fibertig_fs_fl_fa() {
+        use crate::utils::fibertig::FIBERTIG_TYPE;
+        use rust_htslib::bam::record::Aux;
+
+        let mut record = synth_record(b"ATCGATCGATCGATCGATCG"); // 20bp
+
+        // Two legacy fibertig annotations via `fs`/`fl`; `fa` names the first
+        // and leaves the second unnamed (empty `|` segment). No MA tag.
+        let fs: Vec<u32> = vec![2, 10];
+        let fl: Vec<u32> = vec![3, 4];
+        record.push_aux(b"fs", Aux::ArrayU32((&fs).into())).unwrap();
+        record.push_aux(b"fl", Aux::ArrayU32((&fl).into())).unwrap();
+        record.push_aux(b"fa", Aux::String("gene_a|")).unwrap();
+
+        let annot = read_record(&record).expect("read_record");
+
+        let tig = annot
+            .annotation_types
+            .iter()
+            .find(|t| t.name == FIBERTIG_TYPE)
+            .expect("fibertig populated from legacy fs/fl/fa");
+        assert_eq!(tig.annotations.len(), 2);
+        assert_eq!(tig.annotations[0].start, 2);
+        assert_eq!(tig.annotations[0].length, 3);
+        assert_eq!(tig.annotations[0].name.as_deref(), Some("gene_a"));
+        assert_eq!(tig.annotations[1].start, 10);
+        assert_eq!(tig.annotations[1].length, 4);
+        assert_eq!(tig.annotations[1].name, None);
+    }
+
+    #[test]
+    fn read_record_rejects_mismatched_legacy_fibertig_lengths() {
+        use rust_htslib::bam::record::Aux;
+
+        let mut record = synth_record(b"ATCGATCGAT");
+
+        // `fs` has two entries but `fl` only one — a corrupt legacy record.
+        let fs: Vec<u32> = vec![2, 6];
+        let fl: Vec<u32> = vec![3];
+        record.push_aux(b"fs", Aux::ArrayU32((&fs).into())).unwrap();
+        record.push_aux(b"fl", Aux::ArrayU32((&fl).into())).unwrap();
+
+        assert!(
+            read_record(&record).is_err(),
+            "mismatched fs/fl lengths must be a hard error, not a silent drop"
+        );
     }
 
     #[test]
