@@ -5,7 +5,8 @@ use std::fmt::Debug;
 #[derive(Args, Debug)]
 pub struct MockFireOptions {
     /// Input BED file where intervals become FIRE elements.
-    /// The 4th column (name) groups intervals into the same mock read.
+    /// Intervals are grouped into a mock read by chromosome and the 4th column
+    /// (name), so a name reused across chromosomes yields one read per chromosome.
     #[clap()]
     pub bed: String,
     /// Output BAM file

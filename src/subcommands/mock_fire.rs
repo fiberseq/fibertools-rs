@@ -8,18 +8,25 @@ use rust_htslib::bam::record::{Cigar, CigarString};
 use rust_htslib::bam::{Header, HeaderView, Record};
 use std::collections::HashMap;
 
-/// Group BED records by their name (4th column) to create mock reads
-fn group_bed_by_name(bed_records: Vec<BedRecord>) -> HashMap<String, Vec<BedRecord>> {
-    let mut groups: HashMap<String, Vec<BedRecord>> = HashMap::new();
+/// Group BED records by (chromosome, name) to create mock reads.
+///
+/// Grouping on the chromosome as well as the 4th column (name) means a name that
+/// appears on multiple chromosomes yields one mock read per chromosome, instead
+/// of a single read that spans references (which a BAM record cannot represent).
+fn group_bed_by_name_and_chrom(
+    bed_records: Vec<BedRecord>,
+) -> HashMap<(String, String), Vec<BedRecord>> {
+    let mut groups: HashMap<(String, String), Vec<BedRecord>> = HashMap::new();
 
     for record in bed_records {
         let name = record.get_name_or_default();
-        groups.entry(name).or_default().push(record);
+        let key = (record.chrom.clone(), name);
+        groups.entry(key).or_default().push(record);
     }
 
-    // Sort each group by start position
+    // Each group is now single-chromosome, so sort by start position alone.
     for intervals in groups.values_mut() {
-        intervals.sort_by_key(|r| (r.chrom.clone(), r.start));
+        intervals.sort_by_key(|r| r.start);
     }
 
     groups
@@ -147,10 +154,10 @@ pub fn run_mock_fire(opts: &MockFireOptions) -> Result<()> {
 
     log::info!("Read {} intervals from BED file", bed_records.len());
 
-    // Group intervals by read name (4th column)
-    let grouped = group_bed_by_name(bed_records.clone());
+    // Group intervals by chromosome and read name (4th column)
+    let grouped = group_bed_by_name_and_chrom(bed_records.clone());
     log::info!(
-        "Grouped into {} mock reads based on 4th column",
+        "Grouped into {} mock reads based on chromosome and 4th column",
         grouped.len()
     );
 
@@ -177,12 +184,14 @@ pub fn run_mock_fire(opts: &MockFireOptions) -> Result<()> {
             .context("Failed to set uncompressed BAM")?;
     }
 
-    // Create and write mock records
-    let mut read_names: Vec<_> = grouped.keys().collect();
-    read_names.sort();
+    // Create and write mock records. Sorting by (chrom, name) keeps output
+    // deterministic and groups each chromosome's records together.
+    let mut keys: Vec<_> = grouped.keys().collect();
+    keys.sort();
 
-    for read_name in read_names {
-        let intervals = &grouped[read_name];
+    for key in keys {
+        let (_chrom, read_name) = key;
+        let intervals = &grouped[key];
         let record = create_mock_fire_record(
             read_name,
             intervals,
