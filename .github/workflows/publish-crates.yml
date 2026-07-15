@@ -19,6 +19,12 @@ permissions:
   id-token: write
   contents: read
 
+# One release-PR merge can publish two Releases (fibertools + MA); serialize
+# publish runs so their crates.io uploads don't race.
+concurrency:
+  group: publish-crates
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
