@@ -5,6 +5,13 @@
 # own commits, and release-plz updates the internal [workspace.dependencies] pin
 # automatically when molecular-annotation changes.
 
+[workspace]
+# Only open a release PR when there is a feat or fix (or a breaking change).
+# By default release-plz releases on ANY commit (chore/docs/ci included, as a
+# patch); this restricts it to meaningful changes, matching what you'd expect.
+release_commits = "^(feat|fix)[(:!]"
+protect_breaking_commits = true   # ...but always release a breaking change
+
 [[package]]
 name = "fibertools-rs"
 git_tag_name = "v{{ version }}"          # keep v0.X.Y (matches existing tags + cargo-dist)
