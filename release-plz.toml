@@ -6,11 +6,10 @@
 # automatically when molecular-annotation changes.
 
 [workspace]
-# Only open a release PR when there is a feat or fix (or a breaking change).
-# By default release-plz releases on ANY commit (chore/docs/ci included, as a
-# patch); this restricts it to meaningful changes, matching what you'd expect.
+# Only open a release PR when there is a feat or fix. By default release-plz
+# releases on ANY commit (chore/docs/ci included, as a patch); this restricts it
+# to meaningful changes. Breaking changes use feat!/fix!, which still match.
 release_commits = "^(feat|fix)[(:!]"
-protect_breaking_commits = true   # ...but always release a breaking change
 
 [[package]]
 name = "fibertools-rs"
