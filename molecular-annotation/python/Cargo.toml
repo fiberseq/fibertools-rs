@@ -10,3 +10,9 @@ crate-type = ["cdylib"]
 [dependencies]
 molecular-annotation = { path = ".." }
 pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }
+
+# This crate is intentionally excluded from the repo-root workspace (it is a
+# maturin-built cdylib extension module). Declaring an empty workspace table
+# pins it as its own workspace root, so building it directly with maturin does
+# not walk up to the root Cargo.toml and fail workspace resolution.
+[workspace]

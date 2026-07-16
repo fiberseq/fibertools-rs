@@ -41,6 +41,7 @@ use pyo3::prelude::*;
 // Use fully qualified path to avoid name collision with the pymodule
 use ::molecular_annotation::{
     Annotation as RustAnnotation,
+    Encoding as RustEncoding,
     MolecularAnnotations as RustMolecularAnnotations,
     QualitySpec as RustQualitySpec,
     Strand as RustStrand,
@@ -74,8 +75,10 @@ impl Annotation {
             start: a.start,
             length: a.length,
             strand_char: a.strand.as_char(),
-            qualities: a.qualities.clone(),
-            name: a.name.clone(),
+            // Core stores qualities in a SmallVec and names as Arc<str> since
+            // the feat! rewrite; copy into owned Vec/String for the Python side.
+            qualities: a.qualities.to_vec(),
+            name: a.name.as_deref().map(String::from),
         }
     }
 }
@@ -169,7 +172,7 @@ impl MolecularAnnotations {
         aq: Option<Vec<u8>>,
         an: Option<&str>,
     ) -> PyResult<Self> {
-        let inner = RustMolecularAnnotations::from_tags(ma, &[], aq.as_deref(), an)
+        let inner = RustMolecularAnnotations::from_tags(ma, aq.as_deref(), an)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -252,8 +255,9 @@ impl MolecularAnnotations {
     ///     >>> print(ma)  # "1000;msp+P:100-50" (1-based in tag)
     ///     >>> print(aq)  # [40]
     pub fn to_tags(&self) -> (String, Option<Vec<u8>>, Option<String>) {
-        let (ma, _al, aq, an) = self.inner.to_tags();
-        (ma, aq, an)
+        // Core `to_tags` no longer emits a separate AL slot (lengths are inline
+        // in MA:Z); it returns (ma, aq, an) directly.
+        self.inner.to_tags()
     }
 
     /// Add annotations of a given type.
@@ -386,6 +390,10 @@ impl MolecularAnnotations {
             .add_annotations(
                 type_name,
                 qs,
+                // The Python binding is the MA-tag surface; base-mod (MM/ML)
+                // types are produced only via the htslib-backed record path,
+                // so annotations added here are always MA-encoded.
+                RustEncoding::Ma,
                 &starts,
                 &computed_lengths,
                 strand,
