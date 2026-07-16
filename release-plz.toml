@@ -16,6 +16,20 @@ name = "fibertools-rs"
 git_tag_name = "v{{ version }}"          # keep v0.X.Y (matches existing tags + cargo-dist)
 git_release_draft = true                 # draft so cargo-dist attaches binaries, then un-drafts
 features_always_increment_minor = true   # feat -> minor even on 0.x
+# Prepend an install section (the cargo-dist shell installer) to the changelog
+# in the GitHub release body. {{ version }} is the release version; the tag is
+# v{{ version }} and the installer asset is fibertools-rs-installer.sh.
+git_release_body = """
+## Install
+
+Prebuilt binaries are attached below. Quick install (Linux/macOS):
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/fiberseq/fibertools-rs/releases/download/v{{ version }}/fibertools-rs-installer.sh | sh
+```
+
+{{ changelog }}
+"""
 
 [[package]]
 name = "molecular-annotation"
