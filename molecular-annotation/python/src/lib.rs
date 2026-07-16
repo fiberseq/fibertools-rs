@@ -260,6 +260,55 @@ impl MolecularAnnotations {
         self.inner.to_tags()
     }
 
+    /// Parse MM/ML base modifications into this container.
+    ///
+    /// Unlike the MA/AQ/AN tags, MM/ML is delta-skip encoded against the read
+    /// sequence, so decoding requires the **forward** (original molecular
+    /// orientation) bases. For a reverse-aligned record the caller must
+    /// reverse-complement the stored sequence before passing it here (the
+    /// pysam helper `from_record` does this for you).
+    ///
+    /// One annotation type is created per mod code (e.g. "a" for m6A, "m" for
+    /// 5mC); each call is 0-based half-open, 1 bp per modified base, with the
+    /// ML probability stored as a single quality value and the skip-base as the
+    /// annotation name. Pre-existing MM/ML types are cleared first, so repeated
+    /// calls are idempotent; MA-tag types are left untouched.
+    ///
+    /// Args:
+    ///     mm: The MM:Z tag value (e.g. "A+a,1,0,0;").
+    ///     ml: The ML:B,C bytes (0-255 probabilities); may be empty.
+    ///     forward_seq: Read sequence in original molecular orientation.
+    ///
+    /// Example:
+    ///     >>> annot = MolecularAnnotations(6)
+    ///     >>> annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+    ///     >>> annot.iter_type("a") is not None
+    ///     True
+    pub fn parse_mm_ml(&mut self, mm: &str, ml: Vec<u8>, forward_seq: Vec<u8>) {
+        self.inner.parse_mm_ml(mm, &ml, &forward_seq);
+    }
+
+    /// Serialize the MM/ML-encoded types to (MM:Z string, ML:B,C bytes).
+    ///
+    /// This is the canonical re-encode (delta-skip against `forward_seq`), the
+    /// inverse of `parse_mm_ml`. Returns None if there are no base-mod types.
+    ///
+    /// Note: emitting re-canonicalizes — a grouped multi-code input such as
+    /// "C+mh" comes back decomposed as "C+h;C+m". Read/inspection paths that do
+    /// not modify base mods should pass the record's original MM/ML through
+    /// untouched rather than round-tripping through this method.
+    ///
+    /// Args:
+    ///     forward_seq: Read sequence in original molecular orientation
+    ///         (same orientation used for `parse_mm_ml`).
+    ///
+    /// Returns:
+    ///     Tuple of (mm, ml) where mm is the MM:Z string and ml is the list of
+    ///     ML bytes, or None if no MM/ML-encoded types are present.
+    pub fn to_mm_ml(&self, forward_seq: Vec<u8>) -> Option<(String, Vec<u8>)> {
+        self.inner.to_mm_ml(&forward_seq)
+    }
+
     /// Add annotations of a given type.
     ///
     /// Accepts 0-based half-open intervals [start, end).

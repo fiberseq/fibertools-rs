@@ -8,7 +8,14 @@ repository = "https://github.com/fiberseq/fibertools-rs"
 homepage = "https://fiberseq.github.io/"
 
 [features]
-htslib = ["dep:rust-htslib", "dep:regex", "dep:lazy_static", "dep:bio"]
+# MM/ML base-modification codec that operates on plain byte slices (the MM
+# string, ML bytes, and forward sequence). No rust-htslib — this is what the
+# Python bindings enable so they can parse/emit MM/ML using pysam-supplied data.
+mmml = ["dep:regex", "dep:lazy_static"]
+# Full BAM-record bridge: everything in `mmml` plus reading/writing MM/ML (and
+# MA/AQ/AN) directly off a rust_htslib::bam::Record. `bio` is only needed here,
+# for reverse-strand revcomp when deriving the forward sequence from a record.
+htslib = ["mmml", "dep:rust-htslib", "dep:bio"]
 
 [dependencies]
 rust-htslib = { workspace = true, optional = true }

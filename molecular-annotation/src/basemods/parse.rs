@@ -1,4 +1,10 @@
-//! MM/ML parser. Called internally from `MolecularAnnotations::from_record`.
+//! MM/ML parser.
+//!
+//! `parse_mm_ml_into` operates purely on byte slices — the MM string, the ML
+//! bytes, and the **forward** (original molecular orientation) sequence. It has
+//! no rust-htslib dependency, so it is reachable under the `mmml` feature
+//! alone. `MolecularAnnotations::from_record` (htslib) extracts those slices
+//! off a record and delegates here.
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -20,51 +26,36 @@ lazy_static! {
 }
 
 use crate::{AnnotationType, Encoding, MolecularAnnotations, QualitySpec, SkipFlag, Strand};
-use bio::alphabets::dna::revcomp;
-use rust_htslib::bam::record::Aux;
-use rust_htslib::bam::Record;
 
-/// Read MM/ML from `record` and populate `annot` with one MmMl-encoded
-/// AnnotationType per unique mod code encountered.
+/// Parse MM/ML into `annot`, populating one `MmMl`-encoded `AnnotationType`
+/// per unique mod code encountered.
 ///
-/// No-op if MM is absent or empty.
+/// * `mm_text` — the MM:Z tag value (delta-skip encoded, forward orientation).
+/// * `ml_tag` — the ML:B,C bytes; may be empty (a warning is logged and missing
+///   values are padded with 0).
+/// * `forward_seq` — the read sequence in **original molecular orientation**
+///   (callers holding a reverse-aligned record must revcomp before calling).
+///   Case-insensitive; upper-cased internally.
 ///
-/// **Idempotency:** by convention this is only called from `from_record`,
-/// which always operates on a fresh `MolecularAnnotations`. The function
-/// does not wipe state itself; callers must ensure freshness.
-pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
-    let mm_text = match record.aux(b"MM") {
-        Ok(Aux::String(s)) => s.to_string(),
-        _ => return,
-    };
+/// No-op if `mm_text` is empty.
+///
+/// **Idempotency:** appends into existing types via `add_annotation_type`, so
+/// this must run on a container with no pre-existing MM/ML types.
+pub(crate) fn parse_mm_ml_into(
+    annot: &mut MolecularAnnotations,
+    mm_text: &str,
+    ml_tag: &[u8],
+    forward_seq: &[u8],
+) {
     if mm_text.is_empty() {
         return;
     }
 
-    let ml_tag: Vec<u8> = match record.aux(b"ML") {
-        Ok(Aux::ArrayU8(arr)) => arr.iter().collect(),
-        _ => {
-            log::warn!(
-                "MM/ML parser: MM tag present but ML missing or wrong type for {}",
-                String::from_utf8_lossy(record.qname())
-            );
-            Vec::new()
-        }
-    };
-
-    let forward_bases = if record.is_reverse() {
-        revcomp(record.seq().as_bytes())
-    } else {
-        record.seq().as_bytes()
-    };
-    let forward_bases: Vec<u8> = forward_bases
-        .iter()
-        .map(|b| b.to_ascii_uppercase())
-        .collect();
+    let forward_bases: Vec<u8> = forward_seq.iter().map(|b| b.to_ascii_uppercase()).collect();
 
     let mut ml_cursor = 0usize;
 
-    for cap in MM_RE.captures_iter(&mm_text) {
+    for cap in MM_RE.captures_iter(mm_text) {
         let skip_base = cap.get(3).unwrap().as_str().as_bytes()[0];
         let strand_char = cap.get(4).unwrap().as_str().as_bytes()[0];
         let mod_codes_str = cap.get(5).unwrap().as_str();
@@ -116,9 +107,7 @@ pub(crate) fn parse_into(annot: &mut MolecularAnnotations, record: &Record) {
         let resolved = cur_idx;
         if resolved != deltas.len() {
             log::warn!(
-                "MM/ML parser: {} (reverse={}) — MM group ended {} short; truncating",
-                String::from_utf8_lossy(record.qname()),
-                record.is_reverse(),
+                "MM/ML parser: MM group ended {} short; truncating",
                 deltas.len() - resolved
             );
         }

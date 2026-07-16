@@ -126,7 +126,7 @@ mod decode;
 mod iter;
 mod serialize;
 
-#[cfg(feature = "htslib")]
+#[cfg(feature = "mmml")]
 mod basemods;
 
 pub use liftover::{AlignedBlock, AlignedBlocks};

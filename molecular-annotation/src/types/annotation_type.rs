@@ -176,7 +176,7 @@ impl AnnotationType {
     /// Annotations are bucketed by `(skip_base, strand)`, sorted by position,
     /// and delta-encoded against `forward_seq`. ML bytes are emitted in
     /// the same order as the assembled groups.
-    #[cfg(feature = "htslib")]
+    #[cfg(feature = "mmml")]
     pub fn to_mm_ml_parts(&self, forward_seq: &[u8]) -> Option<MmMlParts> {
         use crate::basemods::write::{delta_encode, skip_flag_str};
         use std::collections::BTreeMap;

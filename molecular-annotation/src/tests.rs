@@ -2111,3 +2111,82 @@ fn passthrough_to_record_preserves_mm_ml_byte_identical() {
     assert_eq!(mm_reenc, "C+h,0,0;C+m,0,0;");
     assert_ne!(mm, mm_reenc);
 }
+
+// --- MM/ML codec reachable without htslib (the `mmml` feature) ---------------
+// These mirror the htslib `from_record` parse tests but drive the byte-slice
+// entry points directly, proving the Python-facing path works with no Record.
+
+#[cfg(feature = "mmml")]
+#[test]
+fn mmml_parse_simple_a_plus_a_no_record() {
+    use crate::{Encoding, MolecularAnnotations, SkipFlag, Strand};
+
+    // Same fixture as `parse_simple_a_plus_a`, but via the slice API.
+    // A positions in "ACAGAA": 0, 2, 4, 5. MM "A+a,1,0,0;" -> A at 2, 4, 5.
+    let mut annot = MolecularAnnotations::new(6);
+    annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
+
+    let a = annot.get_type("a").expect("type 'a' present");
+    assert!(matches!(
+        a.encoding,
+        Encoding::MmMl {
+            skip_flag: SkipFlag::Implicit
+        }
+    ));
+    let starts: Vec<u32> = a.annotations.iter().map(|x| x.start).collect();
+    assert_eq!(starts, vec![2, 4, 5]);
+    assert!(a.annotations.iter().all(|x| x.strand == Strand::Forward));
+    let quals: Vec<u8> = a
+        .annotations
+        .iter()
+        .flat_map(|x| x.qualities.iter().copied())
+        .collect();
+    assert_eq!(quals, vec![200, 150, 100]);
+}
+
+#[cfg(feature = "mmml")]
+#[test]
+fn mmml_parse_reverse_group_no_record() {
+    use crate::{MolecularAnnotations, Strand};
+
+    // `T-a` -> reverse-strand annotations. The caller supplies the forward
+    // sequence; parse walks T positions in it.
+    let mut annot = MolecularAnnotations::new(6);
+    annot.parse_mm_ml("T-a,0,0,0;", &[200, 150, 100], b"ATATAT");
+
+    let t = annot.get_type("a").unwrap();
+    assert_eq!(t.annotations.len(), 3);
+    assert!(t.annotations.iter().all(|a| a.strand == Strand::Reverse));
+}
+
+#[cfg(feature = "mmml")]
+#[test]
+fn mmml_roundtrip_single_code_byte_identical() {
+    use crate::MolecularAnnotations;
+
+    // A single-code group survives parse -> emit byte-for-byte (no multi-code
+    // decomposition happens for `A+a`).
+    let mm = "A+a,1,0,0;";
+    let ml = vec![200u8, 150, 100];
+    let seq = b"ACAGAA";
+
+    let mut annot = MolecularAnnotations::new(6);
+    annot.parse_mm_ml(mm, &ml, seq);
+
+    let (mm_out, ml_out) = annot.to_mm_ml(seq).expect("has MM/ML types");
+    assert_eq!(mm_out, mm);
+    assert_eq!(ml_out, ml);
+}
+
+#[cfg(feature = "mmml")]
+#[test]
+fn mmml_parse_is_idempotent() {
+    use crate::MolecularAnnotations;
+
+    // The public `parse_mm_ml` clears existing MM/ML types first, so calling it
+    // twice does not double the annotations.
+    let mut annot = MolecularAnnotations::new(6);
+    annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
+    annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
+    assert_eq!(annot.get_type("a").unwrap().annotations.len(), 3);
+}

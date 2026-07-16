@@ -149,21 +149,22 @@ impl MolecularAnnotations {
     /// must NOT call this: leaving the record's original MM/ML bytes untouched
     /// preserves them byte-identically, including spec-legal encodings the
     /// normalized model cannot represent (e.g. grouped multi-code `C+mh`).
-    #[cfg(feature = "htslib")]
-    pub fn write_mm_ml(&self, record: &mut rust_htslib::bam::Record) {
-        use rust_htslib::bam::record::Aux;
-
-        // --- MM/ML assembly ---
-        let forward_seq: Vec<u8> = if record.is_reverse() {
-            bio::alphabets::dna::revcomp(record.seq().as_bytes())
-        } else {
-            record.seq().as_bytes()
-        };
-
+    /// Assemble the `MmMl`-encoded types into `(MM:Z string, ML:B,C bytes)`.
+    ///
+    /// Returns `None` if there are no MM/ML-encoded types. This is the
+    /// htslib-free canonical re-encode (available under `mmml`), used both by
+    /// [`write_mm_ml`](Self::write_mm_ml) and by the Python bindings.
+    ///
+    /// `forward_seq` must be in original molecular orientation (see
+    /// [`to_mm_ml_parts`](crate::AnnotationType::to_mm_ml_parts)). Groups are
+    /// ordered deterministically by `(skip_base, header)`, and the ML bytes are
+    /// emitted in that same group order.
+    #[cfg(feature = "mmml")]
+    pub fn to_mm_ml(&self, forward_seq: &[u8]) -> Option<(String, Vec<u8>)> {
         // Collect per-type MM parts and pair groups with their ML byte slices.
         let mut all_groups: Vec<(crate::MmGroup, Vec<u8>)> = Vec::new();
         for t in self.annotation_types.iter().filter(|t| t.is_mm_ml()) {
-            if let Some(parts) = t.to_mm_ml_parts(&forward_seq) {
+            if let Some(parts) = t.to_mm_ml_parts(forward_seq) {
                 let mut cursor = 0usize;
                 for g in parts.mm_groups {
                     let n = g.deltas.len();
@@ -173,24 +174,42 @@ impl MolecularAnnotations {
                 }
             }
         }
+
+        if all_groups.is_empty() {
+            return None;
+        }
+
         // Deterministic order: by (skip_base, header).
         all_groups
             .sort_by(|(a, _), (b, _)| a.skip_base.cmp(&b.skip_base).then(a.header.cmp(&b.header)));
 
+        let mut mm_string = String::new();
+        let mut ml_bytes: Vec<u8> = Vec::new();
+        for (group, mls) in all_groups {
+            mm_string.push_str(&group.header);
+            for d in &group.deltas {
+                mm_string.push(',');
+                mm_string.push_str(&d.to_string());
+            }
+            mm_string.push(';');
+            ml_bytes.extend(mls);
+        }
+        Some((mm_string, ml_bytes))
+    }
+
+    #[cfg(feature = "htslib")]
+    pub fn write_mm_ml(&self, record: &mut rust_htslib::bam::Record) {
+        use rust_htslib::bam::record::Aux;
+
+        let forward_seq: Vec<u8> = if record.is_reverse() {
+            bio::alphabets::dna::revcomp(record.seq().as_bytes())
+        } else {
+            record.seq().as_bytes()
+        };
+
         record.remove_aux(b"MM").ok();
         record.remove_aux(b"ML").ok();
-        if !all_groups.is_empty() {
-            let mut mm_string = String::new();
-            let mut ml_bytes: Vec<u8> = Vec::new();
-            for (group, mls) in all_groups {
-                mm_string.push_str(&group.header);
-                for d in &group.deltas {
-                    mm_string.push(',');
-                    mm_string.push_str(&d.to_string());
-                }
-                mm_string.push(';');
-                ml_bytes.extend(mls);
-            }
+        if let Some((mm_string, ml_bytes)) = self.to_mm_ml(&forward_seq) {
             record.push_aux(b"MM", Aux::String(&mm_string)).ok();
             record
                 .push_aux(b"ML", Aux::ArrayU8((&ml_bytes).into()))

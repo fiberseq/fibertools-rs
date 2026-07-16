@@ -559,3 +559,93 @@ class TestRetain:
 
         with pytest.raises(RuntimeError, match="boom"):
             annotations.retain("msp", bad)
+
+
+class TestMmMl:
+    """Tests for MM/ML base-modification decoding (m6A/5mC)."""
+
+    def test_parse_mm_ml_direct(self):
+        """Decode MM/ML from raw slices via the direct API."""
+        annot = MolecularAnnotations(6)
+        # A positions in "ACAGAA": 0,2,4,5. MM "A+a,1,0,0;" -> A at 2,4,5.
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+
+        items = annot.iter_type("a")
+        assert items is not None
+        assert len(items) == 3
+        # tuple: (q_start, q_end, f_start, f_end, r_start, r_end, quals, name)
+        assert [it[2] for it in items] == [2, 4, 5]  # forward starts
+        assert [it[6] for it in items] == [[200], [150], [100]]
+        assert [it[7] for it in items] == ["A", "A", "A"]  # skip base as name
+
+    def test_parse_mm_ml_roundtrip_byte_identical(self):
+        """Single-code group survives parse -> emit byte-for-byte."""
+        annot = MolecularAnnotations(6)
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        mm, ml = annot.to_mm_ml(b"ACAGAA")
+        assert mm == "A+a,1,0,0;"
+        assert ml == [200, 150, 100]
+
+    def test_parse_mm_ml_idempotent(self):
+        """Re-parsing clears prior MM/ML types instead of duplicating."""
+        annot = MolecularAnnotations(6)
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        assert len(annot.iter_type("a")) == 3
+
+    def test_to_mm_ml_none_without_basemods(self):
+        """to_mm_ml returns None when there are no MM/ML types."""
+        annot = MolecularAnnotations(1000)
+        annot.add_annotations("nuc", "+", "", starts=[100], lengths=[147])
+        assert annot.to_mm_ml(b"A" * 1000) is None
+
+    @staticmethod
+    def _make_record(pysam, seq, reverse):
+        header = pysam.AlignmentHeader.from_dict(
+            {"HD": {"VN": "1.0"}, "SQ": [{"SN": "chr1", "LN": 1000000}]}
+        )
+        r = pysam.AlignedSegment(header)
+        r.query_name = "read"
+        r.query_sequence = seq
+        r.flag = 16 if reverse else 0
+        r.reference_id = 0
+        r.reference_start = 100
+        r.cigar = [(0, len(seq))]
+        r.query_qualities = pysam.qualitystring_to_array("I" * len(seq))
+        # MA carries only the read length (no structural annotations here).
+        r.set_tag("MA", str(len(seq)))
+        return r
+
+    def test_from_record_forward(self):
+        pysam = pytest.importorskip("pysam")
+        import array
+
+        record = self._make_record(pysam, "ACAGAA", reverse=False)
+        record.set_tag("MM", "A+a,1,0,0;")
+        record.set_tag("ML", array.array("B", [200, 150, 100]))
+
+        annot = from_record(record)
+        items = annot.iter_type("a")
+        assert items is not None
+        assert [it[2] for it in items] == [2, 4, 5]
+        assert [it[6] for it in items] == [[200], [150], [100]]
+
+    def test_from_record_reverse_uses_forward_orientation(self):
+        """MM is forward-oriented; a reverse record's SEQ must be revcomp'd.
+
+        Forward read "ACAGAA" reverse-maps, so the BAM stores its revcomp
+        "TTCTGT". Decoding must recover the m6A calls at forward positions
+        2,4,5, not walk the stored (BAM-orientation) sequence.
+        """
+        pysam = pytest.importorskip("pysam")
+        import array
+
+        record = self._make_record(pysam, "TTCTGT", reverse=True)
+        record.set_tag("MM", "A+a,1,0,0;")
+        record.set_tag("ML", array.array("B", [200, 150, 100]))
+
+        annot = from_record(record)
+        items = annot.iter_type("a")
+        assert items is not None
+        assert len(items) == 3
+        assert [it[2] for it in items] == [2, 4, 5]  # forward (molecular) starts

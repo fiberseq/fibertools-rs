@@ -15,13 +15,62 @@ if TYPE_CHECKING:
 __all__ = ["from_record", "to_record", "write_to_record"]
 
 
+_COMPLEMENT = bytes.maketrans(b"ACGTNacgtn", b"TGCANtgcan")
+
+
+def _revcomp(seq: bytes) -> bytes:
+    """Reverse-complement an ASCII nucleotide byte string."""
+    return seq.translate(_COMPLEMENT)[::-1]
+
+
+def _get_tag_any(record: "pysam.AlignedSegment", *names: str):
+    """Return the first present tag among `names`, or None.
+
+    MM/ML are written as "MM"/"ML" per the current SAM spec, but older files
+    use the lowercase "Mm"/"Ml"; accept either.
+    """
+    for name in names:
+        try:
+            return record.get_tag(name)
+        except KeyError:
+            continue
+    return None
+
+
+def _parse_mm_ml_into(
+    annot: MolecularAnnotations, record: "pysam.AlignedSegment", is_reverse: bool
+) -> None:
+    """Decode the record's MM/ML tags into `annot` (no-op if MM is absent).
+
+    MM is delta-skip encoded against the read in its original (forward)
+    molecular orientation, so a reverse-aligned record's stored sequence is
+    reverse-complemented before decoding. One annotation type is created per
+    mod code ("a" = m6A, "m" = 5mC, etc.).
+    """
+    mm = _get_tag_any(record, "MM", "Mm")
+    if not mm:
+        return
+    ml = _get_tag_any(record, "ML", "Ml")
+    ml = list(ml) if ml is not None else []
+
+    seq = record.query_sequence
+    if seq is None:
+        return  # nothing to delta-decode against
+    forward_seq = seq.encode("ascii")
+    if is_reverse:
+        forward_seq = _revcomp(forward_seq)
+
+    annot.parse_mm_ml(mm, ml, forward_seq)
+
+
 def from_record(
     record: "pysam.AlignedSegment", parse_tags: bool = True
 ) -> MolecularAnnotations:
     """Read molecular annotations from a pysam AlignedSegment record.
 
     Extracts alignment information (aligned blocks, strand) and optionally
-    parses MA/AQ/AN tags.
+    parses MA/AQ/AN tags (structural annotations) and MM/ML tags (base
+    modifications such as m6A and 5mC).
 
     All coordinates are 0-based half-open [start, end).
 
@@ -57,6 +106,9 @@ def from_record(
 
         annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse
+
+        # Base modifications (m6A/5mC/…) live in MM/ML, not the MA tag set.
+        _parse_mm_ml_into(annot, record, is_reverse)
     else:
         # Create empty annotations with just read length
         annot = MolecularAnnotations(record.query_length)
