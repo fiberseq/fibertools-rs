@@ -1,0 +1,77 @@
+name: release-plz
+
+# Rust-native release automation (replaces release-please).
+#
+# release-plz versions each crate independently on its own commits, updates the
+# internal dependency pin, publishes to crates.io itself, pushes tags, and cuts
+# GitHub releases. The only cross-workflow hop — firing cargo-dist to build the
+# fibertools-rs binaries — uses workflow_dispatch, which the default
+# GITHUB_TOKEN is allowed to trigger, so no PAT is required.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # Open/update the release PR (version bumps + changelog + pin updates).
+  release-plz-pr:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # release-plz needs full git history
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # On merge of the release PR: publish unpublished crates to crates.io
+  # (dependency-ordered), push tags, cut releases; then fire cargo-dist for
+  # fibertools-rs.
+  release-plz-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write     # crates.io Trusted Publishing (OIDC)
+      actions: write      # dispatch cargo-dist (release.yml)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Authenticate to crates.io (Trusted Publishing)
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: release-plz release
+        id: release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      # Build binaries + installer for fibertools-rs, attach to its DRAFT
+      # release, and un-draft it. Only runs when fibertools-rs was released.
+      - name: Dispatch cargo-dist for fibertools-rs
+        if: ${{ steps.release-plz.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES: ${{ steps.release-plz.outputs.releases }}
+        run: |
+          tag=$(echo "$RELEASES" | jq -r '.[] | select(.package_name=="fibertools-rs") | .tag')
+          if [ -n "$tag" ] && [ "$tag" != "null" ]; then
+            echo "Dispatching cargo-dist for $tag"
+            gh workflow run release.yml --ref main -f tag="$tag"
+          else
+            echo "fibertools-rs not in this release; skipping cargo-dist"
+          fi

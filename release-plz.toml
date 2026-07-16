@@ -1,0 +1,23 @@
+# release-plz configuration.
+#
+# Independent per-crate versioning is release-plz's default (it is NOT lockstep,
+# unlike release-please's rust strategy that broke us). Each crate bumps on its
+# own commits, and release-plz updates the internal [workspace.dependencies] pin
+# automatically when molecular-annotation changes.
+
+[[package]]
+name = "fibertools-rs"
+git_tag_name = "v{{ version }}"          # keep v0.X.Y (matches existing tags + cargo-dist)
+git_release_draft = true                 # draft so cargo-dist attaches binaries, then un-drafts
+features_always_increment_minor = true   # feat -> minor even on 0.x
+
+[[package]]
+name = "molecular-annotation"
+git_tag_name = "molecular-annotation-v{{ version }}"
+# git_release_draft defaults false -> MA release is published immediately
+#   (it ships no binaries, so nothing would un-draft it).
+# features_always_increment_minor defaults false -> keeps MA low (feat -> patch).
+
+# semver_check is left off for now: it needs cargo-semver-checks installed in CI,
+# and conventional-commit bumping is sufficient. To enable later, add a
+# cargo-semver-checks install step to the workflow and set `semver_check = true`.

@@ -1,6 +1,3 @@
-# Test data (large files)
-test-data/**
-
 # Rust
 **/target/
 Cargo.lock
