@@ -9,8 +9,11 @@ pub struct FireOptions {
     /// Output file (BAM by default, table of MSP features if `--feats-to-text` is used, and bed9 + if `--extract`` is used)
     #[clap(default_value = "-")]
     pub out: String,
-    /// Use a ONT heuristic adjustment for FIRE calling.
+    /// Force the ONT heuristic adjustment for every read in FIRE calling.
     /// This adjusts the observed number of m6A counts by adding pseudo counts to account for the single stranded nature of ONT data.
+    /// ONT reads are auto-detected per read (via aux tags / read name), so this
+    /// flag is only needed to override detection; reads matching no known
+    /// platform convention default to PacBio.
     #[clap(long, env)]
     pub ont: bool,
     /// Use a human model for FIRE calling

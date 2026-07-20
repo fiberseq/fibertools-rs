@@ -8,5 +8,6 @@ pub mod input_bam;
 pub mod ma_io;
 pub mod nucleosome;
 pub mod panspec;
+pub mod platform;
 // test modules for expressions
 pub mod ftexpression;

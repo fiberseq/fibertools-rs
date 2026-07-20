@@ -183,6 +183,12 @@ impl FiberseqData {
         }
     }
 
+    /// Detect the sequencing platform (PacBio vs ONT) for this read from its
+    /// aux tags, falling back to the read name if those were stripped.
+    pub fn platform(&self) -> crate::utils::platform::SeqPlatform {
+        crate::utils::platform::platform_from_record(&self.record)
+    }
+
     pub fn get_hp(&self) -> String {
         match self.record.aux(b"HP") {
             Ok(Aux::U8(v)) => format!("H{v}"),
