@@ -1,6 +1,6 @@
 # molecular-annotation
 
-> Specification: see [`spec/README.md`](spec/README.md) for the MolecularAnnotation tag format.
+> Specification: see [here](https://github.com/fiberseq/Molecular-annotation-spec) for the MolecularAnnotation tag format.
 
 A Rust library for reading and writing Molecular Annotation (MA) tags in SAM/BAM/CRAM files.
 

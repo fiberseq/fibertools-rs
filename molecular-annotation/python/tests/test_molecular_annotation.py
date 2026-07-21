@@ -1,12 +1,20 @@
 """Tests for the molecular_annotation Python bindings."""
 
+from pathlib import Path
+
 import pytest
 from molecular_annotation import (
     Annotation,
     MolecularAnnotations,
     from_record,
+    to_record,
     write_to_record,
 )
+
+# Reuse the fibertools-rs repo fixture rather than duplicating a BAM. When the
+# molecular-annotation package is built/tested outside that repo, the file is
+# absent and these tests skip (see the skipif on TestRealFixtures).
+_FIBERSEQ_BAM = Path(__file__).parents[3] / "tests" / "data" / "all.bam"
 
 
 class TestMolecularAnnotations:
@@ -559,3 +567,209 @@ class TestRetain:
 
         with pytest.raises(RuntimeError, match="boom"):
             annotations.retain("msp", bad)
+
+
+class TestMmMl:
+    """Tests for MM/ML base-modification decoding (m6A/5mC)."""
+
+    def test_parse_mm_ml_direct(self):
+        """Decode MM/ML from raw slices via the direct API."""
+        annot = MolecularAnnotations(6)
+        # A positions in "ACAGAA": 0,2,4,5. MM "A+a,1,0,0;" -> A at 2,4,5.
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+
+        items = annot.iter_type("a")
+        assert items is not None
+        assert len(items) == 3
+        # tuple: (q_start, q_end, f_start, f_end, r_start, r_end, quals, name)
+        assert [it[2] for it in items] == [2, 4, 5]  # forward starts
+        assert [it[6] for it in items] == [[200], [150], [100]]
+        assert [it[7] for it in items] == ["A", "A", "A"]  # skip base as name
+
+    def test_parse_mm_ml_roundtrip_byte_identical(self):
+        """Single-code group survives parse -> emit byte-for-byte."""
+        annot = MolecularAnnotations(6)
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        mm, ml = annot.to_mm_ml(b"ACAGAA")
+        assert mm == "A+a,1,0,0;"
+        assert ml == [200, 150, 100]
+
+    def test_parse_mm_ml_idempotent(self):
+        """Re-parsing clears prior MM/ML types instead of duplicating."""
+        annot = MolecularAnnotations(6)
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        annot.parse_mm_ml("A+a,1,0,0;", [200, 150, 100], b"ACAGAA")
+        assert len(annot.iter_type("a")) == 3
+
+    def test_to_mm_ml_none_without_basemods(self):
+        """to_mm_ml returns None when there are no MM/ML types."""
+        annot = MolecularAnnotations(1000)
+        annot.add_annotations("nuc", "+", "", starts=[100], lengths=[147])
+        assert annot.to_mm_ml(b"A" * 1000) is None
+
+    @staticmethod
+    def _make_record(pysam, seq, reverse):
+        header = pysam.AlignmentHeader.from_dict(
+            {"HD": {"VN": "1.0"}, "SQ": [{"SN": "chr1", "LN": 1000000}]}
+        )
+        r = pysam.AlignedSegment(header)
+        r.query_name = "read"
+        r.query_sequence = seq
+        r.flag = 16 if reverse else 0
+        r.reference_id = 0
+        r.reference_start = 100
+        r.cigar = [(0, len(seq))]
+        r.query_qualities = pysam.qualitystring_to_array("I" * len(seq))
+        # MA carries only the read length (no structural annotations here).
+        r.set_tag("MA", str(len(seq)))
+        return r
+
+    def test_from_record_forward(self):
+        pysam = pytest.importorskip("pysam")
+        import array
+
+        record = self._make_record(pysam, "ACAGAA", reverse=False)
+        record.set_tag("MM", "A+a,1,0,0;")
+        record.set_tag("ML", array.array("B", [200, 150, 100]))
+
+        annot = from_record(record)
+        items = annot.iter_type("a")
+        assert items is not None
+        assert [it[2] for it in items] == [2, 4, 5]
+        assert [it[6] for it in items] == [[200], [150], [100]]
+
+    def test_from_record_reverse_uses_forward_orientation(self):
+        """MM is forward-oriented; a reverse record's SEQ must be revcomp'd.
+
+        Forward read "ACAGAA" reverse-maps, so the BAM stores its revcomp
+        "TTCTGT". Decoding must recover the m6A calls at forward positions
+        2,4,5, not walk the stored (BAM-orientation) sequence.
+        """
+        pysam = pytest.importorskip("pysam")
+        import array
+
+        record = self._make_record(pysam, "TTCTGT", reverse=True)
+        record.set_tag("MM", "A+a,1,0,0;")
+        record.set_tag("ML", array.array("B", [200, 150, 100]))
+
+        annot = from_record(record)
+        items = annot.iter_type("a")
+        assert items is not None
+        assert len(items) == 3
+        assert [it[2] for it in items] == [2, 4, 5]  # forward (molecular) starts
+
+
+@pytest.mark.skipif(
+    not _FIBERSEQ_BAM.exists(),
+    reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
+)
+class TestRealFixtures:
+    """End-to-end tests against a real fiber-seq BAM (fibertools-rs all.bam).
+
+    PacBio HiFi reads carrying nuc/msp structural annotations (MA tag) and
+    m6A/5mC base modifications (MM/ML). Known counts below are for the first
+    record, m54329U_210323_190418/5048829/ccs (reverse-aligned, 15524 bp).
+    """
+
+    def _open(self):
+        pysam = pytest.importorskip("pysam")
+        return pysam.AlignmentFile(str(_FIBERSEQ_BAM), "rb")
+
+    def test_record_count(self):
+        with self._open() as bam:
+            assert sum(1 for _ in bam) == 22
+
+    def test_first_record_known_counts(self):
+        with self._open() as bam:
+            rec = next(iter(bam))
+            annot = from_record(rec)
+
+        assert annot.read_length == 15524
+        assert set(annot.annotation_type_names()) == {"nuc", "msp", "a", "m"}
+        assert len(annot.iter_type("nuc")) == 76
+        assert len(annot.iter_type("msp")) == 77
+        assert len(annot.iter_type("a")) == 1541  # m6A, from MM/ML
+        assert len(annot.iter_type("m")) == 135  # 5mC, from MM/ML
+
+    def test_basemod_positions_within_read(self):
+        with self._open() as bam:
+            rec = next(iter(bam))
+            read_len = rec.query_length
+            annot = from_record(rec)
+
+        # iter_type tuple: (q_start, q_end, f_start, f_end, r_start, r_end, quals, name)
+        for q_start, _q_end, f_start, _f_end, _rs, _re, quals, name in annot.iter_type("a"):
+            assert 0 <= f_start < read_len
+            # m6A occurs on both strands: skip base is A (forward) or T (reverse).
+            assert name in ("A", "T")
+            assert quals and 0 <= quals[0] <= 255  # ML probability byte
+
+    def test_reference_coords_present_for_mapped_read(self):
+        # A mapped read lifts query -> reference; msp calls inside aligned
+        # blocks get reference coordinates.
+        with self._open() as bam:
+            rec = next(iter(bam))
+            annot = from_record(rec)
+
+        ref_starts = [item[4] for item in annot.iter_type("msp")]
+        assert any(rs is not None for rs in ref_starts)
+
+    def test_write_ma_roundtrip_via_pysam(self, tmp_path):
+        """Rewrite MA tags from parsed annotations, write a BAM, read it back."""
+        pysam = pytest.importorskip("pysam")
+        out = tmp_path / "rewritten.bam"
+
+        with self._open() as bam:
+            header = bam.header
+            rec = next(iter(bam))
+            annot = from_record(rec)
+            ma_before = annot.to_ma_string()
+            # Rewrite MA/AQ/AN from our annotations; MM/ML is left untouched.
+            to_record(annot, rec)
+            with pysam.AlignmentFile(str(out), "wb", header=header) as writer:
+                writer.write(rec)
+
+        with pysam.AlignmentFile(str(out), "rb") as bam2:
+            rec2 = next(iter(bam2))
+            annot2 = from_record(rec2)
+
+        # Structural (MA) annotations round-trip exactly...
+        assert annot2.to_ma_string() == ma_before
+        assert len(annot2.iter_type("nuc")) == 76
+        # ...and the base mods survived the write untouched (MM/ML passthrough).
+        assert len(annot2.iter_type("a")) == 1541
+
+    def test_add_annotation_then_write(self, tmp_path):
+        """Add a new annotation to a parsed record, write it, and read it back."""
+        pysam = pytest.importorskip("pysam")
+        out = tmp_path / "augmented.bam"
+
+        with self._open() as bam:
+            header = bam.header
+            rec = next(iter(bam))
+            annot = from_record(rec)
+            nuc_before = len(annot.iter_type("nuc"))
+            assert "fire" not in annot.annotation_type_names()
+
+            # Add a new structural annotation (0-based molecular coordinates).
+            annot.add_annotations(
+                "fire", ".", "Q", starts=[1000], lengths=[200], qualities=[250]
+            )
+            to_record(annot, rec)
+            with pysam.AlignmentFile(str(out), "wb", header=header) as writer:
+                writer.write(rec)
+
+        with pysam.AlignmentFile(str(out), "rb") as bam2:
+            rec2 = next(iter(bam2))
+            annot2 = from_record(rec2)
+
+        # The added type survived the write with the right coords and quality...
+        fire = annot2.iter_type("fire")
+        assert fire is not None and len(fire) == 1
+        _qs, _qe, f_start, f_end, _rs, _re, quals, _name = fire[0]
+        assert (f_start, f_end) == (1000, 1200)
+        assert quals == [250]
+        # ...the untouched originals are unchanged...
+        assert len(annot2.iter_type("nuc")) == nuc_before
+        # ...and the MM/ML base mods are still intact.
+        assert len(annot2.iter_type("a")) == 1541

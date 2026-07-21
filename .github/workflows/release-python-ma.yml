@@ -1,0 +1,77 @@
+# Build and publish the molecular-annotation Python bindings (pyMA) to PyPI.
+#
+# Triggered by a tag like `molecular-annotation-py-v0.1.0` (distinct from the
+# Rust crate's `molecular-annotation-v*` tag). pyMA is a compiled maturin
+# package, so it needs a per-platform wheel matrix. Bump the version in
+# molecular-annotation/python/pyproject.toml + Cargo.toml, then push the tag.
+name: release pyMA
+on:
+  push:
+    tags: ["molecular-annotation-py-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: molecular-annotation/python
+
+jobs:
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64 }
+          - { os: ubuntu-latest, target: aarch64 }
+          - { os: macos-latest, target: x86_64 }
+          - { os: macos-latest, target: aarch64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: molecular-annotation/python
+          target: ${{ matrix.target }}
+          args: --release --out dist --find-interpreter
+          manylinux: auto
+          sccache: "true"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: molecular-annotation/python/dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: molecular-annotation/python
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: molecular-annotation/python/dist
+
+  publish:
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    # PyPI trusted publishing (OIDC) -- no API token. Requires a matching
+    # trusted publisher on PyPI for project `molecular-annotation`
+    # (owner/repo fiberseq/fibertools-rs, workflow release-python-ma.yml, no
+    # environment).
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

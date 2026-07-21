@@ -60,8 +60,52 @@ impl MolecularAnnotations {
         annot.aligned_blocks = Some(crate::AlignedBlocks::from_record(record));
         annot.is_reverse_aligned = record.is_reverse();
 
-        crate::basemods::parse::parse_into(&mut annot, record);
+        // Extract MM/ML and the forward-oriented sequence off the record, then
+        // hand the raw slices to the htslib-free parser. MM is always written
+        // in original (forward) molecular orientation, so reverse-aligned reads
+        // must be revcomp-ed first.
+        let mm_text: String = match record.aux(b"MM") {
+            Ok(Aux::String(s)) => s.to_string(),
+            _ => String::new(),
+        };
+        if !mm_text.is_empty() {
+            let ml_tag: Vec<u8> = match record.aux(b"ML") {
+                Ok(Aux::ArrayU8(arr)) => arr.iter().collect(),
+                _ => {
+                    log::warn!(
+                        "MM/ML parser: MM tag present but ML missing or wrong type for {}",
+                        String::from_utf8_lossy(record.qname())
+                    );
+                    Vec::new()
+                }
+            };
+            let forward_seq: Vec<u8> = if record.is_reverse() {
+                bio::alphabets::dna::revcomp(record.seq().as_bytes())
+            } else {
+                record.seq().as_bytes()
+            };
+            crate::basemods::parse::parse_mm_ml_into(&mut annot, &mm_text, &ml_tag, &forward_seq);
+        }
         annot
+    }
+
+    /// Parse MM/ML base modifications into this container from raw tag slices.
+    ///
+    /// This is the htslib-free entry point (available under the `mmml` feature)
+    /// used by non-rust-htslib consumers such as the Python bindings, which
+    /// supply the MM string, ML bytes, and forward sequence via pysam.
+    ///
+    /// * `mm` — the MM:Z tag value.
+    /// * `ml` — the ML:B,C bytes (may be empty).
+    /// * `forward_seq` — the read sequence in original molecular orientation
+    ///   (callers holding a reverse-aligned record must revcomp first).
+    ///
+    /// Pre-existing MM/ML-encoded types are cleared first so the call is
+    /// idempotent; `Encoding::Ma` (MA-tag) types are left untouched.
+    #[cfg(feature = "mmml")]
+    pub fn parse_mm_ml(&mut self, mm: &str, ml: &[u8], forward_seq: &[u8]) {
+        self.annotation_types.retain(|t| !t.is_mm_ml());
+        crate::basemods::parse::parse_mm_ml_into(self, mm, ml, forward_seq);
     }
 
     /// Parse from tag values.
