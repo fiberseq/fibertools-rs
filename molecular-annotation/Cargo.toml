@@ -1,6 +1,6 @@
 [package]
 name = "molecular-annotation"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "Library for molecular annotations in SAM/BAM files"
 license = "MIT"
