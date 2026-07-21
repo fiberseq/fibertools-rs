@@ -8,16 +8,14 @@ sphinx:
 
 build:
   os: "ubuntu-22.04"
-  apt_packages:
-    - cmake
   tools:
     python: "3.10"
-    rust: "latest"
 
+# py-ft is now a pure-Python package (pysam + molecular-annotation), so the docs
+# build no longer needs Rust/cmake. Installing the package pulls its runtime
+# deps from PyPI so autodoc can import pyft.
 python:
   install:
     - requirements: py-ft/docs/requirements.txt
     - method: pip
       path: ./py-ft
-#conda:
-#    environment: py-ft/docs/environment.yml

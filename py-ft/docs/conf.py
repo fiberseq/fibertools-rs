@@ -6,10 +6,9 @@ import os
 import re
 import sys
 
-# import sphinx
-# import sphinx.ext.autosummary as autosummary
-# sys.path.insert(0, os.path.abspath("../"))
-sys.path.insert(0, os.path.abspath("../python/pyft"))
+# Put the package source on the path so autodoc can import `pyft` even when the
+# package isn't pip-installed (Read the Docs installs it; local builds may not).
+sys.path.insert(0, os.path.abspath("../python"))
 import pyft
 
 # -- Project information -----------------------------------------------------
@@ -27,16 +26,13 @@ release = pyft.__version__
 
 extensions = [
     "sphinx.ext.autodoc",
-    # "sphinx_autodoc_typehints",
+    "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
-    # "sphinx.ext.napoleon",
     "sphinx_rtd_theme",
     "sphinx.ext.intersphinx",
-    # "edit_on_github",
-    "nbsphinx",
 ]
 
-source_suffix = [".rst", ".py"]
+source_suffix = [".rst"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
