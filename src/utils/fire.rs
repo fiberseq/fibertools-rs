@@ -1,6 +1,7 @@
 use crate::cli::FireOptions;
 use crate::fiber::FiberseqData;
 use crate::utils::bamannotations::AnnotationTypeView;
+use crate::utils::platform::SeqPlatform;
 use crate::*;
 use anyhow;
 use derive_builder::Builder;
@@ -172,6 +173,9 @@ pub struct FireFeats<'a> {
     frac_m6a: f32,
     //frac_m6a_in_msps: f32,
     fire_opts: &'a FireOptions,
+    /// Whether the ONT single-strand heuristic applies to this read. Set from
+    /// `--ont` (forces it for all reads) or per-read platform detection.
+    is_ont: bool,
     seq: Vec<u8>,
     fire_feats: Vec<(i64, i64, Vec<f32>)>,
 }
@@ -180,6 +184,11 @@ impl<'a> FireFeats<'a> {
     pub fn new(rec: &'a FiberseqData, fire_opts: &'a FireOptions) -> Self {
         let seq_len = rec.record.seq_len();
         let seq = rec.record.seq().as_bytes();
+
+        // Apply the ONT single-strand m6A heuristic when the user forces it
+        // (`--ont`) or when this read is detected as ONT. Reads matching no
+        // known platform convention default to PacBio (no heuristic).
+        let is_ont = fire_opts.ont || matches!(rec.platform(), SeqPlatform::Ont);
 
         let mut rtn = Self {
             rec,
@@ -190,6 +199,7 @@ impl<'a> FireFeats<'a> {
             frac_m6a: 0.0,
             //frac_m6a_in_msps,
             fire_opts,
+            is_ont,
             seq,
             fire_feats: vec![],
         };
@@ -204,7 +214,7 @@ impl<'a> FireFeats<'a> {
         };
 
         rtn.get_fire_features();
-        if rtn.fire_opts.ont {
+        if rtn.is_ont {
             rtn.validate_that_ont_is_single_strand();
         }
         rtn
@@ -246,7 +256,7 @@ impl<'a> FireFeats<'a> {
         let mut m6a_count = self.m6a_view.count_query_in(start, end);
 
         // estimate what the count would be if we sequenced the other strand
-        if self.fire_opts.ont {
+        if self.is_ont {
             let mut sequenced_bp = self.get_bp_count(start, end, b'A');
             let mut un_sequenced_bp = self.get_bp_count(start, end, b'T');
             if self.rec.record.is_reverse() {
@@ -318,7 +328,7 @@ impl<'a> FireFeats<'a> {
         if msp_len < self.fire_opts.min_msp_length_for_positive_fire_call {
             return vec![];
         }
-        let ccs_passes = if self.fire_opts.ont { 4.0 } else { self.rec.ec };
+        let ccs_passes = if self.is_ont { 4.0 } else { self.rec.ec };
 
         // find the 100bp window within the range with the most m6a
         let mut max_m6a_count = 0;
