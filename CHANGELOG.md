@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0](https://github.com/fiberseq/fibertools-rs/compare/v0.11.0...v0.12.0) - 2026-07-21
+
+### Added
+
+- sync MA python with Rust ([#118](https://github.com/fiberseq/fibertools-rs/pull/118))
+
 ## [0.11.0](https://github.com/fiberseq/fibertools-rs/compare/v0.10.1...v0.11.0) - 2026-07-21
 
 ### Added
