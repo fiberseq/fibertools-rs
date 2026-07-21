@@ -329,45 +329,23 @@ def _add_fiber_to_data_dict(
     data_dict["qual"].append(fiber.cpg.ml)
 
 
-def region_to_centered_df(
-    fiberbam, region, strand="+", max_flank=None, min_basemod_qual=125
-):
-    """
-    Takes a fiberbam and a region and returns a pandas dataframe with reference centered positions
-    """
-    data_dict = empty_data_dict()
-    for fiber in fiberbam.center(
-        region[0], start=region[1], end=region[2], strand=strand
-    ):
-        _add_fiber_to_data_dict(fiber, data_dict)
-    df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
-    df["centering_position"] = region[1]
-    if strand == "-":
-        df["centering_position"] = region[2] - 1
-    df["centering_strand"] = strand
-
-    # trim the dataframe to only include fibers that overlap
-    if max_flank is not None:
-        df = df[(df.start < +max_flank) & (df.end > -max_flank)]
-
-    is_basemod = df.type.isin(["m6a", "5mC"])
-    df = df[~(is_basemod & (df.qual < min_basemod_qual))]
-    return df
+# NOTE: region_to_centered_df / region_to_df built their dataframes from the
+# now-removed Rust `Fiberbam`. They are stubbed while py-ft is ported to the
+# pysam + molecular_annotation backend; the replacements will loop over
+# `pyft.fetch(bam_path, region)` and `Fiberdata` accessors (see project notes).
 
 
-def region_to_df(fiberbam, region, min_basemod_qual=125):
-    """
-    Takes a fiberbam and a region and returns a pandas dataframe with fibers
-    that overlap the region
-    """
-    data_dict = empty_data_dict()
-    for fiber in fiberbam.fetch(
-        region[0],
-        start=region[1],
-        end=region[2],
-    ):
-        _add_fiber_to_data_dict(fiber, data_dict)
-    df = pd.DataFrame.from_dict(data_dict).explode(WIDE_COLUMNS)
-    is_basemod = df.type.isin(["m6a", "5mC"])
-    df = df[~(is_basemod & (df.qual < min_basemod_qual))]
-    return df
+def region_to_centered_df(bam_path, region, strand="+", max_flank=None, min_basemod_qual=125):
+    """Reference-centered dataframe for a region (not yet ported)."""
+    raise NotImplementedError(
+        "region_to_centered_df is being ported to the pysam + molecular_annotation "
+        "backend; use pyft.fetch() for now."
+    )
+
+
+def region_to_df(bam_path, region, min_basemod_qual=125):
+    """Per-fiber dataframe for a region (not yet ported)."""
+    raise NotImplementedError(
+        "region_to_df is being ported to the pysam + molecular_annotation "
+        "backend; use pyft.fetch() for now."
+    )

@@ -1,8 +1,10 @@
-# this imports all the rust functions
-from .pyft import *
-from . import utils
-from . import plot
+"""pyft: an inspection and visualization toolkit for fiber-seq BAMs.
 
-__doc__ = pyft.__doc__
-if hasattr(pyft, "__all__"):
-    __all__ = pyft.__all__
+Reads fiber-seq annotations (nuc/msp/fire and m6A/5mC base mods) via pysam and
+the molecular_annotation library. The plotting helpers live in `pyft.plot` and
+`pyft.utils` and are imported on demand (they pull in pandas/altair).
+"""
+
+from .fiberdata import Feature, Fiberdata, fetch
+
+__all__ = ["Feature", "Fiberdata", "fetch"]
