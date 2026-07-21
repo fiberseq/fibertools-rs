@@ -1,31 +1,72 @@
 [build-system]
-build-backend = "maturin"
-requires = ["maturin>=1.1,<2.0"]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
-dynamic = ["version"]
-classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
 name = "pyft"
-requires-python = ">=3.7"
+version = "0.4.0"
+description = "Inspection and visualization toolkit for fiber-seq BAMs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["bioinformatics", "genomics", "fiber-seq", "BAM", "pysam"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
 dependencies = [
+    "pysam>=0.20",
+    "molecular-annotation>=0.1",
+]
+
+[project.optional-dependencies]
+# Plotting layer (pyft.plot / pyft.utils, the fiberplot CLI). Kept optional so
+# the inspection API stays a light install.
+viz = [
     "pandas>=2.0",
     "altair==5.5",
     "vegafusion[embed]",
-    "tqdm",
-    "typing-extensions",
     "polars>=1.0,<2.0",
+    "tqdm",
 ]
+dev = ["pytest>=7"]
 
 [project.scripts]
 fiberplot = "pyft.fiberplot:main"
 
-[tool.maturin]
-features = ["pyo3/extension-module"]
-python-source = "python"
+[tool.hatch.build.targets.wheel]
+packages = ["python/pyft"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# nothing extra; tests are excluded from the wheel by default
+
+[tool.pytest.ini_options]
+testpaths = ["python/pyft/tests"]
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+
+# ---------------------------------------------------------------------------
+# Pixi dev environment (https://pixi.sh). Run from `py-ft/`:
+#   pixi run test
+# molecular-annotation is built editable from the sibling crate so py-ft always
+# tests against the local pyMA (mirrors the Rust path dependency).
+# ---------------------------------------------------------------------------
+[tool.pixi.workspace]
+name = "pyft"
+channels = ["conda-forge", "bioconda"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10,<3.13"
+pip = "*"
+pytest = ">=7"
+pysam = ">=0.20"
+
+[tool.pixi.pypi-dependencies]
+pyft = { path = ".", editable = true }
+molecular-annotation = { path = "../molecular-annotation/python", editable = true }
+
+[tool.pixi.tasks]
+test = "pytest python/pyft/tests -v"

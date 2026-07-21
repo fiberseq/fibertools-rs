@@ -1,16 +1,11 @@
-
 API Reference
-=================
+=============
 
-.. automodule:: pyft
+``pyft.fiberdata``
+------------------
+
+.. automodule:: pyft.fiberdata
    :members:
    :undoc-members:
    :show-inheritance:
    :member-order: bysource
-
-.. automodule:: utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :member-order: bysource
-
