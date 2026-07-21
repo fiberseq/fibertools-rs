@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0](https://github.com/fiberseq/fibertools-rs/compare/v0.10.1...v0.11.0) - 2026-07-21
+
+### Added
+
+- auto-detect sequencing platform per read in FIRE ([#116](https://github.com/fiberseq/fibertools-rs/pull/116))
+
+### Other
+
+- add install (curl) section to fibertools-rs release notes
+- drop invalid protect_breaking_commits field from release-plz config
+- only cut a release for feat/fix commits
+- update docs on releases
+
 ## [0.10.1](https://github.com/fiberseq/fibertools-rs/compare/v0.10.0...v0.10.1) (2026-07-15)
 
 
