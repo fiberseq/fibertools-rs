@@ -88,17 +88,14 @@ def create_fiberplot(
     if output_file is None:
         output_file = "fiberplot.html"
 
-    # Load the BAM file
-    print(f"Loading BAM file: {bam_file}", file=sys.stderr)
-    fiberbam = pyft.Fiberbam(str(bam_file))
-
-    # Fetch and convert to dataframe
+    # Fetch and convert to dataframe. NOTE: region_to_* are being ported to the
+    # pysam + molecular_annotation backend and currently raise NotImplementedError.
     print(f"Fetching region: {region[0]}:{region[1]}-{region[2]}", file=sys.stderr)
 
     if centered:
         print(f"Creating centered plot (strand={strand})", file=sys.stderr)
         df = utils.region_to_centered_df(
-            fiberbam,
+            bam_file,
             region,
             strand=strand,
             max_flank=max_flank,
@@ -107,7 +104,7 @@ def create_fiberplot(
         chart = plot.centered_chart(df, width=width, height=height)
     else:
         print("Creating region plot", file=sys.stderr)
-        df = utils.region_to_df(fiberbam, region, min_basemod_qual=min_basemod_qual)
+        df = utils.region_to_df(bam_file, region, min_basemod_qual=min_basemod_qual)
         # Add centering columns required by centered_chart
         df["centering_position"] = region[1]
         df["centering_strand"] = strand
