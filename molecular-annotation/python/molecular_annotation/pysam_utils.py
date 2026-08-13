@@ -206,8 +206,9 @@ def _extract_aligned_blocks(
 def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment") -> None:
     """Write molecular annotations to a pysam AlignedSegment record.
 
-    Sets MA:Z tag, and optionally AQ:B:C and AN:Z tags depending
-    on whether quality/names are present.
+    Sets the Ma:Z tag, and optionally Aq:B:C and An:Z tags depending
+    on whether quality/names are present (both spellings are removed
+    first; see samtools/hts-specs#862 for the canonical spelling).
 
     This is the inverse of `from_record()`.
 
