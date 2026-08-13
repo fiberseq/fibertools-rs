@@ -129,11 +129,12 @@ mod serialize;
 #[cfg(feature = "mmml")]
 mod basemods;
 
+#[cfg(feature = "htslib")]
+pub use decode::ma_family_aux;
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
-    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaParts,
-    MmGroup, MmMlParts, ParseError, ProjectedAnnotation, QualityScaling, QualitySpec, SkipFlag,
-    Strand,
+    Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaParts, MmGroup,
+    MmMlParts, ParseError, ProjectedAnnotation, QualityScaling, QualitySpec, SkipFlag, Strand,
 };
 
 // `parse_type_info` lives in `decode` but is exercised by the test module via

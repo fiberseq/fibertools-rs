@@ -1137,11 +1137,8 @@ fn test_from_tags_merges_strand_split_sections_into_one_type() {
 
 #[test]
 fn test_from_tags_conflicting_quality_spec_for_same_name_errors() {
-    let result = MolecularAnnotations::from_tags(
-        "1000;msp+P:100-50;msp+Q:200-60",
-        Some(&[40, 35]),
-        None,
-    );
+    let result =
+        MolecularAnnotations::from_tags("1000;msp+P:100-50;msp+Q:200-60", Some(&[40, 35]), None);
     assert!(
         matches!(result, Err(ParseError::ConflictingAnnotationType { .. })),
         "from_tags must reject conflicting quality_spec for the same name; got {:?}",
@@ -1155,8 +1152,7 @@ fn test_round_trip_strand_split_preserves_on_disk_form() {
     // the same in-memory state, and the serialized form must match the
     // canonical on-disk shape.
     let original = "10;ctcf+Q:1-4;ctcf-Q:6-3";
-    let annotations =
-        MolecularAnnotations::from_tags(original, Some(&[200, 180]), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(original, Some(&[200, 180]), None).unwrap();
     let (ma, aq, _an) = annotations.to_tags();
     assert_eq!(ma, original);
     assert_eq!(aq, Some(vec![200, 180]));
@@ -2189,4 +2185,43 @@ fn mmml_parse_is_idempotent() {
     annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
     annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
     assert_eq!(annot.get_type("a").unwrap().annotations.len(), 3);
+}
+
+// The reader accepts both the canonical uppercase MA-family spellings and
+// the SAM local-use `Ma`/`Aq`/`An` variants; canonical wins when both are
+// present, and a rewrite removes both spellings before emitting canonical.
+#[cfg(feature = "htslib")]
+#[test]
+fn ma_family_tags_accept_local_use_spelling() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    // variant-spelled tags parse
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAAA", &vec![255u8; 4]);
+    record.push_aux(b"Ma", Aux::String("4;msp+P:1-2")).unwrap();
+    record
+        .push_aux(b"Aq", Aux::ArrayU8((&vec![50u8][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let msp = annot.get_type("msp").expect("Ma variant not parsed");
+    assert_eq!(msp.annotations.len(), 1);
+    assert_eq!(msp.annotations[0].qualities.as_slice(), &[50]);
+
+    // canonical wins over the variant when both are present
+    record.push_aux(b"MA", Aux::String("4;nuc.:1-3")).unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    assert!(annot.get_type("nuc").is_some(), "canonical MA ignored");
+    assert!(
+        annot.get_type("msp").is_none(),
+        "variant Ma won over canonical MA"
+    );
+
+    // a rewrite strips both spellings; only canonical remains
+    let annot = MolecularAnnotations::from_record(&record);
+    annot.to_record(&mut record);
+    assert!(record.aux(b"Ma").is_err(), "variant Ma survived rewrite");
+    assert!(record.aux(b"Aq").is_err(), "variant Aq survived rewrite");
+    assert!(matches!(record.aux(b"MA"), Ok(Aux::String(_))));
 }

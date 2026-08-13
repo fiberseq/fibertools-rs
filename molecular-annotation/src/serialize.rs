@@ -8,9 +8,7 @@ impl MolecularAnnotations {
     /// Types whose encoding is not `Encoding::Ma` are skipped (they don't
     /// participate in MA-tag emission).
     fn ma_parts_iter(&self) -> impl Iterator<Item = MaParts> + '_ {
-        self.annotation_types
-            .iter()
-            .filter_map(|t| t.to_ma_parts())
+        self.annotation_types.iter().filter_map(|t| t.to_ma_parts())
     }
 
     /// Generate the MA:Z tag string.
@@ -125,11 +123,16 @@ impl MolecularAnnotations {
         // re-writing a record that already carries MA-family tags must replace
         // them, not silently no-op and leave the stale values in place. AL is
         // stripped but never re-written: lengths are inline now, so any AL on
-        // the record is a leftover that must not survive the rewrite.
-        record.remove_aux(b"MA").ok();
-        record.remove_aux(b"AL").ok();
-        record.remove_aux(b"AQ").ok();
-        record.remove_aux(b"AN").ok();
+        // the record is a leftover that must not survive the rewrite. Both
+        // spellings are removed (the canonical uppercase and the local-use
+        // `Ma`-style variant the reader accepts) so a rewrite never leaves a
+        // second, stale copy under the other spelling.
+        for tag in [b"MA", b"AL", b"AQ", b"AN"] {
+            record.remove_aux(tag).ok();
+            record
+                .remove_aux(&[tag[0], tag[1].to_ascii_lowercase()])
+                .ok();
+        }
 
         record.push_aux(b"MA", Aux::String(&ma)).ok();
         if let Some(ref aq_arr) = aq {
