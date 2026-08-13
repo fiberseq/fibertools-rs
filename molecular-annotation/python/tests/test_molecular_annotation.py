@@ -387,9 +387,11 @@ class TestPysamIntegration:
 
         write_to_record(annotations, record)
 
-        # Verify tags were written (MA tag uses 1-based coordinates per spec)
-        assert record.get_tag("MA") == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
-        assert list(record.get_tag("AQ")) == [40, 35]
+        # Verify tags were written under the canonical Ma/Aq spellings
+        # (Ma tag uses 1-based coordinates per spec)
+        assert record.get_tag("Ma") == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
+        assert list(record.get_tag("Aq")) == [40, 35]
+        assert not record.has_tag("MA") and not record.has_tag("AQ")
 
         # Read them back
         annotations2 = from_record(record)

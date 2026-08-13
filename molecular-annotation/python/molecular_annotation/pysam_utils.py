@@ -89,20 +89,21 @@ def from_record(
     is_reverse = record.is_reverse
 
     if parse_tags:
-        # Get MA tag (required when parsing tags)
-        ma = record.get_tag("MA")
+        # Get the Ma tag (required when parsing tags). Both spellings are
+        # accepted; uppercase wins when both are present because only an
+        # uppercase-only writer (fibertools 0.10-0.12) can produce a
+        # dual-spelled record, making MA the fresher write.
+        ma = _get_tag_any(record, "MA", "Ma")
+        if ma is None:
+            raise KeyError("record has no Ma/MA tag")
 
-        # Get AQ tag (optional)
-        try:
-            aq = list(record.get_tag("AQ"))
-        except KeyError:
-            aq = None
+        # Get the Aq tag (optional)
+        aq = _get_tag_any(record, "AQ", "Aq")
+        if aq is not None:
+            aq = list(aq)
 
-        # Get AN tag (optional)
-        try:
-            an = record.get_tag("AN")
-        except KeyError:
-            an = None
+        # Get the An tag (optional)
+        an = _get_tag_any(record, "AN", "An")
 
         annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse
@@ -208,16 +209,23 @@ def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment")
     """
     ma, aq, an = annotations.to_tags()
 
-    # Set MA tag (always)
-    record.set_tag("MA", ma)
+    # Write the canonical Ma/Aq/An spellings (samtools/hts-specs#862),
+    # removing both spellings first so a rewrite never leaves a stale copy
+    # under the other casing.
+    for tag in ("MA", "Ma", "AL", "Al", "AQ", "Aq", "AN", "An"):
+        if record.has_tag(tag):
+            record.set_tag(tag, None)
 
-    # Set AQ tag if present
+    # Set the Ma tag (always)
+    record.set_tag("Ma", ma)
+
+    # Set the Aq tag if present
     if aq is not None:
-        record.set_tag("AQ", aq)
+        record.set_tag("Aq", aq)
 
-    # Set AN tag if present
+    # Set the An tag if present
     if an is not None:
-        record.set_tag("AN", an)
+        record.set_tag("An", an)
 
 
 # Backwards compatibility alias
