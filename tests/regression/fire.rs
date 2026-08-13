@@ -1,5 +1,77 @@
 use super::common::{fixture, run, select_tsv_cols};
+use rust_htslib::bam::{self, Read};
 use tempfile::NamedTempFile;
+
+fn extract_fdrs(out: &str) -> Vec<f64> {
+    out.lines()
+        .map(|l| l.split('\t').nth(9).unwrap().parse().unwrap())
+        .collect()
+}
+
+// -x "qual(msp)" historically filtered MSPs by FIRE precision (legacy aq
+// tag). Post-MA the precision lives on the `fire` type, so the filter must
+// overlay fire quals onto MSPs: > keeps the called FIREs, < drops them, and
+// the fire type must never be orphaned from its parent MSPs.
+#[test]
+fn filter_expression_qual_msp_uses_fire_quals() {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        fixture("all.bam").to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    let above = run(&[
+        "fire",
+        "--extract",
+        "-x",
+        "qual(msp)>100",
+        scored.path().to_str().unwrap(),
+    ]);
+    let fdrs = extract_fdrs(&above);
+    assert!(!fdrs.is_empty(), "qual(msp)>100 kept no MSPs");
+    assert!(
+        fdrs.iter().all(|&f| f < 1.0),
+        "qual(msp)>100 kept non-FIRE MSPs"
+    );
+    let below = run(&[
+        "fire",
+        "--extract",
+        "-x",
+        "qual(msp)<100",
+        scored.path().to_str().unwrap(),
+    ]);
+    let fdrs = extract_fdrs(&below);
+    assert!(!fdrs.is_empty(), "qual(msp)<100 kept no MSPs");
+    assert!(
+        fdrs.iter().all(|&f| f >= 1.0),
+        "qual(msp)<100 kept called FIRE elements"
+    );
+}
+
+// `ft fire` on a legacy-tag BAM consumes ns/nl/as/al/aq and writes MA tags;
+// the consumed legacy tags must be stripped (v0.9 replace semantics) or
+// legacy readers silently see stale calls forever.
+#[test]
+fn fire_on_legacy_input_strips_consumed_legacy_tags() {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        fixture("msp_nuc.bam").to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    let mut reader = bam::Reader::from_path(scored.path()).unwrap();
+    for rec in reader.records() {
+        let rec = rec.unwrap();
+        assert!(rec.aux(b"MA").is_ok(), "record missing MA tag");
+        for tag in [b"ns", b"nl", b"as", b"al", b"aq"] {
+            assert!(
+                rec.aux(tag).is_err(),
+                "stale legacy tag {} left on fire output",
+                String::from_utf8_lossy(tag)
+            );
+        }
+    }
+}
 
 // `ft fire` stores FIRE calls on the `fire` annotation type (MA spec); the
 // MSPs themselves carry no quals. `--extract` must overlay the fire quals

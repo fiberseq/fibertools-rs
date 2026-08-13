@@ -150,55 +150,62 @@ pub fn apply_filter_fsd(fsd: &mut FiberseqData, filt: &FiberFilters) -> Result<(
                     other => anyhow::bail!("Unknown feature name: {}", other),
                 };
                 match parser.fn_name.as_str() {
-                    "len" => fsd.annotations.retain(type_name, |a| {
-                        len(a.length as i64, &parser.op, &parser.threshold)
-                    }),
+                    "len" => {
+                        fsd.annotations.retain(type_name, |a| {
+                            len(a.length as i64, &parser.op, &parser.threshold)
+                        });
+                        // fire annotations are interval copies of their source
+                        // MSPs — apply the same predicate so they are not
+                        // orphaned when their parent MSP is removed.
+                        if type_name == "msp" {
+                            fsd.annotations.retain("fire", |a| {
+                                len(a.length as i64, &parser.op, &parser.threshold)
+                            });
+                        }
+                    }
                     "qual" if type_name == "msp" => {
                         // qual(msp) historically meant "filter MSPs by FIRE
                         // precision" (legacy fibertools wrote FIRE precisions
                         // onto the MSP `aq` tag). Post-MA, that quality lives
-                        // on the `fire` annotation type instead. Collect
-                        // per-MSP precisions in *molecular* order to align
-                        // with retain's iteration, then drop msp and fire
-                        // in lockstep.
+                        // on the `fire` annotation type, which holds the p>0
+                        // SUBSET of MSPs as exact interval copies. Overlay the
+                        // fire quals onto the MSPs keyed by molecular start;
+                        // MSPs without a fire entry fall back to their own
+                        // qual (legacy read path) and so evaluate as 0. Drop
+                        // msp and fire entries by the same kept-start set so
+                        // the two types stay paired.
                         let primary = crate::utils::bamannotations::primary_qual;
-                        let mol_quals: Vec<u8> = if let Some(f) =
-                            fsd.annotations.get_type("fire").filter(|f| {
-                                fsd.annotations
-                                    .get_type("msp")
-                                    .is_some_and(|m| m.annotations.len() == f.annotations.len())
-                            }) {
-                            f.annotations
-                                .iter()
-                                .map(|a| primary(&a.qualities, "fire"))
-                                .collect()
-                        } else if let Some(m) = fsd.annotations.get_type("msp") {
-                            m.annotations
-                                .iter()
-                                .map(|a| primary(&a.qualities, "msp"))
-                                .collect()
-                        } else {
-                            Vec::new()
-                        };
-                        let keep: Vec<bool> = mol_quals
-                            .iter()
-                            .map(|q| qual(*q, &parser.op, &parser.threshold))
-                            .collect();
-                        let has_fire = fsd.annotations.get_type("fire").is_some();
-                        let mut i = 0;
-                        fsd.annotations.retain("msp", |_| {
-                            let k = keep.get(i).copied().unwrap_or(false);
-                            i += 1;
-                            k
-                        });
-                        if has_fire {
-                            let mut i = 0;
-                            fsd.annotations.retain("fire", |_| {
-                                let k = keep.get(i).copied().unwrap_or(false);
-                                i += 1;
-                                k
-                            });
-                        }
+                        let fire_quals: std::collections::HashMap<u32, u8> = fsd
+                            .annotations
+                            .get_type("fire")
+                            .map(|f| {
+                                f.annotations
+                                    .iter()
+                                    .map(|a| (a.start, primary(&a.qualities, "fire")))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        let keep_starts: std::collections::HashSet<u32> = fsd
+                            .annotations
+                            .get_type("msp")
+                            .map(|m| {
+                                m.annotations
+                                    .iter()
+                                    .filter(|a| {
+                                        let q = fire_quals
+                                            .get(&a.start)
+                                            .copied()
+                                            .unwrap_or_else(|| primary(&a.qualities, "msp"));
+                                        qual(q, &parser.op, &parser.threshold)
+                                    })
+                                    .map(|a| a.start)
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+                        fsd.annotations
+                            .retain("msp", |a| keep_starts.contains(&a.start));
+                        fsd.annotations
+                            .retain("fire", |a| keep_starts.contains(&a.start));
                     }
                     "qual" => fsd.annotations.retain(type_name, |a| {
                         qual(

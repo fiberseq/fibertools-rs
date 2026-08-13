@@ -34,6 +34,11 @@ pub const FIRE_TYPE: &str = "fire";
 /// MA tag is present. These are never emitted; we only ingest them.
 pub const LEGACY_READ_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
 
+/// Legacy fibertig tags, likewise consumed only as a read fallback (see
+/// [`read_legacy_fibertig`]) and stripped alongside [`LEGACY_READ_TAGS`]
+/// when they were the source of a written annotation model.
+pub const LEGACY_FIBERTIG_TAGS: &[&[u8]] = &[b"fs", b"fl", b"fa"];
+
 /// Molecular-orientation nuc/msp arrays returned by [`extract_nuc_msp_arrays`]:
 /// `(nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual)`. `msp_qual`
 /// is empty when there are no MSP qualities (pre-FIRE state).
@@ -59,20 +64,19 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     // legacy fallback whenever MM/ML is present).
     let has_ma = matches!(record.aux(b"MA"), Ok(Aux::String(_)));
     if !has_ma {
-        // Provenance caveat: presence of `ns`/`as`/`fs` is treated as evidence
-        // of fibertools-legacy data with no further validation. This path is
-        // read-only — we never delete these tags — so a foreign tool reusing
-        // those names is at worst mis-parsed here, never destroyed. Any future
-        // code that *removes* legacy tags must verify provenance first.
-        let has_legacy_nuc = record.aux(b"ns").is_ok();
-        let has_legacy_msp = record.aux(b"as").is_ok();
-        if has_legacy_nuc || has_legacy_msp {
+        // Provenance: the gates are type-checked (`has_legacy_nuc_msp`,
+        // `has_legacy_fibertig`), so a foreign tool reusing these two-letter
+        // names with a different aux type is never parsed as fibertools data.
+        // The write path (`strip_consumed_legacy_tags`) removes a legacy tag
+        // only under these same gates plus a per-tag type check — i.e. only
+        // when this reader consumed it — so keep the two in sync.
+        if has_legacy_nuc_msp(record) {
             merge_missing_types(&mut annot, read_legacy_nuc_msp(record)?);
         }
         // Legacy fibertig (`fs`/`fl`/`fa`): the pre-MA fibertig wire format,
         // dropped from the writer in favour of the MA-spec `AN` tag. Kept
-        // read-only so older fibertig BAMs stay consumable by `extract`.
-        if record.aux(b"fs").is_ok() {
+        // readable so older fibertig BAMs stay consumable by `extract`.
+        if has_legacy_fibertig(record) {
             merge_missing_types(&mut annot, read_legacy_fibertig(record)?);
         }
     }
@@ -133,7 +137,66 @@ fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations
 /// Producers that create or modify base mods must instead call
 /// [`write_record_with_basemods`], which canonically re-emits MM/ML.
 pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
+    strip_consumed_legacy_tags(record);
     annot.to_record(record);
+}
+
+/// Provenance rule shared by every MA write: strip exactly the legacy tag
+/// sets that [`read_record`] consumed as the source of the annotation model
+/// being written — they are superseded by the MA tags (v0.9 replace
+/// semantics; otherwise legacy readers silently see stale calls forever).
+///
+/// The gates mirror [`read_record`]'s consumption gates, which is what makes
+/// this provenance-safe: a set is only removed when the reader ingested it
+/// (and it parsed as fibertools data — a parse failure errors out before any
+/// write). Records that already carry `MA` were not read from legacy tags,
+/// so their legacy-named aux tags are left untouched: a foreign tool reusing
+/// those names is never destroyed. Likewise a lone foreign tag outside its
+/// set's gate (e.g. `nl` with no `ns`/`as`) is left alone.
+fn strip_consumed_legacy_tags(record: &mut bam::Record) {
+    if matches!(record.aux(b"MA"), Ok(Aux::String(_))) {
+        return;
+    }
+    if has_legacy_nuc_msp(record) {
+        for tag in LEGACY_READ_TAGS {
+            if is_legacy_typed(record, tag) {
+                record.remove_aux(tag).ok();
+            }
+        }
+    }
+    if has_legacy_fibertig(record) {
+        for tag in LEGACY_FIBERTIG_TAGS {
+            if is_legacy_typed(record, tag) {
+                record.remove_aux(tag).ok();
+            }
+        }
+    }
+}
+
+/// Type-checked consumption gate for the legacy nuc/msp tag set. Presence
+/// alone is weak provenance — a foreign tool could reuse these two-letter
+/// names with a different aux type — so the set only counts as
+/// fibertools-legacy when a gate tag parses as the int array legacy
+/// fibertools wrote.
+fn has_legacy_nuc_msp(record: &bam::Record) -> bool {
+    u32_array(record, b"ns").is_some() || u32_array(record, b"as").is_some()
+}
+
+/// Type-checked consumption gate for the legacy fibertig tag set.
+fn has_legacy_fibertig(record: &bam::Record) -> bool {
+    u32_array(record, b"fs").is_some() && u32_array(record, b"fl").is_some()
+}
+
+/// True when `tag` carries the aux type legacy fibertools wrote for it —
+/// the per-tag half of the provenance check in
+/// [`strip_consumed_legacy_tags`]: even inside a gated set, a wrong-typed
+/// tag was not consumed by the reader and so is never removed.
+fn is_legacy_typed(record: &bam::Record, tag: &[u8]) -> bool {
+    match tag {
+        b"aq" => u8_array(record, tag).is_some(),
+        b"fa" => matches!(record.aux(tag), Ok(Aux::String(_))),
+        _ => u32_array(record, tag).is_some(),
+    }
 }
 
 /// Writes MA-family tags **and** canonically re-encodes MM/ML from the
@@ -151,7 +214,7 @@ pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
 /// Basemod types must already be `Encoding::MmMl` — they are when read from a
 /// record, and producers create them that way (e.g. `Encoding::mm_ml()`).
 pub fn write_record_with_basemods(record: &mut bam::Record, annot: &MolecularAnnotations) {
-    annot.to_record(record);
+    write_record(record, annot);
     annot.write_mm_ml(record);
 }
 
@@ -494,6 +557,44 @@ fn u8_array(record: &bam::Record, tag: &[u8]) -> Option<Vec<u8>> {
 mod tests {
     use super::*;
     use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
+
+    /// Foreign tags that merely reuse legacy names with a different aux type
+    /// must never be stripped by the MA write path; correctly-typed consumed
+    /// legacy tags must be.
+    #[test]
+    fn strip_consumed_legacy_tags_checks_types() {
+        // foreign: `ns` as a string, `al` as a float — not fibertools-typed
+        let mut foreign = synth_record(b"ACGTACGT");
+        foreign.push_aux(b"ns", Aux::String("not-ours")).unwrap();
+        foreign.push_aux(b"al", Aux::Float(1.5)).unwrap();
+        strip_consumed_legacy_tags(&mut foreign);
+        assert!(foreign.aux(b"ns").is_ok(), "foreign string ns was stripped");
+        assert!(foreign.aux(b"al").is_ok(), "foreign float al was stripped");
+
+        // fibertools-typed legacy nuc/msp set: consumed, so stripped — but a
+        // wrong-typed member of the set (string aq) survives
+        let mut legacy = synth_record(b"ACGTACGT");
+        legacy
+            .push_aux(b"ns", Aux::ArrayU32((&vec![1u32, 5]).into()))
+            .unwrap();
+        legacy
+            .push_aux(b"nl", Aux::ArrayU32((&vec![2u32, 2]).into()))
+            .unwrap();
+        legacy.push_aux(b"aq", Aux::String("not-ours")).unwrap();
+        strip_consumed_legacy_tags(&mut legacy);
+        assert!(legacy.aux(b"ns").is_err(), "consumed ns not stripped");
+        assert!(legacy.aux(b"nl").is_err(), "consumed nl not stripped");
+        assert!(legacy.aux(b"aq").is_ok(), "wrong-typed aq was stripped");
+
+        // a record already carrying MA keeps even fibertools-typed legacy tags
+        let mut with_ma = synth_record(b"ACGTACGT");
+        with_ma.push_aux(b"MA", Aux::String("8;")).unwrap();
+        with_ma
+            .push_aux(b"ns", Aux::ArrayU32((&vec![1u32]).into()))
+            .unwrap();
+        strip_consumed_legacy_tags(&mut with_ma);
+        assert!(with_ma.aux(b"ns").is_ok(), "legacy tag stripped despite MA");
+    }
 
     /// Build a synthetic record with the given forward sequence. Aligned-blocks
     /// metadata is not needed for these I/O tests because we only exercise
