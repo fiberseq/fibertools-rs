@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.1](https://github.com/fiberseq/fibertools-rs/compare/v0.12.0...v0.12.1) - 2026-08-13
+
+### Fixed
+
+- ft fire --extract reported FDR 1.0 for every MSP ([#121](https://github.com/fiberseq/fibertools-rs/pull/121))
+
 ## [0.12.0](https://github.com/fiberseq/fibertools-rs/compare/v0.11.0...v0.12.0) - 2026-07-21
 
 ### Added
