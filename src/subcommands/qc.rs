@@ -243,13 +243,12 @@ impl<'a> QcStats<'a> {
     fn m6a_per_msp(&mut self, fiber: &fiber::FiberseqData) {
         let msp = fiber.msp();
         let m6a_starts = fiber.m6a().starts();
-        for annotation in &msp {
+        // FIRE quals live on the `fire` annotation type, not the MSPs —
+        // msp_fire_quals() overlays them (both are BAM-orient ascending).
+        let quals = fiber.msp_fire_quals();
+        for (annotation, qual) in msp.infos().iter().zip(quals.into_iter()) {
             let st = annotation.query_start as i64;
             let en = annotation.query_end as i64;
-            let qual = crate::utils::bamannotations::primary_qual(
-                annotation.qualities,
-                annotation.type_name,
-            );
             let is_fire = qual >= 230;
             let msp_size = en - st;
             let m6a_count = m6a_starts

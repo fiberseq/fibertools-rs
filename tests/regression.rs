@@ -4,6 +4,8 @@ mod center;
 mod common;
 #[path = "regression/convert_tags.rs"]
 mod convert_tags;
+#[path = "regression/decorator.rs"]
+mod decorator;
 #[path = "regression/extract.rs"]
 mod extract;
 #[path = "regression/fire.rs"]

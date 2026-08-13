@@ -157,6 +157,25 @@ impl FiberseqData {
         AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
     }
 
+    /// Per-MSP FIRE quals, BAM-orient ascending (aligned with the `msp()`
+    /// view's accessors). FIRE quals live on the `fire` annotation type (the
+    /// subset of MSPs called as FIREs), not on the MSPs themselves — overlay
+    /// them onto the matching MSPs, keyed by BAM-orient query start (fire
+    /// entries are exact interval copies of their source MSPs). MSPs without
+    /// a fire entry fall back to their own qual, which is 0 for MA-era
+    /// records (FDR 100) and the legacy `aq` value for pre-MA BAMs.
+    pub fn msp_fire_quals(&self) -> Vec<u8> {
+        let fire = self.fire();
+        let fire_quals: std::collections::HashMap<i64, u8> =
+            fire.starts().into_iter().zip(fire.qual()).collect();
+        let msp = self.msp();
+        msp.qual()
+            .into_iter()
+            .zip(msp.starts())
+            .map(|(q, s)| fire_quals.get(&s).copied().unwrap_or(q))
+            .collect()
+    }
+
     /// Flush `self.annotations` onto the record's MA-family aux tags. The
     /// single write path for subcommands that edit nuc/msp/fire annotations;
     /// call this, then hand the record to the BAM writer.

@@ -24,6 +24,13 @@ fn fire_extract_reports_fire_fdrs() {
         fdrs.iter().any(|&f| f < 1.0),
         "no FIRE elements with FDR < 1.0 in extract output; fire quals were not overlaid onto MSPs"
     );
+    // Pin the called FIRE elements (FDR < 1) so qual->FDR mapping drift is caught.
+    let fire_rows: String = out
+        .lines()
+        .filter(|l| l.split('\t').nth(9).unwrap().parse::<f64>().unwrap() < 1.0)
+        .collect::<Vec<_>>()
+        .join("\n");
+    insta::assert_snapshot!(fire_rows);
 }
 
 // Snapshot a stable subset of FIRE feature columns so additions/reorderings
