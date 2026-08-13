@@ -121,25 +121,23 @@ impl MolecularAnnotations {
 
         // push_aux refuses to overwrite an existing tag, so remove first:
         // re-writing a record that already carries MA-family tags must replace
-        // them, not silently no-op and leave the stale values in place. AL is
-        // stripped but never re-written: lengths are inline now, so any AL on
+        // them, not silently no-op and leave the stale values in place. Al is
+        // stripped but never re-written: lengths are inline now, so any Al on
         // the record is a leftover that must not survive the rewrite. Both
-        // spellings are removed (the canonical uppercase and the local-use
-        // `Ma`-style variant the reader accepts) so a rewrite never leaves a
-        // second, stale copy under the other spelling.
-        for tag in [b"MA", b"AL", b"AQ", b"AN"] {
+        // spellings are removed (the canonical `Ma`-style local-use form and
+        // the all-uppercase form fibertools 0.10-0.12 emitted) so a rewrite
+        // never leaves a second, stale copy under the other spelling.
+        for tag in [b"Ma", b"Al", b"Aq", b"An"] {
             record.remove_aux(tag).ok();
-            record
-                .remove_aux(&[tag[0], tag[1].to_ascii_lowercase()])
-                .ok();
+            record.remove_aux(&[tag[0], tag[1] ^ 0x20]).ok();
         }
 
-        record.push_aux(b"MA", Aux::String(&ma)).ok();
+        record.push_aux(b"Ma", Aux::String(&ma)).ok();
         if let Some(ref aq_arr) = aq {
-            record.push_aux(b"AQ", Aux::ArrayU8(aq_arr.into())).ok();
+            record.push_aux(b"Aq", Aux::ArrayU8(aq_arr.into())).ok();
         }
         if let Some(ref an_str) = an {
-            record.push_aux(b"AN", Aux::String(an_str)).ok();
+            record.push_aux(b"An", Aux::String(an_str)).ok();
         }
     }
 

@@ -5,20 +5,27 @@ use std::str::FromStr;
 use crate::{MolecularAnnotations, ParseError, QualitySpec, Strand};
 
 /// Resolve an MA-family aux tag on a record, accepting both the canonical
-/// all-uppercase spelling (`MA`/`AQ`/`AN`) and the lowercase-second-letter
-/// variant (`Ma`/`Aq`/`An`), which the SAM spec reserves for local use and a
-/// future revision of the MA spec may adopt. The canonical spelling wins
-/// when both are present. Writers emit only the canonical spelling.
+/// spelling (`Ma`/`Aq`/`An` — the lowercase-second-letter local-use form
+/// proposed to hts-specs, samtools/hts-specs#862) and the all-uppercase
+/// spelling (`MA`/`AQ`/`AN`) that fibertools 0.10-0.12 emitted.
+///
+/// The uppercase spelling wins when both are present: writers that know
+/// about both spellings strip both before writing, so a dual-spelled record
+/// can only have been produced by an uppercase-only tool (0.10-0.12)
+/// editing a `Ma`-spelled file — leaving its fresh `MA` next to the now
+/// stale `Ma`. Preferring uppercase therefore always reads the most recent
+/// write. New writers emit only the canonical `Ma` spelling.
 #[cfg(feature = "htslib")]
 pub fn ma_family_aux<'a>(
     record: &'a rust_htslib::bam::Record,
     tag: &[u8; 2],
 ) -> Option<rust_htslib::bam::record::Aux<'a>> {
-    if let Ok(aux) = record.aux(tag) {
+    let upper = [tag[0].to_ascii_uppercase(), tag[1].to_ascii_uppercase()];
+    if let Ok(aux) = record.aux(&upper) {
         return Some(aux);
     }
-    let variant = [tag[0], tag[1].to_ascii_lowercase()];
-    record.aux(&variant).ok()
+    let canonical = [upper[0], upper[1].to_ascii_lowercase()];
+    record.aux(&canonical).ok()
 }
 
 impl MolecularAnnotations {
@@ -56,15 +63,15 @@ impl MolecularAnnotations {
         // `ma_family_aux`). If MA is present and parses, start from that;
         // otherwise start from an empty annotation set keyed off the
         // record's sequence length.
-        let ma_string: Option<String> = match ma_family_aux(record, b"MA") {
+        let ma_string: Option<String> = match ma_family_aux(record, b"Ma") {
             Some(Aux::String(s)) => Some(s.to_string()),
             _ => None,
         };
-        let aq_vec: Option<Vec<u8>> = match ma_family_aux(record, b"AQ") {
+        let aq_vec: Option<Vec<u8>> = match ma_family_aux(record, b"Aq") {
             Some(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
             _ => None,
         };
-        let an_string: Option<String> = match ma_family_aux(record, b"AN") {
+        let an_string: Option<String> = match ma_family_aux(record, b"An") {
             Some(Aux::String(s)) => Some(s.to_string()),
             _ => None,
         };

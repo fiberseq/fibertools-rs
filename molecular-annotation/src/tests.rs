@@ -1800,7 +1800,7 @@ fn round_trip_ma_and_mm_ml_no_cross_contamination() {
     annot.to_record(&mut out);
     annot.write_mm_ml(&mut out);
 
-    let ma = match out.aux(b"MA").unwrap() {
+    let ma = match out.aux(b"Ma").unwrap() {
         Aux::String(s) => s.to_string(),
         _ => panic!(),
     };
@@ -2192,36 +2192,38 @@ fn mmml_parse_is_idempotent() {
 // present, and a rewrite removes both spellings before emitting canonical.
 #[cfg(feature = "htslib")]
 #[test]
-fn ma_family_tags_accept_local_use_spelling() {
+fn ma_family_tags_accept_both_spellings() {
     use crate::MolecularAnnotations;
     use rust_htslib::bam::record::Aux;
     use rust_htslib::bam::Record;
 
-    // variant-spelled tags parse
+    // uppercase-spelled tags (fibertools 0.10-0.12 output) still parse
     let mut record = Record::new();
     record.set(b"r", None, b"AAAA", &vec![255u8; 4]);
-    record.push_aux(b"Ma", Aux::String("4;msp+P:1-2")).unwrap();
+    record.push_aux(b"MA", Aux::String("4;msp+P:1-2")).unwrap();
     record
-        .push_aux(b"Aq", Aux::ArrayU8((&vec![50u8][..]).into()))
+        .push_aux(b"AQ", Aux::ArrayU8((&vec![50u8][..]).into()))
         .unwrap();
     let annot = MolecularAnnotations::from_record(&record);
-    let msp = annot.get_type("msp").expect("Ma variant not parsed");
+    let msp = annot.get_type("msp").expect("uppercase MA not parsed");
     assert_eq!(msp.annotations.len(), 1);
     assert_eq!(msp.annotations[0].qualities.as_slice(), &[50]);
 
-    // canonical wins over the variant when both are present
-    record.push_aux(b"MA", Aux::String("4;nuc.:1-3")).unwrap();
+    // uppercase wins when both are present: only an uppercase-only tool
+    // (0.10-0.12) can produce a dual-spelled record, by replacing MA while
+    // leaving a stale Ma behind — so MA is always the fresher write.
+    record.push_aux(b"Ma", Aux::String("4;nuc.:1-3")).unwrap();
     let annot = MolecularAnnotations::from_record(&record);
-    assert!(annot.get_type("nuc").is_some(), "canonical MA ignored");
+    assert!(annot.get_type("msp").is_some(), "uppercase MA ignored");
     assert!(
-        annot.get_type("msp").is_none(),
-        "variant Ma won over canonical MA"
+        annot.get_type("nuc").is_none(),
+        "stale Ma won over fresher uppercase MA"
     );
 
-    // a rewrite strips both spellings; only canonical remains
+    // a rewrite strips both spellings; only the canonical remains
     let annot = MolecularAnnotations::from_record(&record);
     annot.to_record(&mut record);
-    assert!(record.aux(b"Ma").is_err(), "variant Ma survived rewrite");
-    assert!(record.aux(b"Aq").is_err(), "variant Aq survived rewrite");
-    assert!(matches!(record.aux(b"MA"), Ok(Aux::String(_))));
+    assert!(record.aux(b"MA").is_err(), "uppercase MA survived rewrite");
+    assert!(record.aux(b"AQ").is_err(), "uppercase AQ survived rewrite");
+    assert!(matches!(record.aux(b"Ma"), Ok(Aux::String(_))));
 }

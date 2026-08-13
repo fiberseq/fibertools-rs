@@ -16,7 +16,7 @@ fn fire_on_legacy_input_strips_consumed_legacy_tags() {
     let mut reader = bam::Reader::from_path(scored.path()).unwrap();
     for rec in reader.records() {
         let rec = rec.unwrap();
-        assert!(rec.aux(b"MA").is_ok(), "record missing MA tag");
+        assert!(rec.aux(b"Ma").is_ok(), "record missing Ma tag");
         for tag in [b"ns", b"nl", b"as", b"al", b"aq"] {
             assert!(
                 rec.aux(tag).is_err(),

@@ -235,11 +235,11 @@ fn test_create_annotated_records_from_splits() -> Result<()> {
     // Verify both records have MA-spec tags. MA is always emitted; AN
     // tags along because the fixtures supply names. AL is only emitted
     // under the Separate encoding, which isn't the spec default.
-    assert!(first_record.aux(b"MA").is_ok());
-    assert!(first_record.aux(b"AN").is_ok());
+    assert!(first_record.aux(b"Ma").is_ok());
+    assert!(first_record.aux(b"An").is_ok());
 
-    assert!(second_record.aux(b"MA").is_ok());
-    assert!(second_record.aux(b"AN").is_ok());
+    assert!(second_record.aux(b"Ma").is_ok());
+    assert!(second_record.aux(b"An").is_ok());
 
     Ok(())
 }
@@ -281,8 +281,8 @@ fn test_inject_with_bed_annotations() -> Result<()> {
     // fibertig annotations must have MA; AN tags along because the BED
     // supplies feature names.
     for record in &fiber_tig.records {
-        if record.aux(b"MA").is_ok() {
-            assert!(record.aux(b"AN").is_ok(), "AN tag missing when MA exists");
+        if record.aux(b"Ma").is_ok() {
+            assert!(record.aux(b"An").is_ok(), "An tag missing when Ma exists");
         }
     }
 

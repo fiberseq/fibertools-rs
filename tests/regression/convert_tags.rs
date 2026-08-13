@@ -38,7 +38,7 @@ fn ml(rec: &bam::Record) -> Option<Vec<u8>> {
 }
 
 fn ma(rec: &bam::Record) -> Option<String> {
-    match rec.aux(b"MA") {
+    match rec.aux(b"Ma") {
         Ok(Aux::String(s)) => Some(s.to_string()),
         _ => None,
     }
@@ -135,7 +135,7 @@ fn convert_tags_strips_consumed_fibertig_tags() {
         ma_tag.contains("fibertig"),
         "fibertig annotations not carried into MA tag: {ma_tag}"
     );
-    let an = match rec.aux(b"AN") {
+    let an = match rec.aux(b"An") {
         Ok(Aux::String(s)) => s.to_string(),
         _ => String::new(),
     };

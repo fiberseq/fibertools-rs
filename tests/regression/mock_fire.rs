@@ -25,8 +25,8 @@ fn mock_fire_emits_msp_and_fire_annotations() {
     let mut reader = bam::Reader::from_path(out.path()).unwrap();
     for rec in reader.records() {
         let rec = rec.unwrap();
-        let Ok(Aux::String(ma)) = rec.aux(b"MA") else {
-            panic!("mock-fire record has no MA tag");
+        let Ok(Aux::String(ma)) = rec.aux(b"Ma") else {
+            panic!("mock-fire record has no Ma tag");
         };
         assert!(ma.contains("msp"), "mock-fire MA tag lacks msp group: {ma}");
         assert!(
