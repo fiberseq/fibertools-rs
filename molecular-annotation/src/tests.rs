@@ -1137,11 +1137,8 @@ fn test_from_tags_merges_strand_split_sections_into_one_type() {
 
 #[test]
 fn test_from_tags_conflicting_quality_spec_for_same_name_errors() {
-    let result = MolecularAnnotations::from_tags(
-        "1000;msp+P:100-50;msp+Q:200-60",
-        Some(&[40, 35]),
-        None,
-    );
+    let result =
+        MolecularAnnotations::from_tags("1000;msp+P:100-50;msp+Q:200-60", Some(&[40, 35]), None);
     assert!(
         matches!(result, Err(ParseError::ConflictingAnnotationType { .. })),
         "from_tags must reject conflicting quality_spec for the same name; got {:?}",
@@ -1155,8 +1152,7 @@ fn test_round_trip_strand_split_preserves_on_disk_form() {
     // the same in-memory state, and the serialized form must match the
     // canonical on-disk shape.
     let original = "10;ctcf+Q:1-4;ctcf-Q:6-3";
-    let annotations =
-        MolecularAnnotations::from_tags(original, Some(&[200, 180]), None).unwrap();
+    let annotations = MolecularAnnotations::from_tags(original, Some(&[200, 180]), None).unwrap();
     let (ma, aq, _an) = annotations.to_tags();
     assert_eq!(ma, original);
     assert_eq!(aq, Some(vec![200, 180]));
@@ -1804,7 +1800,7 @@ fn round_trip_ma_and_mm_ml_no_cross_contamination() {
     annot.to_record(&mut out);
     annot.write_mm_ml(&mut out);
 
-    let ma = match out.aux(b"MA").unwrap() {
+    let ma = match out.aux(b"Ma").unwrap() {
         Aux::String(s) => s.to_string(),
         _ => panic!(),
     };
@@ -2189,4 +2185,86 @@ fn mmml_parse_is_idempotent() {
     annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
     annot.parse_mm_ml("A+a,1,0,0;", &[200, 150, 100], b"ACAGAA");
     assert_eq!(annot.get_type("a").unwrap().annotations.len(), 3);
+}
+
+// The reader accepts both the canonical uppercase MA-family spellings and
+// the SAM local-use `Ma`/`Aq`/`An` variants; canonical wins when both are
+// present, and a rewrite removes both spellings before emitting canonical.
+#[cfg(feature = "htslib")]
+#[test]
+fn ma_family_tags_accept_both_spellings() {
+    use crate::MolecularAnnotations;
+    use rust_htslib::bam::record::Aux;
+    use rust_htslib::bam::Record;
+
+    // uppercase-spelled tags (fibertools 0.10-0.12 output) still parse
+    let mut record = Record::new();
+    record.set(b"r", None, b"AAAA", &vec![255u8; 4]);
+    record.push_aux(b"MA", Aux::String("4;msp+P:1-2")).unwrap();
+    record
+        .push_aux(b"AQ", Aux::ArrayU8((&vec![50u8][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let msp = annot.get_type("msp").expect("uppercase MA not parsed");
+    assert_eq!(msp.annotations.len(), 1);
+    assert_eq!(msp.annotations[0].qualities.as_slice(), &[50]);
+
+    // uppercase wins when both are present: only an uppercase-only tool
+    // (0.10-0.12) can produce a dual-spelled record, by replacing MA while
+    // leaving a stale Ma behind — so MA is always the fresher write.
+    record.push_aux(b"Ma", Aux::String("4;nuc.:1-3")).unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    assert!(annot.get_type("msp").is_some(), "uppercase MA ignored");
+    assert!(
+        annot.get_type("nuc").is_none(),
+        "stale Ma won over fresher uppercase MA"
+    );
+
+    // family resolution is ATOMIC: the winning uppercase family must not be
+    // paired with the stale canonical Aq/An siblings (misattached quals or
+    // names, or a count-mismatch parse failure that wipes everything)
+    record.push_aux(b"An", Aux::String("stale_name,")).unwrap();
+    record
+        .push_aux(b"Aq", Aux::ArrayU8((&vec![7u8][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let msp = annot.get_type("msp").expect("uppercase family wiped");
+    assert_eq!(
+        msp.annotations[0].qualities.as_slice(),
+        &[50],
+        "stale canonical Aq paired with fresh uppercase MA"
+    );
+    assert!(
+        msp.annotations[0].name.is_none(),
+        "stale canonical An name misattached to fresh uppercase MA"
+    );
+
+    // a wrong-typed uppercase main tag never shadows a valid canonical Ma
+    let mut shadow = Record::new();
+    shadow.set(b"r2", None, b"AAAA", &vec![255u8; 4]);
+    shadow.push_aux(b"MA", Aux::I32(5)).unwrap();
+    shadow.push_aux(b"Ma", Aux::String("4;nuc.:1-3")).unwrap();
+    let annot = MolecularAnnotations::from_record(&shadow);
+    assert!(
+        annot.get_type("nuc").is_some(),
+        "wrong-typed uppercase MA shadowed valid canonical Ma"
+    );
+
+    // a rewrite strips both spellings; only the canonical remains
+    let annot = MolecularAnnotations::from_record(&record);
+    annot.to_record(&mut record);
+    assert!(record.aux(b"MA").is_err(), "uppercase MA survived rewrite");
+    assert!(record.aux(b"AQ").is_err(), "uppercase AQ survived rewrite");
+    assert!(record.aux(b"An").is_err(), "stale An survived rewrite");
+    // the rewrite emits a FRESH canonical Aq from the model (qual 50); the
+    // stale [7] must be gone
+    match record.aux(b"Aq") {
+        Ok(Aux::ArrayU8(arr)) => assert_eq!(
+            arr.iter().collect::<Vec<u8>>(),
+            vec![50],
+            "rewrite kept the stale Aq value"
+        ),
+        other => panic!("expected fresh canonical Aq after rewrite, got {other:?}"),
+    }
+    assert!(matches!(record.aux(b"Ma"), Ok(Aux::String(_))));
 }

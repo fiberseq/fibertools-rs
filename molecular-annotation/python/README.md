@@ -2,7 +2,7 @@
 
 Python bindings for molecular annotation tags in SAM/BAM/CRAM files.
 
-This package provides a Python interface to parse and generate MA/AQ/AN tags according to the Molecular Annotation specification.
+This package provides a Python interface to parse MA-family tags in either spelling and generate Ma/Aq/An tags according to the Molecular Annotation specification.
 
 ## Installation
 

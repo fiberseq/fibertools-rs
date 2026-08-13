@@ -43,3 +43,4 @@ benches/data/
 
 # Criterion baseline / measurement storage (redundant with target/ but explicit)
 target/criterion/
+profile.json.gz

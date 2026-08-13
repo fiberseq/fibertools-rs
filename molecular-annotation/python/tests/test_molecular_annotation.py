@@ -387,9 +387,11 @@ class TestPysamIntegration:
 
         write_to_record(annotations, record)
 
-        # Verify tags were written (MA tag uses 1-based coordinates per spec)
-        assert record.get_tag("MA") == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
-        assert list(record.get_tag("AQ")) == [40, 35]
+        # Verify tags were written under the canonical Ma/Aq spellings
+        # (Ma tag uses 1-based coordinates per spec)
+        assert record.get_tag("Ma") == "1000;msp+P:101-50,201-60;nuc+:151-147,401-147"
+        assert list(record.get_tag("Aq")) == [40, 35]
+        assert not record.has_tag("MA") and not record.has_tag("AQ")
 
         # Read them back
         annotations2 = from_record(record)
@@ -659,10 +661,74 @@ class TestMmMl:
         assert [it[2] for it in items] == [2, 4, 5]  # forward (molecular) starts
 
 
-@pytest.mark.skipif(
-    not _FIBERSEQ_BAM.exists(),
-    reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
-)
+class TestMaFamilySpelling:
+    """Dual-spelling resolution must be family-atomic and type-checked,
+    mirroring the Rust ma_family_tags()."""
+
+    def _record(self, pysam, seq="ACGTACGTAA"):
+        header = pysam.AlignmentHeader.from_dict(
+            {"SQ": [{"SN": "chr1", "LN": 100000}]}
+        )
+        r = pysam.AlignedSegment(header)
+        r.query_name = "read"
+        r.query_sequence = seq
+        r.reference_id = 0
+        r.reference_start = 100
+        r.cigarstring = f"{len(seq)}M"
+        return r
+
+    def test_uppercase_family_wins_atomically(self):
+        """Fresh uppercase MA (old-tool edit) must not be paired with stale
+        canonical Aq/An siblings."""
+        import array
+
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("Ma", "10;fire+Q:1-2")          # stale canonical family
+        r.set_tag("Aq", array.array("B", [7]))
+        r.set_tag("An", "stale_name,")
+        r.set_tag("MA", "10;msp+P:1-2,5-2")       # fresh uppercase family
+        r.set_tag("AQ", array.array("B", [40, 35]))
+        annot = from_record(r)
+        # iter_type yields (qs, qe, fs, fe, rs, re, quals, name) tuples
+        quals = [item[6] for item in annot.iter_type("msp")]
+        assert quals == [[40], [35]], "stale canonical Aq paired with fresh MA"
+        names = [item[7] for item in annot.iter_type("msp")]
+        assert names == [None, None], (
+            "stale canonical An name misattached to fresh uppercase MA"
+        )
+        assert annot.annotation_type_names() == ["msp"], "wrong family read"
+
+    def test_stale_sibling_never_pairs_when_uppercase_sibling_absent(self):
+        """Fresh uppercase MA whose own AQ is missing must NOT borrow the
+        stale canonical Aq: the quality spec then has no array and parsing
+        raises, rather than silently misattaching stale values."""
+        import array
+
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("Ma", "10;fire+Q:1-2")          # stale canonical family
+        r.set_tag("Aq", array.array("B", [7]))
+        r.set_tag("MA", "10;msp+P:1-2,5-2")       # fresh uppercase, no AQ
+        with pytest.raises(ValueError):
+            from_record(r)
+
+    def test_wrong_typed_uppercase_never_shadows(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("MA", 5)                        # foreign int-typed MA
+        r.set_tag("Ma", "10;nuc.:1-3")
+        annot = from_record(r)
+        assert annot.annotation_type_names() == ["nuc"], (
+            "wrong-typed uppercase MA shadowed valid canonical Ma"
+        )
+
 
 class TestAlignedBlocks:
     """Liftover block extraction from CIGAR strings."""
@@ -708,6 +774,10 @@ class TestAlignedBlocks:
         assert _extract_aligned_blocks(r) == [((0, 100), (1000, 1100))]
 
 
+@pytest.mark.skipif(
+    not _FIBERSEQ_BAM.exists(),
+    reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
+)
 class TestRealFixtures:
     """End-to-end tests against a real fiber-seq BAM (fibertools-rs all.bam).
 

@@ -37,6 +37,42 @@ def _get_tag_any(record: "pysam.AlignedSegment", *names: str):
     return None
 
 
+def _ma_family_tags(record: "pysam.AlignedSegment"):
+    """Read the MA tag family (Ma, Aq, An), resolving the spelling ONCE.
+
+    Mirrors the Rust `ma_family_tags`: the spelling is chosen from the main
+    tag alone, type-checked (string-typed); uppercase wins when both are
+    present (a dual-spelled record can only come from an uppercase-only
+    0.10-0.12 tool editing a Ma-spelled file, so its family is the fresher
+    write). The sibling Aq/An are then read ONLY in the winning spelling —
+    per-tag fallback would pair a fresh main tag with stale siblings from
+    the other spelling. A wrong-typed main tag (e.g. a foreign MA:i) never
+    wins. Returns (ma, aq, an) or None when neither spelling carries a
+    string-typed main tag.
+    """
+
+    def _string_tag(name: str):
+        try:
+            v = record.get_tag(name)
+        except KeyError:
+            return None
+        return v if isinstance(v, str) else None
+
+    if _string_tag("MA") is not None:
+        ma_t, aq_t, an_t = "MA", "AQ", "AN"
+    elif _string_tag("Ma") is not None:
+        ma_t, aq_t, an_t = "Ma", "Aq", "An"
+    else:
+        return None
+    ma = record.get_tag(ma_t)
+    try:
+        aq = list(record.get_tag(aq_t))
+    except (KeyError, TypeError):
+        aq = None
+    an = _string_tag(an_t)
+    return ma, aq, an
+
+
 def _parse_mm_ml_into(
     annot: MolecularAnnotations, record: "pysam.AlignedSegment", is_reverse: bool
 ) -> None:
@@ -89,20 +125,12 @@ def from_record(
     is_reverse = record.is_reverse
 
     if parse_tags:
-        # Get MA tag (required when parsing tags)
-        ma = record.get_tag("MA")
-
-        # Get AQ tag (optional)
-        try:
-            aq = list(record.get_tag("AQ"))
-        except KeyError:
-            aq = None
-
-        # Get AN tag (optional)
-        try:
-            an = record.get_tag("AN")
-        except KeyError:
-            an = None
+        # Resolve the Ma/Aq/An family atomically (required when parsing
+        # tags); see _ma_family_tags for the spelling-precedence rules.
+        family = _ma_family_tags(record)
+        if family is None:
+            raise KeyError("record has no Ma/MA tag")
+        ma, aq, an = family
 
         annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse
@@ -178,8 +206,9 @@ def _extract_aligned_blocks(
 def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment") -> None:
     """Write molecular annotations to a pysam AlignedSegment record.
 
-    Sets MA:Z tag, and optionally AQ:B:C and AN:Z tags depending
-    on whether quality/names are present.
+    Sets the Ma:Z tag, and optionally Aq:B:C and An:Z tags depending
+    on whether quality/names are present (both spellings are removed
+    first; see samtools/hts-specs#862 for the canonical spelling).
 
     This is the inverse of `from_record()`.
 
@@ -202,16 +231,23 @@ def to_record(annotations: MolecularAnnotations, record: "pysam.AlignedSegment")
     """
     ma, aq, an = annotations.to_tags()
 
-    # Set MA tag (always)
-    record.set_tag("MA", ma)
+    # Write the canonical Ma/Aq/An spellings (samtools/hts-specs#862),
+    # removing both spellings first so a rewrite never leaves a stale copy
+    # under the other casing.
+    for tag in ("MA", "Ma", "AL", "Al", "AQ", "Aq", "AN", "An"):
+        if record.has_tag(tag):
+            record.set_tag(tag, None)
 
-    # Set AQ tag if present
+    # Set the Ma tag (always)
+    record.set_tag("Ma", ma)
+
+    # Set the Aq tag if present
     if aq is not None:
-        record.set_tag("AQ", aq)
+        record.set_tag("Aq", aq)
 
-    # Set AN tag if present
+    # Set the An tag if present
     if an is not None:
-        record.set_tag("AN", an)
+        record.set_tag("An", an)
 
 
 # Backwards compatibility alias

@@ -1,7 +1,7 @@
 //! Convert fiber-seq BAM tags (ns/nl, as/al/aq) to MolecularAnnotations format
 //!
 //! This example reads a CRAM/BAM file with fiber-seq annotations and converts
-//! them to the MA/AQ tag format (lengths are inline in the MA string).
+//! them to the Ma/Aq tag format (lengths are inline in the Ma string).
 //!
 //! Run with:
 //!   cargo run --example fiberseq_to_ma

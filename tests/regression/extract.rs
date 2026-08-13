@@ -83,3 +83,21 @@ fn extract_all_napa() {
         ]
     ));
 }
+
+// `ma_spelled.bam` is a committed fixture carrying only the canonical
+// Ma/Aq/An tag spellings (samtools/hts-specs#862), generated once with
+// `ft convert-tags` from msp_nuc.bam. It pins the on-disk format
+// independently of the current writer: a same-build write+read round trip
+// can be self-consistently wrong, this fixture cannot.
+#[test]
+fn extract_reads_ma_spelled_fixture() {
+    let tmp = NamedTempFile::new().unwrap();
+    run(&[
+        "extract",
+        fixture("ma_spelled.bam").to_str().unwrap(),
+        "--nuc",
+        tmp.path().to_str().unwrap(),
+    ]);
+    let out = std::fs::read_to_string(tmp.path()).unwrap();
+    insta::assert_snapshot!(select_bed12_cols(&out, BED12_COLS));
+}

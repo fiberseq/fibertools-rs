@@ -12,11 +12,14 @@ use rust_htslib::bam::Read;
 /// dropped on the way in (the legacy `aq` byte becomes the separate `fire`
 /// type), so converted MSP tags carry no qualities.
 ///
-/// Legacy tags are removed **only** when they were the source of the
-/// annotations, i.e. the record had no `MA` tag. A record that already carries
-/// an `MA` tag is passed through untouched, so we never strip identically-named
-/// aux tags written by another tool. `MM`/`ML` are preserved byte-identically
-/// (this path does not touch base modifications).
+/// Legacy tags (including the fibertig `fs`/`fl`/`fa` set) are removed
+/// **only** when they were the source of the annotations, i.e. the record had
+/// no `MA` tag — this provenance rule is enforced by `ma_io::write_record`
+/// itself, shared with every other MA-writing subcommand. A record that
+/// already carries an `MA` tag keeps its legacy-named aux tags untouched, so
+/// we never strip identically-named tags written by another tool. `MM`/`ML`
+/// are preserved byte-identically (this path does not touch base
+/// modifications).
 pub fn convert_tags(opts: &mut cli::ConvertTagsOptions) {
     let mut bam = opts.input.bam_reader();
     let mut out = opts.input.bam_writer(&opts.out);
@@ -24,16 +27,8 @@ pub fn convert_tags(opts: &mut cli::ConvertTagsOptions) {
 
     for rec in bam.records() {
         let mut record = rec.expect("failed to read BAM record");
-        let had_ma = record.aux(b"MA").is_ok();
         let annot = ma_io::read_record(&record)
             .unwrap_or_else(|e| panic!("failed to read annotations: {e}"));
-
-        // Provenance guard: only remove legacy tags we actually consumed.
-        if !had_ma {
-            for tag in ma_io::LEGACY_READ_TAGS {
-                record.remove_aux(tag).ok();
-            }
-        }
 
         ma_io::write_record(&mut record, &annot);
         out.write(&record).expect("failed to write BAM record");

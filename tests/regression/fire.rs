@@ -1,5 +1,31 @@
 use super::common::{fixture, run, select_tsv_cols};
+use rust_htslib::bam::{self, Read};
 use tempfile::NamedTempFile;
+
+// `ft fire` on a legacy-tag BAM consumes ns/nl/as/al/aq and writes MA tags;
+// the consumed legacy tags must be stripped (v0.9 replace semantics) or
+// legacy readers silently see stale calls forever.
+#[test]
+fn fire_on_legacy_input_strips_consumed_legacy_tags() {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        fixture("msp_nuc.bam").to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    let mut reader = bam::Reader::from_path(scored.path()).unwrap();
+    for rec in reader.records() {
+        let rec = rec.unwrap();
+        assert!(rec.aux(b"Ma").is_ok(), "record missing Ma tag");
+        for tag in [b"ns", b"nl", b"as", b"al", b"aq"] {
+            assert!(
+                rec.aux(tag).is_err(),
+                "stale legacy tag {} left on fire output",
+                String::from_utf8_lossy(tag)
+            );
+        }
+    }
+}
 
 fn extract_fdrs(out: &str) -> Vec<f64> {
     out.lines()

@@ -38,7 +38,7 @@ fn ml(rec: &bam::Record) -> Option<Vec<u8>> {
 }
 
 fn ma(rec: &bam::Record) -> Option<String> {
-    match rec.aux(b"MA") {
+    match rec.aux(b"Ma") {
         Ok(Aux::String(s)) => Some(s.to_string()),
         _ => None,
     }
@@ -94,5 +94,81 @@ fn convert_tags_is_idempotent() {
                 String::from_utf8_lossy(tag)
             );
         }
+    }
+}
+
+// Legacy fibertig fs/fl/fa tags are consumed by the reader (into the MA
+// fibertig type) and must be stripped on conversion just like ns/nl/as/al/aq
+// — otherwise the source tags survive as duplicate, potentially-stale copies.
+#[test]
+fn convert_tags_strips_consumed_fibertig_tags() {
+    use rust_htslib::bam::Header;
+
+    // synthesize a legacy fibertig BAM from the first msp_nuc.bam record
+    let input = fixture("msp_nuc.bam");
+    let mut reader = bam::Reader::from_path(&input).unwrap();
+    let header = Header::from_template(reader.header());
+    let synth = NamedTempFile::with_suffix(".bam").unwrap();
+    {
+        let mut writer = bam::Writer::from_path(synth.path(), &header, bam::Format::Bam).unwrap();
+        let mut rec = reader.records().next().unwrap().unwrap();
+        rec.push_aux(b"fs", Aux::ArrayU32((&vec![100u32, 500]).into()))
+            .unwrap();
+        rec.push_aux(b"fl", Aux::ArrayU32((&vec![50u32, 60]).into()))
+            .unwrap();
+        rec.push_aux(b"fa", Aux::String("gene_a|")).unwrap();
+        writer.write(&rec).unwrap();
+    }
+
+    let out = NamedTempFile::with_suffix(".bam").unwrap();
+    convert(synth.path(), out.path());
+    let rec = &records(out.path())[0];
+    for tag in [b"fs", b"fl", b"fa"] {
+        assert!(
+            rec.aux(tag).is_err(),
+            "fibertig tag {} survived conversion",
+            String::from_utf8_lossy(tag)
+        );
+    }
+    let ma_tag = ma(rec).expect("MA tag not written");
+    assert!(
+        ma_tag.contains("fibertig"),
+        "fibertig annotations not carried into MA tag: {ma_tag}"
+    );
+    let an = match rec.aux(b"An") {
+        Ok(Aux::String(s)) => s.to_string(),
+        _ => String::new(),
+    };
+    assert!(
+        an.contains("gene_a"),
+        "fibertig name not carried into AN tag: {an}"
+    );
+}
+
+// Uppercase-spelled files (fibertools 0.10-0.12 output) must migrate to the
+// canonical Ma/Aq/An spellings on conversion, byte-preserving MM/ML.
+#[test]
+fn convert_tags_migrates_uppercase_to_canonical() {
+    let input = fixture("all.bam"); // uppercase MA-era fixture
+    let out = NamedTempFile::new().unwrap();
+    convert(&input, out.path());
+
+    let before = records(&input);
+    let after = records(out.path());
+    assert_eq!(before.len(), after.len(), "record count changed");
+    for (b, a) in before.iter().zip(&after) {
+        assert!(
+            matches!(a.aux(b"Ma"), Ok(Aux::String(_))),
+            "canonical Ma tag not written"
+        );
+        for tag in [b"MA" as &[u8], b"AQ", b"AN"] {
+            assert!(
+                a.aux(tag).is_err(),
+                "uppercase {} survived migration",
+                String::from_utf8_lossy(tag)
+            );
+        }
+        assert_eq!(mm(b), mm(a), "MM changed");
+        assert_eq!(ml(b), ml(a), "ML changed");
     }
 }
