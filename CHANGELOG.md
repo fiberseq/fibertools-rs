@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0](https://github.com/fiberseq/fibertools-rs/compare/v0.12.1...v0.13.0) - 2026-08-13
+
+### Fixed
+
+- [**breaking**] write MA-family tags as Ma/Aq/An (SAM local-use spelling) + legacy-tag hygiene ([#124](https://github.com/fiberseq/fibertools-rs/pull/124))
+- make the Read the Docs (py-ft) build independent of the pyft Rust build ([#127](https://github.com/fiberseq/fibertools-rs/pull/127))
+- MA-refactor fallout — qc, track-decorators, filter expressions, mock-fire ([#123](https://github.com/fiberseq/fibertools-rs/pull/123))
+
+### Other
+
+- cache cargo artifacts, parallelize jobs and tests ([#128](https://github.com/fiberseq/fibertools-rs/pull/128))
+
 ## [0.12.1](https://github.com/fiberseq/fibertools-rs/compare/v0.12.0...v0.12.1) - 2026-08-13
 
 ### Fixed
