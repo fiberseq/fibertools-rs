@@ -128,7 +128,23 @@ pub fn fire_to_bed9(fire_opts: &FireOptions, bam: &mut bam::Reader) -> Result<()
         let msp_ends = msp.reference_ends();
         let nuc_ends = nuc.reference_ends();
         let end_iter = msp_ends.iter().chain(nuc_ends.iter());
-        let msp_qual = msp.qual();
+        // FIRE quals live on the `fire` annotation type (the subset of MSPs
+        // called as FIREs), not on the MSPs themselves. Overlay them onto the
+        // matching MSPs (keyed by molecular start) so extraction reports the
+        // called FDR; MSPs without a fire entry fall back to their own qual
+        // (nonzero only for legacy-tag BAMs) and so report an FDR of 100.
+        let fire = rec.fire();
+        let fire_quals: std::collections::HashMap<i64, u8> = fire
+            .starts()
+            .into_iter()
+            .zip(fire.qual().into_iter())
+            .collect();
+        let msp_qual: Vec<u8> = msp
+            .qual()
+            .into_iter()
+            .zip(msp.starts().into_iter())
+            .map(|(q, s)| fire_quals.get(&s).copied().unwrap_or(q))
+            .collect();
         let nuc_qual = nuc.qual();
         let qual_iter = msp_qual.iter().chain(nuc_qual.iter());
         let n_msps = msp_starts.len();
