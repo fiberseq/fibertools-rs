@@ -30,15 +30,6 @@ pub const NUC_TYPE: &str = "nuc";
 pub const MSP_TYPE: &str = "msp";
 pub const FIRE_TYPE: &str = "fire";
 
-/// Legacy fibertools-rs tags consumed by the reader as a fallback when no
-/// MA tag is present. These are never emitted; we only ingest them.
-pub const LEGACY_READ_TAGS: &[&[u8]] = &[b"ns", b"nl", b"as", b"al", b"aq"];
-
-/// Legacy fibertig tags, likewise consumed only as a read fallback (see
-/// [`read_legacy_fibertig`]) and stripped alongside [`LEGACY_READ_TAGS`]
-/// when they were the source of a written annotation model.
-pub const LEGACY_FIBERTIG_TAGS: &[&[u8]] = &[b"fs", b"fl", b"fa"];
-
 /// Molecular-orientation nuc/msp arrays returned by [`extract_nuc_msp_arrays`]:
 /// `(nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual)`. `msp_qual`
 /// is empty when there are no MSP qualities (pre-FIRE state).
@@ -159,29 +150,39 @@ fn strip_consumed_legacy_tags(record: &mut bam::Record) {
     if ma_family_tags(record).is_some() {
         return;
     }
-    // Pair-level gates mirroring read_legacy_nuc_msp exactly: it ingests
-    // ns+nl only when both are present, as+al only when both are present,
-    // and aq only inside the as/al branch. A lone or orphan tag was never
+    // The reader consumes legacy tags only when the ENTIRE legacy parse
+    // succeeds: any validation bail (a length-mismatched pair) errors
+    // read_record, and the writers that catch that error fall back to
+    // writing an empty model — nothing was consumed, so nothing may be
+    // removed. Gating on the same parse keeps strip and read consumption
+    // identical by construction.
+    if read_legacy_nuc_msp(record).is_err() || read_legacy_fibertig(record).is_err() {
+        return;
+    }
+    // Pair-level gates mirroring read_legacy_nuc_msp: ns+nl only as a pair,
+    // as+al only as a pair, aq only inside a valid msp pair (its count is
+    // validated by the parse above). A lone or orphan tag was never
     // consumed and so is never removed.
-    let nuc_pair = u32_array(record, b"ns").is_some() && u32_array(record, b"nl").is_some();
-    let msp_pair = u32_array(record, b"as").is_some() && u32_array(record, b"al").is_some();
-    if nuc_pair {
+    if u32_array(record, b"ns").is_some() && u32_array(record, b"nl").is_some() {
         record.remove_aux(b"ns").ok();
         record.remove_aux(b"nl").ok();
     }
-    if msp_pair {
+    if u32_array(record, b"as").is_some() && u32_array(record, b"al").is_some() {
         record.remove_aux(b"as").ok();
         record.remove_aux(b"al").ok();
         if u8_array(record, b"aq").is_some() {
             record.remove_aux(b"aq").ok();
         }
     }
-    // fibertig set: fs+fl pair, fa only alongside them (mirrors
-    // read_legacy_fibertig)
-    if has_legacy_fibertig(record) {
+    // fibertig: fs+fl as a pair; fa is only consumed (and so only stripped)
+    // when the pair is non-empty, mirroring read_legacy_fibertig's early
+    // return on empty fs.
+    let fs = u32_array(record, b"fs");
+    if fs.is_some() && u32_array(record, b"fl").is_some() {
+        let non_empty = fs.as_ref().is_some_and(|v| !v.is_empty());
         record.remove_aux(b"fs").ok();
         record.remove_aux(b"fl").ok();
-        if matches!(record.aux(b"fa"), Ok(Aux::String(_))) {
+        if non_empty && matches!(record.aux(b"fa"), Ok(Aux::String(_))) {
             record.remove_aux(b"fa").ok();
         }
     }
@@ -598,6 +599,32 @@ mod tests {
         assert!(msp.aux(b"as").is_err(), "consumed as not stripped");
         assert!(msp.aux(b"al").is_err(), "consumed al not stripped");
         assert!(msp.aux(b"aq").is_err(), "consumed aq not stripped");
+
+        // a length-mismatched pair fails the reader's validation, so the
+        // whole legacy parse errors and NOTHING may be stripped — the
+        // writer falls back to an empty model and the tags are the only
+        // surviving copy of the data
+        let mut mismatched = synth_record(b"ACGTACGT");
+        mismatched
+            .push_aux(b"as", Aux::ArrayU32((&vec![1u32, 5]).into()))
+            .unwrap();
+        mismatched
+            .push_aux(b"al", Aux::ArrayU32((&vec![4u32]).into()))
+            .unwrap();
+        mismatched
+            .push_aux(b"ns", Aux::ArrayU32((&vec![1u32]).into()))
+            .unwrap();
+        mismatched
+            .push_aux(b"nl", Aux::ArrayU32((&vec![2u32]).into()))
+            .unwrap();
+        strip_consumed_legacy_tags(&mut mismatched);
+        for tag in [b"as" as &[u8], b"al", b"ns", b"nl"] {
+            assert!(
+                mismatched.aux(tag).is_ok(),
+                "{} stripped although the legacy parse bailed",
+                String::from_utf8_lossy(tag)
+            );
+        }
 
         // a record already carrying an MA-family tag keeps everything
         let mut with_ma = synth_record(b"ACGTACGT");

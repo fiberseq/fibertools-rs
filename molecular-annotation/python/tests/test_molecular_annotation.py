@@ -695,7 +695,27 @@ class TestMaFamilySpelling:
         # iter_type yields (qs, qe, fs, fe, rs, re, quals, name) tuples
         quals = [item[6] for item in annot.iter_type("msp")]
         assert quals == [[40], [35]], "stale canonical Aq paired with fresh MA"
+        names = [item[7] for item in annot.iter_type("msp")]
+        assert names == [None, None], (
+            "stale canonical An name misattached to fresh uppercase MA"
+        )
         assert annot.annotation_type_names() == ["msp"], "wrong family read"
+
+    def test_stale_sibling_never_pairs_when_uppercase_sibling_absent(self):
+        """Fresh uppercase MA whose own AQ is missing must NOT borrow the
+        stale canonical Aq: the quality spec then has no array and parsing
+        raises, rather than silently misattaching stale values."""
+        import array
+
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("Ma", "10;fire+Q:1-2")          # stale canonical family
+        r.set_tag("Aq", array.array("B", [7]))
+        r.set_tag("MA", "10;msp+P:1-2,5-2")       # fresh uppercase, no AQ
+        with pytest.raises(ValueError):
+            from_record(r)
 
     def test_wrong_typed_uppercase_never_shadows(self):
         pysam = pytest.importorskip("pysam")
