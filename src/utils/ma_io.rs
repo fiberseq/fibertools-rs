@@ -96,7 +96,7 @@ fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations
     }
 }
 
-/// Writes MA-family tags (MA/AL/AQ/AN) to a BAM record, **preserving the
+/// Writes MA-family tags (MA/AQ/AN) to a BAM record, **preserving the
 /// record's existing MM/ML bytes**.
 ///
 /// # Which write function do I call?

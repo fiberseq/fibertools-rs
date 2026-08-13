@@ -12,7 +12,7 @@ but non-canonical encodings (grouped multi-code `C+mh`, `N+a` wildcards).
 Today we work around this with two write functions, and the caller picks based
 on intent:
 
-- `write_record` / `to_record` — writes only MA-family tags (`MA`/`AL`/`AQ`/`AN`),
+- `write_record` / `to_record` — writes only MA-family tags (`MA`/`AQ`/`AN`),
   leaves the record's MM/ML bytes untouched. Used by structural editors
   (fire, add-nucs, footprint, pileup, extract, center, convert-tags) via
   `FiberseqData::serialize_annotations`.
