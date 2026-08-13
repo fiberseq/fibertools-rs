@@ -129,13 +129,17 @@ fn create_mock_fire_record(
         quals.push(quality);
     }
 
-    // Build MA-spec annotations and emit. Mock FIRE only produces MSPs with
-    // the FIRE precision (Q-scaled) quality; no nucleosomes are populated.
+    // Build MA-spec annotations and emit. No nucleosomes are populated.
+    // Real fire-scored records carry every interval as an `msp` annotation
+    // (no quals) with the called subset duplicated into the `fire` type, so
+    // emit both — fire-only records are invisible to msp-driven consumers
+    // (pileup msp_coverage, ft extract, qc, filter expressions).
     // Using `ma_io::write_record_with_basemods` directly (rather than the
     // `FiberseqData::serialize_annotations` path used elsewhere) is intentional
     // here — we're synthesizing a record from BED, so there's no `FiberseqData`
     // to round-trip through.
     let mut annot = MolecularAnnotations::from_record(&record);
+    ma_io::add_msp_annotations(&mut annot, &starts, &lengths, None);
     ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
     ma_io::write_record_with_basemods(&mut record, &annot);
 

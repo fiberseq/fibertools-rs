@@ -166,12 +166,13 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
         map.insert(color, vec![]);
     }
 
-    // FIRE is its own annotation type — color decorators by FIRE precision
-    // directly. Non-FIRE MSPs are not decorated here
-    let fire = fiber.fire();
-    let ref_starts = fire.reference_starts();
-    let ref_lengths = fire.reference_lengths();
-    let quals = fire.qual();
+    // FIRE quals live on the `fire` annotation type — overlay them onto the
+    // MSPs so every MSP is decorated: called FIREs by their precision, and
+    // non-FIRE MSPs as LINKER (qual 0 -> FDR 100), matching pre-MA output.
+    let msp = fiber.msp();
+    let ref_starts = msp.reference_starts();
+    let ref_lengths = msp.reference_lengths();
+    let quals = fiber.msp_fire_quals();
 
     for ((pos, length), qual) in ref_starts.iter().zip(ref_lengths.iter()).zip(quals.iter()) {
         if let (Some(p), Some(l)) = (pos, length) {
@@ -182,8 +183,11 @@ pub fn fire_decorators(fiber: &FiberseqData) -> Vec<Decorator<'_>> {
             map.get_mut(&fire_color).unwrap().push((p, l));
         }
     }
+    // iterate in FIRE_COLORS order so output is deterministic (HashMap
+    // iteration order is randomized per process)
     let mut rtn = vec![];
-    for (color, values) in map.into_iter() {
+    for color in FIRE_COLORS.iter().map(|(_, color)| color) {
+        let values = map.remove(&color).unwrap();
         let (starts, lengths): (Vec<Option<i64>>, Vec<Option<i64>>) = values.into_iter().unzip();
         let el_type = if *color == LINKER_COLOR {
             "LINKER"
