@@ -22,7 +22,7 @@
 //! library serializes them into MM/ML rather than the MA tag set.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{Encoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{ma_family_aux, Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -62,7 +62,7 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     // legacy-derived nuc/msp into whatever the library produced rather
     // than gating on `annotation_types.is_empty()` (which would skip the
     // legacy fallback whenever MM/ML is present).
-    let has_ma = matches!(record.aux(b"MA"), Ok(Aux::String(_)));
+    let has_ma = matches!(ma_family_aux(record, b"MA"), Some(Aux::String(_)));
     if !has_ma {
         // Provenance: the gates are type-checked (`has_legacy_nuc_msp`,
         // `has_legacy_fibertig`), so a foreign tool reusing these two-letter
@@ -154,7 +154,7 @@ pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
 /// those names is never destroyed. Likewise a lone foreign tag outside its
 /// set's gate (e.g. `nl` with no `ns`/`as`) is left alone.
 fn strip_consumed_legacy_tags(record: &mut bam::Record) {
-    if matches!(record.aux(b"MA"), Ok(Aux::String(_))) {
+    if matches!(ma_family_aux(record, b"MA"), Some(Aux::String(_))) {
         return;
     }
     if has_legacy_nuc_msp(record) {
@@ -231,16 +231,16 @@ pub fn read_annotations(record: &bam::Record) -> Result<MolecularAnnotations> {
 }
 
 fn read_ma_tags(record: &bam::Record) -> Result<Option<MolecularAnnotations>> {
-    let ma = match record.aux(b"MA") {
-        Ok(Aux::String(s)) => s.to_string(),
+    let ma = match ma_family_aux(record, b"MA") {
+        Some(Aux::String(s)) => s.to_string(),
         _ => return Ok(None),
     };
-    let aq: Option<Vec<u8>> = match record.aux(b"AQ") {
-        Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
+    let aq: Option<Vec<u8>> = match ma_family_aux(record, b"AQ") {
+        Some(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
         _ => None,
     };
-    let an: Option<String> = match record.aux(b"AN") {
-        Ok(Aux::String(s)) => Some(s.to_string()),
+    let an: Option<String> = match ma_family_aux(record, b"AN") {
+        Some(Aux::String(s)) => Some(s.to_string()),
         _ => None,
     };
     let mut annot = MolecularAnnotations::from_tags(&ma, aq.as_deref(), an.as_deref())
