@@ -661,11 +661,6 @@ class TestMmMl:
         assert [it[2] for it in items] == [2, 4, 5]  # forward (molecular) starts
 
 
-@pytest.mark.skipif(
-    not _FIBERSEQ_BAM.exists(),
-    reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
-)
-
 class TestMaFamilySpelling:
     """Dual-spelling resolution must be family-atomic and type-checked,
     mirroring the Rust ma_family_tags()."""
@@ -715,6 +710,54 @@ class TestMaFamilySpelling:
         )
 
 
+class TestAlignedBlocks:
+    """Liftover block extraction from CIGAR strings."""
+
+    def _record(self, pysam, cigar, seq_len, ref_start=1000):
+        header = pysam.AlignmentHeader.from_dict(
+            {"SQ": [{"SN": "chr1", "LN": 100000}]}
+        )
+        r = pysam.AlignedSegment(header)
+        r.query_name = "read"
+        r.query_sequence = "A" * seq_len
+        r.reference_id = 0
+        r.reference_start = ref_start
+        r.cigarstring = cigar
+        return r
+
+    def test_leading_soft_clip_not_double_counted(self):
+        """A leading soft clip must shift query coords by its length exactly
+        once; the old pre-scan double-counted it, shifting every liftover
+        right by the clip length."""
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import _extract_aligned_blocks
+
+        r = self._record(pysam, "10S90M", 100)
+        assert _extract_aligned_blocks(r) == [((10, 100), (1000, 1090))]
+
+    def test_clips_and_indels(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import _extract_aligned_blocks
+
+        # hard clips consume nothing; trailing soft clip consumes query only
+        r = self._record(pysam, "5H10S40M2D40M10S5H", 100)
+        assert _extract_aligned_blocks(r) == [
+            ((10, 50), (1000, 1040)),
+            ((50, 90), (1042, 1082)),
+        ]
+
+    def test_pure_match_unchanged(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import _extract_aligned_blocks
+
+        r = self._record(pysam, "100M", 100)
+        assert _extract_aligned_blocks(r) == [((0, 100), (1000, 1100))]
+
+
+@pytest.mark.skipif(
+    not _FIBERSEQ_BAM.exists(),
+    reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
+)
 class TestRealFixtures:
     """End-to-end tests against a real fiber-seq BAM (fibertools-rs all.bam).
 

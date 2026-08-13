@@ -176,16 +176,10 @@ def _extract_aligned_blocks(
     query_pos = 0
     ref_pos = record.reference_start
 
-    # Handle leading hard/soft clips
-    for op, length in record.cigartuples:
-        if op == BAM_CHARD_CLIP:
-            continue  # Hard clips don't consume query
-        elif op == BAM_CSOFT_CLIP:
-            query_pos += length
-        else:
-            break
-
-    # Process CIGAR operations
+    # Process CIGAR operations. Leading soft clips are consumed by the
+    # BAM_CSOFT_CLIP branch below exactly once — a separate pre-scan would
+    # double-count them and shift every query coordinate right by the clip
+    # length.
     for op, length in record.cigartuples:
         if op in (BAM_CMATCH, BAM_CEQUAL, BAM_CDIFF):
             # Aligned block
@@ -202,7 +196,7 @@ def _extract_aligned_blocks(
             # Deletion/skip - consumes reference only
             ref_pos += length
         elif op == BAM_CSOFT_CLIP:
-            # Soft clip at end - consumes query only
+            # Soft clip (leading or trailing) - consumes query only
             query_pos += length
         # Hard clips and padding don't consume either
 
