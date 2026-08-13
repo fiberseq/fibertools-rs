@@ -16,10 +16,9 @@ molecular-annotation = { path = ".", features = ["htslib"] }
 
 ## Encoding Formats
 
-Two encoding formats are available via feature flags:
-
-- **`inline-lengths`** (default): Lengths in MA string: `MA:Z:1000;nuc+:100-50,200-60`
-- **`separate-lengths`**: Lengths in AL array: `MA:Z:1000;nuc+:100,200` + `AL:B:I,50,60`
+Lengths are encoded inline in the MA string (`MA:Z:1000;nuc+:100-50,200-60`).
+The retired separate-length encoding (`AL` array) is stripped on write and
+never emitted.
 
 ## Documentation
 

@@ -1,7 +1,7 @@
 //! Molecular Annotation Library
 //!
 //! This library provides types and functions for working with molecular annotations
-//! according to the MA/AL/AQ/AN tag specification for SAM/BAM files.
+//! according to the MA/AQ/AN tag specification for SAM/BAM files.
 //!
 //! # Coordinate Conventions
 //!
