@@ -37,6 +37,42 @@ def _get_tag_any(record: "pysam.AlignedSegment", *names: str):
     return None
 
 
+def _ma_family_tags(record: "pysam.AlignedSegment"):
+    """Read the MA tag family (Ma, Aq, An), resolving the spelling ONCE.
+
+    Mirrors the Rust `ma_family_tags`: the spelling is chosen from the main
+    tag alone, type-checked (string-typed); uppercase wins when both are
+    present (a dual-spelled record can only come from an uppercase-only
+    0.10-0.12 tool editing a Ma-spelled file, so its family is the fresher
+    write). The sibling Aq/An are then read ONLY in the winning spelling —
+    per-tag fallback would pair a fresh main tag with stale siblings from
+    the other spelling. A wrong-typed main tag (e.g. a foreign MA:i) never
+    wins. Returns (ma, aq, an) or None when neither spelling carries a
+    string-typed main tag.
+    """
+
+    def _string_tag(name: str):
+        try:
+            v = record.get_tag(name)
+        except KeyError:
+            return None
+        return v if isinstance(v, str) else None
+
+    if _string_tag("MA") is not None:
+        ma_t, aq_t, an_t = "MA", "AQ", "AN"
+    elif _string_tag("Ma") is not None:
+        ma_t, aq_t, an_t = "Ma", "Aq", "An"
+    else:
+        return None
+    ma = record.get_tag(ma_t)
+    try:
+        aq = list(record.get_tag(aq_t))
+    except (KeyError, TypeError):
+        aq = None
+    an = _string_tag(an_t)
+    return ma, aq, an
+
+
 def _parse_mm_ml_into(
     annot: MolecularAnnotations, record: "pysam.AlignedSegment", is_reverse: bool
 ) -> None:
@@ -89,21 +125,12 @@ def from_record(
     is_reverse = record.is_reverse
 
     if parse_tags:
-        # Get the Ma tag (required when parsing tags). Both spellings are
-        # accepted; uppercase wins when both are present because only an
-        # uppercase-only writer (fibertools 0.10-0.12) can produce a
-        # dual-spelled record, making MA the fresher write.
-        ma = _get_tag_any(record, "MA", "Ma")
-        if ma is None:
+        # Resolve the Ma/Aq/An family atomically (required when parsing
+        # tags); see _ma_family_tags for the spelling-precedence rules.
+        family = _ma_family_tags(record)
+        if family is None:
             raise KeyError("record has no Ma/MA tag")
-
-        # Get the Aq tag (optional)
-        aq = _get_tag_any(record, "AQ", "Aq")
-        if aq is not None:
-            aq = list(aq)
-
-        # Get the An tag (optional)
-        an = _get_tag_any(record, "AN", "An")
+        ma, aq, an = family
 
         annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse

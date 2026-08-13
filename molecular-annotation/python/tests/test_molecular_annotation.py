@@ -665,6 +665,56 @@ class TestMmMl:
     not _FIBERSEQ_BAM.exists(),
     reason="fiber-seq BAM fixture only present inside the fibertools-rs repo",
 )
+
+class TestMaFamilySpelling:
+    """Dual-spelling resolution must be family-atomic and type-checked,
+    mirroring the Rust ma_family_tags()."""
+
+    def _record(self, pysam, seq="ACGTACGTAA"):
+        header = pysam.AlignmentHeader.from_dict(
+            {"SQ": [{"SN": "chr1", "LN": 100000}]}
+        )
+        r = pysam.AlignedSegment(header)
+        r.query_name = "read"
+        r.query_sequence = seq
+        r.reference_id = 0
+        r.reference_start = 100
+        r.cigarstring = f"{len(seq)}M"
+        return r
+
+    def test_uppercase_family_wins_atomically(self):
+        """Fresh uppercase MA (old-tool edit) must not be paired with stale
+        canonical Aq/An siblings."""
+        import array
+
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("Ma", "10;fire+Q:1-2")          # stale canonical family
+        r.set_tag("Aq", array.array("B", [7]))
+        r.set_tag("An", "stale_name,")
+        r.set_tag("MA", "10;msp+P:1-2,5-2")       # fresh uppercase family
+        r.set_tag("AQ", array.array("B", [40, 35]))
+        annot = from_record(r)
+        # iter_type yields (qs, qe, fs, fe, rs, re, quals, name) tuples
+        quals = [item[6] for item in annot.iter_type("msp")]
+        assert quals == [[40], [35]], "stale canonical Aq paired with fresh MA"
+        assert annot.annotation_type_names() == ["msp"], "wrong family read"
+
+    def test_wrong_typed_uppercase_never_shadows(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        r = self._record(pysam)
+        r.set_tag("MA", 5)                        # foreign int-typed MA
+        r.set_tag("Ma", "10;nuc.:1-3")
+        annot = from_record(r)
+        assert annot.annotation_type_names() == ["nuc"], (
+            "wrong-typed uppercase MA shadowed valid canonical Ma"
+        )
+
+
 class TestRealFixtures:
     """End-to-end tests against a real fiber-seq BAM (fibertools-rs all.bam).
 
