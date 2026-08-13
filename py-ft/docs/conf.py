@@ -5,12 +5,36 @@
 import os
 import re
 import sys
+import types
 
-# import sphinx
-# import sphinx.ext.autosummary as autosummary
-# sys.path.insert(0, os.path.abspath("../"))
-sys.path.insert(0, os.path.abspath("../python/pyft"))
-import pyft
+# The docs build must not depend on compiling the pyft Rust extension:
+# Read the Docs was failing in `pip install ./py-ft` because the native
+# (maturin/PyO3) build no longer compiles there. Instead, make the
+# pure-python sources importable directly and stub out the compiled
+# `pyft.pyft` submodule so `import pyft` works without the Rust build.
+sys.path.insert(0, os.path.abspath("../python"))  # provides the `pyft` package
+sys.path.insert(0, os.path.abspath("../python/pyft"))  # provides `utils` for api.rst
+
+_rust_stub = types.ModuleType("pyft.pyft")
+_rust_stub.__doc__ = (
+    "Compiled Rust extension of pyft (not available during the docs build)."
+)
+# `pyft/__init__.py` does `from .pyft import *` and then reads `pyft.__doc__`,
+# so the star-import must bind the name `pyft` to this stub.
+_rust_stub.pyft = _rust_stub
+_rust_stub.__all__ = ["pyft"]
+sys.modules["pyft.pyft"] = _rust_stub
+
+# Heavy runtime dependencies of pyft.utils/pyft.plot are not installed for the
+# docs build; mock them for autodoc.
+autodoc_mock_imports = [
+    "pandas",
+    "altair",
+    "polars",
+    "numpy",
+    "vegafusion",
+    "tqdm",
+]
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -18,8 +42,11 @@ import pyft
 project = "pyft"
 copyright = "2023, Mitchell R. Vollger"
 author = "Mitchell R. Vollger"
-version = pyft.__version__
-release = pyft.__version__
+
+# Read the version from py-ft/Cargo.toml instead of importing the built package.
+with open(os.path.join(os.path.dirname(__file__), "..", "Cargo.toml")) as _fh:
+    version = re.search(r'^version\s*=\s*"([^"]+)"', _fh.read(), re.M).group(1)
+release = version
 
 
 # -- General configuration ---------------------------------------------------
@@ -36,10 +63,14 @@ extensions = [
     "nbsphinx",
 ]
 
-source_suffix = [".rst", ".py"]
+source_suffix = [".rst"]
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+# The vignette notebooks ship with saved outputs; never re-execute them during
+# the docs build (the compiled pyft extension is not available here).
+nbsphinx_execute = "never"
 
 
 # -- Options for HTML output -------------------------------------------------

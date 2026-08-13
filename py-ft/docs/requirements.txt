@@ -8,4 +8,5 @@ docutils==0.18.1
 setuptools
 nbsphinx
 pypandoc_binary
+ipython
 #sphinxawesome-theme
