@@ -130,7 +130,7 @@ mod serialize;
 mod basemods;
 
 #[cfg(feature = "htslib")]
-pub use decode::ma_family_aux;
+pub use decode::ma_family_tags;
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
     Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaParts, MmGroup,

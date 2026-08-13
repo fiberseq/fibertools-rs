@@ -54,3 +54,6 @@ jobs:
 
       - name: Run test
         run: cargo test -p fibertools-rs -- --test-threads=1
+
+      - name: Run molecular-annotation tests
+        run: cargo test -p molecular-annotation --features htslib

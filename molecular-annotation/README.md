@@ -16,9 +16,11 @@ molecular-annotation = { path = ".", features = ["htslib"] }
 
 ## Encoding Formats
 
-Lengths are encoded inline in the MA string (`MA:Z:1000;nuc+:100-50,200-60`).
-The retired separate-length encoding (`AL` array) is stripped on write and
-never emitted.
+Lengths are encoded inline in the Ma string (`Ma:Z:1000;nuc+:100-50,200-60`).
+The retired separate-length encoding (`Al` array) is stripped on write and
+never emitted. Readers accept the all-uppercase `MA`/`AQ`/`AN` spellings that
+fibertools 0.10-0.12 emitted; writers emit only `Ma`/`Aq`/`An`
+(samtools/hts-specs#862).
 
 ## Documentation
 

@@ -144,3 +144,31 @@ fn convert_tags_strips_consumed_fibertig_tags() {
         "fibertig name not carried into AN tag: {an}"
     );
 }
+
+// Uppercase-spelled files (fibertools 0.10-0.12 output) must migrate to the
+// canonical Ma/Aq/An spellings on conversion, byte-preserving MM/ML.
+#[test]
+fn convert_tags_migrates_uppercase_to_canonical() {
+    let input = fixture("all.bam"); // uppercase MA-era fixture
+    let out = NamedTempFile::new().unwrap();
+    convert(&input, out.path());
+
+    let before = records(&input);
+    let after = records(out.path());
+    assert_eq!(before.len(), after.len(), "record count changed");
+    for (b, a) in before.iter().zip(&after) {
+        assert!(
+            matches!(a.aux(b"Ma"), Ok(Aux::String(_))),
+            "canonical Ma tag not written"
+        );
+        for tag in [b"MA" as &[u8], b"AQ", b"AN"] {
+            assert!(
+                a.aux(tag).is_err(),
+                "uppercase {} survived migration",
+                String::from_utf8_lossy(tag)
+            );
+        }
+        assert_eq!(mm(b), mm(a), "MM changed");
+        assert_eq!(ml(b), ml(a), "ML changed");
+    }
+}

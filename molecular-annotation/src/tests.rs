@@ -2220,10 +2220,51 @@ fn ma_family_tags_accept_both_spellings() {
         "stale Ma won over fresher uppercase MA"
     );
 
+    // family resolution is ATOMIC: the winning uppercase family must not be
+    // paired with the stale canonical Aq/An siblings (misattached quals or
+    // names, or a count-mismatch parse failure that wipes everything)
+    record.push_aux(b"An", Aux::String("stale_name,")).unwrap();
+    record
+        .push_aux(b"Aq", Aux::ArrayU8((&vec![7u8][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&record);
+    let msp = annot.get_type("msp").expect("uppercase family wiped");
+    assert_eq!(
+        msp.annotations[0].qualities.as_slice(),
+        &[50],
+        "stale canonical Aq paired with fresh uppercase MA"
+    );
+    assert!(
+        msp.annotations[0].name.is_none(),
+        "stale canonical An name misattached to fresh uppercase MA"
+    );
+
+    // a wrong-typed uppercase main tag never shadows a valid canonical Ma
+    let mut shadow = Record::new();
+    shadow.set(b"r2", None, b"AAAA", &vec![255u8; 4]);
+    shadow.push_aux(b"MA", Aux::I32(5)).unwrap();
+    shadow.push_aux(b"Ma", Aux::String("4;nuc.:1-3")).unwrap();
+    let annot = MolecularAnnotations::from_record(&shadow);
+    assert!(
+        annot.get_type("nuc").is_some(),
+        "wrong-typed uppercase MA shadowed valid canonical Ma"
+    );
+
     // a rewrite strips both spellings; only the canonical remains
     let annot = MolecularAnnotations::from_record(&record);
     annot.to_record(&mut record);
     assert!(record.aux(b"MA").is_err(), "uppercase MA survived rewrite");
     assert!(record.aux(b"AQ").is_err(), "uppercase AQ survived rewrite");
+    assert!(record.aux(b"An").is_err(), "stale An survived rewrite");
+    // the rewrite emits a FRESH canonical Aq from the model (qual 50); the
+    // stale [7] must be gone
+    match record.aux(b"Aq") {
+        Ok(Aux::ArrayU8(arr)) => assert_eq!(
+            arr.iter().collect::<Vec<u8>>(),
+            vec![50],
+            "rewrite kept the stale Aq value"
+        ),
+        other => panic!("expected fresh canonical Aq after rewrite, got {other:?}"),
+    }
     assert!(matches!(record.aux(b"Ma"), Ok(Aux::String(_))));
 }

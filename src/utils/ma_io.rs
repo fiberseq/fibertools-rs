@@ -22,7 +22,7 @@
 //! library serializes them into MM/ML rather than the MA tag set.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{ma_family_aux, Encoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{ma_family_tags, Encoding, MolecularAnnotations, QualitySpec, Strand};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -62,14 +62,15 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
     // legacy-derived nuc/msp into whatever the library produced rather
     // than gating on `annotation_types.is_empty()` (which would skip the
     // legacy fallback whenever MM/ML is present).
-    let has_ma = matches!(ma_family_aux(record, b"Ma"), Some(Aux::String(_)));
+    let has_ma = ma_family_tags(record).is_some();
     if !has_ma {
         // Provenance: the gates are type-checked (`has_legacy_nuc_msp`,
         // `has_legacy_fibertig`), so a foreign tool reusing these two-letter
         // names with a different aux type is never parsed as fibertools data.
-        // The write path (`strip_consumed_legacy_tags`) removes a legacy tag
-        // only under these same gates plus a per-tag type check — i.e. only
-        // when this reader consumed it — so keep the two in sync.
+        // The write path (`strip_consumed_legacy_tags`) removes legacy tags
+        // under pair-level gates mirroring `read_legacy_nuc_msp`'s
+        // consumption — i.e. only what this reader ingested — so keep the
+        // two in sync.
         if has_legacy_nuc_msp(record) {
             merge_missing_types(&mut annot, read_legacy_nuc_msp(record)?);
         }
@@ -141,34 +142,47 @@ pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
     annot.to_record(record);
 }
 
-/// Provenance rule shared by every MA write: strip exactly the legacy tag
-/// sets that [`read_record`] consumed as the source of the annotation model
-/// being written — they are superseded by the MA tags (v0.9 replace
+/// Provenance rule shared by every MA write: strip exactly the legacy tags
+/// that [`read_record`] consumed as the source of the annotation model being
+/// written — they are superseded by the MA-family tags (v0.9 replace
 /// semantics; otherwise legacy readers silently see stale calls forever).
 ///
-/// The gates mirror [`read_record`]'s consumption gates, which is what makes
-/// this provenance-safe: a set is only removed when the reader ingested it
-/// (and it parsed as fibertools data — a parse failure errors out before any
-/// write). Records that already carry `MA` were not read from legacy tags,
-/// so their legacy-named aux tags are left untouched: a foreign tool reusing
-/// those names is never destroyed. Likewise a lone foreign tag outside its
-/// set's gate (e.g. `nl` with no `ns`/`as`) is left alone.
+/// The gates mirror [`read_legacy_nuc_msp`]'s consumption at PAIR level
+/// (ns+nl, as+al, aq only inside the msp pair, fa only with fs+fl), which is
+/// what makes this provenance-safe: a tag is only removed when the reader
+/// ingested it. Records that already carry an MA-family main tag were not
+/// read from legacy tags, so their legacy-named aux tags are left untouched:
+/// a foreign tool reusing those names is never destroyed. Likewise a lone or
+/// wrong-typed tag outside its pair gate (e.g. `as` with no `al`, or `aq`
+/// with no msp pair) is left alone.
 fn strip_consumed_legacy_tags(record: &mut bam::Record) {
-    if matches!(ma_family_aux(record, b"Ma"), Some(Aux::String(_))) {
+    if ma_family_tags(record).is_some() {
         return;
     }
-    if has_legacy_nuc_msp(record) {
-        for tag in LEGACY_READ_TAGS {
-            if is_legacy_typed(record, tag) {
-                record.remove_aux(tag).ok();
-            }
+    // Pair-level gates mirroring read_legacy_nuc_msp exactly: it ingests
+    // ns+nl only when both are present, as+al only when both are present,
+    // and aq only inside the as/al branch. A lone or orphan tag was never
+    // consumed and so is never removed.
+    let nuc_pair = u32_array(record, b"ns").is_some() && u32_array(record, b"nl").is_some();
+    let msp_pair = u32_array(record, b"as").is_some() && u32_array(record, b"al").is_some();
+    if nuc_pair {
+        record.remove_aux(b"ns").ok();
+        record.remove_aux(b"nl").ok();
+    }
+    if msp_pair {
+        record.remove_aux(b"as").ok();
+        record.remove_aux(b"al").ok();
+        if u8_array(record, b"aq").is_some() {
+            record.remove_aux(b"aq").ok();
         }
     }
+    // fibertig set: fs+fl pair, fa only alongside them (mirrors
+    // read_legacy_fibertig)
     if has_legacy_fibertig(record) {
-        for tag in LEGACY_FIBERTIG_TAGS {
-            if is_legacy_typed(record, tag) {
-                record.remove_aux(tag).ok();
-            }
+        record.remove_aux(b"fs").ok();
+        record.remove_aux(b"fl").ok();
+        if matches!(record.aux(b"fa"), Ok(Aux::String(_))) {
+            record.remove_aux(b"fa").ok();
         }
     }
 }
@@ -185,18 +199,6 @@ fn has_legacy_nuc_msp(record: &bam::Record) -> bool {
 /// Type-checked consumption gate for the legacy fibertig tag set.
 fn has_legacy_fibertig(record: &bam::Record) -> bool {
     u32_array(record, b"fs").is_some() && u32_array(record, b"fl").is_some()
-}
-
-/// True when `tag` carries the aux type legacy fibertools wrote for it —
-/// the per-tag half of the provenance check in
-/// [`strip_consumed_legacy_tags`]: even inside a gated set, a wrong-typed
-/// tag was not consumed by the reader and so is never removed.
-fn is_legacy_typed(record: &bam::Record, tag: &[u8]) -> bool {
-    match tag {
-        b"aq" => u8_array(record, tag).is_some(),
-        b"fa" => matches!(record.aux(tag), Ok(Aux::String(_))),
-        _ => u32_array(record, tag).is_some(),
-    }
 }
 
 /// Writes MA-family tags **and** canonically re-encodes MM/ML from the
@@ -231,17 +233,8 @@ pub fn read_annotations(record: &bam::Record) -> Result<MolecularAnnotations> {
 }
 
 fn read_ma_tags(record: &bam::Record) -> Result<Option<MolecularAnnotations>> {
-    let ma = match ma_family_aux(record, b"Ma") {
-        Some(Aux::String(s)) => s.to_string(),
-        _ => return Ok(None),
-    };
-    let aq: Option<Vec<u8>> = match ma_family_aux(record, b"Aq") {
-        Some(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
-        _ => None,
-    };
-    let an: Option<String> = match ma_family_aux(record, b"An") {
-        Some(Aux::String(s)) => Some(s.to_string()),
-        _ => None,
+    let Some((ma, aq, an)) = ma_family_tags(record) else {
+        return Ok(None);
     };
     let mut annot = MolecularAnnotations::from_tags(&ma, aq.as_deref(), an.as_deref())
         .map_err(|e| anyhow::anyhow!("MA tag parse error: {e}"))?;
@@ -558,11 +551,12 @@ mod tests {
     use super::*;
     use molecular_annotation::{MolecularAnnotations, QualitySpec, Strand};
 
-    /// Foreign tags that merely reuse legacy names with a different aux type
-    /// must never be stripped by the MA write path; correctly-typed consumed
-    /// legacy tags must be.
+    /// The strip must remove exactly what the reader consumed: foreign
+    /// (wrong-typed) tags, lone pair members, and orphan aq must all
+    /// survive; consumed pairs are removed; MA-family presence blocks all
+    /// stripping.
     #[test]
-    fn strip_consumed_legacy_tags_checks_types() {
+    fn strip_consumed_legacy_tags_mirrors_consumption() {
         // foreign: `ns` as a string, `al` as a float — not fibertools-typed
         let mut foreign = synth_record(b"ACGTACGT");
         foreign.push_aux(b"ns", Aux::String("not-ours")).unwrap();
@@ -571,8 +565,8 @@ mod tests {
         assert!(foreign.aux(b"ns").is_ok(), "foreign string ns was stripped");
         assert!(foreign.aux(b"al").is_ok(), "foreign float al was stripped");
 
-        // fibertools-typed legacy nuc/msp set: consumed, so stripped — but a
-        // wrong-typed member of the set (string aq) survives
+        // consumed nuc pair is stripped; a typed-but-orphan aq (no msp pair)
+        // and a lone as (no al) were never ingested and must survive
         let mut legacy = synth_record(b"ACGTACGT");
         legacy
             .push_aux(b"ns", Aux::ArrayU32((&vec![1u32, 5]).into()))
@@ -580,17 +574,39 @@ mod tests {
         legacy
             .push_aux(b"nl", Aux::ArrayU32((&vec![2u32, 2]).into()))
             .unwrap();
-        legacy.push_aux(b"aq", Aux::String("not-ours")).unwrap();
+        legacy
+            .push_aux(b"aq", Aux::ArrayU8((&vec![200u8, 0]).into()))
+            .unwrap();
+        legacy
+            .push_aux(b"as", Aux::ArrayU32((&vec![3u32]).into()))
+            .unwrap();
         strip_consumed_legacy_tags(&mut legacy);
         assert!(legacy.aux(b"ns").is_err(), "consumed ns not stripped");
         assert!(legacy.aux(b"nl").is_err(), "consumed nl not stripped");
-        assert!(legacy.aux(b"aq").is_ok(), "wrong-typed aq was stripped");
+        assert!(legacy.aux(b"aq").is_ok(), "orphan aq was stripped");
+        assert!(legacy.aux(b"as").is_ok(), "lone as was stripped");
 
-        // a record already carrying MA keeps even fibertools-typed legacy tags
+        // a consumed msp pair takes its aq with it
+        let mut msp = synth_record(b"ACGTACGT");
+        msp.push_aux(b"as", Aux::ArrayU32((&vec![1u32]).into()))
+            .unwrap();
+        msp.push_aux(b"al", Aux::ArrayU32((&vec![4u32]).into()))
+            .unwrap();
+        msp.push_aux(b"aq", Aux::ArrayU8((&vec![200u8]).into()))
+            .unwrap();
+        strip_consumed_legacy_tags(&mut msp);
+        assert!(msp.aux(b"as").is_err(), "consumed as not stripped");
+        assert!(msp.aux(b"al").is_err(), "consumed al not stripped");
+        assert!(msp.aux(b"aq").is_err(), "consumed aq not stripped");
+
+        // a record already carrying an MA-family tag keeps everything
         let mut with_ma = synth_record(b"ACGTACGT");
         with_ma.push_aux(b"MA", Aux::String("8;")).unwrap();
         with_ma
             .push_aux(b"ns", Aux::ArrayU32((&vec![1u32]).into()))
+            .unwrap();
+        with_ma
+            .push_aux(b"nl", Aux::ArrayU32((&vec![2u32]).into()))
             .unwrap();
         strip_consumed_legacy_tags(&mut with_ma);
         assert!(with_ma.aux(b"ns").is_ok(), "legacy tag stripped despite MA");

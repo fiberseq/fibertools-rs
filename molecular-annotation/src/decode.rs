@@ -4,28 +4,52 @@ use std::str::FromStr;
 
 use crate::{MolecularAnnotations, ParseError, QualitySpec, Strand};
 
-/// Resolve an MA-family aux tag on a record, accepting both the canonical
-/// spelling (`Ma`/`Aq`/`An` — the lowercase-second-letter local-use form
+/// Read the MA tag family (`Ma:Z`, `Aq:B:C`, `An:Z`) off a record, resolving
+/// the spelling ONCE for the whole family. Both spellings are accepted: the
+/// canonical `Ma`/`Aq`/`An` (the lowercase-second-letter local-use form
 /// proposed to hts-specs, samtools/hts-specs#862) and the all-uppercase
-/// spelling (`MA`/`AQ`/`AN`) that fibertools 0.10-0.12 emitted.
+/// `MA`/`AQ`/`AN` that fibertools 0.10-0.12 emitted.
 ///
-/// The uppercase spelling wins when both are present: writers that know
-/// about both spellings strip both before writing, so a dual-spelled record
-/// can only have been produced by an uppercase-only tool (0.10-0.12)
-/// editing a `Ma`-spelled file — leaving its fresh `MA` next to the now
-/// stale `Ma`. Preferring uppercase therefore always reads the most recent
-/// write. New writers emit only the canonical `Ma` spelling.
+/// The spelling is chosen from the main tag alone, type-checked (`Z`-typed):
+/// uppercase wins when both are present, because writers that know about
+/// both spellings strip both before writing — a dual-spelled record can only
+/// have been produced by an uppercase-only tool (0.10-0.12) editing a
+/// `Ma`-spelled file, leaving its fresh `MA` family next to the now-stale
+/// `Ma` family. The sibling `Aq`/`An` tags are then read ONLY in the winning
+/// spelling: resolving them per-tag would pair the fresh main tag with stale
+/// siblings from the other spelling (misattached quals/names, or a
+/// count-mismatch parse failure). A wrong-typed main tag never wins, so a
+/// foreign `MA:i` cannot shadow a valid `Ma:Z`.
+///
+/// Returns `(ma, aq, an)`, or `None` when neither spelling carries a
+/// `Z`-typed main tag. New writers emit only the canonical spelling.
 #[cfg(feature = "htslib")]
-pub fn ma_family_aux<'a>(
-    record: &'a rust_htslib::bam::Record,
-    tag: &[u8; 2],
-) -> Option<rust_htslib::bam::record::Aux<'a>> {
-    let upper = [tag[0].to_ascii_uppercase(), tag[1].to_ascii_uppercase()];
-    if let Ok(aux) = record.aux(&upper) {
-        return Some(aux);
-    }
-    let canonical = [upper[0], upper[1].to_ascii_lowercase()];
-    record.aux(&canonical).ok()
+pub fn ma_family_tags(
+    record: &rust_htslib::bam::Record,
+) -> Option<(String, Option<Vec<u8>>, Option<String>)> {
+    use rust_htslib::bam::record::Aux;
+
+    let (ma_tag, aq_tag, an_tag): (&[u8; 2], &[u8; 2], &[u8; 2]) =
+        if matches!(record.aux(b"MA"), Ok(Aux::String(_))) {
+            (b"MA", b"AQ", b"AN")
+        } else if matches!(record.aux(b"Ma"), Ok(Aux::String(_))) {
+            (b"Ma", b"Aq", b"An")
+        } else {
+            return None;
+        };
+    let ma = match record.aux(ma_tag) {
+        Ok(Aux::String(s)) => s.to_string(),
+        _ => return None,
+    };
+    let aq = match record.aux(aq_tag) {
+        Ok(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
+        _ => None,
+    };
+    let an = match record.aux(an_tag) {
+        Ok(Aux::String(s)) => Some(s.to_string()),
+        _ => None,
+    };
+    Some((ma, aq, an))
 }
 
 impl MolecularAnnotations {
@@ -59,25 +83,14 @@ impl MolecularAnnotations {
     pub fn from_record(record: &rust_htslib::bam::Record) -> Self {
         use rust_htslib::bam::record::Aux;
 
-        // Pull MA/AQ/AN tags off the record (either spelling; see
-        // `ma_family_aux`). If MA is present and parses, start from that;
-        // otherwise start from an empty annotation set keyed off the
-        // record's sequence length.
-        let ma_string: Option<String> = match ma_family_aux(record, b"Ma") {
-            Some(Aux::String(s)) => Some(s.to_string()),
-            _ => None,
-        };
-        let aq_vec: Option<Vec<u8>> = match ma_family_aux(record, b"Aq") {
-            Some(Aux::ArrayU8(arr)) => Some(arr.iter().collect()),
-            _ => None,
-        };
-        let an_string: Option<String> = match ma_family_aux(record, b"An") {
-            Some(Aux::String(s)) => Some(s.to_string()),
-            _ => None,
-        };
+        // Pull the Ma/Aq/An tag family off the record (either spelling,
+        // resolved atomically; see `ma_family_tags`). If the main tag is
+        // present and parses, start from that; otherwise start from an empty
+        // annotation set keyed off the record's sequence length.
+        let family = ma_family_tags(record);
 
-        let mut annot = match ma_string {
-            Some(ref ma) => Self::from_tags(ma, aq_vec.as_deref(), an_string.as_deref())
+        let mut annot = match family {
+            Some((ref ma, ref aq, ref an)) => Self::from_tags(ma, aq.as_deref(), an.as_deref())
                 .unwrap_or_else(|_| Self::new(record.seq_len() as u32)),
             None => Self::new(record.seq_len() as u32),
         };
