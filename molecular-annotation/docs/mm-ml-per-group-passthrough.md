@@ -18,7 +18,7 @@ on intent:
   `FiberseqData::serialize_annotations`.
 - `write_record_with_basemods` / `write_mm_ml` — destructively re-encodes MM/ML
   canonically from the model. Used by base-mod producers (predict-m6a,
-  ddda-to-m6a, strip-basemods, mock-fire, fibertig synthesis).
+  ddda-to-m6a, strip-basemods, mock-fire, union-peaks, fibertig synthesis).
 
 The split is a proxy for one boolean: "did this code path change base mods?"
 It works, but the decision lives in the caller's choice of function — a footgun

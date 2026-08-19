@@ -138,6 +138,9 @@ pub fn main() -> Result<(), Error> {
         Some(Commands::MockFire(mock_fire_opts)) => {
             subcommands::mock_fire::run_mock_fire(mock_fire_opts)?;
         }
+        Some(Commands::UnionPeaks(union_peaks_opts)) => {
+            subcommands::union_peaks::run_union_peaks(union_peaks_opts)?;
+        }
         Some(Commands::Benchmark(benchmark_opts)) => {
             subcommands::benchmark::run_benchmark(benchmark_opts)?;
         }

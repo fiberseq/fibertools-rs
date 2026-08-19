@@ -1,6 +1,7 @@
 use super::chrom_names_and_lengths;
 use super::fdr::{lookup_fdr, FdrEntry};
 use crate::cli::CallPeaksOptions;
+use crate::fiber::FiberseqData;
 use crate::subcommands::pileup::{
     FiberseqPileup, FiberseqPileupOptions, FireTrack, FireTrackOptions,
 };
@@ -32,6 +33,44 @@ pub fn reciprocal_overlap_raw(
     let a_len = (a_end - a_start) as f64;
     let b_len = (b_end - b_start) as f64;
     (overlap_len / a_len).min(overlap_len / b_len)
+}
+
+/// Everything peak calling needs from the CLI, decoupled from `CallPeaksOptions`
+/// (which flattens `InputBam`/`FiberFilters`, so commands that never read a BAM
+/// cannot build one). See `ft union-peaks` for the other caller.
+#[derive(Debug, Clone, Copy)]
+pub struct PeakCallingParams {
+    pub window_size: usize,
+    pub min_fire_coverage: i32,
+    pub min_cov: Option<i32>,
+    pub max_cov: Option<i32>,
+    pub sd_cov: f64,
+    pub max_fdr: f64,
+    pub min_fire_frac: Option<f64>,
+    pub min_fire_frac_filter: f64,
+    pub min_frac_overlap: f64,
+    pub min_reciprocal_overlap: f64,
+    pub high_reciprocal_overlap: f64,
+    pub max_grouping_iterations: usize,
+}
+
+impl From<&CallPeaksOptions> for PeakCallingParams {
+    fn from(o: &CallPeaksOptions) -> Self {
+        Self {
+            window_size: o.window_size,
+            min_fire_coverage: o.min_fire_coverage,
+            min_cov: o.min_cov,
+            max_cov: o.max_cov,
+            sd_cov: o.sd_cov,
+            max_fdr: o.max_fdr,
+            min_fire_frac: o.min_fire_frac,
+            min_fire_frac_filter: o.min_fire_frac_filter,
+            min_frac_overlap: o.min_frac_overlap,
+            min_reciprocal_overlap: o.min_reciprocal_overlap,
+            high_reciprocal_overlap: o.high_reciprocal_overlap,
+            max_grouping_iterations: o.max_grouping_iterations,
+        }
+    }
 }
 
 /// Filtering thresholds for peak calling
@@ -518,17 +557,20 @@ fn merge_peaks_single_iteration<'a>(
 /// Phase 1: High reciprocal overlap (default 90%, configurable via --high-reciprocal-overlap)
 /// Phase 2: FIRE element overlap (default 50%, configurable via --min-frac-overlap)
 /// Phase 3: Reciprocal overlap (default 75%, configurable via --min-reciprocal-overlap)
-fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) -> Vec<Peak<'a>> {
+fn merge_peaks_iterative<'a>(
+    mut peaks: Vec<Peak<'a>>,
+    params: &PeakCallingParams,
+) -> Vec<Peak<'a>> {
     let initial_count = peaks.len();
 
     // Phase 1: High reciprocal overlap
     log::debug!(
         "  Phase 1: Merging peaks with reciprocal overlap >= {}",
-        opts.high_reciprocal_overlap
+        params.high_reciprocal_overlap
     );
-    for iteration in 0..opts.max_grouping_iterations {
+    for iteration in 0..params.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, 0.0, opts.high_reciprocal_overlap);
+        peaks = merge_peaks_single_iteration(peaks, 0.0, params.high_reciprocal_overlap);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -544,11 +586,11 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     // Phase 2: FIRE element overlap
     log::debug!(
         "  Phase 2: Merging peaks with FIRE element overlap >= {}",
-        opts.min_frac_overlap
+        params.min_frac_overlap
     );
-    for iteration in 0..opts.max_grouping_iterations {
+    for iteration in 0..params.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, opts.min_frac_overlap, 0.0);
+        peaks = merge_peaks_single_iteration(peaks, params.min_frac_overlap, 0.0);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -564,11 +606,11 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     // Phase 3: High reciprocal overlap again
     log::debug!(
         "  Phase 3: Merging peaks with reciprocal overlap >= {}",
-        opts.min_reciprocal_overlap
+        params.min_reciprocal_overlap
     );
-    for iteration in 0..opts.max_grouping_iterations {
+    for iteration in 0..params.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, 0.0, opts.min_reciprocal_overlap);
+        peaks = merge_peaks_single_iteration(peaks, 0.0, params.min_reciprocal_overlap);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -589,6 +631,75 @@ fn merge_peaks_iterative<'a>(mut peaks: Vec<Peak<'a>>, opts: &CallPeaksOptions) 
     );
 
     peaks
+}
+
+/// Call and merge peaks over one reference window using an in-memory fiber stream.
+///
+/// `chrom_start`/`chrom_end` bound the pileup track, so a caller can size the track
+/// to its data instead of to the whole chromosome (`ft call-peaks` passes the whole
+/// chromosome, `ft union-peaks` passes one island of BED intervals). `emit` is called
+/// once per merged peak in output order. Returns `(peaks_before_merge, peaks_after_merge)`.
+pub fn call_peaks_for_chrom(
+    chrom: &str,
+    chrom_start: usize,
+    chrom_end: usize,
+    fibers: impl Iterator<Item = FiberseqData>,
+    params: &PeakCallingParams,
+    fdr_table: &[FdrEntry],
+    mut emit: impl FnMut(&Peak) -> Result<()>,
+) -> Result<(usize, usize)> {
+    // Create FiberseqPileupOptions for peak calling
+    let pileup_opts = FiberseqPileupOptions {
+        fire_track_opts: FireTrackOptions {
+            no_nuc: false,
+            no_msp: false,
+            m6a: false,
+            cpg: false,
+            callable_fibers: true,
+            shuffle: false,
+            random_shuffle: false,
+            shuffle_seed: None,
+            rolling_max: Some(params.window_size),
+            track_fire_elements: true, // Enable FIRE element tracking for peak calling
+        },
+        rolling_max: Some(params.window_size),
+        haps: false,
+        per_base: false,
+        keep_zeros: false,
+        min_fire_coverage: Some(params.min_fire_coverage),
+    };
+
+    // Process fibers to build the track
+    let mut pileup = FiberseqPileup::new(chrom, chrom_start, chrom_end, pileup_opts, &None, None);
+    pileup.add_fibers(fibers);
+
+    // Calculate coverage thresholds
+    let (median, std_dev, _) = pileup.all_data.median_and_std_coverage();
+    let min_cov = params.min_cov.unwrap_or_else(|| {
+        let calculated_min = (median - params.sd_cov * std_dev).round() as i32;
+        calculated_min.max(4) // DEFAULT_MIN_COVERAGE = 4
+    });
+    let max_cov = params
+        .max_cov
+        .unwrap_or_else(|| (median + params.sd_cov * std_dev).round() as i32);
+
+    // Find local maxima and filter by threshold (FDR or FIRE fraction)
+    let peaks = Peak::from_pileup(
+        &pileup,
+        fdr_table,
+        params.max_fdr,
+        params.min_fire_frac,
+        params.min_fire_frac_filter,
+        min_cov,
+        max_cov,
+    );
+
+    let peaks_before = peaks.len();
+    let merged_peaks = merge_peaks_iterative(peaks, params);
+    for peak in &merged_peaks {
+        emit(peak)?;
+    }
+    Ok((peaks_before, merged_peaks.len()))
 }
 
 /// Call peaks using FDR table or FIRE fraction filtering
@@ -626,6 +737,7 @@ pub fn call_peaks(
     let mut writer = bio_io::writer(&opts.out)?;
     writeln!(writer, "{}", Peak::header())?;
 
+    let params = PeakCallingParams::from(&*opts);
     let mut total_peaks_before_merge = 0;
     let mut total_peaks_after_merge = 0;
 
@@ -642,60 +754,18 @@ pub fn call_peaks(
             chrom_len
         );
 
-        // Create FiberseqPileupOptions for peak calling
-        let pileup_opts = FiberseqPileupOptions {
-            fire_track_opts: FireTrackOptions {
-                no_nuc: false,
-                no_msp: false,
-                m6a: false,
-                cpg: false,
-                callable_fibers: true,
-                shuffle: false,
-                random_shuffle: false,
-                shuffle_seed: None,
-                rolling_max: Some(opts.window_size),
-                track_fire_elements: true, // Enable FIRE element tracking for peak calling
-            },
-            rolling_max: Some(opts.window_size),
-            haps: false,
-            per_base: false,
-            keep_zeros: false,
-            min_fire_coverage: Some(opts.min_fire_coverage),
-        };
-
-        // Process fibers to build the track
-        let mut pileup =
-            FiberseqPileup::new(&chrom, 0, chrom_len as usize, pileup_opts, &None, None);
         let fibers = opts.input.fetch_fibers(bam, &chrom, None, None)?;
-        pileup.add_fibers(fibers);
-
-        // Calculate coverage thresholds
-        let (median, std_dev, _) = pileup.all_data.median_and_std_coverage();
-        let min_cov = opts.min_cov.unwrap_or_else(|| {
-            let calculated_min = (median - opts.sd_cov * std_dev).round() as i32;
-            calculated_min.max(4) // DEFAULT_MIN_COVERAGE = 4
-        });
-        let max_cov = opts
-            .max_cov
-            .unwrap_or_else(|| (median + opts.sd_cov * std_dev).round() as i32);
-
-        // Find local maxima and filter by threshold (FDR or FIRE fraction)
-        let peaks = Peak::from_pileup(
-            &pileup,
+        let (peaks_before, peaks_after) = call_peaks_for_chrom(
+            &chrom,
+            0,
+            chrom_len as usize,
+            fibers,
+            &params,
             fdr_table,
-            opts.max_fdr,
-            opts.min_fire_frac,
-            opts.min_fire_frac_filter,
-            min_cov,
-            max_cov,
-        );
-
-        let peaks_before = peaks.len();
+            |peak| Ok(writeln!(writer, "{}", peak)?),
+        )?;
         total_peaks_before_merge += peaks_before;
-
-        // Merge peaks for this chromosome
-        let merged_peaks = merge_peaks_iterative(peaks, opts);
-        total_peaks_after_merge += merged_peaks.len();
+        total_peaks_after_merge += peaks_after;
 
         // Summary info statement per chromosome
         log::info!(
@@ -703,13 +773,8 @@ pub fn call_peaks(
             chrom,
             chrom_len / 1_000_000,
             peaks_before,
-            merged_peaks.len(),
+            peaks_after,
         );
-
-        // Write merged peaks for this chromosome
-        for peak in &merged_peaks {
-            writeln!(writer, "{}", peak)?;
-        }
     }
 
     log::info!("Total peaks before merging: {}", total_peaks_before_merge);

@@ -5,7 +5,9 @@ pub use fdr::{
     fdr_table, lookup_fdr, read_fdr_table, write_fdr_table, FdrEntry, IncrementalFdrBuilder,
     PileupRecord,
 };
-pub use peaks::{call_peaks, reciprocal_overlap_raw};
+pub use peaks::{
+    call_peaks, call_peaks_for_chrom, reciprocal_overlap_raw, Peak, PeakCallingParams,
+};
 
 use crate::cli::CallPeaksOptions;
 use crate::subcommands::pileup::{FireTrack, FireTrackOptions};
