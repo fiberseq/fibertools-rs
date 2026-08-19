@@ -33,7 +33,7 @@ fn group_bed_by_name_and_chrom(
 }
 
 /// Create a BAM header from BED records
-fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
+pub(crate) fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
     let mut header = Header::new();
 
     // Collect unique chromosomes and their max positions
@@ -61,7 +61,7 @@ fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
 }
 
 /// Create a mock BAM record with FIRE elements
-fn create_mock_fire_record(
+pub(crate) fn create_mock_fire_record(
     read_name: &str,
     intervals: &[BedRecord],
     header_view: &HeaderView,

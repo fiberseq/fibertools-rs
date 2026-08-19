@@ -20,3 +20,5 @@ mod pileup;
 mod predict_m6a;
 #[path = "regression/qc.rs"]
 mod qc;
+#[path = "regression/union_peaks.rs"]
+mod union_peaks;
