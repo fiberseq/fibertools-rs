@@ -43,7 +43,7 @@ fn union_peaks_support_counts_and_boundaries() {
 }
 
 // --min-support is an output filter, so it must drop exactly the low support rows and
-// leave the surviving rows byte for byte the same as the unfiltered run.
+// leave the surviving rows unchanged apart from the sequential name, which renumbers.
 #[test]
 fn union_peaks_min_support_filters_only() {
     let beds = fixture();
