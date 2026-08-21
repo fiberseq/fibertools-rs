@@ -14,8 +14,10 @@ use std::io::Write;
 const MOCK_FIRE_QUALITY: u8 = 255;
 
 /// Slack added to `--window-size` when grouping intervals into islands. The gap has to
-/// exceed the rolling-max window, otherwise a window could span two islands and the
-/// islanded result would differ from a whole-chromosome one.
+/// exceed the rolling-max window so that no window ever spans two islands. That bounds the
+/// rolling-max failure mode; it does not make islanding identical to a whole-chromosome
+/// run, since confining a sample's mock fiber to one island also drops the coverage it
+/// would have contributed between islands, which can move a summit.
 const ISLAND_PAD: i64 = 1000;
 
 /// Longest island we will build a mock fiber for. `Cigar::Equal(len)` packs the length
@@ -185,8 +187,11 @@ fn support_for<'a>(
 ///
 /// Reported `start`/`end` are therefore the peak caller's consensus (median) boundaries
 /// of the overlapping input intervals, not their outer span; the outer span is reported
-/// alongside as `union_start`/`union_end`. `--min-support` filters the output only, so
-/// `-n 3` and `-n 1` plus a downstream filter agree.
+/// alongside as `union_start`/`union_end`, and `peak_summit` (the pileup's local maximum,
+/// `peak_max` in `ft call-peaks` output) can sit outside `start`/`end` for the same reason.
+/// Only local maxima become peaks, so at most one peak is reported per `--window-size`
+/// bases. `--min-support` filters the output only, so `-n 3` and `-n 1` plus a downstream
+/// filter agree apart from the sequential `name` column, which renumbers.
 pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
     if opts.window_size < 2 {
         bail!("--window-size must be at least 2; a smaller window finds no local maxima");
@@ -269,15 +274,19 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
                     "intervals at {chrom}:{island_start}-{island_end} span more than {MAX_ISLAND_LEN} bp, which is too long for a mock fiber"
                 );
             }
-            // Every interval falls wholly inside one island, so this is a select, not a clip.
+            // Every interval falls wholly inside one island, so this is a select, not a
+            // clip. Intervals are merged and sorted, so their ends rise with their starts:
+            // binary search to the first one reaching this island and stop at the first one
+            // past it, the way support_for does. Scanning them all instead costs
+            // islands x intervals, which dominates the run on dense whole-genome input.
             let records = samples
                 .iter()
                 .filter_map(|sample| {
-                    let intervals: Vec<BedRecord> = sample
-                        .by_chrom
-                        .get(chrom)?
+                    let sample_intervals = sample.by_chrom.get(chrom)?;
+                    let first = sample_intervals.partition_point(|iv| iv.1 <= island_start);
+                    let intervals: Vec<BedRecord> = sample_intervals[first..]
                         .iter()
-                        .filter(|(start, end)| *start < island_end && *end > island_start)
+                        .take_while(|(start, _)| *start < island_end)
                         .map(|&(start, end)| BedRecord {
                             chrom: chrom.clone(),
                             start,

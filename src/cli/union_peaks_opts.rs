@@ -19,7 +19,8 @@ pub struct UnionPeaksOptions {
     /// Minimum number of input BEDs that must overlap a peak for it to be reported
     #[clap(short = 'n', long, default_value_t = 1)]
     pub min_support: usize,
-    /// Rolling window size for finding local maxima (in base pairs)
+    /// Rolling window size for finding local maxima (in base pairs).
+    /// Only local maxima are kept, so at most one peak is reported per window.
     #[clap(long, default_value_t = 200)]
     pub window_size: usize,
     #[clap(flatten)]
