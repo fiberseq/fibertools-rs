@@ -17,7 +17,11 @@ const MOCK_FIRE_QUALITY: u8 = 255;
 /// exceed the rolling-max window so that no window ever spans two islands. That bounds the
 /// rolling-max failure mode; it does not make islanding identical to a whole-chromosome
 /// run, since confining a sample's mock fiber to one island also drops the coverage it
-/// would have contributed between islands, which can move a summit.
+/// would have contributed between islands. Coverage is the denominator of the FIRE score,
+/// so that can move a summit: measured at 11 summit shifts and 1 peak-set change in 60
+/// adversarial random configurations. The shifts are tie-breaks inside a plateau of equal
+/// sample support (the summit lands on a maximum-support position either way, 99% of the
+/// time), and n_support/support/union_start/union_end never come from the pileup at all.
 const ISLAND_PAD: i64 = 1000;
 
 /// Longest island we will build a mock fiber for. `Cigar::Equal(len)` packs the length
