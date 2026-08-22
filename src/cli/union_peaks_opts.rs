@@ -21,8 +21,8 @@ pub struct UnionPeaksOptions {
     pub min_support: usize,
     /// Minimum fraction of input BEDs that must overlap a peak for it to be
     /// reported (0-1). Applied together with --min-support.
-    #[clap(long, value_parser = frac_in_range)]
-    pub min_frac_support: Option<f64>,
+    #[clap(long, default_value_t = 0.0, value_parser = frac_in_range)]
+    pub min_frac_support: f64,
     /// Rolling window size for finding local maxima (in base pairs).
     /// Only local maxima are kept, so at most one peak is reported per window.
     #[clap(long, default_value_t = 200)]

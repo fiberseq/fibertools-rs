@@ -279,7 +279,7 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
     }
     let min_support = opts
         .min_support
-        .max((opts.min_frac_support.unwrap_or(0.0) * n_inputs as f64).ceil() as usize);
+        .max((opts.min_frac_support * n_inputs as f64).ceil() as usize);
     let gap = opts.window_size as i64 + ISLAND_PAD;
     let mut n_peaks = 0;
     for chrom in chrom_lengths.keys() {
