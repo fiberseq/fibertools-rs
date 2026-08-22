@@ -23,6 +23,9 @@ const MOCK_FIRE_QUALITY: u8 = 255;
 /// sample support (the summit lands on a maximum-support position either way, 99% of the
 /// time), and n_support/support/union_start/union_end never come from the pileup at all.
 const ISLAND_PAD: i64 = 1000;
+/// BAM reference lengths are int32 and the liftover stores positions as u32; cap
+/// coordinates so the mock header (max end + 10000) and every position stay in range.
+const MAX_COORD: i64 = i32::MAX as i64 - 10_000;
 
 /// Longest island we will build a mock fiber for. `Cigar::Equal(len)` packs the length
 /// into 28 bits and wraps silently past that.
@@ -100,10 +103,11 @@ fn load_sample(path: &str, name: String) -> Result<Sample> {
     for rec in read_bed_regions(path).with_context(|| format!("failed to read BED file {path}"))? {
         // read_bed_regions parses the coordinates as bare i64s, and a negative start makes
         // create_mock_fire_record emit a record whose positions are all dropped later.
-        if rec.start < 0 || rec.end <= rec.start {
+        if rec.start < 0 || rec.end <= rec.start || rec.end > MAX_COORD {
             bail!(
-                "invalid interval in {}: {} {} {}",
+                "invalid interval in {} (coordinates must be 0 <= start < end <= {}): {} {} {}",
                 path,
+                MAX_COORD,
                 rec.chrom,
                 rec.start,
                 rec.end
@@ -135,7 +139,8 @@ fn load_sample(path: &str, name: String) -> Result<Sample> {
 /// Group sorted intervals into maximal runs separated by no more than `gap` bases.
 ///
 /// Peaks are called one island at a time so the pileup track is sized to the data. A
-/// whole-chromosome track costs ~56 bytes a base, which is tens of GB for a genome-wide
+/// whole-chromosome track costs ~56 bytes a base (plus 24 bytes per overlapping sample
+/// element on covered bases), which is tens of GB for a genome-wide
 /// peak union.
 fn islands(sorted: &[(i64, i64)], gap: i64) -> Vec<(i64, i64)> {
     let mut out: Vec<(i64, i64)> = Vec::new();
@@ -148,8 +153,10 @@ fn islands(sorted: &[(i64, i64)], gap: i64) -> Vec<(i64, i64)> {
     out
 }
 
-/// Samples with an interval overlapping `[start, end)`, in input order, plus the outer
-/// span of those intervals.
+/// Samples with an interval overlapping or exactly abutting `[start, end)`, in input
+/// order, plus the outer span of those intervals. Touch counts because the consensus
+/// bounds are medians of element edges: an exactly book-ended element that formed the
+/// peak can land flush against the reported boundary.
 ///
 /// The pileup cannot answer this: its FIRE elements carry no fiber identity.
 fn support_for<'a>(
@@ -165,9 +172,9 @@ fn support_for<'a>(
             continue;
         };
         let mut hit = false;
-        let first = intervals.partition_point(|iv| iv.1 <= start);
+        let first = intervals.partition_point(|iv| iv.1 < start);
         for &(iv_start, iv_end) in &intervals[first..] {
-            if iv_start >= end {
+            if iv_start > end {
                 break;
             }
             hit = true;
@@ -260,7 +267,17 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
     )?;
 
     let n_inputs = samples.len();
-    let min_support = opts.min_support.max(1);
+    if opts.min_support == 0 {
+        bail!("--min-support must be >= 1");
+    }
+    if opts.min_support > n_inputs {
+        log::warn!(
+            "--min-support {} exceeds the {} input BEDs; no peak can be reported",
+            opts.min_support,
+            n_inputs
+        );
+    }
+    let min_support = opts.min_support;
     let gap = opts.window_size as i64 + ISLAND_PAD;
     let mut n_peaks = 0;
     for chrom in chrom_lengths.keys() {
@@ -273,6 +290,15 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
         all.sort_unstable();
 
         for (island_start, island_end) in islands(&all, gap) {
+            if island_end - island_start > 10_000_000 {
+                static BIG_ISLAND: std::sync::Once = std::sync::Once::new();
+                BIG_ISLAND.call_once(|| {
+                    log::warn!(
+                        "an island spans {} Mb ({chrom}:{island_start}-{island_end}); memory scales with island size, and dense input with no gaps over {gap} bp can grow islands to chromosome scale",
+                        (island_end - island_start) / 1_000_000
+                    );
+                });
+            }
             if island_end - island_start >= MAX_ISLAND_LEN {
                 bail!(
                     "intervals at {chrom}:{island_start}-{island_end} span more than {MAX_ISLAND_LEN} bp, which is too long for a mock fiber"

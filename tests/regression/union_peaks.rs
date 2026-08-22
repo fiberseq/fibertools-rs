@@ -134,3 +134,44 @@ fn union_peaks_rejects_bad_input() {
         assert!(stderr.contains(expected), "{args:?} stderr: {stderr}");
     }
 }
+
+// Exactly book-ended intervals from two samples form one peak whose consensus core is
+// the upper-median element; the touching sample must still be counted (support counts
+// exact abutment because consensus bounds are medians of element edges). Before this
+// was fixed, bkA vanished from the output entirely.
+#[test]
+fn book_ended_samples_both_support_the_peak() {
+    let a = NamedTempFile::with_suffix(".bed").unwrap();
+    std::fs::write(a.path(), "chr1\t100\t200\n").unwrap();
+    let b = NamedTempFile::with_suffix(".bed").unwrap();
+    std::fs::write(b.path(), "chr1\t200\t300\n").unwrap();
+    let out = run(&[
+        "union-peaks",
+        a.path().to_str().unwrap(),
+        b.path().to_str().unwrap(),
+        "--names",
+        "bkA,bkB",
+    ]);
+    let rows: Vec<&str> = out.lines().skip(1).collect();
+    assert_eq!(rows.len(), 1, "one peak: {out}");
+    let f: Vec<&str> = rows[0].split('\t').collect();
+    assert_eq!(
+        (f[4], f[6], f[7], f[8]),
+        ("2", "bkA,bkB", "100", "300"),
+        "both samples support the peak and the union spans both: {out}"
+    );
+}
+
+// Coordinates past the mock-header/liftover range must fail loudly, not vanish.
+#[test]
+fn oversized_coordinates_error_cleanly() {
+    let bed = NamedTempFile::with_suffix(".bed").unwrap();
+    std::fs::write(bed.path(), "chr1\t4294967296\t4294967496\n").unwrap();
+    let out = std::process::Command::new(ft())
+        .args(["union-peaks", bed.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "must fail");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("invalid interval"), "clean error: {err}");
+}
