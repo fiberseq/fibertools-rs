@@ -33,6 +33,8 @@ pub fn strip_base_mods(opts: &mut StripBasemodsOptions) {
                     );
                     MolecularAnnotations::from_record(record)
                 });
+                // Verdict from the calling-time set, before any stripping.
+                ma_io::sync_fiberseq_callable(&mut annot, record, &opts.input.filters);
 
                 // Drop whole annotation types.
                 if filter_mod == "5mC" || filter_mod == "CpG" {

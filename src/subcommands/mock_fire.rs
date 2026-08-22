@@ -141,6 +141,18 @@ fn create_mock_fire_record(
     let mut annot = MolecularAnnotations::from_record(&record);
     ma_io::add_msp_annotations(&mut annot, &starts, &lengths, None);
     ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
+    // Mock records carry no m6A, so the read-time backfill would brand
+    // them NotCallable and --callable-fibers would drop every one.
+    // Write an explicit full-width Callable annotation instead: mock data is
+    // callable by construction.
+    {
+        use crate::utils::input_bam::{FIRE_CALLABLE_MIN_AVE_MSP_SIZE, FIRE_CALLABLE_MIN_MSP};
+        ma_io::set_fiberseq_callable(
+            &mut annot,
+            Some((0, record.seq_len() as u32)),
+            ma_io::callable_minimums_name(FIRE_CALLABLE_MIN_MSP, FIRE_CALLABLE_MIN_AVE_MSP_SIZE),
+        );
+    }
     ma_io::write_record_with_basemods(&mut record, &annot);
 
     Ok(record)

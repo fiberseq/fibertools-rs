@@ -9,7 +9,7 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rust_htslib::bam::Record;
 
-pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
+pub fn ddda_to_m6a_record(record: &mut Record, opts: &DddaToM6aOptions) {
     let was_reverse = record.is_reverse();
     // clear the flag of any reverse or positive strand, by resetting the 4th bit, aka 16, to zero
     // let mut flag = record.flags() & !(1 << 4);
@@ -71,6 +71,8 @@ pub fn ddda_to_m6a_record(record: &mut Record, _opts: &DddaToM6aOptions) {
         );
         MolecularAnnotations::from_record(record)
     });
+    // Verdict from the calling-time set, before the m6A rebuild.
+    ma_io::sync_fiberseq_callable(&mut annot, record, &opts.input.filters);
     annot
         .annotation_types
         .retain(|t| t.name != basemods::M6A_TYPE);

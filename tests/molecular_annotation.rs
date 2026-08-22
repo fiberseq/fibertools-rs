@@ -268,17 +268,17 @@ fn add_nucleosomes_is_idempotent_on_rerun() {
         covered += 1;
         let m6a: Vec<i64> = fsd
             .annotations
-            .get_forward_coords("m6a")
+            .get_forward_coords(fibertools_rs::utils::basemods::M6A_TYPE)
             .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
             .unwrap_or_default();
 
         // First pass.
         let mut once = fsd.annotations.clone();
-        add_nucleosomes_to_annotations(&record, &mut once, &m6a, &nuc_opts);
+        add_nucleosomes_to_annotations(&record, &mut once, &m6a, &nuc_opts, (10, 10));
 
         // Second pass on already-annotated container — must equal first.
         let mut twice = once.clone();
-        add_nucleosomes_to_annotations(&record, &mut twice, &m6a, &nuc_opts);
+        add_nucleosomes_to_annotations(&record, &mut twice, &m6a, &nuc_opts, (10, 10));
 
         assert_eq!(
             once.annotation_types, twice.annotation_types,
@@ -311,7 +311,7 @@ fn add_nucleosomes_is_idempotent_on_rerun() {
             &precisions,
         );
         assert!(with_fire.get_type(FIRE_TYPE).is_some());
-        add_nucleosomes_to_annotations(&record, &mut with_fire, &m6a, &nuc_opts);
+        add_nucleosomes_to_annotations(&record, &mut with_fire, &m6a, &nuc_opts, (10, 10));
         assert!(
             with_fire.get_type(FIRE_TYPE).is_none(),
             "re-run must drop stale `fire` annotations (paired with stale MSPs)"
@@ -373,4 +373,305 @@ fn mismatched_legacy_lengths_returns_error() {
         .push_aux(b"nl", Aux::ArrayU32((&vec![10u32, 20]).into()))
         .unwrap();
     assert!(read_annotations(&record).is_err());
+}
+
+#[test]
+fn fiberseq_callable_roundtrips() {
+    use fibertools_rs::utils::ma_io::{set_fiberseq_callable, FIBERSEQ_CALLABLE_TYPE};
+    if let Some(record) = read_records("msp_nuc.bam").into_iter().next() {
+        let mut annot = read_record(&record).unwrap();
+
+        // Callable span round-trips.
+        set_fiberseq_callable(&mut annot, Some((77, 4954)), None);
+        let mut rec = record.clone();
+        write_record(&mut rec, &annot);
+        let round = read_record(&rec).unwrap();
+        let t = round
+            .get_type(FIBERSEQ_CALLABLE_TYPE)
+            .expect("type present");
+        assert_eq!(t.annotations.len(), 1);
+        assert_eq!(t.annotations[0].start, 77);
+        assert_eq!(t.annotations[0].length, 4954 - 77);
+
+        // The NotCallable marker (None -> zero-length at 0, wire `1-0`)
+        // round-trips and is not optimized away into an absent type.
+        set_fiberseq_callable(&mut annot, None, None);
+        let mut rec = record.clone();
+        write_record(&mut rec, &annot);
+        let round = read_record(&rec).unwrap();
+        let t = round
+            .get_type(FIBERSEQ_CALLABLE_TYPE)
+            .expect("type present");
+        assert_eq!(t.annotations.len(), 1);
+        assert_eq!(t.annotations[0].start, 0, "the marker carries no position");
+        assert_eq!(t.annotations[0].length, 0);
+    }
+}
+
+#[test]
+fn sync_backfills_fiberseq_callable() {
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::{sync_fiberseq_callable, FIBERSEQ_CALLABLE_TYPE};
+    // A pre-tag BAM with nuc/msp calls gains the tag when a tool ensures
+    // it; a raw MM/ML-only record (no nuc/msp) stays untagged. read_record
+    // itself is a pure parser and never adds the tag.
+    let filters = FiberFilters::default();
+    let mut n_with_calls = 0;
+    let mut n_backfilled = 0;
+    for record in read_records("msp_nuc.bam") {
+        let mut annot = read_record(&record).unwrap();
+        // read_record is a pure parser: msp_nuc.bam has no on-disk tag, so
+        // parsing alone must not create one.
+        assert!(
+            annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none(),
+            "read_record must never add the tag"
+        );
+        sync_fiberseq_callable(&mut annot, &record, &filters);
+        let has_calls = annot.get_type("nuc").is_some() || annot.get_type("msp").is_some();
+        if has_calls {
+            n_with_calls += 1;
+            if annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_some() {
+                n_backfilled += 1;
+            }
+        } else {
+            assert!(
+                annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none(),
+                "no-call record must stay untagged, never NotCallable"
+            );
+        }
+    }
+    assert!(n_with_calls > 0, "fixture must have called reads");
+    assert_eq!(
+        n_backfilled, n_with_calls,
+        "every called read is backfilled"
+    );
+}
+
+#[test]
+fn callable_state_returns_bam_orient_window() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::set_fiberseq_callable;
+
+    let reverse = read_records("msp_nuc.bam")
+        .into_iter()
+        .find(|r| r.is_reverse());
+    let Some(record) = reverse else {
+        // msp_nuc.bam carries at least one reverse record per the test above.
+        panic!("expected a reverse record in msp_nuc.bam");
+    };
+    let len = record.seq_len() as i64;
+
+    // Hand-build a deliberately ASYMMETRIC molecular span. A symmetric one
+    // would mirror onto itself about L/2 and hide a coordinate-frame bug.
+    let (ms, me) = (77u32, (len as u32) / 3);
+    let mut annot = read_record(&record).unwrap();
+    set_fiberseq_callable(&mut annot, Some((ms, me)), None);
+    let mut rec = record.clone();
+    write_record(&mut rec, &annot);
+
+    let fiber = FiberseqData::new(rec, None, &FiberFilters::default());
+    let (state, cs, ce) = fiber.callable_state();
+    assert_eq!(state, CallableState::Callable);
+    // BAM-orient window on a reverse read is the mirror about L/2 of the
+    // molecular span, not the molecular span itself.
+    assert_eq!((cs, ce), (len - me as i64, len - ms as i64));
+    assert_ne!((cs, ce), (ms as i64, me as i64), "span must be asymmetric");
+}
+
+#[test]
+fn stale_read_length_resolves_to_untagged() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+    let mut fiber = FiberseqData::new(record, None, &FiberFilters::default());
+    // The backfilled tag resolves.
+    let (state, _, _) = fiber.callable_state();
+    assert_ne!(state, CallableState::Untagged, "backfilled tag resolves");
+    // Corrupt the recorded read length: the tag is now stale.
+    fiber.annotations.read_length += 1;
+    let (state, cs, ce) = fiber.callable_state();
+    assert_eq!(state, CallableState::Untagged);
+    assert_eq!((cs, ce), (0, 0));
+}
+
+#[test]
+fn fiberseq_callable_minimums_name_lands_in_an() {
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::{sync_fiberseq_callable, FIBERSEQ_CALLABLE_TYPE};
+    use rust_htslib::bam::record::Aux;
+    // NAPA.bam carries fire.Q annotations with a real quality array.
+    for record in read_records("NAPA.bam") {
+        let mut annot = read_record(&record).unwrap();
+        sync_fiberseq_callable(&mut annot, &record, &FiberFilters::default());
+        if annot.get_type("fire").is_none() {
+            continue;
+        }
+        let aux_str = |r: &bam::Record, tag: &[u8]| -> Option<String> {
+            match r.aux(tag) {
+                Ok(Aux::String(s)) => Some(s.to_string()),
+                Ok(Aux::ArrayU8(a)) => Some(format!("{:?}", a.iter().collect::<Vec<_>>())),
+                _ => None,
+            }
+        };
+
+        // Default minimums: unnamed annotation, so NO An tag materializes and
+        // the quality bytes never move. Compare against a rewritten record
+        // WITHOUT the tag (same write path, same tag spelling).
+        let mut default_tag = record.clone();
+        write_record(&mut default_tag, &annot);
+        assert_eq!(
+            aux_str(&default_tag, b"An"),
+            None,
+            "default minimums add no An bytes"
+        );
+        let mut stripped = annot.clone();
+        stripped
+            .annotation_types
+            .retain(|t| t.name != FIBERSEQ_CALLABLE_TYPE);
+        let mut without_tag = record.clone();
+        write_record(&mut without_tag, &stripped);
+        for tag in [b"Aq" as &[u8], b"AQ"] {
+            assert_eq!(
+                aux_str(&default_tag, tag),
+                aux_str(&without_tag, tag),
+                "{} bytes must not move",
+                String::from_utf8_lossy(tag)
+            );
+        }
+
+        // Custom minimums: the name is the ONLY non-empty AN slot and it
+        // round-trips.
+        let custom = FiberFilters {
+            min_msp: Some(20),
+            ..FiberFilters::default()
+        };
+        let mut annot = read_record(&record).unwrap();
+        sync_fiberseq_callable(&mut annot, &record, &custom);
+        let mut with_name = record.clone();
+        write_record(&mut with_name, &annot);
+        let an = aux_str(&with_name, b"An").expect("An present with custom minimums");
+        let named: Vec<&str> = an.split(',').filter(|n| !n.is_empty()).collect();
+        assert_eq!(named, vec!["m20a10"], "exactly one name: the minimums");
+        let round = read_record(&with_name).unwrap();
+        let t = round
+            .get_type(FIBERSEQ_CALLABLE_TYPE)
+            .expect("type present");
+        assert_eq!(t.annotations[0].name.as_deref(), Some("m20a10"));
+        return;
+    }
+    panic!("expected a fire-scored record in NAPA.bam");
+}
+
+#[test]
+fn cli_minimums_recalculate_callable_on_read() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+
+    // Default minimums: the read clears 10/10 and is Callable.
+    let fiber = FiberseqData::new(record.clone(), None, &FiberFilters::default());
+    assert_eq!(fiber.callable_state().0, CallableState::Callable);
+    let span = (fiber.callable_state().1, fiber.callable_state().2);
+
+    // Non-default minimums recalculate the callable state for every fiber at
+    // read time. An impossible minimum flips this read to NotCallable.
+    let strict = FiberFilters {
+        min_msp: Some(100_000),
+        ..FiberFilters::default()
+    };
+    let fiber = FiberseqData::new(record.clone(), None, &strict);
+    assert_eq!(fiber.callable_state().0, CallableState::NotCallable);
+
+    // Minimums the read still clears keep the same span.
+    let loose = FiberFilters {
+        min_msp: Some(1),
+        min_ave_msp_size: Some(1),
+        ..FiberFilters::default()
+    };
+    let fiber = FiberseqData::new(record, None, &loose);
+    assert_eq!(fiber.callable_state().0, CallableState::Callable);
+    assert_eq!((fiber.callable_state().1, fiber.callable_state().2), span);
+}
+
+#[test]
+fn seqless_record_trusts_tag_and_rederives_under_custom_minimums() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::sync_fiberseq_callable;
+
+    // Tag a record on disk, then strip its SEQ (a SEQ-dropped archive BAM).
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+    let mut annot = read_record(&record).unwrap();
+    sync_fiberseq_callable(&mut annot, &record, &FiberFilters::default());
+    let mut tagged = record.clone();
+    write_record(&mut tagged, &annot);
+    let read_length = annot.read_length;
+    let mut noseq = tagged.clone();
+    noseq.set(tagged.qname(), None, &[], &[]);
+    assert_eq!(noseq.seq_len(), 0, "SEQ stripped");
+
+    // Default minimums: the on-disk tag is trusted; the MA read length is
+    // the frame, so the span resolves inside it.
+    let fiber = FiberseqData::new(noseq.clone(), None, &FiberFilters::default());
+    let (state, cs, ce) = fiber.callable_state();
+    assert_eq!(state, CallableState::Callable, "SEQ-less tag is trusted");
+    assert!(ce > cs && ce <= read_length as i64, "span in the MA frame");
+    assert_eq!(fiber.frame_length(), read_length as usize);
+
+    // Custom minimums re-derive from the MA tag alone: no SEQ needed, so a
+    // SEQ-less read is judged under the same minimums as its neighbors.
+    let strict = FiberFilters {
+        min_msp: Some(100_000),
+        ..FiberFilters::default()
+    };
+    let fiber = FiberseqData::new(noseq, None, &strict);
+    assert_eq!(
+        fiber.callable_state().0,
+        CallableState::NotCallable,
+        "custom minimums apply to SEQ-less reads"
+    );
+}
+
+#[test]
+fn softclipped_supplementary_is_judged_like_a_primary() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+
+    // A soft-clipped supplementary carries the full-length SEQ, so its MA
+    // frame matches and it derives/judges exactly like the primary.
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+    let primary = FiberseqData::new(record.clone(), None, &FiberFilters::default());
+    let (pstate, pcs, pce) = primary.callable_state();
+    assert_eq!(pstate, CallableState::Callable);
+
+    let mut supp = record;
+    supp.set_flags(supp.flags() | 2048);
+    let supp = FiberseqData::new(supp, None, &FiberFilters::default());
+    assert_eq!(supp.callable_state(), (pstate, pcs, pce));
+}
+
+#[test]
+fn callable_does_not_require_a_decodable_m6a_type() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+
+    // The >=1 m6A requirement is enforced by construction (the nucleosome
+    // caller emits no MSP without m6A), not by inspecting the m6A type at
+    // derive time. A record whose MM/ML were stripped but whose nuc/msp MA
+    // calls survive is still judged from those calls, even when minimums
+    // force a re-derivation.
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+    let mut nomm = record.clone();
+    nomm.remove_aux(b"MM").unwrap_or(());
+    nomm.remove_aux(b"ML").unwrap_or(());
+    let explicit_defaults = FiberFilters {
+        min_msp: Some(10),
+        min_ave_msp_size: Some(10),
+        ..FiberFilters::default()
+    };
+    let fiber = FiberseqData::new(nomm, None, &explicit_defaults);
+    assert_eq!(fiber.callable_state().0, CallableState::Callable);
 }

@@ -20,7 +20,9 @@ pub struct NucleosomeParameters {
     #[clap(long, default_value = MIN_DIST_ADDED)]
     pub min_distance_added: i64,
     /// Minimum distance from the end of a fiber to call a nucleosome or MSP
-    #[clap(short, long, default_value = DIST_FROM_END)]
+    // A negative value silently behaves as 0 in filter_for_end; reject it
+    // rather than persist callable spans under a D that did not apply.
+    #[clap(short, long, default_value = DIST_FROM_END, value_parser = clap::value_parser!(i64).range(0..))]
     pub distance_from_end: i64,
     /// Most m6A events we can skip over to get to the nucleosome length when using D-segment algorithm. 2 is often a good value, negative values disable D-segment for the simple caller.
     #[clap(short, long, default_value = ALLOWED_SKIPS, hide = true)]

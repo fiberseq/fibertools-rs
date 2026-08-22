@@ -14,6 +14,11 @@
 //! - `nuc`  (no strand, no quality)
 //! - `msp`  (no strand, `Q` zero-valued — qualities live on `fire`)
 //! - `fire` (no strand, `Q` linear precision 0–255)
+//! - `fiberseq_callable` (no strand, no quality, one annotation per
+//!   processed read): the span of the surviving nuc/MSP calls. A read
+//!   that fails the minimums gets a zero-length annotation at position 0
+//!   (NotCallable); only never-processed reads have none. Non-default
+//!   minimums name the annotation in the AN tag (e.g. "m20a10").
 //!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
 //! populated by the library's MM/ML parser. Their on-disk source of truth
@@ -29,6 +34,7 @@ use rust_htslib::bam::{self, record::Aux};
 pub const NUC_TYPE: &str = "nuc";
 pub const MSP_TYPE: &str = "msp";
 pub const FIRE_TYPE: &str = "fire";
+pub const FIBERSEQ_CALLABLE_TYPE: &str = "fiberseq_callable";
 
 /// Molecular-orientation nuc/msp arrays returned by [`extract_nuc_msp_arrays`]:
 /// `(nuc_starts, nuc_lengths, msp_starts, msp_lengths, msp_qual)`. `msp_qual`
@@ -73,6 +79,109 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
         }
     }
     Ok(annot)
+}
+
+/// Make the fiberseq_callable annotation agree with the CLI minimums.
+/// Runs right after parsing, before any consumer-side pruning. Derives
+/// when the tag is absent (backfill) or the minimums are non-default
+/// (recalculation); otherwise the on-disk tag stands.
+pub fn sync_fiberseq_callable(
+    annot: &mut MolecularAnnotations,
+    record: &bam::Record,
+    filters: &crate::utils::input_bam::FiberFilters,
+) {
+    let needed =
+        filters.callable_minimums_are_custom() || annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none();
+    if needed && can_derive_callable(annot, record) {
+        let (min_msp, min_ave) = filters.callable_minimums();
+        derive_fiberseq_callable(annot, min_msp, min_ave);
+    }
+}
+
+/// True when a present SEQ disagrees with the recorded read length
+/// (something rewrote the read after tagging). SEQ-less records are never
+/// stale: the MA read length is the frame.
+pub(crate) fn read_length_is_stale(read_length: u32, seq_len: usize) -> bool {
+    seq_len > 0 && read_length as usize != seq_len
+}
+
+/// True when the callable state can be derived: calling ran (nuc or msp
+/// present) and the frame is not stale. Derivation is pure MA-tag
+/// arithmetic, so SEQ-less records derive fine.
+fn can_derive_callable(annot: &MolecularAnnotations, record: &bam::Record) -> bool {
+    !read_length_is_stale(annot.read_length, record.seq_len())
+        && (annot.get_type(NUC_TYPE).is_some() || annot.get_type(MSP_TYPE).is_some())
+}
+
+/// AN name recording non-default minimums, e.g. "m20a10". `None` for the
+/// defaults: unnamed means default minimums, so a default-run BAM carries
+/// no AN tag. Comma-free (the AN tag joins names with commas).
+pub fn callable_minimums_name(min_msp: usize, min_ave_msp_size: i64) -> Option<String> {
+    use crate::utils::input_bam::{FIRE_CALLABLE_MIN_AVE_MSP_SIZE, FIRE_CALLABLE_MIN_MSP};
+    if min_msp == FIRE_CALLABLE_MIN_MSP && min_ave_msp_size == FIRE_CALLABLE_MIN_AVE_MSP_SIZE {
+        None
+    } else {
+        Some(format!("m{min_msp}a{min_ave_msp_size}"))
+    }
+}
+
+/// Non-default minimums name the annotation (see [`callable_minimums_name`]),
+/// so the AN tag records the provenance on disk; default minimums stay
+/// unnamed and adds no AN bytes.
+pub fn set_fiberseq_callable(
+    annot: &mut MolecularAnnotations,
+    span: Option<(u32, u32)>,
+    minimums_name: Option<String>,
+) {
+    annot
+        .annotation_types
+        .retain(|t| t.name != FIBERSEQ_CALLABLE_TYPE);
+    let t = annot.add_annotation_type(FIBERSEQ_CALLABLE_TYPE, QualitySpec::none(), Encoding::Ma);
+    let (s, l) = match span {
+        Some((s, e)) => (s, e - s),
+        None => (0, 0),
+    };
+    t.add(s, l, Strand::Unknown, vec![], minimums_name);
+}
+
+/// Derive the callable span and state from the nuc/MSP annotations; the
+/// single source of truth for every writer. The span is the extent of the
+/// surviving calls; callable requires >= `min_msp` MSPs with mean length
+/// >= `min_ave_msp_size`. m6A is never inspected: the caller emits no MSP
+/// without m6A, and MA-only derivation is what lets SEQ-less records
+/// derive.
+pub fn derive_fiberseq_callable(
+    annot: &mut MolecularAnnotations,
+    min_msp: usize,
+    min_ave_msp_size: i64,
+) {
+    let nuc = annot.get_forward_coords(NUC_TYPE).unwrap_or_default();
+    let msp = annot.get_forward_coords(MSP_TYPE).unwrap_or_default();
+
+    // min of the first starts, max of the last ends; both vectors are
+    // ascending and non-overlapping, and either may be empty.
+    let start = [nuc.first(), msp.first()]
+        .into_iter()
+        .flatten()
+        .map(|(s, _)| *s)
+        .min();
+    let end = [nuc.last(), msp.last()]
+        .into_iter()
+        .flatten()
+        .map(|(_, e)| *e)
+        .max();
+    let span = start.zip(end);
+
+    let callable = msp.len() >= min_msp
+        && !msp.is_empty()
+        && msp.iter().map(|(s, e)| (e - s) as i64).sum::<i64>() / msp.len() as i64
+            >= min_ave_msp_size;
+
+    set_fiberseq_callable(
+        annot,
+        if callable { span } else { None },
+        callable_minimums_name(min_msp, min_ave_msp_size),
+    );
 }
 
 /// Merge every annotation type from `src` into `dst`, skipping any type whose
