@@ -337,12 +337,15 @@ impl<'a> QcStats<'a> {
             if !seq.is_empty() {
                 let (cs, ce) = (f.cs as usize, f.ce as usize);
                 let at_in = count_at(&seq[cs..ce]);
-                bump(
-                    &mut self.m6a_ratio,
-                    ordered_float_100k_round(m6a_in as f32 / at_in as f32),
-                    0,
-                    1,
-                );
+                // an AT-free span would put a NaN key in the table
+                if at_in > 0 {
+                    bump(
+                        &mut self.m6a_ratio,
+                        ordered_float_100k_round(m6a_in as f32 / at_in as f32),
+                        0,
+                        1,
+                    );
+                }
             }
             bump(
                 &mut self.cpg_count,
@@ -537,7 +540,7 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     if untagged > 0 {
         log::warn!(
             "{untagged} reads have no fiberseq_callable state (no nuc/msp \
-             calls, no SEQ, or a stale tag). These reads never enter \
+             calls, no SEQ to derive from, or a stale tag). These reads never enter \
              count_filtered. Run ft add-nucleosomes or ft predict-m6a to \
              call them."
         );
