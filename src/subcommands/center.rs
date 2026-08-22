@@ -8,7 +8,6 @@ use bio::alphabets::dna::revcomp;
 use indicatif::{style, ProgressBar};
 use molecular_annotation::AlignedBlocks;
 use rayon::prelude::*;
-use rust_htslib::bam::Read;
 use rust_htslib::{bam, bam::ext::BamRecordExtensions};
 use std::fmt::Write;
 use std::io::{self, prelude::*};
@@ -423,13 +422,11 @@ impl CenteredFiberData {
 
 #[allow(clippy::too_many_arguments)]
 pub fn center(
-    records: Vec<bam::Record>,
-    header_view: &rust_htslib::bam::HeaderView,
+    fiber_data: Vec<FiberseqData>,
     center_position: CenterPosition,
     opts: &CenterOptions,
     buffer: &mut Box<dyn std::io::Write>,
 ) {
-    let fiber_data = FiberseqData::from_records(records, header_view, &opts.input.filters);
     let total = fiber_data.len();
     let mut seen = 0;
 
@@ -486,7 +483,6 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
     let center_positions = read_center_positions(&center_opts.bed)?;
 
     // header needed for the contig name...
-    let header_view = center_opts.input.header_view();
     // output buffer
     let mut buffer = bio_io::writer("-").unwrap();
 
@@ -504,33 +500,27 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
     );
 
     for center_position in center_positions {
-        bam.fetch((
-            &center_position.chrom,
-            center_position.position,
-            center_position.position + 1,
-        ))
-        .unwrap_or_else(|_| {
-            panic!(
-                "Failed to fetch region: {}:{}-{}",
-                &center_position.chrom,
-                center_position.position,
-                center_position.position + 1
-            )
-        });
-
-        let records: Vec<bam::Record> = center_opts
+        // The indexed fiber stream applies the same filters (bit flag,
+        // --callable-fibers) as every other command.
+        let fiber_data: Vec<FiberseqData> = center_opts
             .input
-            .filters
-            .filter_on_bit_flags(bam.records())
+            .fetch_fibers(
+                &mut bam,
+                &center_position.chrom,
+                Some(center_position.position),
+                Some(center_position.position + 1),
+            )
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Failed to fetch region: {}:{}-{}",
+                    &center_position.chrom,
+                    center_position.position,
+                    center_position.position + 1
+                )
+            })
             .collect();
 
-        center(
-            records,
-            &header_view,
-            center_position,
-            center_opts,
-            &mut buffer,
-        );
+        center(fiber_data, center_position, center_opts, &mut buffer);
         pb.inc(1);
     }
     buffer.flush().unwrap();

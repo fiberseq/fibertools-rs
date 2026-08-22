@@ -1,12 +1,12 @@
 use super::nucleosome_opts::NucleosomeParameters;
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{DropUncallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct PredictM6AOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<DropUncallableFibers>,
     /// Output bam file with m6A calls in new/extended MM and ML bam tags
     #[clap(default_value = "-")]
     pub out: String,

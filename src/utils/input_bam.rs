@@ -52,11 +52,8 @@ pub struct FiberFilters {
         hide = true
     )]
     pub strip_starting_basemods: i64,
-    /// Transitional: replaced by the callable-fibers flags in the next
-    /// commit; kept so pileup still compiles.
-    #[clap(skip)]
-    pub fire_filter: bool,
-    /// Not a CLI argument here; set by BAM-writing commands.
+    /// Not a CLI argument here: copied in from the command's flattened
+    /// capability struct when the BAM is opened.
     #[clap(skip)]
     pub drop_uncallable_fibers: bool,
     /// Not a CLI argument here; see [`CallableFilterArgs`].
@@ -95,12 +92,127 @@ impl std::default::Default for FiberFilters {
             filter_expression: None,
             uncompressed: false,
             strip_starting_basemods: 0,
-            fire_filter: false,
             drop_uncallable_fibers: false,
             callable_fibers: false,
             min_msp: None,
             min_ave_msp_size: None,
         }
+    }
+}
+
+/// The callable-filtering flags, offered only by the fiber-streaming
+/// commands that implement them: each flattens this struct and folds it
+/// into its [`FiberFilters`]. Producers and tag-maintenance commands keep
+/// every read and do not offer these flags.
+#[derive(Debug, Args, Clone, Default)]
+pub struct CallableFibers {
+    /// Exclude fibers that are not fiberseq-callable from text output and
+    /// calculations (tables, QC tallies, coverage tracks). Never removes
+    /// reads from an output BAM. In `ft pileup` this also limits each
+    /// callable fiber's coverage to its callable span.
+    #[clap(
+        long,
+        visible_alias = "fiber-filter",
+        visible_alias = "fiber-coverage",
+        visible_alias = "fire-coverage",
+        visible_alias = "fire-filter",
+        help_heading = "Fiber-Filter",
+        display_order = 1
+    )]
+    pub callable_fibers: bool,
+}
+
+impl CallableFibers {
+    /// Copy the parsed flag into the stream filters; runs when the BAM
+    /// is opened.
+    pub fn copy_to_filters(&self, filters: &mut FiberFilters) {
+        filters.callable_fibers |= self.callable_fibers;
+    }
+}
+
+/// `--drop-uncallable-fibers`: the only flag that removes reads from an
+/// outgoing BAM. Offered only by the BAM-writing commands (fire,
+/// add-nucleosomes).
+#[derive(Debug, Args, Clone, Default)]
+pub struct DropUncallableFibers {
+    /// Remove fibers that are not fiberseq-callable from the record
+    /// stream and the output BAM. A fiber is callable when it has at
+    /// least `--min-msp` MSPs (default 10) and a mean MSP length of at
+    /// least `--min-ave-msp-size` (default 10); a fiber with no m6A has
+    /// no MSPs and is never callable.
+    #[clap(
+        long,
+        visible_alias = "drop",
+        help_heading = "Fiber-Filter",
+        display_order = 2
+    )]
+    pub drop_uncallable_fibers: bool,
+}
+
+impl DropUncallableFibers {
+    /// Copy the parsed flag into the stream filters; runs when the BAM
+    /// is opened.
+    pub fn copy_to_filters(&self, filters: &mut FiberFilters) {
+        filters.drop_uncallable_fibers |= self.drop_uncallable_fibers;
+    }
+}
+
+/// Both callable-filtering flags, for commands with BAM and text output
+/// modes (fire).
+#[derive(Debug, Args, Clone, Default)]
+pub struct CallableFilterArgs {
+    #[clap(flatten)]
+    pub drop: DropUncallableFibers,
+    #[clap(flatten)]
+    pub fibers: CallableFibers,
+}
+
+impl CallableFilterArgs {
+    /// Copy the parsed flags into the stream filters; runs when the BAM
+    /// is opened.
+    pub fn copy_to_filters(&self, filters: &mut FiberFilters) {
+        self.drop.copy_to_filters(filters);
+        self.fibers.copy_to_filters(filters);
+    }
+}
+
+/// A command's callable-filtering capability, chosen in its opts file as
+/// the type parameter of [`InputBam`]. `apply` runs automatically when the
+/// BAM is opened, so the parsed flags always reach [`FiberFilters`].
+pub trait CallableArgs: Args + Debug + Clone + Default {
+    fn apply(&self, filters: &mut FiberFilters);
+}
+
+/// Capability of commands that offer no callable-filtering flags.
+#[derive(Debug, Args, Clone, Default)]
+pub struct NoCallableArgs {}
+
+impl CallableArgs for NoCallableArgs {
+    fn apply(&self, _filters: &mut FiberFilters) {}
+}
+
+impl CallableArgs for CallableFibers {
+    fn apply(&self, filters: &mut FiberFilters) {
+        self.copy_to_filters(filters);
+    }
+}
+
+impl CallableArgs for DropUncallableFibers {
+    fn apply(&self, filters: &mut FiberFilters) {
+        self.copy_to_filters(filters);
+    }
+}
+
+impl CallableArgs for CallableFilterArgs {
+    // SAFETY OF THE BAM CONTRACT LIVES HERE: coverage is deliberately NOT
+    // folded. The stream drops uncallable fibers whenever
+    // filters.callable_fibers is set, and fire's BAM mode streams
+    // straight into a BAM writer -- copying coverage here would let
+    // --fire-filter delete reads from the output BAM. fire's text-mode
+    // branch copies coverage in itself, so forgetting that copy is a
+    // visible no-op, never silent read loss.
+    fn apply(&self, filters: &mut FiberFilters) {
+        self.drop.copy_to_filters(filters);
     }
 }
 
@@ -158,10 +270,12 @@ impl FiberFilters {
 /// This struct is used to parse the input bam file and the filters that should be applied to the bam file.
 /// This struct is parsed to create command line arguments and then passed to many functions.
 #[derive(Debug, Args)]
-pub struct InputBam {
+pub struct InputBam<C: CallableArgs = NoCallableArgs> {
     /// Input BAM file. If no path is provided stdin is used. For m6A prediction, this should be a HiFi bam file with kinetics data. For other commands, this should be a bam file with m6A calls.
     #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
     pub bam: String,
+    #[clap(flatten)]
+    pub callable: C,
     #[clap(flatten)]
     pub filters: FiberFilters,
     #[clap(flatten)]
@@ -171,8 +285,16 @@ pub struct InputBam {
     pub header: Option<bam::Header>,
 }
 
-impl InputBam {
+impl<C: CallableArgs> InputBam<C> {
+    /// Copy the command's callable-filtering flags into the filters.
+    /// Idempotent; runs automatically when the BAM is opened.
+    pub fn apply_callable_args(&mut self) {
+        let callable = self.callable.clone();
+        callable.apply(&mut self.filters);
+    }
+
     pub fn bam_reader(&mut self) -> bam::Reader {
+        self.apply_callable_args();
         let mut bam = bio_io::bam_reader(&self.bam);
         bam.set_threads(self.global.threads)
             .expect("unable to set threads for bam reader");
@@ -181,6 +303,7 @@ impl InputBam {
     }
 
     pub fn indexed_bam_reader(&mut self) -> bam::IndexedReader {
+        self.apply_callable_args();
         if &self.bam == "-" {
             panic!("Cannot use stdin (\"-\") for indexed bam reading. Please provide a file path for the bam file.");
         }
@@ -276,10 +399,11 @@ impl InputBam {
     }
 }
 
-impl std::default::Default for InputBam {
+impl<C: CallableArgs> std::default::Default for InputBam<C> {
     fn default() -> Self {
         Self {
             bam: "-".to_string(),
+            callable: C::default(),
             filters: FiberFilters::default(),
             global: cli::GlobalOpts::default(),
             header: None,

@@ -1,4 +1,4 @@
-use super::common::{fixture, run, select_tsv_cols};
+use super::common::{fixture, run, select_tsv_cols, tagged_bam};
 use rust_htslib::bam::{self, Read};
 use tempfile::NamedTempFile;
 
@@ -134,4 +134,84 @@ fn fire_feats_to_text() {
             "best_frac_m6a",
         ]
     ));
+}
+
+/// `ft fire` must pass the fiberseq_callable section through byte-identically:
+/// its retain strips only FIRE_TYPE, and the early returns must not skip
+/// serialization of tagged records.
+#[test]
+fn fire_preserves_fiberseq_callable() {
+    use tempfile::NamedTempFile;
+    let sections = |path: &str| -> Vec<String> {
+        let mut reader = rust_htslib::bam::Reader::from_path(path).unwrap();
+        use rust_htslib::bam::Read;
+        reader
+            .records()
+            .map(|r| {
+                let rec = r.unwrap();
+                match rec.aux(b"Ma") {
+                    Ok(rust_htslib::bam::record::Aux::String(s)) => s
+                        .split(';')
+                        .find(|x| x.starts_with("fiberseq_callable"))
+                        .unwrap_or("")
+                        .to_string(),
+                    _ => String::new(),
+                }
+            })
+            .collect()
+    };
+    let tagged = tagged_bam("all.bam");
+    let fired = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        tagged.path().to_str().unwrap(),
+        fired.path().to_str().unwrap(),
+    ]);
+    let before = sections(tagged.path().to_str().unwrap());
+    let after = sections(fired.path().to_str().unwrap());
+    assert!(!before.is_empty() && before.iter().all(|s| !s.is_empty()));
+    assert_eq!(before, after, "fire must not alter the callable section");
+}
+
+fn bam_read_count(path: &std::path::Path) -> usize {
+    let mut reader = bam::Reader::from_path(path).unwrap();
+    reader.records().count()
+}
+
+// The BAM contract: --fire-filter (coverage) never removes reads from the
+// output BAM; only --drop does. all.bam is fully callable at default
+// minimums, so the drop case raises --min-msp to make reads uncallable
+// (which also pins that --drop honors re-derived minimums).
+#[test]
+fn fire_bam_mode_coverage_keeps_every_read_and_drop_removes() {
+    let input = fixture("all.bam");
+    let n_in = bam_read_count(&input);
+
+    let coverage = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        input.to_str().unwrap(),
+        coverage.path().to_str().unwrap(),
+        "--fire-filter",
+    ]);
+    assert_eq!(
+        bam_read_count(coverage.path()),
+        n_in,
+        "--fire-filter must not remove reads from the output BAM"
+    );
+
+    let dropped = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        input.to_str().unwrap(),
+        dropped.path().to_str().unwrap(),
+        "--drop",
+        "--min-msp",
+        "100000",
+    ]);
+    let n_drop = bam_read_count(dropped.path());
+    assert!(
+        n_drop < n_in,
+        "--drop must remove uncallable reads ({n_drop} vs {n_in})"
+    );
 }

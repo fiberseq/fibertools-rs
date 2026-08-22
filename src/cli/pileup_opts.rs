@@ -1,11 +1,11 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct PileupOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<CallableFibers>,
     /// Region string(s) to make a pileup of. e.g. chr1:1-1000 or chr1:1-1,000
     /// Can be specified multiple times for multiple regions.
     /// If not provided will make a pileup of the whole genome
@@ -33,10 +33,6 @@ pub struct PileupOptions {
     /// Write output one base at a time even if the values do not change
     #[clap(short, long)]
     pub per_base: bool,
-    /// Calculate coverage starting from the first MSP/NUC to the last MSP/NUC
-    /// position instead of the complete span of the read alignment.
-    #[clap(long)]
-    pub fiber_coverage: bool,
     /// Shuffle the fiber-seq data according to a bed file of
     /// the shuffled positions of the fiber-seq data
     ///
@@ -53,13 +49,4 @@ pub struct PileupOptions {
     /// No NUC columns
     #[clap(long)]
     pub no_nuc: bool,
-}
-
-impl PileupOptions {
-    /// `--fire-filter` bundles `--fiber-coverage` in addition to the three
-    /// filters. Callers should use this in place of reading `fiber_coverage`
-    /// directly so the bundle stays coherent.
-    pub fn effective_fiber_coverage(&self) -> bool {
-        self.fiber_coverage || self.input.filters.fire_filter
-    }
 }

@@ -127,13 +127,13 @@ fn process_chromosome_pileup_both(
 
     // Create fire track options - to calculate FIRE scores
     // Note: Python uses --no-msp --no-nuc flags in shuffled_pileup_chromosome rule
-    // This means FIRE scores are calculated using only fiber_coverage, not MSP/NUC
+    // This means FIRE scores are calculated using only callable_fibers, not MSP/NUC
     let real_opts = FireTrackOptions {
         no_nuc: true, // Match Python: --no-nuc
         no_msp: true, // Match Python: --no-msp
         m6a: false,
         cpg: false,
-        fiber_coverage: true,
+        callable_fibers: true,
         shuffle: false,
         random_shuffle: false,
         shuffle_seed: None,
@@ -190,7 +190,7 @@ fn process_chromosome_pileup_both(
         no_msp: true, // Match Python: --no-msp
         m6a: false,
         cpg: false,
-        fiber_coverage: true,
+        callable_fibers: true,
         shuffle: true,
         random_shuffle: false, // We have explicit shuffle positions now
         shuffle_seed: None,

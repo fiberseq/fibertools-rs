@@ -66,6 +66,22 @@ pub fn add_fire_to_rec(
 }
 
 pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error> {
+    fire_opts.input.apply_callable_args();
+    // Text modes honor --callable-fibers by copying it into the stream
+    // filters; the BAM mode never does (see CallableFilterArgs::apply),
+    // so the output BAM keeps every read without an explicit
+    // --drop-uncallable-fibers. Warn in BAM mode: `ft fire --fire-filter`
+    // removed reads before this change, and this is the one silent
+    // regression an old pipeline can hit.
+    if fire_opts.extract || fire_opts.feats_to_text {
+        let fibers = fire_opts.input.callable.fibers.clone();
+        fibers.copy_to_filters(&mut fire_opts.input.filters);
+    } else if fire_opts.input.callable.fibers.callable_fibers {
+        log::warn!(
+            "--callable-fibers does not remove reads from the output BAM; \
+             use --drop-uncallable-fibers"
+        );
+    }
     let (model, precision_table) = get_model(fire_opts);
     let mut bam = fire_opts.input.bam_reader();
 

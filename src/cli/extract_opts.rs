@@ -1,11 +1,11 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct ExtractOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<CallableFibers>,
     /// Report positions in reference sequence coordinates
     #[clap(short, long, default_value = "true",
           default_value_ifs([

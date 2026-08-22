@@ -1,11 +1,11 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFilterArgs, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct FireOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<CallableFilterArgs>,
     /// Output file (BAM by default, table of MSP features if `--feats-to-text` is used, and bed9 + if `--extract`` is used)
     #[clap(default_value = "-")]
     pub out: String,

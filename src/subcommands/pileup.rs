@@ -25,7 +25,7 @@ pub struct FireTrackOptions {
     pub no_msp: bool,
     pub m6a: bool,
     pub cpg: bool,
-    pub fiber_coverage: bool,
+    pub callable_fibers: bool,
     pub shuffle: bool,             // Track if shuffling is enabled
     pub random_shuffle: bool, // If true, generate random positions instead of using ShuffledFibers
     pub shuffle_seed: Option<u64>, // Optional seed for reproducible random shuffling
@@ -40,7 +40,7 @@ impl From<&PileupOptions> for FireTrackOptions {
             no_msp: opts.no_msp,
             m6a: opts.m6a,
             cpg: opts.cpg,
-            fiber_coverage: opts.effective_fiber_coverage(),
+            callable_fibers: opts.input.filters.callable_fibers,
             shuffle: opts.shuffle.is_some(),
             random_shuffle: false, // PileupOptions doesn't have this yet
             shuffle_seed: None,
@@ -316,39 +316,37 @@ impl<'a> FireTrack<'a> {
     }
 
     fn fiber_start_and_end(&self, fiber: &FiberseqData) -> (i64, i64) {
-        if !self.fire_track_opts.fiber_coverage {
-            return (
-                fiber.record.reference_start() + self.cur_offset,
-                fiber.record.reference_end() + self.cur_offset,
-            );
-        }
-        let mut start = i64::MAX;
-        let mut end = i64::MIN;
-        for info in fiber.msp().infos() {
-            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
-                start = std::cmp::min(start, rs as i64);
-                end = std::cmp::max(end, re as i64);
+        let mut start = fiber.record.reference_start();
+        let mut end = fiber.record.reference_end();
+        if self.fire_track_opts.callable_fibers {
+            // update_with_fiber already skipped reads whose span cannot
+            // lift, so this always narrows to the callable span.
+            if let Some((cs, ce)) = fiber.callable_reference_range() {
+                start = std::cmp::max(start, cs);
+                end = std::cmp::min(end, ce);
             }
-        }
-        for info in fiber.nuc().infos() {
-            if let (Some(rs), Some(re)) = (info.ref_start, info.ref_end) {
-                start = std::cmp::min(start, rs as i64);
-                end = std::cmp::max(end, re as i64);
-            }
-        }
-        if start == i64::MAX {
-            start = fiber.record.reference_start();
-        }
-        if end == i64::MIN {
-            end = fiber.record.reference_end();
         }
         (start + self.cur_offset, end + self.cur_offset)
     }
 
     pub fn update_with_fiber(&mut self, fiber: &FiberseqData) {
-        // skip this fiber if it has no MSP/NUC information
-        // and we are looking at fiber_coverage
-        if self.fire_track_opts.fiber_coverage && fiber.msp().is_empty() && fiber.nuc().is_empty() {
+        // Skip non-Callable reads under --callable-fibers (this subsumes
+        // the old no-MSP/NUC skip: such reads can never be Callable).
+        // callable_reference_range() is None for every non-Callable state
+        // and for a Callable span that does not lift to the reference.
+        if self.fire_track_opts.callable_fibers && fiber.callable_reference_range().is_none() {
+            // Non-Callable reads were already dropped by the stream; what
+            // reaches this skip is a Callable read whose span does not lift
+            // to the reference (for example a span entirely inside soft
+            // clips): counting its full alignment span would be the
+            // opposite of the flag's meaning.
+            static SKIP_WARN: std::sync::Once = std::sync::Once::new();
+            SKIP_WARN.call_once(|| {
+                log::warn!(
+                    "--callable-fibers skips reads whose callable span \
+                     does not lift to the reference"
+                );
+            });
             return;
         }
 
