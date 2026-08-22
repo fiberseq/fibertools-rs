@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.0.4](https://github.com/fiberseq/fibertools-rs/compare/molecular-annotation-v0.0.3...molecular-annotation-v0.0.4) - 2026-08-22
+
+### Added
+
+- add `ft union-peaks` to merge peak calls from many BED files ([#129](https://github.com/fiberseq/fibertools-rs/pull/129)) ([a31e0d3](https://github.com/fiberseq/fibertools-rs/commit/a31e0d3cece97d1ebd2a105778dcb46a492b684b))
 
 ## [0.0.3](https://github.com/fiberseq/fibertools-rs/compare/molecular-annotation-v0.0.2...molecular-annotation-v0.0.3) - 2026-08-13
 

@@ -1,6 +1,26 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.14.0](https://github.com/fiberseq/fibertools-rs/compare/v0.13.0...v0.14.0) - 2026-08-22
+
+### Added
+
+- add `ft union-peaks` to merge peak calls from many BED files ([#129](https://github.com/fiberseq/fibertools-rs/pull/129)) ([a31e0d3](https://github.com/fiberseq/fibertools-rs/commit/a31e0d3cece97d1ebd2a105778dcb46a492b684b))
+- [**breaking**] ft qc unfiltered/filtered columns (count, count_filtered) ([cd3ce27](https://github.com/fiberseq/fibertools-rs/commit/cd3ce271d3efd4f27740ac2327775e11f6a69242))
+- [**breaking**] callable-fibers filter model, scoped per command ([47ea125](https://github.com/fiberseq/fibertools-rs/commit/47ea1254068c65d6774bce52303d2aada3b1f05e))
+- fiberseq_callable per-read tag with frame and SEQ-less semantics ([f0d140b](https://github.com/fiberseq/fibertools-rs/commit/f0d140b6072575d4be4bc5742fedece5551ecfcb))
+
+### Fixed
+
+- true median for peak consensus boundaries ([#135](https://github.com/fiberseq/fibertools-rs/pull/135)) ([465af60](https://github.com/fiberseq/fibertools-rs/commit/465af6076a0e2fd4b72cd274ef4c5cfb71164e1b))
+- a fully-filtered chunk no longer ends the fiber stream ([#131](https://github.com/fiberseq/fibertools-rs/pull/131)) ([d1f8d91](https://github.com/fiberseq/fibertools-rs/commit/d1f8d91dbe6acb32ed527d25fffc96c9222f1ac5))
+- harden edges found in backup review of fiber.rs and qc.rs ([4e9f9c9](https://github.com/fiberseq/fibertools-rs/commit/4e9f9c98874f0ba843af68c71dbf07dffd1c5d2d))
+
+### Other
+
+- allow manual release-plz runs via workflow_dispatch ([#134](https://github.com/fiberseq/fibertools-rs/pull/134)) ([464fe87](https://github.com/fiberseq/fibertools-rs/commit/464fe876c76c929c179dbecd2e9920b5e40ee35f))
+- link changelog entries to pull requests ([#133](https://github.com/fiberseq/fibertools-rs/pull/133)) ([3a60a4e](https://github.com/fiberseq/fibertools-rs/commit/3a60a4e576b62518cccb4fbfe78987838147ec08))
+- [**breaking**] remove the never-implemented ft fiber-hmm stub ([f77daf7](https://github.com/fiberseq/fibertools-rs/commit/f77daf75eb8807e59fa908b4c6c96dd061394ea5))
 
 ## [0.13.0](https://github.com/fiberseq/fibertools-rs/compare/v0.12.1...v0.13.0) - 2026-08-13
 
