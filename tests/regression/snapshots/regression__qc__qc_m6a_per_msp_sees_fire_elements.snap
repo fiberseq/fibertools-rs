@@ -2,24 +2,24 @@
 source: tests/regression/qc.rs
 expression: "fire_rows.join(\"\\n\")"
 ---
-m6a_per_msp_size	14,197,true	1
-m6a_per_msp_size	22,88,true	1
-m6a_per_msp_size	29,90,true	1
-m6a_per_msp_size	36,136,true	1
-m6a_per_msp_size	37,103,true	1
-m6a_per_msp_size	37,190,true	1
-m6a_per_msp_size	42,112,true	1
-m6a_per_msp_size	46,147,true	1
-m6a_per_msp_size	46,153,true	1
-m6a_per_msp_size	47,166,true	1
-m6a_per_msp_size	49,138,true	1
-m6a_per_msp_size	57,145,true	1
-m6a_per_msp_size	57,165,true	1
-m6a_per_msp_size	59,177,true	1
-m6a_per_msp_size	60,154,true	1
-m6a_per_msp_size	61,152,true	1
-m6a_per_msp_size	62,182,true	1
-m6a_per_msp_size	75,300,true	1
-m6a_per_msp_size	91,353,true	1
-m6a_per_msp_size	93,218,true	1
-m6a_per_msp_size	107,362,true	1
+m6a_per_msp_size	14,197,true	1	1
+m6a_per_msp_size	22,88,true	1	1
+m6a_per_msp_size	29,90,true	1	1
+m6a_per_msp_size	36,136,true	1	1
+m6a_per_msp_size	37,103,true	1	1
+m6a_per_msp_size	37,190,true	1	1
+m6a_per_msp_size	42,112,true	1	1
+m6a_per_msp_size	46,147,true	1	1
+m6a_per_msp_size	46,153,true	1	1
+m6a_per_msp_size	47,166,true	1	1
+m6a_per_msp_size	49,138,true	1	1
+m6a_per_msp_size	57,145,true	1	1
+m6a_per_msp_size	57,165,true	1	1
+m6a_per_msp_size	59,177,true	1	1
+m6a_per_msp_size	60,154,true	1	1
+m6a_per_msp_size	61,152,true	1	1
+m6a_per_msp_size	62,182,true	1	1
+m6a_per_msp_size	75,300,true	1	1
+m6a_per_msp_size	91,353,true	1	1
+m6a_per_msp_size	93,218,true	1	1
+m6a_per_msp_size	107,362,true	1	1

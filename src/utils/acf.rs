@@ -36,8 +36,8 @@ pub fn acf<T: Float + From<u32> + From<f64> + Copy + Add + AddAssign + Div>(
 ) -> Result<Vec<T>> {
     let max_lag = match max_lag {
         // if upper bound for max_lag is n-1
-        Some(max_lag) => cmp::min(max_lag, x.len() - 1),
-        None => x.len() - 1,
+        Some(max_lag) => cmp::min(max_lag, x.len().saturating_sub(1)),
+        None => x.len().saturating_sub(1),
     };
     if x.len() <= max_lag {
         return Err(anyhow::anyhow!(
@@ -95,8 +95,8 @@ pub fn acf_par<
 ) -> Result<Vec<T>> {
     let max_lag = match max_lag {
         // if upper bound for max_lag is n-1
-        Some(max_lag) => cmp::min(max_lag, x.len() - 1),
-        None => x.len() - 1,
+        Some(max_lag) => cmp::min(max_lag, x.len().saturating_sub(1)),
+        None => x.len().saturating_sub(1),
     };
     if x.len() <= max_lag {
         return Err(anyhow::anyhow!(
