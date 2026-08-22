@@ -1,3 +1,5 @@
+#[path = "regression/call_peaks.rs"]
+mod call_peaks;
 #[path = "regression/center.rs"]
 mod center;
 #[path = "regression/common.rs"]
