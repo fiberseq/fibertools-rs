@@ -371,7 +371,7 @@ pub fn fdr_table(
     }
 
     // Build the final FDR table
-    fdr_builder.build(opts.max_fdr)
+    fdr_builder.build(opts.peak_params.max_fdr)
 }
 
 /// Write FDR table to TSV file

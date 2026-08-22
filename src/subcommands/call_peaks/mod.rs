@@ -18,18 +18,18 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
     log::info!("  Input BAM: {}", opts.input.bam);
     log::info!("  Output: {}", opts.out);
 
-    if let Some(min_frac) = opts.min_fire_frac {
+    if let Some(min_frac) = opts.peak_params.min_fire_frac {
         log::info!("  Using FIRE fraction mode: min_fire_frac = {}", min_frac);
     } else {
-        log::info!("  Max FDR: {}", opts.max_fdr);
+        log::info!("  Max FDR: {}", opts.peak_params.max_fdr);
     }
-    log::info!("  Window size: {}", opts.window_size);
+    log::info!("  Window size: {}", opts.peak_params.window_size);
 
     let mut bam = opts.input.indexed_bam_reader();
     let header = opts.input.header_view();
 
     // Generate or load FDR table (skip if using FIRE fraction mode)
-    let fdr_table = if opts.min_fire_frac.is_some() {
+    let fdr_table = if opts.peak_params.min_fire_frac.is_some() {
         // FIRE fraction mode: use empty FDR table (won't be used for filtering)
         log::info!("  Skipping FDR calculation (using FIRE fraction threshold)");
         Vec::new()
@@ -159,19 +159,20 @@ fn process_chromosome_pileup_both(
 
     // Apply sd_cov thresholds if max_cov/min_cov are not explicitly set
     // Match Python behavior: minimum coverage defaults to 4
-    let min_cov_threshold = opts.min_cov.unwrap_or_else(|| {
-        let calculated_min = (median - opts.sd_cov * std_dev).round() as i32;
+    let min_cov_threshold = opts.peak_params.min_cov.unwrap_or_else(|| {
+        let calculated_min = (median - opts.peak_params.sd_cov * std_dev).round() as i32;
         calculated_min.max(DEFAULT_MIN_COVERAGE)
     });
     let max_cov_threshold = opts
+        .peak_params
         .max_cov
-        .unwrap_or_else(|| (median + opts.sd_cov * std_dev).round() as i32);
+        .unwrap_or_else(|| (median + opts.peak_params.sd_cov * std_dev).round() as i32);
 
     log::debug!(
         "  Coverage: median={:.1}, std_dev={:.1} ({:.1} SDs), range=[{}, {}]",
         median,
         std_dev,
-        opts.sd_cov,
+        opts.peak_params.sd_cov,
         min_cov_threshold,
         max_cov_threshold
     );

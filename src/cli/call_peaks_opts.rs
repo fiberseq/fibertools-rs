@@ -7,6 +7,9 @@ pub struct CallPeaksOptions {
     #[clap(flatten)]
     pub input: InputBam<CallableFibers>,
 
+    #[clap(flatten)]
+    pub peak_params: PeakCallingParams,
+
     /// BED file with shuffled fiber positions (from bedtools shuffle)
     /// If not provided, will use all positions as real data (no FDR calculation)
     #[clap(short, long)]
@@ -16,6 +19,31 @@ pub struct CallPeaksOptions {
     #[clap(short, long, default_value = "-")]
     pub out: String,
 
+    /// Minimum fraction of accessible bases in peak
+    #[clap(long, default_value = "0.0", hide = true)]
+    pub min_frac_accessible: f64,
+
+    /// Skip the FDR table generation and use existing table
+    #[clap(long)]
+    pub fdr_table: Option<String>,
+
+    /// Output the FDR table to this file
+    #[clap(long)]
+    pub fdr_table_out: Option<String>,
+
+    /// Include nucleosome and MSP coverage in pileup (default: only FIRE coverage)
+    #[clap(long)]
+    pub include_nuc_msp: bool,
+
+    /// Include haplotype-specific calls
+    #[clap(long)]
+    pub haps: bool,
+}
+
+/// The knobs of the shared peak caller. Flattened into `CallPeaksOptions` for the
+/// CLI; other callers (union-peaks) construct it directly with their own values.
+#[derive(Args, Debug, Clone)]
+pub struct PeakCallingParams {
     /// Maximum coverage threshold for filtering (optional)
     #[clap(long)]
     pub max_cov: Option<i32>,
@@ -46,10 +74,6 @@ pub struct CallPeaksOptions {
     #[clap(long, default_value = "0.1")]
     pub min_fire_frac_filter: f64,
 
-    /// Minimum fraction of accessible bases in peak
-    #[clap(long, default_value = "0.0", hide = true)]
-    pub min_frac_accessible: f64,
-
     /// Rolling window size for finding local maxima (in base pairs)
     #[clap(long, default_value = "200")]
     pub window_size: usize,
@@ -69,22 +93,6 @@ pub struct CallPeaksOptions {
     /// Maximum number of grouping iterations for merging
     #[clap(long, default_value = "10")]
     pub max_grouping_iterations: usize,
-
-    /// Skip the FDR table generation and use existing table
-    #[clap(long)]
-    pub fdr_table: Option<String>,
-
-    /// Output the FDR table to this file
-    #[clap(long)]
-    pub fdr_table_out: Option<String>,
-
-    /// Include nucleosome and MSP coverage in pileup (default: only FIRE coverage)
-    #[clap(long)]
-    pub include_nuc_msp: bool,
-
-    /// Include haplotype-specific calls
-    #[clap(long)]
-    pub haps: bool,
 
     /// Minimum FIRE coverage required to calculate a score (default: 4)
     #[clap(long, default_value = "4", hide = true)]
