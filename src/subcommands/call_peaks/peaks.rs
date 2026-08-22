@@ -37,7 +37,7 @@ pub fn reciprocal_overlap_raw(
 }
 
 /// Median of a sorted slice: middle value for odd counts, midpoint of the two middle
-/// values for even counts.
+/// values for even counts (added in a31e0d3, #129).
 fn median(sorted: &[i64]) -> i64 {
     let n = sorted.len();
     if n % 2 == 1 {
