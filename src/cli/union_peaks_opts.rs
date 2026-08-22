@@ -1,4 +1,4 @@
-use crate::cli::GlobalOpts;
+use crate::cli::{GlobalOpts, PeakMergeParams};
 use clap::Args;
 use std::fmt::Debug;
 
@@ -23,10 +23,8 @@ pub struct UnionPeaksOptions {
     /// reported (0-1). Applied together with --min-support.
     #[clap(long, default_value_t = 0.0, value_parser = frac_in_range)]
     pub min_frac_support: f64,
-    /// Rolling window size for finding local maxima (in base pairs).
-    /// Only local maxima are kept, so at most one peak is reported per window.
-    #[clap(long, default_value_t = 200)]
-    pub window_size: usize,
+    #[clap(flatten)]
+    pub merge: PeakMergeParams,
     #[clap(flatten)]
     pub global: GlobalOpts,
 }

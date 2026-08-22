@@ -41,9 +41,13 @@ pub struct CallPeaksOptions {
 }
 
 /// The knobs of the shared peak caller. Flattened into `CallPeaksOptions` for the
-/// CLI; other callers (union-peaks) construct it directly with their own values.
+/// CLI. union-peaks flattens only [`PeakMergeParams`] (shared semantics) and
+/// hardcodes the mode/coverage fields, which assume real fibers.
 #[derive(Args, Debug, Clone)]
 pub struct PeakCallingParams {
+    #[clap(flatten)]
+    pub merge: PeakMergeParams,
+
     /// Maximum coverage threshold for filtering (optional)
     #[clap(long)]
     pub max_cov: Option<i32>,
@@ -74,6 +78,15 @@ pub struct PeakCallingParams {
     #[clap(long, default_value = "0.1")]
     pub min_fire_frac_filter: f64,
 
+    /// Minimum FIRE coverage required to calculate a score (default: 4)
+    #[clap(long, default_value = "4", hide = true)]
+    pub min_fire_coverage: i32,
+}
+
+/// Local-max window and merge geometry: meaningful for any element source, so
+/// union-peaks exposes these too.
+#[derive(Args, Debug, Clone)]
+pub struct PeakMergeParams {
     /// Rolling window size for finding local maxima (in base pairs)
     #[clap(long, default_value = "200")]
     pub window_size: usize,
@@ -93,8 +106,4 @@ pub struct PeakCallingParams {
     /// Maximum number of grouping iterations for merging
     #[clap(long, default_value = "10")]
     pub max_grouping_iterations: usize,
-
-    /// Minimum FIRE coverage required to calculate a score (default: 4)
-    #[clap(long, default_value = "4", hide = true)]
-    pub min_fire_coverage: i32,
 }

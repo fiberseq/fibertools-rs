@@ -540,11 +540,11 @@ fn merge_peaks_iterative<'a>(
     // Phase 1: High reciprocal overlap
     log::debug!(
         "  Phase 1: Merging peaks with reciprocal overlap >= {}",
-        params.high_reciprocal_overlap
+        params.merge.high_reciprocal_overlap
     );
-    for iteration in 0..params.max_grouping_iterations {
+    for iteration in 0..params.merge.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, 0.0, params.high_reciprocal_overlap);
+        peaks = merge_peaks_single_iteration(peaks, 0.0, params.merge.high_reciprocal_overlap);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -560,11 +560,11 @@ fn merge_peaks_iterative<'a>(
     // Phase 2: FIRE element overlap
     log::debug!(
         "  Phase 2: Merging peaks with FIRE element overlap >= {}",
-        params.min_frac_overlap
+        params.merge.min_frac_overlap
     );
-    for iteration in 0..params.max_grouping_iterations {
+    for iteration in 0..params.merge.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, params.min_frac_overlap, 0.0);
+        peaks = merge_peaks_single_iteration(peaks, params.merge.min_frac_overlap, 0.0);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -580,11 +580,11 @@ fn merge_peaks_iterative<'a>(
     // Phase 3: High reciprocal overlap again
     log::debug!(
         "  Phase 3: Merging peaks with reciprocal overlap >= {}",
-        params.min_reciprocal_overlap
+        params.merge.min_reciprocal_overlap
     );
-    for iteration in 0..params.max_grouping_iterations {
+    for iteration in 0..params.merge.max_grouping_iterations {
         let prev_count = peaks.len();
-        peaks = merge_peaks_single_iteration(peaks, 0.0, params.min_reciprocal_overlap);
+        peaks = merge_peaks_single_iteration(peaks, 0.0, params.merge.min_reciprocal_overlap);
         log::debug!(
             "    Iteration {}: {} -> {} peaks",
             iteration + 1,
@@ -633,10 +633,10 @@ pub fn call_peaks_for_chrom(
             shuffle: false,
             random_shuffle: false,
             shuffle_seed: None,
-            rolling_max: Some(params.window_size),
+            rolling_max: Some(params.merge.window_size),
             track_fire_elements: true, // Enable FIRE element tracking for peak calling
         },
-        rolling_max: Some(params.window_size),
+        rolling_max: Some(params.merge.window_size),
         haps: false,
         per_base: false,
         keep_zeros: false,

@@ -23,7 +23,7 @@ pub fn run_call_peaks(opts: &mut CallPeaksOptions) -> Result<()> {
     } else {
         log::info!("  Max FDR: {}", opts.peak_params.max_fdr);
     }
-    log::info!("  Window size: {}", opts.peak_params.window_size);
+    log::info!("  Window size: {}", opts.peak_params.merge.window_size);
 
     let mut bam = opts.input.indexed_bam_reader();
     let header = opts.input.header_view();
