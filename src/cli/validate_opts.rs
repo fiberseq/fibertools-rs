@@ -1,10 +1,10 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFibers, InputBam};
 use clap::Args;
 
 #[derive(Args, Debug)]
 pub struct ValidateOptions {
     #[clap(flatten)]
-    pub bam: InputBam,
+    pub bam: InputBam<CallableFibers>,
 
     /// Number of reads to validate
     #[clap(short, long, default_value = "5000")]

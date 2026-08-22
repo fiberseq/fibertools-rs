@@ -49,3 +49,59 @@ fn mm_strand_groups() {
     let projection = groups.into_iter().collect::<Vec<_>>().join("\n");
     insta::assert_snapshot!(projection);
 }
+
+/// A kinetics-less read cannot have m6A called, so `predict-m6a` must mark it
+/// definitively NotCallable (zero-length `fiberseq_callable`) and must not
+/// leave contradicting nuc/msp/fire behind. Previously these records passed
+/// through byte-identically.
+#[test]
+fn no_kinetics_reads_marked_not_callable() {
+    use fibertools_rs::utils::ma_io::{read_record, FIBERSEQ_CALLABLE_TYPE};
+
+    use super::common::run;
+    // Strip kinetics from a real fixture, then predict.
+    let stripped = NamedTempFile::new().unwrap();
+    run(&[
+        "clear-kinetics",
+        fixture("revio.bam").to_str().unwrap(),
+        stripped.path().to_str().unwrap(),
+    ]);
+    let out_bam = NamedTempFile::new().unwrap();
+    run(&[
+        "predict-m6a",
+        "-t",
+        "1",
+        stripped.path().to_str().unwrap(),
+        out_bam.path().to_str().unwrap(),
+    ]);
+
+    let mut reader = Reader::from_path(out_bam.path()).expect("open predicted bam");
+    let mut n = 0;
+    for rec in reader.records() {
+        let record = rec.expect("read record");
+        let annot = read_record(&record).expect("read annotations");
+        let t = annot
+            .get_type(FIBERSEQ_CALLABLE_TYPE)
+            .expect("kinetics-less record carries the explicit marker");
+        assert_eq!(t.annotations.len(), 1);
+        assert_eq!(t.annotations[0].start, 0, "the marker carries no position");
+        assert_eq!(t.annotations[0].length, 0, "must be NotCallable");
+        assert!(
+            annot.get_type("msp").is_none() && annot.get_type("nuc").is_none(),
+            "NotCallable record must not carry nuc/msp"
+        );
+        // The m6A retain must reach the wire: stale MM/ML from a prior
+        // run cannot survive next to a NotCallable annotation.
+        assert!(
+            record.aux(b"MM").is_err() || {
+                match record.aux(b"MM") {
+                    Ok(Aux::String(mm)) => !mm.contains("+a") && !mm.contains("-a"),
+                    _ => true,
+                }
+            },
+            "no m6A MM groups on a NotCallable record"
+        );
+        n += 1;
+    }
+    assert!(n > 0, "fixture must produce records");
+}

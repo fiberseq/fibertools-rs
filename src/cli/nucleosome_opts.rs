@@ -1,4 +1,4 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{DropUncallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
@@ -44,7 +44,7 @@ impl std::default::Default for NucleosomeParameters {
 #[derive(Args, Debug)]
 pub struct AddNucleosomeOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<DropUncallableFibers>,
     /// Output bam file with nucleosome calls
     #[clap(default_value = "-")]
     pub out: String,

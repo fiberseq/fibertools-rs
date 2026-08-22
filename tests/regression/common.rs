@@ -94,3 +94,15 @@ pub fn run(args: &[&str]) -> String {
     );
     String::from_utf8(out.stdout).expect("non-UTF8 stdout")
 }
+
+/// Run `ft add-nucleosomes` on a fixture into a temp BAM, so tests get a
+/// BAM with the fiberseq_callable tag on disk.
+pub fn tagged_bam(name: &str) -> tempfile::NamedTempFile {
+    let t = tempfile::NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "add-nucleosomes",
+        fixture(name).to_str().unwrap(),
+        t.path().to_str().unwrap(),
+    ]);
+    t
+}

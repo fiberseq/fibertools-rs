@@ -649,7 +649,7 @@ pub fn call_peaks(
                 no_msp: false,
                 m6a: false,
                 cpg: false,
-                fiber_coverage: true,
+                callable_fibers: true,
                 shuffle: false,
                 random_shuffle: false,
                 shuffle_seed: None,

@@ -6,7 +6,6 @@ use anyhow;
 use std::io::BufRead;
 //use rayon::prelude::*;
 use rust_htslib::bam::ext::BamRecordExtensions;
-use rust_htslib::{bam, bam::*};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 
@@ -351,7 +350,6 @@ pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyho
     log::debug!("YAML: {yaml:?}");
 
     let mut bam = opts.input.indexed_bam_reader();
-    let header_view = opts.input.header_view();
     let mut out = bio_io::writer(&opts.out)?;
 
     let reader = bio_io::buffer_from(&opts.bed)?;
@@ -363,14 +361,12 @@ pub fn start_finding_footprints(opts: &mut FootprintOptions) -> Result<(), anyho
             continue;
         }
         let motif = ReferenceMotif::new(&line, &yaml)?;
-        bam.fetch((&motif.chrom, motif.start, motif.end))?;
-        let records: Vec<bam::Record> = opts
+        // The indexed fiber stream applies the same filters (bit flag,
+        // --callable-fibers) as every other command.
+        let fibers: Vec<FiberseqData> = opts
             .input
-            .filters
-            .filter_on_bit_flags(bam.records())
+            .fetch_fibers(&mut bam, &motif.chrom, Some(motif.start), Some(motif.end))?
             .collect();
-
-        let fibers = FiberseqData::from_records(records, &header_view, &opts.input.filters);
 
         let footprint = Footprint::new(&motif, &fibers);
         if first {

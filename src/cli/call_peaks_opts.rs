@@ -1,11 +1,11 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct CallPeaksOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<CallableFibers>,
 
     /// BED file with shuffled fiber positions (from bedtools shuffle)
     /// If not provided, will use all positions as real data (no FDR calculation)

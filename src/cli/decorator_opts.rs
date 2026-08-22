@@ -1,11 +1,11 @@
-use crate::utils::input_bam::InputBam;
+use crate::utils::input_bam::{CallableFibers, InputBam};
 use clap::Args;
 use std::fmt::Debug;
 
 #[derive(Args, Debug)]
 pub struct DecoratorOptions {
     #[clap(flatten)]
-    pub input: InputBam,
+    pub input: InputBam<CallableFibers>,
     /// Output path for bed12 file to be decorated
     #[clap(short, long)]
     pub bed12: String,
