@@ -27,8 +27,9 @@ pub fn convert_tags(opts: &mut cli::ConvertTagsOptions) {
 
     for rec in bam.records() {
         let mut record = rec.expect("failed to read BAM record");
-        let annot = ma_io::read_record(&record)
+        let mut annot = ma_io::read_record(&record)
             .unwrap_or_else(|e| panic!("failed to read annotations: {e}"));
+        ma_io::sync_fiberseq_callable(&mut annot, &record, &opts.input.filters);
 
         ma_io::write_record(&mut record, &annot);
         out.write(&record).expect("failed to write BAM record");

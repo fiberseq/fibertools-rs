@@ -5,7 +5,7 @@ use crate::utils::bamannotations::*;
 use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
 use crate::utils::bio_io::*;
 use crate::utils::ftexpression::apply_filter_fsd;
-use crate::utils::ma_io::{FIRE_TYPE, MSP_TYPE, NUC_TYPE};
+use crate::utils::ma_io::{FIBERSEQ_CALLABLE_TYPE, FIRE_TYPE, MSP_TYPE, NUC_TYPE};
 use molecular_annotation::MolecularAnnotations;
 use rayon::prelude::*;
 use rust_htslib::bam::Read;
@@ -23,6 +23,18 @@ pub struct FiberseqData {
     pub center_position: Option<CenterPosition>,
 }
 
+/// A read's resolved `fiberseq_callable` status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallableState {
+    /// Tag present with a non-empty span: cleared the callability minimums.
+    Callable,
+    /// Zero-length tag (`1-0`): calling ran and the read failed the minimums.
+    NotCallable,
+    /// No tag (calling never ran), or the tag is stale (recorded read
+    /// length no longer matches the record).
+    Untagged,
+}
+
 impl FiberseqData {
     pub fn new(record: bam::Record, target_name: Option<&String>, filters: &FiberFilters) -> Self {
         // read group
@@ -37,6 +49,10 @@ impl FiberseqData {
             log::warn!("Failed to read annotations: {e}");
             MolecularAnnotations::from_record(&record)
         });
+
+        // Backfill or recalculate the callable state per the CLI minimums,
+        // before any consumer-side pruning; see sync_fiberseq_callable.
+        crate::utils::ma_io::sync_fiberseq_callable(&mut annotations, &record, filters);
 
         // The library populates m6a/cpg from MM/ML on read; apply the
         // fibertools read-side basemod filters (min ML score, end-strip
@@ -155,6 +171,71 @@ impl FiberseqData {
     /// View over `fire` annotations derived from `self.annotations`.
     pub fn fire(&self) -> AnnotationTypeView<'_> {
         AnnotationTypeView::new(&self.annotations, FIRE_TYPE)
+    }
+
+    /// View over the `fiberseq_callable` annotation.
+    pub fn fiberseq_callable(&self) -> AnnotationTypeView<'_> {
+        AnnotationTypeView::new(&self.annotations, FIBERSEQ_CALLABLE_TYPE)
+    }
+
+    /// Resolve the read's callability. The returned range is in BAM-orient
+    /// query coordinates (already flipped for reverse-aligned reads) — the
+    /// frame `count_query_in` and `record.seq()` live in — and is defined on
+    /// every arm: Untagged and NotCallable return empty ranges.
+    pub fn callable_state(&self) -> (CallableState, i64, i64) {
+        // A tag whose recorded read length no longer matches the record is
+        // stale: something rewrote the read after tagging. Treat as Untagged.
+        // A SEQ-less record (seq_len 0, SEQ dropped to save space) is NOT
+        // stale: the MA read length is the source of truth there.
+        if crate::utils::ma_io::read_length_is_stale(
+            self.annotations.read_length,
+            self.record.seq_len(),
+        ) {
+            return (CallableState::Untagged, 0, 0);
+        }
+        let view = self.fiberseq_callable();
+        let infos = view.infos();
+        let Some(a) = infos.first() else {
+            return (CallableState::Untagged, 0, 0);
+        };
+        let (cs, ce) = (a.query_start as i64, a.query_end as i64);
+        if ce <= cs {
+            return (CallableState::NotCallable, cs, cs);
+        }
+        let len = self.frame_length() as i64;
+        (CallableState::Callable, cs.clamp(0, len), ce.clamp(0, len))
+    }
+
+    /// The record's length in its own frame: the SEQ length when a SEQ is
+    /// present, else the MA read length (on a SEQ-less record the tag is the
+    /// frame). Length statistics over streams that may contain SEQ-less
+    /// records must use this, not `record.seq_len()`.
+    pub fn frame_length(&self) -> usize {
+        let seq_len = self.record.seq_len();
+        if seq_len > 0 {
+            seq_len
+        } else {
+            self.annotations.read_length as usize
+        }
+    }
+
+    /// True when the read carries a non-empty `fiberseq_callable` span.
+    pub fn is_callable(&self) -> bool {
+        self.callable_state().0 == CallableState::Callable
+    }
+
+    /// Reference-coordinate callable range, for pileup-style consumers.
+    /// `None` when the read is not Callable or the span does not lift.
+    pub fn callable_reference_range(&self) -> Option<(i64, i64)> {
+        let (state, _, _) = self.callable_state();
+        if state != CallableState::Callable {
+            return None;
+        }
+        let view = self.fiberseq_callable();
+        match view.infos().first().map(|a| (a.ref_start, a.ref_end)) {
+            Some((Some(s), Some(e))) if e > s => Some((s as i64, e as i64)),
+            _ => None,
+        }
     }
 
     /// Per-MSP FIRE quals, BAM-orient ascending (aligned with the `msp()`
@@ -598,9 +679,21 @@ where
                 }
             }
             let rec = self.cur_chunk.pop()?;
-            if self.filters.passes_fire_filter(&rec) {
+            // The stream implements both callable filters: --drop removes
+            // reads for BAM writers, --callable-fibers excludes them from
+            // text output. The state was synced in FiberseqData::new with
+            // these same filters.
+            let exclude = self.filters.drop_uncallable_fibers || self.filters.callable_fibers;
+            if !exclude || rec.is_callable() {
                 return Some(rec);
             }
+            static EXCLUDE_LOG: std::sync::Once = std::sync::Once::new();
+            EXCLUDE_LOG.call_once(|| {
+                log::info!(
+                    "excluding fibers that are not fiberseq-callable \
+                     (--callable-fibers / --drop-uncallable-fibers)"
+                );
+            });
         }
     }
 }

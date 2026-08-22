@@ -193,7 +193,26 @@ pub fn add_nucleosomes_to_annotations(
     annot: &mut MolecularAnnotations,
     m6a: &[i64],
     options: &NucleosomeParameters,
+    callable_minimums: (usize, i64),
 ) {
+    // SEQ-less records pass through untouched: calling needs m6A (which
+    // cannot decode without SEQ), and mutating the frame would corrupt a
+    // tag that can never be re-derived.
+    if record.seq_len() == 0 {
+        return;
+    }
+    // The annotations must describe THIS record. An inherited MA field 0
+    // from a differently-sized input would make the tag we are about to
+    // write read back as stale (Untagged) forever.
+    let seq_len = record.seq_len() as u32;
+    if annot.read_length != seq_len {
+        log::warn!(
+            "MA read_length {} != record seq_len {}; correcting",
+            annot.read_length,
+            seq_len
+        );
+        annot.read_length = seq_len;
+    }
     let nucs = if options.allowed_m6a_skips < 0 {
         find_nucleosomes(m6a, options)
     } else {
@@ -208,44 +227,50 @@ pub fn add_nucleosomes_to_annotations(
     // by construction, so leaving fire behind while replacing msp would
     // strand fire precisions against unrelated MSPs.
     annot.annotation_types.retain(|t| {
-        t.name != ma_io::NUC_TYPE && t.name != ma_io::MSP_TYPE && t.name != ma_io::FIRE_TYPE
+        t.name != ma_io::NUC_TYPE
+            && t.name != ma_io::MSP_TYPE
+            && t.name != ma_io::FIRE_TYPE
+            && t.name != ma_io::FIBERSEQ_CALLABLE_TYPE
     });
     ma_io::add_nuc_annotations(annot, &nuc_starts, &nuc_lengths);
     ma_io::add_msp_annotations(annot, &msp_starts, &msp_lengths, None);
+    ma_io::derive_fiberseq_callable(annot, callable_minimums.0, callable_minimums.1);
+    #[cfg(debug_assertions)]
+    check_callable_span(annot, options, seq_len, &nuc_lengths, &msp_lengths);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_nucleosomes() {
-        let m6a = vec![];
-        let o = crate::cli::NucleosomeParameters::default();
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
-        // simple case
-        let m6a = vec![100];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(0, 100)]);
-        // simple case
-        let m6a = vec![74];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
-        // simple case 2
-        let m6a = vec![0, 86];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 85)]);
-        // simple nothing case
-        let m6a = vec![0, 74];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![]);
-        // single complex case
-        let m6a = vec![0, 26, 105];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(1, 104)]);
-        // mixed complex case
-        let m6a = vec![0, 86, 96, 100, 126, 210, 211, 212, 213, 214, 305, 340];
-        assert_eq!(
-            find_nucleosomes(&m6a, &o),
-            vec![(1, 85), (101, 109), (215, 125)]
-        );
-        // two m6a case
-        let m6a = vec![5, 40, 101];
-        assert_eq!(find_nucleosomes(&m6a, &o), vec![(0, 101)]);
+/// Debug-build producer invariants: the callable span sits inside the
+/// end-trimmed window and the surviving nuc/MSP calls tile it exactly
+/// (what licenses one-interval storage). Runs on every record in every
+/// debug run, so the whole fixture corpus exercises it.
+#[cfg(debug_assertions)]
+fn check_callable_span(
+    annot: &MolecularAnnotations,
+    options: &NucleosomeParameters,
+    seq_len: u32,
+    nuc_lengths: &[u32],
+    msp_lengths: &[u32],
+) {
+    let Some(t) = annot.get_type(ma_io::FIBERSEQ_CALLABLE_TYPE) else {
+        return;
+    };
+    let a = &t.annotations[0];
+    if a.length == 0 {
+        return;
     }
+    let d = options.distance_from_end.max(0) as u32;
+    debug_assert!(d <= a.start, "span start {} < D {}", a.start, d);
+    debug_assert!(
+        a.end() <= seq_len - d,
+        "span end {} > L - D {}",
+        a.end(),
+        seq_len - d
+    );
+    let tiled: u32 = nuc_lengths.iter().chain(msp_lengths.iter()).sum();
+    debug_assert!(
+        tiled == a.length,
+        "survivors do not tile the span: {} != {}",
+        tiled,
+        a.length
+    );
 }

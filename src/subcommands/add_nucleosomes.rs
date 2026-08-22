@@ -15,6 +15,7 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
 
     // iterate over chunks
     for chunk in bam_chunk_iter {
+        let minimums = nuc_opts.input.filters.callable_minimums();
         let mut fibers: Vec<FiberseqData> = chunk
             .into_iter()
             .map(|r| FiberseqData::new(r, None, &nuc_opts.input.filters))
@@ -27,11 +28,22 @@ pub fn add_nucleosomes_to_bam(nuc_opts: &mut AddNucleosomeOptions) {
                 .get_forward_coords(M6A_TYPE)
                 .map(|v| v.into_iter().map(|(s, _)| s as i64).collect())
                 .unwrap_or_default();
-            add_nucleosomes_to_annotations(&fd.record, &mut fd.annotations, &m6a, &nuc_opts.nuc);
+            add_nucleosomes_to_annotations(
+                &fd.record,
+                &mut fd.annotations,
+                &m6a,
+                &nuc_opts.nuc,
+                minimums,
+            );
             fd.serialize_annotations();
         });
 
         for fd in &fibers {
+            // --drop-uncallable-fibers: the callable state was just computed
+            // above, so drop here, after tagging.
+            if nuc_opts.input.filters.drop_uncallable_fibers && !fd.is_callable() {
+                continue;
+            }
             out.write(&fd.record).unwrap();
         }
     }

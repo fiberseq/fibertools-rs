@@ -46,6 +46,7 @@ where
     pub model: Vec<u8>,
     pub min_ml: u8,
     pub nuc_opts: cli::NucleosomeParameters,
+    pub callable_minimums: (usize, i64),
     pub burn_models: m6a_burn::BurnModels<B>,
     pub fake: bool,
 }
@@ -63,6 +64,7 @@ where
         polymerase: PbChem,
         batch_size: usize,
         nuc_opts: cli::NucleosomeParameters,
+        callable_minimums: (usize, i64),
         fake: bool,
     ) -> Self {
         // set up a precision table
@@ -80,6 +82,7 @@ where
             model: vec![],
             min_ml: 0,
             nuc_opts,
+            callable_minimums,
             burn_models: m6a_burn::BurnModels::new(&polymerase),
             fake,
         };
@@ -234,9 +237,34 @@ where
                 .retain(|t| t.name != basemods::M6A_TYPE);
 
             // check if there is any data
-            let (a_data, t_data) = match option_data {
-                Some((a_data, t_data)) => (a_data, t_data),
-                None => continue,
+            let Some((a_data, t_data)) = option_data else {
+                // Not ours to judge without kinetics: their primary
+                // carries the verdict, so pass through byte-identically.
+                if record.is_secondary() || record.is_supplementary() || record.seq_len() == 0 {
+                    continue;
+                }
+                // No kinetics: definitively NotCallable. Drop inherited
+                // nuc/msp/fire so stale calls cannot contradict the marker.
+                annot.annotation_types.retain(|t| {
+                    t.name != ma_io::NUC_TYPE
+                        && t.name != ma_io::MSP_TYPE
+                        && t.name != ma_io::FIRE_TYPE
+                });
+                // Sync the frame or the marker reads back as Untagged.
+                annot.read_length = record.seq_len() as u32;
+                ma_io::set_fiberseq_callable(
+                    &mut annot,
+                    None,
+                    ma_io::callable_minimums_name(
+                        opts.callable_minimums.0,
+                        opts.callable_minimums.1,
+                    ),
+                );
+                // write_record_with_basemods so the M6A_TYPE retain above
+                // reaches the wire: stale MM/ML from a prior run must not
+                // survive next to a NotCallable annotation.
+                ma_io::write_record_with_basemods(record, &annot);
+                continue;
             };
             // Iterate over A and then T basemods, collecting their forward
             // positions + ML qualities into a single sorted m6a list. Each call
@@ -284,6 +312,7 @@ where
                 &mut annot,
                 &modified_bases_forward,
                 &opts.nuc_opts,
+                opts.callable_minimums,
             );
 
             ma_io::write_record_with_basemods(record, &annot);
@@ -436,7 +465,17 @@ fn get_m6a_data_windows(record: &bam::Record) -> Option<(DataWidows, DataWidows)
         seq = revcomp(seq);
     }
 
-    assert_eq!(f_ip.len(), seq.len());
+    // Kinetics must cover the SEQ base-for-base; a record clipped after
+    // kinetics were attached (hard-clipped supplementary) is skipped.
+    if f_ip.len() != seq.len() {
+        log::warn!(
+            "Skipping {}: kinetics length {} != SEQ length {} (clipped after kinetics were attached?)",
+            String::from_utf8_lossy(record.qname()),
+            f_ip.len(),
+            seq.len()
+        );
+        return None;
+    }
     let mut a_count = 0;
     let mut t_count = 0;
     let mut a_windows = vec![];
@@ -547,6 +586,7 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
         find_pb_polymerase(&header),
         opts.batch_size,
         opts.nuc.clone(),
+        opts.input.filters.callable_minimums(),
         opts.fake,
     );
     // get default fire options
@@ -571,6 +611,7 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
                     predict_options.polymerase.clone(),
                     predict_options.batch_size,
                     predict_options.nuc_opts.clone(),
+                    predict_options.callable_minimums,
                     predict_options.fake,
                 );
                 PredictOptions::predict_m6a_on_records(&thread_opts, records)
@@ -590,7 +631,10 @@ pub fn read_bam_into_fiberdata(opts: &mut PredictM6AOptions) {
         });
 
         // write to output
-        fd_recs.iter().for_each(|fd| out.write(&fd.record).unwrap());
+        fd_recs
+            .iter()
+            .filter(|fd| !opts.input.filters.drop_uncallable_fibers || fd.is_callable())
+            .for_each(|fd| out.write(&fd.record).unwrap());
     }
 }
 
