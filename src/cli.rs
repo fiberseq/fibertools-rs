@@ -165,7 +165,7 @@ pub enum Commands {
     CallPeaks(CallPeaksOptions),
     /// Create a mock BAM file with FIRE elements from a BED file.
     /// Each interval in the BED becomes a FIRE element. The 4th column groups intervals into the same mock read.
-    #[clap(name = "mock-fire")]
+    #[clap(name = "mock-fire", hide = true)]
     MockFire(MockFireOptions),
     /// Combine peak calls from many BED files into one union peak set.
     /// Each input BED is one sample, and peaks are reported with the number and names of
