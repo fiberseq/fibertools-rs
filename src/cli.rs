@@ -23,6 +23,7 @@ mod pileup_opts;
 mod predict_opts;
 mod qc_opts;
 mod strip_basemods_opts;
+mod union_peaks_opts;
 mod validate_opts;
 
 // include the subcommand modules as top level functions and structs in the cli module
@@ -45,6 +46,7 @@ pub use pileup_opts::*;
 pub use predict_opts::*;
 pub use qc_opts::*;
 pub use strip_basemods_opts::*;
+pub use union_peaks_opts::*;
 pub use validate_opts::ValidateOptions;
 
 //
@@ -163,8 +165,13 @@ pub enum Commands {
     CallPeaks(CallPeaksOptions),
     /// Create a mock BAM file with FIRE elements from a BED file.
     /// Each interval in the BED becomes a FIRE element. The 4th column groups intervals into the same mock read.
-    #[clap(name = "mock-fire")]
+    #[clap(name = "mock-fire", hide = true)]
     MockFire(MockFireOptions),
+    /// Combine peak calls from many BED files into one union peak set.
+    /// Each input BED is one sample, and peaks are reported with the number and names of
+    /// the input BEDs that support them.
+    #[clap(name = "union-peaks", visible_aliases = &["union"])]
+    UnionPeaks(UnionPeaksOptions),
     /// Benchmark fiber iterator performance (hidden command for testing)
     #[clap(hide = true)]
     Benchmark(BenchmarkOptions),

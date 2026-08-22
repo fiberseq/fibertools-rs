@@ -33,7 +33,7 @@ fn group_bed_by_name_and_chrom(
 }
 
 /// Create a BAM header from BED records
-fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
+pub(crate) fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
     let mut header = Header::new();
 
     // Collect unique chromosomes and their max positions
@@ -61,7 +61,7 @@ fn create_header_from_bed(bed_records: &[BedRecord]) -> Header {
 }
 
 /// Create a mock BAM record with FIRE elements
-fn create_mock_fire_record(
+pub(crate) fn create_mock_fire_record(
     read_name: &str,
     intervals: &[BedRecord],
     header_view: &HeaderView,
@@ -141,10 +141,10 @@ fn create_mock_fire_record(
     let mut annot = MolecularAnnotations::from_record(&record);
     ma_io::add_msp_annotations(&mut annot, &starts, &lengths, None);
     ma_io::add_fire_annotations(&mut annot, &starts, &lengths, &quals);
-    // Mock records carry no m6A, so the read-time backfill would brand
-    // them NotCallable and --callable-fibers would drop every one.
-    // Write an explicit full-width Callable annotation instead: mock data is
-    // callable by construction.
+    // Sparse mock reads would fail the >=10-MSP minimum if the tag were
+    // derived, and --callable-fibers would drop them. Write an explicit
+    // full-width Callable annotation instead: mock data is callable by
+    // construction.
     {
         use crate::utils::input_bam::{FIRE_CALLABLE_MIN_AVE_MSP_SIZE, FIRE_CALLABLE_MIN_MSP};
         ma_io::set_fiberseq_callable(
@@ -159,6 +159,10 @@ fn create_mock_fire_record(
 }
 
 pub fn run_mock_fire(opts: &MockFireOptions) -> Result<()> {
+    log::warn!(
+        "ft mock-fire is deprecated and will be removed in a future release; \
+         ft union-peaks replaces the mock-fire | sort | call-peaks pipeline"
+    );
     log::info!("Reading BED file: {}", opts.bed);
 
     // Read BED file

@@ -596,7 +596,11 @@ pub fn read_bed_regions(bed_path: &str) -> Result<Vec<BedRecord>> {
 
     for line in reader.lines() {
         let line = line?;
-        if line.starts_with('#') || line.trim().is_empty() {
+        if line.starts_with('#')
+            || line.starts_with("track")
+            || line.starts_with("browser")
+            || line.trim().is_empty()
+        {
             continue;
         }
         let tokens: Vec<&str> = line.split('\t').collect();

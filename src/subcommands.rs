@@ -26,6 +26,8 @@ pub mod predict_m6a;
 pub mod qc;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
+/// Call union peaks across many BED files
+pub mod union_peaks;
 
 /// Create mock BAM from reference FASTA
 pub mod pg_inject;

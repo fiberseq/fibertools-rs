@@ -1,3 +1,5 @@
+#[path = "regression/call_peaks.rs"]
+mod call_peaks;
 #[path = "regression/center.rs"]
 mod center;
 #[path = "regression/common.rs"]
@@ -20,3 +22,5 @@ mod pileup;
 mod predict_m6a;
 #[path = "regression/qc.rs"]
 mod qc;
+#[path = "regression/union_peaks.rs"]
+mod union_peaks;
