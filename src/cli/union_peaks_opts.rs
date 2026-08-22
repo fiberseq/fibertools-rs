@@ -6,7 +6,7 @@ use std::fmt::Debug;
 pub struct UnionPeaksOptions {
     /// Input BED files, one per sample.
     /// Every interval becomes a FIRE element on a mock fiber for that sample, and
-    /// peaks are called across all the samples at once. Overlapping intervals within
+    /// peaks are called across all the samples at once. Overlapping or book-ended intervals within
     /// one file are merged first, so a file can add at most 1 to a peak's support.
     #[clap(required = true, num_args = 1..)]
     pub beds: Vec<String>,
