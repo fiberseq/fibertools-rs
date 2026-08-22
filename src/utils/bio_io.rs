@@ -274,6 +274,8 @@ where
     //     * Otherwise, the next value is wrapped in `Some` and returned.
     // We use Self::Item in the return type, so we can change
     // the type without having to update the function signatures.
+    // Yields only non-empty chunks; `None` strictly means the underlying
+    // reader is exhausted. Consumers (FiberseqRecords) rely on this.
     fn next(&mut self) -> Option<Self::Item> {
         // update progress bar with results from previous iteration
         if self.pre_chunk_done > 0 {
@@ -285,23 +287,33 @@ where
         }
 
         let mut cur_vec = vec![];
-        for r in self.bam.by_ref().take(self.chunk_size) {
-            let r = r.unwrap();
-            let has_mm_and_ml = r.aux(b"MM").is_ok() && r.aux(b"ML").is_ok();
-            if has_mm_and_ml
-                && (r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0)
-            {
-                log::warn!(
-                    "Skipping read ({}) because it has been hard clipped and has ML and MM tags. This read will be excluded from calculations and any output.",
-                    String::from_utf8_lossy(r.qname())
-                );
-                continue;
+        // A pull whose records are ALL filtered out must not end the
+        // iterator (None means exhausted): keep pulling until a record
+        // survives or the underlying reader is truly out of records.
+        loop {
+            let mut pulled = 0usize;
+            for r in self.bam.by_ref().take(self.chunk_size) {
+                pulled += 1;
+                let r = r.unwrap();
+                let has_mm_and_ml = r.aux(b"MM").is_ok() && r.aux(b"ML").is_ok();
+                if has_mm_and_ml
+                    && (r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0)
+                {
+                    log::warn!(
+                        "Skipping read ({}) because it has been hard clipped and has ML and MM tags. This read will be excluded from calculations and any output.",
+                        String::from_utf8_lossy(r.qname())
+                    );
+                    continue;
+                }
+                // filter by bit flag
+                if r.flags() & self.bit_flag_filter != 0 {
+                    continue;
+                }
+                cur_vec.push(r);
             }
-            // filter by bit flag
-            if r.flags() & self.bit_flag_filter != 0 {
-                continue;
+            if !cur_vec.is_empty() || pulled < self.chunk_size {
+                break;
             }
-            cur_vec.push(r);
         }
 
         // extend progress bar
