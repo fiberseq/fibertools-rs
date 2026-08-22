@@ -204,7 +204,7 @@ fn support_for<'a>(
 /// bases. `--min-support` filters the output only, so `-n 3` and `-n 1` plus a downstream
 /// filter agree apart from the sequential `name` column, which renumbers.
 pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
-    if opts.window_size < 2 {
+    if opts.merge.window_size < 2 {
         bail!("--window-size must be at least 2; a smaller window finds no local maxima");
     }
     let names = resolve_names(opts)?;
@@ -246,7 +246,7 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
     // built from the same synthetic fibers), so call in FIRE-fraction mode with the
     // fraction threshold off and filter on sample support afterwards instead.
     let params = PeakCallingParams {
-        window_size: opts.window_size,
+        merge: opts.merge.clone(),
         min_fire_coverage: 1, // one sample is enough to score a position
         min_cov: Some(1),     // coverage bounds only set pass_coverage, which we do not emit
         max_cov: Some(i32::MAX),
@@ -254,10 +254,6 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
         max_fdr: 1.0,
         min_fire_frac: Some(0.0),
         min_fire_frac_filter: 0.0,
-        min_frac_overlap: 0.5,
-        min_reciprocal_overlap: 0.75,
-        high_reciprocal_overlap: 0.90,
-        max_grouping_iterations: 10,
     };
 
     let mut writer = bio_io::writer(&opts.out)?;
@@ -280,7 +276,7 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
     let min_support = opts
         .min_support
         .max((opts.min_frac_support * n_inputs as f64).ceil() as usize);
-    let gap = opts.window_size as i64 + ISLAND_PAD;
+    let gap = opts.merge.window_size as i64 + ISLAND_PAD;
     let mut n_peaks = 0;
     for chrom in chrom_lengths.keys() {
         let mut all: Vec<(i64, i64)> = samples
