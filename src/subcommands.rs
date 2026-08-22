@@ -27,7 +27,6 @@ pub mod qc;
 /// Remove base modifications from a bam record
 pub mod strip_basemods;
 
-pub mod fiber_hmm;
 /// Create mock BAM from reference FASTA
 pub mod pg_inject;
 /// Lift annotations through a pangenome graph from source to target coordinates
