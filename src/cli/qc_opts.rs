@@ -69,6 +69,6 @@ pub struct QcOpts {
     /// is at least this many bases. The span is the fiberseq_callable
     /// range, not the read length: a long read with a short callable
     /// span fails this filter. Applies on top of the callable state.
-    #[clap(long)]
+    #[clap(long, value_parser = clap::value_parser!(i64).range(0..))]
     pub filtered_min_callable_length: Option<i64>,
 }

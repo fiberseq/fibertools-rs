@@ -30,8 +30,8 @@ pub enum CallableState {
     Callable,
     /// Zero-length tag (`1-0`): calling ran and the read failed the minimums.
     NotCallable,
-    /// No tag (calling never ran), or the tag is stale (recorded read
-    /// length no longer matches the record).
+    /// No tag (calling never ran), or, when a SEQ is present, a stale tag
+    /// (recorded read length no longer matches the record).
     Untagged,
 }
 
@@ -198,12 +198,17 @@ impl FiberseqData {
         let Some(a) = infos.first() else {
             return (CallableState::Untagged, 0, 0);
         };
-        let (cs, ce) = (a.query_start as i64, a.query_end as i64);
+        let len = self.frame_length() as i64;
+        let (cs, ce) = (
+            (a.query_start as i64).clamp(0, len),
+            (a.query_end as i64).clamp(0, len),
+        );
+        // Empty after clamping covers both the 1-0 NotCallable marker and
+        // a corrupt foreign span lying outside the frame.
         if ce <= cs {
             return (CallableState::NotCallable, cs, cs);
         }
-        let len = self.frame_length() as i64;
-        (CallableState::Callable, cs.clamp(0, len), ce.clamp(0, len))
+        (CallableState::Callable, cs, ce)
     }
 
     /// The record's length in its own frame: the SEQ length when a SEQ is
@@ -691,7 +696,8 @@ where
             EXCLUDE_LOG.call_once(|| {
                 log::info!(
                     "excluding fibers that are not fiberseq-callable \
-                     (--callable-fibers / --drop-uncallable-fibers)"
+                     (--callable-fibers / --drop-uncallable-fibers); \
+                     further exclusions are not logged"
                 );
             });
         }
