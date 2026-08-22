@@ -35,6 +35,17 @@ pub fn reciprocal_overlap_raw(
     (overlap_len / a_len).min(overlap_len / b_len)
 }
 
+/// Median of a sorted slice: middle value for odd counts, midpoint of the two middle
+/// values for even counts.
+fn median(sorted: &[i64]) -> i64 {
+    let n = sorted.len();
+    if n % 2 == 1 {
+        sorted[n / 2]
+    } else {
+        (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+    }
+}
+
 /// Everything peak calling needs from the CLI, decoupled from `CallPeaksOptions`
 /// (which flattens `InputBam`/`FiberFilters`, so commands that never read a BAM
 /// cannot build one). See `ft union-peaks` for the other caller.
@@ -312,12 +323,12 @@ impl<'a> Peak<'a> {
                     let end = pileup.chrom_start + positions[positions.len() - 1] + 1;
                     (start, end)
                 } else {
-                    // Calculate median start and end from FIRE elements
+                    // True median: for even counts, the midpoint of the two middle
+                    // values. The upper median biased the consensus onto one
+                    // element's bounds whenever contributors tied.
                     starts.sort_unstable();
                     ends.sort_unstable();
-                    let median_start = starts[starts.len() / 2] as usize;
-                    let median_end = ends[ends.len() / 2] as usize;
-                    (median_start, median_end)
+                    (median(&starts) as usize, median(&ends) as usize)
                 }
             } else {
                 // Fallback: FIRE element tracking not enabled
