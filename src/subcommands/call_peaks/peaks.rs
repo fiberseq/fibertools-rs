@@ -1,6 +1,7 @@
 use super::chrom_names_and_lengths;
 use super::fdr::{lookup_fdr, FdrEntry};
 use crate::cli::CallPeaksOptions;
+pub use crate::cli::PeakCallingParams;
 use crate::fiber::FiberseqData;
 use crate::subcommands::pileup::{
     FiberseqPileup, FiberseqPileupOptions, FireTrack, FireTrackOptions,
@@ -43,44 +44,6 @@ fn median(sorted: &[i64]) -> i64 {
         sorted[n / 2]
     } else {
         (sorted[n / 2 - 1] + sorted[n / 2]) / 2
-    }
-}
-
-/// Everything peak calling needs from the CLI, decoupled from `CallPeaksOptions`
-/// (which flattens `InputBam`/`FiberFilters`, so commands that never read a BAM
-/// cannot build one). See `ft union-peaks` for the other caller.
-#[derive(Debug, Clone, Copy)]
-pub struct PeakCallingParams {
-    pub window_size: usize,
-    pub min_fire_coverage: i32,
-    pub min_cov: Option<i32>,
-    pub max_cov: Option<i32>,
-    pub sd_cov: f64,
-    pub max_fdr: f64,
-    pub min_fire_frac: Option<f64>,
-    pub min_fire_frac_filter: f64,
-    pub min_frac_overlap: f64,
-    pub min_reciprocal_overlap: f64,
-    pub high_reciprocal_overlap: f64,
-    pub max_grouping_iterations: usize,
-}
-
-impl From<&CallPeaksOptions> for PeakCallingParams {
-    fn from(o: &CallPeaksOptions) -> Self {
-        Self {
-            window_size: o.window_size,
-            min_fire_coverage: o.min_fire_coverage,
-            min_cov: o.min_cov,
-            max_cov: o.max_cov,
-            sd_cov: o.sd_cov,
-            max_fdr: o.max_fdr,
-            min_fire_frac: o.min_fire_frac,
-            min_fire_frac_filter: o.min_fire_frac_filter,
-            min_frac_overlap: o.min_frac_overlap,
-            min_reciprocal_overlap: o.min_reciprocal_overlap,
-            high_reciprocal_overlap: o.high_reciprocal_overlap,
-            max_grouping_iterations: o.max_grouping_iterations,
-        }
     }
 }
 
@@ -727,7 +690,7 @@ pub fn call_peaks(
     header: &rust_htslib::bam::HeaderView,
     fdr_table: &[FdrEntry],
 ) -> Result<()> {
-    if opts.min_fire_frac.is_some() {
+    if opts.peak_params.min_fire_frac.is_some() {
         log::info!("Calling peaks using FIRE fraction threshold");
     } else {
         log::info!(
@@ -748,7 +711,7 @@ pub fn call_peaks(
     let mut writer = bio_io::writer(&opts.out)?;
     writeln!(writer, "{}", Peak::header())?;
 
-    let params = PeakCallingParams::from(&*opts);
+    let params = opts.peak_params.clone();
     let mut total_peaks_before_merge = 0;
     let mut total_peaks_after_merge = 0;
 
