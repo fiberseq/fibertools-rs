@@ -35,7 +35,7 @@ fn union_peaks_support_counts_and_boundaries() {
         union_peaks(&beds, &[]),
         "#chrom\tstart\tend\tname\tn_support\tfrac_support\tsupport\tunion_start\tunion_end\tpeak_summit\n\
          chr1\t1020\t1220\tunion_peak_1\t3\t1.0000\ts1,s2,s3\t1000\t1250\t1125\n\
-         chr1\t5050\t5350\tunion_peak_2\t2\t0.6667\ts1,s2\t5000\t5350\t5175\n\
+         chr1\t5025\t5325\tunion_peak_2\t2\t0.6667\ts1,s2\t5000\t5350\t5175\n\
          chr1\t9000\t9100\tunion_peak_3\t1\t0.3333\ts1\t9000\t9100\t9050\n\
          chr1\t20000\t20400\tunion_peak_4\t1\t0.3333\ts3\t20000\t20400\t20200\n\
          chr2\t120\t400\tunion_peak_5\t3\t1.0000\ts1,s2,s3\t100\t420\t265\n"
@@ -51,7 +51,7 @@ fn union_peaks_min_support_filters_only() {
     let filtered = union_peaks(&beds, &["-n", "2"]);
     let kept: Vec<&str> = filtered.lines().skip(1).collect();
     assert_eq!(kept.len(), 3, "got: {filtered}");
-    for (line, expected) in kept.iter().zip(["1020\t1220", "5050\t5350", "120\t400"]) {
+    for (line, expected) in kept.iter().zip(["1020\t1220", "5025\t5325", "120\t400"]) {
         assert!(line.contains(expected), "{line} lacks {expected}");
         // same peak, only the sequential name changes
         let coords = line.split('\t').take(3).collect::<Vec<_>>().join("\t");
@@ -174,4 +174,17 @@ fn oversized_coordinates_error_cleanly() {
     assert!(!out.status.success(), "must fail");
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(err.contains("invalid interval"), "clean error: {err}");
+}
+
+// --min-frac-support is the fractional twin of -n: 0.5 of 3 inputs rounds up to 2.
+#[test]
+fn min_frac_support_filters_like_min_support() {
+    let beds = fixture();
+    let out = union_peaks(&beds, &["--min-frac-support", "0.5"]);
+    let rows: Vec<&str> = out.lines().skip(1).collect();
+    assert!(rows.iter().all(|r| {
+        let n: usize = r.split('\t').nth(4).unwrap().parse().unwrap();
+        n >= 2
+    }));
+    assert_eq!(rows.len(), 3, "peaks with support 1 are dropped: {out}");
 }
