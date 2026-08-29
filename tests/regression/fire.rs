@@ -27,6 +27,43 @@ fn fire_on_legacy_input_strips_consumed_legacy_tags() {
     }
 }
 
+// Hard-clipped supplementary alignments can keep nuc/msp tag coordinates
+// from the full-length read, so positions run past the clipped SEQ (and wrap
+// below zero when flipped on reverse-strand records). `ft fire` must skip
+// scoring these records instead of panicking, and still write them to the
+// output unchanged (#136). The fixture holds two scorable primary reads plus
+// a forward and a reverse hard-clipped supplementary read from TEnCATS ONT
+// data.
+#[test]
+fn fire_skips_records_whose_coords_exceed_the_sequence() {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        "--ont",
+        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    let mut reader = bam::Reader::from_path(scored.path()).unwrap();
+    let mut n_scored = 0;
+    let mut n_skipped = 0;
+    for rec in reader.records() {
+        let rec = rec.unwrap();
+        if rec.is_supplementary() {
+            assert!(rec.aux(b"Ma").is_err(), "unscorable record got a Ma tag");
+            assert!(
+                rec.aux(b"as").is_ok(),
+                "skipped record lost its original tags"
+            );
+            n_skipped += 1;
+        } else {
+            assert!(rec.aux(b"Ma").is_ok(), "scorable record missing Ma tag");
+            n_scored += 1;
+        }
+    }
+    assert_eq!(n_scored, 2);
+    assert_eq!(n_skipped, 2);
+}
+
 fn extract_fdrs(out: &str) -> Vec<f64> {
     out.lines()
         .map(|l| l.split('\t').nth(9).unwrap().parse().unwrap())
