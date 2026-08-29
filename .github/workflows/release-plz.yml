@@ -7,9 +7,14 @@ name: release-plz
 # GitHub releases. The only cross-workflow hop — firing cargo-dist to build the
 # fibertools-rs binaries — uses workflow_dispatch, which the default
 # GITHUB_TOKEN is allowed to trigger, so no PAT is required.
+# This copy lives on the release/v0.13 maintenance branch: it runs on pushes
+# to that branch (push-triggered workflows use the pushed branch's file), so
+# merging a fix opens the patch release PR and merging that PR publishes it,
+# the same flow main has.
 on:
   push:
-    branches: [main]
+    branches: ["release/**"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -71,7 +76,9 @@ jobs:
           tag=$(echo "$RELEASES" | jq -r '.[] | select(.package_name=="fibertools-rs") | .tag')
           if [ -n "$tag" ] && [ "$tag" != "null" ]; then
             echo "Dispatching cargo-dist for $tag"
-            gh workflow run release.yml --ref main -f tag="$tag"
+            # Dispatch on the tag itself (not main) so the binaries are
+            # built from the patched 0.13.x source, not main's 0.14 code.
+            gh workflow run release.yml --ref "$tag" -f tag="$tag"
           else
             echo "fibertools-rs not in this release; skipping cargo-dist"
           fi
