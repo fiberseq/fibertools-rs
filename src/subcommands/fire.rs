@@ -15,6 +15,11 @@ pub fn add_fire_to_rec(
     model: &GBDT,
     precision_table: &MapPrecisionValues,
 ) {
+    // Skip (and pass through unchanged) records whose annotations cannot be
+    // scored; fire_coords_fit_seq logs the reason (#136).
+    if !fire_coords_fit_seq(rec) {
+        return;
+    }
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
     // FIRE produces precisions in MSP-iteration (BAM) order. Convert to
@@ -98,6 +103,7 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
             let chunk: Vec<FiberseqData> = chunk.collect();
             let feats: Vec<FireFeats> = chunk
                 .par_iter()
+                .filter(|r| fire_coords_fit_seq(r))
                 .map(|r| FireFeats::new(r, fire_opts))
                 .collect();
             feats.iter().for_each(|f| {
