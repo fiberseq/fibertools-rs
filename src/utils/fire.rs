@@ -61,6 +61,38 @@ fn get_mid_point(start: i64, end: i64) -> i64 {
     (start + end) / 2
 }
 
+/// Check that the annotations FIRE reads (msp, m6a, cpg) all fit inside the
+/// stored sequence, warning and returning false if they do not.
+///
+/// Hard-clipped supplementary alignments can keep nuc/msp tag coordinates
+/// from the full-length read, so positions run past the clipped SEQ and
+/// scoring the record indexes out of bounds (#136). The check uses the raw
+/// molecular-orientation coordinates: building a BAM-oriented view flips
+/// coordinates through `read_length - end`, which itself overflows on these
+/// records.
+pub fn fire_coords_fit_seq(rec: &FiberseqData) -> bool {
+    use crate::utils::basemods::{CPG_TYPE, M6A_TYPE};
+    use crate::utils::ma_io::MSP_TYPE;
+    let seq_len = rec.record.seq_len() as u64;
+    for type_name in [MSP_TYPE, M6A_TYPE, CPG_TYPE] {
+        let Some(t) = rec.annotations.get_type(type_name) else {
+            continue;
+        };
+        for a in &t.annotations {
+            if a.start as u64 + a.length as u64 > seq_len {
+                log::warn!(
+                    "skipping FIRE for {}: {} coordinates extend past the {} bp sequence (hard-clipped supplementary alignment?)",
+                    String::from_utf8_lossy(rec.record.qname()),
+                    type_name,
+                    seq_len
+                );
+                return false;
+            }
+        }
+    }
+    true
+}
+
 /// ```
 /// use fibertools_rs::utils::fire::get_bins;
 /// let bins = get_bins(50, 5, 20, 200);
