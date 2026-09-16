@@ -637,7 +637,7 @@ pub fn call_peaks_for_chrom(
             track_fire_elements: true, // Enable FIRE element tracking for peak calling
         },
         rolling_max: Some(params.merge.window_size),
-        haps: false,
+        haps: params.haps,
         per_base: false,
         keep_zeros: false,
         min_fire_coverage: Some(params.min_fire_coverage),

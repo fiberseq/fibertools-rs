@@ -34,10 +34,6 @@ pub struct CallPeaksOptions {
     /// Include nucleosome and MSP coverage in pileup (default: only FIRE coverage)
     #[clap(long)]
     pub include_nuc_msp: bool,
-
-    /// Include haplotype-specific calls
-    #[clap(long)]
-    pub haps: bool,
 }
 
 /// The knobs of the shared peak caller. Flattened into `CallPeaksOptions` for the
@@ -81,6 +77,10 @@ pub struct PeakCallingParams {
     /// Minimum FIRE coverage required to calculate a score (default: 4)
     #[clap(long, default_value = "4", hide = true)]
     pub min_fire_coverage: i32,
+
+    /// Include haplotype-specific calls
+    #[clap(long)]
+    pub haps: bool,
 }
 
 /// Local-max window and merge geometry: meaningful for any element source, so
