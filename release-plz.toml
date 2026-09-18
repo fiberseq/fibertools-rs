@@ -38,8 +38,10 @@ git_tag_name = "molecular-annotation-v{{ version }}"
 #   (it ships no binaries, so nothing would un-draft it).
 # features_always_increment_minor defaults false -> keeps MA low (feat -> patch).
 
-# semver_check is on (the default): the release-plz action installs
-# cargo-semver-checks. It builds the crate from a fresh registry resolution, not
-# Cargo.lock, so a dependency range that no longer resolves to a buildable set
-# fails here first and blocks the release PR. `cargo install` without --locked
-# would fail the same way, so fix the dependency rather than turn this off.
+# The release-plz action installs cargo-semver-checks, so the check runs unless
+# turned off here. It builds both the current source and the published baseline
+# from a fresh registry resolution without any Cargo.lock. The baseline is
+# immutable, and the 0.13.0 crate no longer resolves to a buildable set (vergen
+# 9.1.0 vs vergen-git2 1.x), so the check can never pass again for that
+# baseline. Conventional-commit bumping is what we rely on.
+semver_check = false

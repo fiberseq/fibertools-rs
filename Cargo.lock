@@ -2430,6 +2430,7 @@ dependencies = [
  "env_logger",
  "gbdt",
  "gzp",
+ "hts-sys",
  "indicatif",
  "insta",
  "itertools 0.10.5",
