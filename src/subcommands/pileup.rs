@@ -699,19 +699,25 @@ impl<'a> FiberseqPileup<'a> {
             &None,
         );
         let (hap1_data, hap2_data) = if pileup_opts.haps {
+            // Only all_data's FIRE elements are ever read (peak boundaries in
+            // call-peaks), so do not pay for them on the haplotype tracks.
+            let hap_opts = FireTrackOptions {
+                track_fire_elements: false,
+                ..fire_track_opts.clone()
+            };
             (
                 Some(FireTrack::new(
                     chrom.to_string(),
                     chrom_start,
                     chrom_end,
-                    fire_track_opts.clone(),
+                    hap_opts.clone(),
                     &None,
                 )),
                 Some(FireTrack::new(
                     chrom.to_string(),
                     chrom_start,
                     chrom_end,
-                    fire_track_opts.clone(),
+                    hap_opts,
                     &None,
                 )),
             )
