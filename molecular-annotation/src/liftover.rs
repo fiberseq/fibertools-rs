@@ -486,6 +486,11 @@ impl AlignedBlocks {
 /// end on both strands: the bases before the first base of SEQ.
 #[cfg(feature = "htslib")]
 pub fn hard_clips(record: &rust_htslib::bam::Record) -> (u32, u32) {
+    // A record with no CIGAR (unmapped, or a bare `Record::new()`) has no
+    // data to read; `cigar()` on it trips a debug assertion.
+    if record.cigar_len() == 0 {
+        return (0, 0);
+    }
     let cigar = record.cigar();
     (
         cigar.leading_hardclips() as u32,
@@ -499,7 +504,7 @@ pub fn hard_clips(record: &rust_htslib::bam::Record) -> (u32, u32) {
 pub fn query_span(record: &rust_htslib::bam::Record) -> u32 {
     use rust_htslib::bam::record::Cigar;
     let seq_len = record.seq_len() as u32;
-    if seq_len > 0 {
+    if seq_len > 0 || record.cigar_len() == 0 {
         return seq_len;
     }
     record
