@@ -209,9 +209,71 @@ fn assert_stale_records_cleaned(bam: &str, n_supp: usize) {
     assert_eq!(seen_supp, n_supp, "{bam}");
 }
 
+/// Full-read-frame supplementaries (#136): convert-tags keeps nuc/msp under
+/// the full read length, marks them NotCallable (no m6A), and strips the
+/// consumed legacy tags and MM/ML/MN.
+fn assert_full_frame_records_kept(bam: &str, expected: &[(&str, u16, u32)]) {
+    let out = NamedTempFile::with_suffix(".bam").unwrap();
+    convert(&fixture(bam), out.path());
+    let mut seen = 0;
+    for rec in records(out.path()) {
+        let tag = ma(&rec).expect("every record gets an MA tag");
+        for legacy in LEGACY_TAGS {
+            assert!(rec.aux(legacy).is_err(), "{bam}: legacy tag survived");
+        }
+        if !rec.is_supplementary() {
+            assert_eq!(tag.split(';').next().unwrap(), rec.seq_len().to_string());
+            assert!(rec.aux(b"MM").is_ok(), "{bam}: primary lost MM");
+            continue;
+        }
+        let qname = String::from_utf8_lossy(rec.qname()).to_string();
+        let e = expected
+            .iter()
+            .find(|e| qname.starts_with(e.0) && rec.flags() == e.1)
+            .unwrap_or_else(|| panic!("{bam}: unexpected {qname} {}", rec.flags()));
+        assert_eq!(
+            tag.split(';').next().unwrap(),
+            e.2.to_string(),
+            "{bam} {qname}: MA frame must be the full read"
+        );
+        assert!(
+            tag.contains(";nuc") && tag.contains(";msp"),
+            "{bam} {qname}: nuc/msp lost: {tag}"
+        );
+        assert!(
+            tag.contains("fiberseq_callable.:1-0"),
+            "{bam} {qname}: no m6A means NotCallable: {tag}"
+        );
+        for t in [b"MM", b"ML", b"MN"] {
+            assert!(
+                rec.aux(t).is_err(),
+                "{bam} {qname}: {} on a full-read frame",
+                String::from_utf8_lossy(t)
+            );
+        }
+        seen += 1;
+    }
+    assert_eq!(seen, expected.len(), "{bam}");
+}
+
 #[test]
-fn convert_tags_cleans_hard_clipped_legacy_records() {
-    assert_stale_records_cleaned("ont_hardclip_supplementary.bam", 2);
+fn convert_tags_keeps_full_frame_legacy_records() {
+    assert_full_frame_records_kept(
+        "ont_hardclip_supplementary.bam",
+        &[("8ac3be13", 2048, 29940), ("4bd15181", 2064, 33088)],
+    );
+}
+
+#[test]
+fn convert_tags_keeps_full_frame_ma_records() {
+    assert_full_frame_records_kept(
+        "ont_hardclip_full_frame.bam",
+        &[
+            ("f2009f4d", 2048, 5376),
+            ("f2009f4d", 2064, 5376),
+            ("7b40cfd0", 2048, 9693),
+        ],
+    );
 }
 
 #[test]

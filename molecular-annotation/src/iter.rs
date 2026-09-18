@@ -131,14 +131,16 @@ impl MolecularAnnotations {
 
     /// Project annotations into a query-coordinate system anchored at 0.
     ///
-    /// Each annotation's coords (in BAM orientation, matching `iter_full`) are
-    /// shifted by `-anchor`. If `flip` is true, each interval is reversed
-    /// around 0: `[a, b)` → `[-(b-1), -(a-1))`.
+    /// Each annotation's coords (in BAM orientation, matching `iter_full`,
+    /// then made SEQ-relative by subtracting [`query_offset`](Self::query_offset))
+    /// are shifted by `-anchor`, so `anchor` is a SEQ position. If `flip` is
+    /// true, each interval is reversed around 0: `[a, b)` → `[-(b-1), -(a-1))`.
     pub fn project_query(
         &self,
         anchor: i64,
         flip: bool,
     ) -> impl Iterator<Item = ProjectedAnnotation<'_>> + '_ {
+        let offset = self.query_offset() as i64;
         self.annotation_types.iter().flat_map(move |t| {
             t.annotations.iter().map(move |a| {
                 let (qs, qe) = if self.is_reverse_aligned {
@@ -146,7 +148,8 @@ impl MolecularAnnotations {
                 } else {
                     (a.start, a.end())
                 };
-                let (start, end) = project_interval(qs as i64, qe as i64, anchor, flip);
+                let (start, end) =
+                    project_interval(qs as i64 - offset, qe as i64 - offset, anchor, flip);
                 ProjectedAnnotation {
                     type_name: &t.name,
                     start,

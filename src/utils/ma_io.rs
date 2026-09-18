@@ -20,6 +20,11 @@
 //!   (NotCallable); only never-processed reads have none. Non-default
 //!   minimums name the annotation in the AN tag (e.g. "m20a10").
 //!
+//! Hard-clipped records whose tags describe the full-length read (an aligner
+//! copied the primary's tags onto a supplementary; see [`record_frame`]) keep
+//! their nuc/msp/fire in that frame, lifted with the leading hard clip, and
+//! lose their MM/ML. They are always NotCallable: they have no m6A.
+//!
 //! `m6a` and `cpg` types may appear *in memory* on a [`MolecularAnnotations`]
 //! populated by the library's MM/ML parser. Their on-disk source of truth
 //! is `MM`/`ML`; they carry `Encoding::MmMl` (set at construction, whether read
@@ -27,7 +32,10 @@
 //! library serializes them into MM/ML rather than the MA tag set.
 
 use anyhow::{bail, Result};
-use molecular_annotation::{ma_family_tags, Encoding, MolecularAnnotations, QualitySpec, Strand};
+use molecular_annotation::{
+    hard_clips, ma_family_tags, query_span, AlignedBlocks, Encoding, MolecularAnnotations,
+    QualitySpec, Strand,
+};
 use rust_htslib::bam::{self, record::Aux};
 
 /// Annotation type names used by fibertools-rs.
@@ -49,52 +57,112 @@ type MspInput<'a> = (&'a [u32], &'a [u32], Option<&'a [u8]>);
 ///
 /// Delegates to the library's combined MA-spec + MM/ML parser. If the
 /// library returns an empty annotation set and the record carries legacy
-/// `ns`/`nl`/`as`/`al`/`aq` tags, falls back to `read_legacy_nuc_msp`.
+/// `ns`/`nl`/`as`/`al`/`aq` tags, falls back to the legacy reader.
 /// Tolerant of malformed MM/ML — the library handles those internally
 /// without panicking.
+///
+/// The record's frame ([`record_frame`]) decides what is parsed: a stale
+/// record comes back empty, a full-read-frame record keeps its MA/legacy
+/// annotations under the full read length (lifted with the leading hard
+/// clip) and never parses MM/ML, and everything else parses as before.
 pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
-    // A record whose tags describe another read is untagged, and parsing
-    // its MM/ML would only produce truncation noise: decide before parsing.
-    if let Some(why) = record_frame_reason(record) {
-        let mut annot = MolecularAnnotations::new(0);
-        annot.set_aligned_blocks_raw(
-            molecular_annotation::AlignedBlocks::from_record(record),
-            record.is_reverse(),
-        );
-        drop_stale_frame(&mut annot, record, why);
-        return Ok(annot);
-    }
-    let mut annot = MolecularAnnotations::from_record(record);
-    // If MA tag is absent, also ingest legacy nuc/msp tags. The library
-    // already populates basemod types (m6a/cpg) from MM/ML, so we merge
-    // legacy-derived nuc/msp into whatever the library produced rather
-    // than gating on `annotation_types.is_empty()` (which would skip the
-    // legacy fallback whenever MM/ML is present).
-    let has_ma = ma_family_tags(record).is_some();
-    if !has_ma {
-        // Provenance: the gates are type-checked (`has_legacy_nuc_msp`,
-        // `has_legacy_fibertig`), so a foreign tool reusing these two-letter
-        // names with a different aux type is never parsed as fibertools data.
-        // The write path (`strip_consumed_legacy_tags`) removes legacy tags
-        // under pair-level gates mirroring `read_legacy_nuc_msp`'s
-        // consumption — i.e. only what this reader ingested — so keep the
-        // two in sync.
-        if has_legacy_nuc_msp(record) {
-            merge_missing_types(&mut annot, read_legacy_nuc_msp(record)?);
+    let mut annot = match record_frame(record) {
+        // A record whose tags describe another read is untagged, and parsing
+        // its MM/ML would only produce truncation noise: decide before parsing.
+        Frame::Stale(why) => {
+            let mut annot = MolecularAnnotations::new(0);
+            drop_stale_frame(&mut annot, record, why);
+            return Ok(annot);
         }
-        // Legacy fibertig (`fs`/`fl`/`fa`): the pre-MA fibertig wire format,
-        // dropped from the writer in favour of the MA-spec `AN` tag. Kept
-        // readable so older fibertig BAMs stay consumable by `extract`.
-        if has_legacy_fibertig(record) {
-            merge_missing_types(&mut annot, read_legacy_fibertig(record)?);
+        Frame::FullRead {
+            h_lead,
+            read_length,
+        } => {
+            let annot = if ma_family_tags(record).is_some() {
+                // The library sets the query offset from the MA read length
+                // and skips MM/ML itself.
+                MolecularAnnotations::from_record(record)
+            } else {
+                // Legacy arrays record no frame, and every producer wrote
+                // them on the full read: build that frame directly so MM/ML
+                // are never decoded against the wrong SEQ.
+                let mut annot = MolecularAnnotations::new(read_length);
+                annot.set_aligned_blocks_raw(
+                    AlignedBlocks::from_record(record).with_query_offset(h_lead),
+                    record.is_reverse(),
+                );
+                read_legacy_nuc_msp_into(record, &mut annot)?;
+                read_legacy_fibertig_into(record, &mut annot)?;
+                annot
+            };
+            annot
         }
-    }
-    // Backstop on the parsed model: a read length that disagrees with SEQ,
-    // or any annotation ending past it.
+        Frame::Seq => {
+            let mut annot = MolecularAnnotations::from_record(record);
+            // The MA tag vouches for the frame, but an MN tag that disagrees
+            // with SEQ says the base mods were copied from a longer read: keep
+            // the calls, drop only the m6A/CpG (the writer strips MM/ML/MN).
+            if mn_disagrees(record) {
+                annot.annotation_types.retain(|t| !t.is_mm_ml());
+            }
+            // If MA tag is absent, also ingest legacy nuc/msp tags. The library
+            // already populates basemod types (m6a/cpg) from MM/ML, so we add
+            // legacy-derived nuc/msp to whatever the library produced rather
+            // than gating on `annotation_types.is_empty()` (which would skip
+            // the legacy fallback whenever MM/ML is present).
+            if ma_family_tags(record).is_none() {
+                // Provenance: the gates are type-checked (`has_legacy_nuc_msp`,
+                // `has_legacy_fibertig`), so a foreign tool reusing these
+                // two-letter names with a different aux type is never parsed
+                // as fibertools data. The write path
+                // (`strip_consumed_legacy_tags`) removes legacy tags under
+                // pair-level gates mirroring `read_legacy_nuc_msp_into`'s
+                // consumption, i.e. only what this reader ingested, so keep
+                // the two in sync.
+                if has_legacy_nuc_msp(record) {
+                    read_legacy_nuc_msp_into(record, &mut annot)?;
+                }
+                // Legacy fibertig (`fs`/`fl`/`fa`): the pre-MA fibertig wire
+                // format, dropped from the writer in favour of the MA-spec
+                // `AN` tag. Kept readable so older fibertig BAMs stay
+                // consumable by `extract`.
+                if has_legacy_fibertig(record) {
+                    read_legacy_fibertig_into(record, &mut annot)?;
+                }
+            }
+            annot
+        }
+    };
+    // Backstop on the parsed model: a read length that disagrees with the
+    // frame, or any annotation ending past it.
     if let Some(why) = model_frame_reason(&annot, record) {
         drop_stale_frame(&mut annot, record, why);
+    } else if model_is_full_read_frame(&annot, record) {
+        // Warn and count only when this pass really drops m6A. The writer
+        // strips MM/ML, so a second run over ft's own output stays quiet.
+        if matches!(record.aux(b"MM"), Ok(Aux::String(_))) {
+            note_full_read_frame(record);
+        } else {
+            log::debug!(
+                "full-read frame for {} (no m6A to drop)",
+                String::from_utf8_lossy(record.qname())
+            );
+        }
     }
     Ok(annot)
+}
+
+/// True when an MN tag is present and names a different length than SEQ:
+/// the MM/ML next to it were written for another read.
+fn mn_disagrees(record: &bam::Record) -> bool {
+    let seq_len = record.seq_len();
+    seq_len > 0
+        && matches!(record.aux(b"MM"), Ok(Aux::String(_)))
+        && record
+            .aux(b"MN")
+            .ok()
+            .and_then(aux_as_usize)
+            .is_some_and(|mn| mn != seq_len)
 }
 
 /// How many stale-frame records get a WARN before the rest drop to DEBUG.
@@ -151,12 +219,52 @@ fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record, why:
     annot.annotation_types.clear();
     // An untagged read's frame is its SEQ, or its CIGAR query span without SEQ,
     // so the writers persist a clean `Ma:Z:<len>` instead of the stale length.
-    let seq_len = record.seq_len();
-    annot.read_length = if seq_len > 0 {
-        seq_len as u32
+    // The liftover follows the frame (no query offset).
+    annot.read_length = query_span(record);
+    annot.set_aligned_blocks_raw(AlignedBlocks::from_record(record), record.is_reverse());
+}
+
+/// Records whose Fiber-seq tags describe the full-length read while they
+/// hold a hard-clipped part of it (`Frame::FullRead`).
+static FULL_FRAMES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What happens to the base mods of a full-read-frame record. Part of the
+/// once-per-run warning, so a test can look for it.
+pub const FULL_FRAME_M6A_DROPPED: &str =
+    "their m6A (MM/ML) describes bases this record does not carry and was dropped";
+
+/// Warn once per run that a record is in the full-read frame; later records
+/// are logged at debug level and totalled at exit by [`report_full_frames`].
+fn note_full_read_frame(record: &bam::Record) {
+    use std::sync::atomic::Ordering;
+    let n = FULL_FRAMES.fetch_add(1, Ordering::Relaxed);
+    let qname = String::from_utf8_lossy(record.qname());
+    if n == 0 {
+        log::warn!(
+            "some hard-clipped records carry Fiber-seq tags computed on the full-length read \
+             (supplementary alignments; the aligner copied them from the primary). Their \
+             nucleosome/MSP/FIRE calls are kept and lifted with the hard-clip offset; \
+             {FULL_FRAME_M6A_DROPPED}, so these reads are not fiberseq-callable. \
+             {HARD_CLIP_REMEDY}\n\
+             full-read frame for {qname}"
+        );
     } else {
-        cigar_query_len(record)
-    };
+        log::debug!("full-read frame for {qname}");
+    }
+}
+
+/// Log the number of full-read-frame records. Called once at exit by
+/// `main`, next to [`report_stale_frames`].
+pub fn report_full_frames() {
+    let n = FULL_FRAMES.load(std::sync::atomic::Ordering::Relaxed);
+    if n > 0 {
+        let records = if n == 1 { "record" } else { "records" };
+        log::warn!(
+            "kept nucleosome/MSP calls on {n} hard-clipped {records} whose Fiber-seq tags \
+             describe the full-length read; they have no m6A and are not fiberseq-callable. \
+             {HARD_CLIP_REMEDY}"
+        );
+    }
 }
 
 /// Log the number of records whose annotations were dropped for a stale
@@ -172,88 +280,150 @@ pub fn report_stale_frames() {
     }
 }
 
-/// Query bases the CIGAR consumes, hard clips excluded.
-fn cigar_query_len(record: &bam::Record) -> u32 {
-    use rust_htslib::bam::record::Cigar;
-    record
-        .cigar()
-        .iter()
-        .map(|c| match c {
-            Cigar::Match(l)
-            | Cigar::Ins(l)
-            | Cigar::SoftClip(l)
-            | Cigar::Equal(l)
-            | Cigar::Diff(l) => *l,
-            _ => 0,
-        })
-        .sum()
+/// True when the model is in the full-read frame of a hard-clipped record:
+/// SEQ is present, the record has hard clips, and the model's read length is
+/// SEQ plus both clips. Such a model has no m6A (the reader never parses
+/// MM/ML in this frame) and its query coordinates run past SEQ; the lift
+/// carries the leading hard clip as `annot.query_offset()`.
+pub(crate) fn model_is_full_read_frame(annot: &MolecularAnnotations, record: &bam::Record) -> bool {
+    let span = query_span(record) as usize;
+    if span == 0 {
+        return false;
+    }
+    let (lead, trail) = hard_clips(record);
+    lead + trail > 0 && annot.read_length as usize == span + lead as usize + trail as usize
 }
 
-/// True when a present SEQ disagrees with the recorded read length
-/// (something rewrote the read after tagging). SEQ-less records are never
-/// stale: the MA read length is the frame.
-pub(crate) fn read_length_is_stale(read_length: u32, seq_len: usize) -> bool {
-    seq_len > 0 && read_length as usize != seq_len
+/// True when a present SEQ disagrees with the model's frame: the recorded
+/// read length must equal SEQ, or SEQ plus the hard clips for a full-read
+/// frame (something else rewrote the read after tagging). SEQ-less records
+/// are never stale: the MA read length is the frame.
+pub(crate) fn frame_is_stale(annot: &MolecularAnnotations, record: &bam::Record) -> bool {
+    let seq_len = record.seq_len();
+    seq_len > 0 && annot.read_length as usize != seq_len && !model_is_full_read_frame(annot, record)
 }
 
-/// Signals, read straight off the record, that its Fiber-seq tags describe a
-/// different read than its SEQ. Each tag family has its own frame signal:
-/// - MA: the tag's own read length. A hard-clipped record whose tags were
-///   computed after clipping has `read_length == seq_len` and is fine.
-/// - legacy `ns`/`nl`/`as`/`al` and `fs`/`fl`: no frame is recorded and no
-///   producer writes them after clipping, so any hard clip means stale; so
-///   does a missing SEQ, since nothing then anchors them.
-/// - MM/ML: the SAM `MN` tag when present (the spec's frame for exactly this
-///   case), else hard clips.
+/// Which read a record's Fiber-seq tags describe; see [`record_frame`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Frame {
+    /// The tags describe SEQ (unclipped, soft-clipped, SEQ-less, or computed
+    /// after clipping).
+    Seq,
+    /// The tags describe the full-length read of which SEQ is a hard-clipped
+    /// part. `h_lead` is the leading hard clip (BAM/CIGAR orientation, the
+    /// same end on both strands), `read_length` the full read's length.
+    FullRead { h_lead: u32, read_length: u32 },
+    /// The tags describe some other read: drop them.
+    Stale(String),
+}
+
+/// Which read a record's Fiber-seq tags describe, from signals read straight
+/// off the record. Each tag family has its own frame signal:
+/// - MA: the tag's own read length. Equal to SEQ (a hard-clipped record whose
+///   tags were computed after clipping included): `Seq`. Equal to SEQ plus
+///   the hard clips: `FullRead`, the aligner copied the full-length read's
+///   tags onto this clipped part of it. Anything else: `Stale`.
+/// - legacy `ns`/`nl`/`as`/`al` and fibertig `fs`/`fl`: no frame is recorded
+///   and every producer wrote them on the full read, so any hard clip means
+///   `FullRead` with `read_length = seq_len + H_lead + H_trail`; a missing
+///   SEQ is `Stale`, since nothing then anchors them.
+/// - MM/ML (with no MA or legacy tags deciding first): the SAM `MN` tag when
+///   present (the spec's frame for exactly this case), else hard clips.
+///
+/// In the full-read frame the MA-family coordinates are still right (they
+/// are molecular coordinates of the full read; only the lift needs the
+/// leading hard clip), but MM/ML are SEQ-relative and cannot be recovered:
+/// the reader drops them and the writer strips them.
 ///
 /// SEQ-less MA records are never stale: the MA read length is the frame.
 /// Both the reader ([`read_record`]) and the writer ([`write_record`]) use
 /// this, so a stale record is cleared on the way in and cleaned on the way
 /// out.
-pub(crate) fn record_frame_reason(record: &bam::Record) -> Option<String> {
+pub(crate) fn record_frame(record: &bam::Record) -> Frame {
     let seq_len = record.seq_len();
-    let cigar = record.cigar();
-    let hard_clipped = cigar.leading_hardclips() > 0 || cigar.trailing_hardclips() > 0;
+    let (lead, trail) = hard_clips(record);
+    let hard_clipped = lead + trail > 0;
+    // The bases this record holds: SEQ, or the CIGAR query span when SEQ was
+    // dropped. A hard-clipped record's frame is judged against that span so
+    // a SEQ-less supplementary still gets the offset lift.
+    let span = query_span(record) as usize;
+    let full = span + lead as usize + trail as usize;
     if let Some((ma, _, _)) = ma_family_tags(record) {
         if let Some(read_length) = ma.split(';').next().and_then(|s| s.parse::<usize>().ok()) {
+            if hard_clipped && span > 0 && read_length == full {
+                return Frame::FullRead {
+                    h_lead: lead,
+                    read_length: read_length as u32,
+                };
+            }
             if seq_len > 0 && read_length != seq_len {
-                return Some(format!(
+                if hard_clipped && read_length == full {
+                    return Frame::FullRead {
+                        h_lead: lead,
+                        read_length: read_length as u32,
+                    };
+                }
+                if hard_clipped {
+                    return Frame::Stale(format!(
+                        "MA read length {read_length} matches neither the {seq_len} bp sequence \
+                         nor the {full} bp read it was hard-clipped from"
+                    ));
+                }
+                return Frame::Stale(format!(
                     "MA read length {read_length} does not match the {seq_len} bp sequence"
                 ));
             }
             // The MA tag was written for this SEQ, so it vouches for the
             // MM/ML next to it too: fibertools' own writers emit MA and
             // MM/ML together, and a hard-clipped record it produced is fine.
-            return None;
+            return Frame::Seq;
         }
     } else if has_legacy_nuc_msp(record) || has_legacy_fibertig(record) {
-        if hard_clipped {
-            return Some("legacy nuc/msp tags on a hard-clipped alignment".to_string());
-        }
         if seq_len == 0 {
-            return Some("legacy nuc/msp tags on a record without SEQ".to_string());
+            return Frame::Stale("legacy nuc/msp tags on a record without SEQ".to_string());
+        }
+        if hard_clipped {
+            // Any MM/ML next to them are SEQ-relative copies from the full
+            // read, dropped with the frame; they are not a stale signal.
+            return Frame::FullRead {
+                h_lead: lead,
+                read_length: full as u32,
+            };
         }
     }
     if matches!(record.aux(b"MM"), Ok(Aux::String(_))) {
         if seq_len == 0 {
             // Positions are implicit in SEQ; without it there is nothing to
             // decode against (minimap2 -y writes SEQ-less secondaries).
-            return Some("MM/ML on a record without SEQ".to_string());
+            return Frame::Stale("MM/ML on a record without SEQ".to_string());
         }
         match record.aux(b"MN").ok().and_then(aux_as_usize) {
             Some(mn) => {
-                if seq_len > 0 && mn != seq_len {
-                    return Some(format!("MN {mn} does not match the {seq_len} bp sequence"));
+                if mn != seq_len {
+                    return Frame::Stale(format!(
+                        "MN {mn} does not match the {seq_len} bp sequence"
+                    ));
                 }
             }
             None => {
                 if hard_clipped {
-                    return Some("MM/ML on a hard-clipped alignment without an MN tag".to_string());
+                    return Frame::Stale(
+                        "MM/ML on a hard-clipped alignment without an MN tag".to_string(),
+                    );
                 }
             }
         }
     }
-    None
+    Frame::Seq
+}
+
+/// Why a record's tags describe a different read than its SEQ, or `None`
+/// when they describe SEQ or the full read it was hard-clipped from.
+pub(crate) fn record_frame_reason(record: &bam::Record) -> Option<String> {
+    match record_frame(record) {
+        Frame::Stale(why) => Some(why),
+        _ => None,
+    }
 }
 
 fn aux_as_usize(aux: Aux) -> Option<usize> {
@@ -268,34 +438,32 @@ fn aux_as_usize(aux: Aux) -> Option<usize> {
     }
 }
 
-/// The parsed model disagrees with SEQ: a read length that does not match,
-/// or an annotation ending past it. Backstop behind [`record_frame_reason`]
-/// for tags that carry no frame signal of their own.
+/// The parsed model disagrees with its frame: a read length that matches
+/// neither SEQ nor the full read SEQ was hard-clipped from, or an annotation
+/// ending past the frame. Backstop behind [`record_frame`] for tags that
+/// carry no frame signal of their own.
 fn model_frame_reason(annot: &MolecularAnnotations, record: &bam::Record) -> Option<String> {
     let seq_len = record.seq_len();
     if seq_len == 0 {
         return None;
     }
-    if read_length_is_stale(annot.read_length, seq_len) {
+    if frame_is_stale(annot, record) {
         return Some(format!(
             "MA read length {} does not match the {seq_len} bp sequence",
             annot.read_length
         ));
     }
+    // SEQ, or the full read in the full-read frame.
+    let frame = annot.read_length as usize;
     annot
         .annotation_types
         .iter()
         .find(|t| {
             t.annotations
                 .iter()
-                .any(|a| a.start as usize + a.length as usize > seq_len)
+                .any(|a| a.start as usize + a.length as usize > frame)
         })
-        .map(|t| {
-            format!(
-                "{} coordinates extend past the {seq_len} bp sequence",
-                t.name
-            )
-        })
+        .map(|t| format!("{} coordinates extend past the {frame} bp read", t.name))
 }
 
 /// Why a record's annotations do not fit its SEQ, or `None` when they do:
@@ -312,25 +480,45 @@ pub(crate) fn stale_frame_reason(
 /// Runs right after parsing, before any consumer-side pruning. Derives
 /// when the tag is absent (backfill) or the minimums are non-default
 /// (recalculation); otherwise the on-disk tag stands.
+///
+/// A full-read-frame record (hard clips, tags from the full read) has no
+/// m6A: the reader dropped its MM/ML. FIRE cannot score it, so it is
+/// NotCallable whatever its on-disk tag or the minimums say. That is the
+/// only "no m6A" this function knows about; m6A is never inspected, so a
+/// read whose MM/ML were stripped on purpose (ft strip-basemods) keeps the
+/// verdict from calling time.
 pub fn sync_fiberseq_callable(
     annot: &mut MolecularAnnotations,
     record: &bam::Record,
     filters: &crate::utils::input_bam::FiberFilters,
 ) {
+    let (min_msp, min_ave) = filters.callable_minimums();
+    if model_is_full_read_frame(annot, record) {
+        // No m6A means not callable. Without nuc/msp there is nothing to
+        // judge either, so a never-called read gets no marker, but a copied
+        // Callable span must not survive the frame it no longer describes.
+        if has_calls(annot) || annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_some() {
+            set_fiberseq_callable(annot, None, callable_minimums_name(min_msp, min_ave));
+        }
+        return;
+    }
     let needed =
         filters.callable_minimums_are_custom() || annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none();
     if needed && can_derive_callable(annot, record) {
-        let (min_msp, min_ave) = filters.callable_minimums();
         derive_fiberseq_callable(annot, min_msp, min_ave);
     }
+}
+
+/// True when calling ran: nuc or msp present.
+fn has_calls(annot: &MolecularAnnotations) -> bool {
+    annot.get_type(NUC_TYPE).is_some() || annot.get_type(MSP_TYPE).is_some()
 }
 
 /// True when the callable state can be derived: calling ran (nuc or msp
 /// present) and the frame is not stale. Derivation is pure MA-tag
 /// arithmetic, so SEQ-less records derive fine.
 fn can_derive_callable(annot: &MolecularAnnotations, record: &bam::Record) -> bool {
-    !read_length_is_stale(annot.read_length, record.seq_len())
-        && (annot.get_type(NUC_TYPE).is_some() || annot.get_type(MSP_TYPE).is_some())
+    !frame_is_stale(annot, record) && has_calls(annot)
 }
 
 /// AN name recording non-default minimums, e.g. "m20a10". `None` for the
@@ -366,10 +554,11 @@ pub fn set_fiberseq_callable(
 
 /// Derive the callable span and state from the nuc/MSP annotations; the
 /// single source of truth for every writer. The span is the extent of the
-/// surviving calls; callable requires >= `min_msp` MSPs with mean length
-/// >= `min_ave_msp_size`. m6A is never inspected: the caller emits no MSP
-/// without m6A, and MA-only derivation is what lets SEQ-less records
-/// derive.
+/// surviving calls; callable requires at least `min_msp` MSPs with a mean
+/// length of at least `min_ave_msp_size`. m6A is never inspected: the caller
+/// emits no MSP without m6A, and MA-only derivation is what lets SEQ-less
+/// records derive. A full-read-frame record (no m6A) is forced NotCallable
+/// by [`sync_fiberseq_callable`], not here.
 pub fn derive_fiberseq_callable(
     annot: &mut MolecularAnnotations,
     min_msp: usize,
@@ -402,23 +591,6 @@ pub fn derive_fiberseq_callable(
         if callable { span } else { None },
         callable_minimums_name(min_msp, min_ave_msp_size),
     );
-}
-
-/// Merge every annotation type from `src` into `dst`, skipping any type whose
-/// name already exists on `dst`. Lets the legacy-tag fallbacks layer their
-/// annotations on top of whatever the MA/MM/ML library parser already produced
-/// rather than clobbering it (e.g. legacy nuc/msp alongside library-parsed
-/// base mods).
-fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations) {
-    for t in src.annotation_types.into_iter() {
-        if dst.get_type(&t.name).is_some() {
-            continue;
-        }
-        let new_t = dst.add_annotation_type(&t.name, t.quality_spec.clone(), t.encoding);
-        for a in t.annotations.into_iter() {
-            new_t.add_shared(a.start, a.length, a.strand, a.qualities, a.name);
-        }
-    }
 }
 
 /// Writes MA-family tags (MA/AQ/AN) to a BAM record, **preserving the
@@ -458,20 +630,37 @@ fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations
 /// Producers that create or modify base mods must instead call
 /// [`write_record_with_basemods`], which canonically re-emits MM/ML.
 pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
-    if record_frame_reason(record).is_some() {
+    match record_frame(record) {
         // The reader cleared this record's annotations (drop_stale_frame);
         // leave no stale tag behind for another tool to trust.
-        strip_all_fiber_tags(record);
-    } else {
-        strip_consumed_legacy_tags(record);
+        Frame::Stale(_) => strip_all_fiber_tags(record),
+        Frame::FullRead { .. } => {
+            // The MA tag is rewritten from the model below, in the full
+            // read's frame. The SEQ-relative base mods describe bases this
+            // record does not carry: the reader dropped them, so leave none
+            // behind for another tool to trust.
+            for tag in [b"MM", b"ML", b"MN"] {
+                record.remove_aux(tag).ok();
+            }
+            strip_consumed_legacy_tags(record);
+        }
+        Frame::Seq => {
+            if mn_disagrees(record) {
+                // The reader dropped these base mods (see read_record).
+                for tag in [b"MM", b"ML", b"MN"] {
+                    record.remove_aux(tag).ok();
+                }
+            }
+            strip_consumed_legacy_tags(record)
+        }
     }
     annot.to_record(record);
 }
 
 /// Every Fiber-seq tag fibertools knows how to read: legacy nuc/msp/fibertig
 /// arrays, MM/ML/MN base mods, and both spellings of the MA family. Used only
-/// for records whose frame is stale (`record_frame_reason`), where none of
-/// them describe this SEQ.
+/// for records whose frame is stale (`record_frame`), where none of them
+/// describe this SEQ.
 fn strip_all_fiber_tags(record: &mut bam::Record) {
     for tag in [
         b"ns", b"nl", b"as", b"al", b"aq", b"fs", b"fl", b"fa", b"MM", b"ML", b"MN", b"Ma", b"Aq",
@@ -486,7 +675,7 @@ fn strip_all_fiber_tags(record: &mut bam::Record) {
 /// written — they are superseded by the MA-family tags (v0.9 replace
 /// semantics; otherwise legacy readers silently see stale calls forever).
 ///
-/// The gates mirror [`read_legacy_nuc_msp`]'s consumption at PAIR level
+/// The gates mirror [`read_legacy_nuc_msp_into`]'s consumption at PAIR level
 /// (ns+nl, as+al, aq only inside the msp pair, fa only with fs+fl), which is
 /// what makes this provenance-safe: a tag is only removed when the reader
 /// ingested it. Records that already carry an MA-family main tag were not
@@ -504,10 +693,13 @@ fn strip_consumed_legacy_tags(record: &mut bam::Record) {
     // writing an empty model — nothing was consumed, so nothing may be
     // removed. Gating on the same parse keeps strip and read consumption
     // identical by construction.
-    if read_legacy_nuc_msp(record).is_err() || read_legacy_fibertig(record).is_err() {
+    let mut scratch = MolecularAnnotations::new(0);
+    if read_legacy_nuc_msp_into(record, &mut scratch).is_err()
+        || read_legacy_fibertig_into(record, &mut scratch).is_err()
+    {
         return;
     }
-    // Pair-level gates mirroring read_legacy_nuc_msp: ns+nl only as a pair,
+    // Pair-level gates mirroring read_legacy_nuc_msp_into: ns+nl only as a pair,
     // as+al only as a pair, aq only inside a valid msp pair (its count is
     // validated by the parse above). A lone or orphan tag was never
     // consumed and so is never removed.
@@ -523,7 +715,7 @@ fn strip_consumed_legacy_tags(record: &mut bam::Record) {
         }
     }
     // fibertig: fs+fl as a pair; fa is only consumed (and so only stripped)
-    // when the pair is non-empty, mirroring read_legacy_fibertig's early
+    // when the pair is non-empty, mirroring read_legacy_fibertig_into's early
     // return on empty fs.
     let fs = u32_array(record, b"fs");
     if fs.is_some() && u32_array(record, b"fl").is_some() {
@@ -595,8 +787,11 @@ fn read_ma_tags(record: &bam::Record) -> Result<Option<MolecularAnnotations>> {
     };
     let mut annot = MolecularAnnotations::from_tags(&ma, aq.as_deref(), an.as_deref())
         .map_err(|e| anyhow::anyhow!("MA tag parse error: {e}"))?;
+    // Same frame rule as the library's from_record: a full-read MA tag on a
+    // hard-clipped record lifts with the leading hard clip.
+    let offset = molecular_annotation::full_read_query_offset(annot.read_length, record);
     annot.set_aligned_blocks_raw(
-        molecular_annotation::AlignedBlocks::from_record(record),
+        AlignedBlocks::from_record(record).with_query_offset(offset.unwrap_or(0)),
         record.is_reverse(),
     );
     Ok(Some(annot))
@@ -604,7 +799,13 @@ fn read_ma_tags(record: &bam::Record) -> Result<Option<MolecularAnnotations>> {
 
 fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
     let mut annot = MolecularAnnotations::from_record(record);
+    read_legacy_nuc_msp_into(record, &mut annot)?;
+    Ok(annot)
+}
 
+/// Add the legacy `ns`/`nl`/`as`/`al`/`aq` tags to `annot` as nuc/msp/fire
+/// types. The model's frame (read length, aligned blocks) is the caller's.
+fn read_legacy_nuc_msp_into(record: &bam::Record, annot: &mut MolecularAnnotations) -> Result<()> {
     let ns = u32_array(record, b"ns");
     let nl = u32_array(record, b"nl");
     let a_starts = u32_array(record, b"as");
@@ -673,7 +874,7 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
         }
     }
 
-    Ok(annot)
+    Ok(())
 }
 
 /// Read the legacy fibertig `fs`/`fl`/`fa` tags into a [`FIBERTIG_TYPE`]
@@ -686,13 +887,11 @@ fn read_legacy_nuc_msp(record: &bam::Record) -> Result<MolecularAnnotations> {
 /// those older BAMs consumable. Mirrors the in-memory shape the MA path
 /// produces (`Strand::Forward`, no quality, `Encoding::Ma`) so downstream
 /// liftover to reference coordinates is identical either way.
-fn read_legacy_fibertig(record: &bam::Record) -> Result<MolecularAnnotations> {
+fn read_legacy_fibertig_into(record: &bam::Record, annot: &mut MolecularAnnotations) -> Result<()> {
     use crate::utils::fibertig::FIBERTIG_TYPE;
 
-    let mut annot = MolecularAnnotations::from_record(record);
-
     let (Some(fs), Some(fl)) = (u32_array(record, b"fs"), u32_array(record, b"fl")) else {
-        return Ok(annot);
+        return Ok(());
     };
     if fs.len() != fl.len() {
         bail!(
@@ -702,7 +901,7 @@ fn read_legacy_fibertig(record: &bam::Record) -> Result<MolecularAnnotations> {
         );
     }
     if fs.is_empty() {
-        return Ok(annot);
+        return Ok(());
     }
 
     // `fa` is optional; when present it must have one `|`-separated segment per
@@ -730,7 +929,7 @@ fn read_legacy_fibertig(record: &bam::Record) -> Result<MolecularAnnotations> {
         let name = names.as_ref().and_then(|v| v[i].clone());
         t.add(*s, *l, Strand::Forward, vec![], name);
     }
-    Ok(annot)
+    Ok(())
 }
 
 /// Convenience for callers that still operate on raw `i64` arrays of
@@ -1280,15 +1479,28 @@ mod tests {
         assert_eq!(nuc_starts(&r), vec![9], "MA text is 1-based");
     }
 
-    // Legacy tags carry no frame: any hard clip is stale even when every
-    // coordinate fits, a soft clip is not, and no SEQ is.
+    // Legacy tags carry no frame and were always written on the full read:
+    // a hard clip puts them in the full-read frame, a soft clip does not,
+    // and no SEQ is stale.
     #[test]
     fn stale_frame_legacy_uses_hard_clips() {
         let seq = b"ACGT".repeat(50);
         let mut fits = synth_aligned(&seq, "30H200M", 2048);
         legacy(&mut fits, &[10, 100], &[20, 20]);
-        assert!(record_frame_reason(&fits).is_some());
-        assert!(nuc_starts(&fits).is_empty());
+        assert_eq!(
+            record_frame(&fits),
+            Frame::FullRead {
+                h_lead: 30,
+                read_length: 230
+            }
+        );
+        assert!(record_frame_reason(&fits).is_none());
+        assert_eq!(
+            nuc_starts(&fits),
+            vec![10, 100],
+            "legacy coords are full-read molecular coords"
+        );
+        assert_eq!(read_record(&fits).unwrap().read_length, 230);
 
         let mut soft = synth_aligned(&seq, "30S170M", 2048);
         legacy(&mut soft, &[10, 100], &[20, 20]);
@@ -1396,15 +1608,16 @@ mod tests {
     #[test]
     fn write_record_strips_every_tag_of_a_stale_record() {
         let seq = b"ACGT".repeat(50);
-        let mut r = synth_aligned(&seq, "30H200M", 2048);
+        let mut r = synth_aligned(&seq, "200M", 0);
         legacy(&mut r, &[10], &[20]);
+        r.push_aux(b"Ma", Aux::String("300;nuc.:11-20")).unwrap();
         r.push_aux(b"MM", Aux::String("A+a.,0;")).unwrap();
         r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
             .unwrap();
         let annot = read_record(&r).unwrap();
         assert!(annot.annotation_types.is_empty());
         write_record(&mut r, &annot);
-        for tag in [b"ns", b"nl", b"MM", b"ML"] {
+        for tag in [b"ns", b"nl", b"MM", b"ML", b"MN"] {
             assert!(
                 r.aux(tag).is_err(),
                 "{} survived",
@@ -1416,5 +1629,282 @@ mod tests {
             matches!(ma, Ok(Aux::String(s)) if s.split(';').next() == Some("200")),
             "Ma = {ma:?}"
         );
+    }
+
+    // MA read length decides the frame three ways; the offset is the leading
+    // hard clip on both strands.
+    #[test]
+    fn frame_rule_ma_three_way() {
+        let seq = b"ACGT".repeat(50); // 200 bp
+        let mut full = synth_aligned(&seq, "50H200M50H", 2048);
+        // molecular [60,100), [200,240)
+        full.push_aux(b"Ma", Aux::String("300;nuc.:61-40,201-40"))
+            .unwrap();
+        assert_eq!(
+            record_frame(&full),
+            Frame::FullRead {
+                h_lead: 50,
+                read_length: 300
+            }
+        );
+        assert!(record_frame_reason(&full).is_none());
+        let annot = read_record(&full).unwrap();
+        assert_eq!(annot.read_length, 300);
+        assert_eq!(annot.query_offset(), 50);
+        assert_eq!(nuc_starts(&full), vec![60, 200], "tag kept as is");
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![
+                (60, 100, Some(10), Some(50)),
+                (200, 240, Some(150), Some(190))
+            ]
+        );
+
+        let mut clipped = synth_aligned(&seq, "50H200M50H", 2048);
+        clipped
+            .push_aux(b"Ma", Aux::String("200;nuc.:11-40"))
+            .unwrap();
+        assert_eq!(record_frame(&clipped), Frame::Seq);
+        let annot = read_record(&clipped).unwrap();
+        assert_eq!((annot.read_length, annot.query_offset()), (200, 0));
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![(10, 50, Some(10), Some(50))],
+            "clipped frame lifts as today"
+        );
+
+        let mut stale = synth_aligned(&seq, "50H200M50H", 2048);
+        stale
+            .push_aux(b"Ma", Aux::String("250;nuc.:11-40"))
+            .unwrap();
+        assert!(matches!(record_frame(&stale), Frame::Stale(_)));
+        assert!(nuc_starts(&stale).is_empty());
+        assert_eq!(read_record(&stale).unwrap().read_length, 200);
+
+        // reverse strand, trailing clip: offset 0; molecular [200,240) -> BAM [60,100)
+        let mut rev = synth_aligned(&seq, "200M100H", 2064);
+        rev.push_aux(b"Ma", Aux::String("300;nuc.:201-40")).unwrap();
+        let annot = read_record(&rev).unwrap();
+        assert_eq!(annot.query_offset(), 0);
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![(60, 100, Some(60), Some(100))]
+        );
+        // reverse strand, leading clip: molecular [100,140) -> BAM [160,200) -> SEQ [60,100)
+        let mut rev_lead = synth_aligned(&seq, "100H200M", 2064);
+        rev_lead
+            .push_aux(b"Ma", Aux::String("300;nuc.:101-40"))
+            .unwrap();
+        let annot = read_record(&rev_lead).unwrap();
+        assert_eq!(annot.query_offset(), 100);
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![(160, 200, Some(60), Some(100))]
+        );
+        // an annotation past the full read length is still stale
+        let mut past = synth_aligned(&seq, "50H200M50H", 2048);
+        past.push_aux(b"Ma", Aux::String("300;nuc.:281-40"))
+            .unwrap();
+        assert!(nuc_starts(&past).is_empty());
+    }
+
+    // A full-read frame keeps nuc/msp, drops m6A, and the writer strips
+    // MM/ML/MN.
+    #[test]
+    fn full_frame_drops_mm_ml_and_strips_on_write() {
+        use crate::utils::basemods::M6A_TYPE;
+        let seq = b"ACGT".repeat(50);
+        // MN of the full read (dorado copy) or of SEQ: dropped either way
+        for mn in [250i32, 200] {
+            let mut r = synth_aligned(&seq, "50H200M", 2048);
+            r.push_aux(b"Ma", Aux::String("250;nuc.:61-40;msp.:101-20"))
+                .unwrap();
+            r.push_aux(b"MM", Aux::String("A+a.,0;")).unwrap();
+            r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+                .unwrap();
+            r.push_aux(b"MN", Aux::I32(mn)).unwrap();
+            let annot = read_record(&r).unwrap();
+            assert!(annot.get_type(NUC_TYPE).is_some() && annot.get_type(MSP_TYPE).is_some());
+            assert!(
+                annot.get_type(M6A_TYPE).is_none(),
+                "MN {mn}: m6A must be dropped on a full-read frame"
+            );
+            write_record(&mut r, &annot);
+            for tag in [b"MM", b"ML", b"MN"] {
+                assert!(
+                    r.aux(tag).is_err(),
+                    "MN {mn}: {} survived",
+                    String::from_utf8_lossy(tag)
+                );
+            }
+            let ma = r.aux(b"Ma");
+            assert!(
+                matches!(ma, Ok(Aux::String(s)) if s.starts_with("250;") && s.contains("nuc") && s.contains("msp")),
+                "Ma = {ma:?}"
+            );
+            // write_record_with_basemods on the same model writes no MM/MN either
+            write_record_with_basemods(&mut r, &annot);
+            assert!(r.aux(b"MM").is_err() && r.aux(b"MN").is_err());
+            // and the rewritten record reads back in the same frame
+            let back = read_record(&r).unwrap();
+            assert_eq!((back.read_length, back.query_offset()), (250, 50));
+            assert_eq!(back.get_forward_coords(NUC_TYPE), Some(vec![(60, 100)]));
+        }
+    }
+
+    // Legacy ns/nl on a hard clip: read_length = seq + H_lead + H_trail,
+    // full-read frame.
+    #[test]
+    fn legacy_on_hard_clip_is_a_full_read_frame() {
+        let seq = b"ACGT".repeat(50);
+        let mut r = synth_aligned(&seq, "30H200M", 2048);
+        // [10,30) before SEQ, [20,60) straddles, [100,120) inside
+        legacy(&mut r, &[10, 20, 100], &[20, 40, 20]);
+        let annot = read_record(&r).unwrap();
+        assert_eq!((annot.read_length, annot.query_offset()), (230, 30));
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![
+                (10, 30, None, None),
+                (20, 60, Some(0), Some(30)),
+                (100, 120, Some(70), Some(90))
+            ]
+        );
+        write_record(&mut r, &annot);
+        assert!(
+            r.aux(b"ns").is_err() && r.aux(b"nl").is_err(),
+            "consumed legacy tags stripped"
+        );
+        assert!(
+            matches!(r.aux(b"Ma"), Ok(Aux::String(s)) if s.starts_with("230;") && s.contains("nuc.:11-20,21-40,101-20")),
+            "Ma = {:?}",
+            r.aux(b"Ma")
+        );
+        let mut trail = synth_aligned(&seq, "200M30H", 0);
+        legacy(&mut trail, &[100], &[20]);
+        let annot = read_record(&trail).unwrap();
+        assert_eq!((annot.read_length, annot.query_offset()), (230, 0));
+        assert_eq!(
+            annot.get_ref_coords(NUC_TYPE).unwrap(),
+            vec![(100, 120, Some(100), Some(120))]
+        );
+        // molecular [100,120) -> BAM [110,130)
+        let mut rev = synth_aligned(&seq, "200M30H", 2064);
+        legacy(&mut rev, &[100], &[20]);
+        assert_eq!(
+            read_record(&rev).unwrap().get_ref_coords(NUC_TYPE).unwrap(),
+            vec![(110, 130, Some(110), Some(130))]
+        );
+    }
+
+    // No m6A on a full-read frame means NotCallable, whatever the on-disk
+    // span says; an unprocessed full-frame record stays Untagged; a clipped
+    // frame keeps its span.
+    #[test]
+    fn full_frame_records_derive_not_callable() {
+        use crate::fiber::{CallableState, FiberseqData};
+        let seq = b"ACGT".repeat(50);
+        let filters = crate::utils::input_bam::FiberFilters::default();
+        // 10 MSPs, mean 15, end 150
+        let msp = (0..10)
+            .map(|i| format!("{}-15", 1 + i * 15))
+            .collect::<Vec<_>>()
+            .join(",");
+        let state = |r: &bam::Record| {
+            FiberseqData::new(r.clone(), None, &filters)
+                .callable_state()
+                .0
+        };
+        let marker = |r: &bam::Record| {
+            let mut annot = read_record(r).unwrap();
+            sync_fiberseq_callable(&mut annot, r, &filters);
+            annot
+                .get_type(FIBERSEQ_CALLABLE_TYPE)
+                .map(|t| (t.annotations[0].start, t.annotations[0].length))
+        };
+        let mut full = synth_aligned(&seq, "50H200M", 2048);
+        full.push_aux(
+            b"Ma",
+            Aux::String(&format!("250;msp.:{msp};fiberseq_callable.:1-150")),
+        )
+        .unwrap();
+        assert_eq!(
+            marker(&full),
+            Some((0, 0)),
+            "no m6A: NotCallable marker replaces the span"
+        );
+        assert_eq!(state(&full), CallableState::NotCallable);
+        let mut clipped = synth_aligned(&seq, "50H200M", 2048);
+        clipped
+            .push_aux(
+                b"Ma",
+                Aux::String(&format!("200;msp.:{msp};fiberseq_callable.:1-150")),
+            )
+            .unwrap();
+        assert_eq!(marker(&clipped), Some((0, 150)));
+        assert_eq!(state(&clipped), CallableState::Callable);
+        let mut bare = synth_aligned(&seq, "50H200M", 2048);
+        bare.push_aux(b"Ma", Aux::String("250")).unwrap();
+        assert_eq!(marker(&bare), None);
+        assert_eq!(state(&bare), CallableState::Untagged);
+    }
+
+    // A SEQ-less hard-clipped record with a full-read MA tag is judged by
+    // its CIGAR span, so it gets the offset lift like a record with SEQ.
+    #[test]
+    fn seqless_hard_clipped_ma_is_full_read_frame() {
+        let mut r = synth_aligned(b"", "50H200M", 2048);
+        r.push_aux(b"Ma", Aux::String("250;nuc.:60-40")).unwrap();
+        assert_eq!(
+            record_frame(&r),
+            Frame::FullRead {
+                h_lead: 50,
+                read_length: 250
+            }
+        );
+        let annot = read_record(&r).unwrap();
+        assert!(annot.get_type(NUC_TYPE).is_some());
+        assert!(model_is_full_read_frame(&annot, &r));
+    }
+
+    // An MN tag that disagrees with SEQ next to an MA tag that matches it:
+    // the calls stay, only the base mods go, on read and on write.
+    #[test]
+    fn mn_disagreement_drops_only_base_mods() {
+        let seq = b"ACGT".repeat(50);
+        let mut r = synth_aligned(&seq, "200M", 0);
+        r.push_aux(b"Ma", Aux::String("200;nuc.:10-40")).unwrap();
+        r.push_aux(b"MM", Aux::String("A+a.,0;")).unwrap();
+        r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+            .unwrap();
+        r.push_aux(b"MN", Aux::I32(500)).unwrap();
+        assert_eq!(record_frame(&r), Frame::Seq);
+        let annot = read_record(&r).unwrap();
+        assert!(annot.get_type(NUC_TYPE).is_some());
+        assert!(annot.annotation_types.iter().all(|t| !t.is_mm_ml()));
+        write_record(&mut r, &annot);
+        for tag in [b"MM", b"ML", b"MN"] {
+            assert!(
+                r.aux(tag).is_err(),
+                "{} survived",
+                String::from_utf8_lossy(tag)
+            );
+        }
+        assert!(r.aux(b"Ma").is_ok());
+    }
+
+    // A Callable span copied onto a full-frame record with no calls of its
+    // own is replaced by the NotCallable marker rather than kept.
+    #[test]
+    fn full_frame_copied_callable_span_is_replaced() {
+        let seq = b"ACGT".repeat(50);
+        let filters = crate::utils::input_bam::FiberFilters::default();
+        let mut r = synth_aligned(&seq, "50H200M", 2048);
+        r.push_aux(b"Ma", Aux::String("250;fiberseq_callable.:1-200"))
+            .unwrap();
+        let mut annot = read_record(&r).unwrap();
+        sync_fiberseq_callable(&mut annot, &r, &filters);
+        let t = annot.get_type(FIBERSEQ_CALLABLE_TYPE).expect("marker kept");
+        assert_eq!(t.annotations[0].length, 0, "copied Callable span survived");
     }
 }

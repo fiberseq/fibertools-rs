@@ -1,4 +1,4 @@
-use super::common::{fixture, run, select_tsv_cols, tagged_bam};
+use super::common::{fixture, run, run_capture, select_tsv_cols, tagged_bam};
 use rust_htslib::bam::{self, Read};
 use tempfile::NamedTempFile;
 
@@ -74,9 +74,130 @@ fn assert_fire_cleans_stale_records(bam: &str, n_scored: usize, n_cleaned: usize
     assert_eq!((seen_scored, seen_cleaned), (n_scored, n_cleaned), "{bam}");
 }
 
+// Records with msp but no m6A cannot be scored: fire writes the model back
+// with the full read length, no fire section, the NotCallable marker, and no
+// MM/ML/MN (#136).
+fn assert_fire_keeps_full_frame_records(bam: &str, n_scored: usize, expected: &[(&str, u16, u32)]) {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&[
+        "fire",
+        "--ont",
+        fixture(bam).to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    let mut reader = bam::Reader::from_path(scored.path()).unwrap();
+    let (mut seen_scored, mut seen_full) = (0, 0);
+    for rec in reader.records() {
+        let rec = rec.unwrap();
+        let ma = match rec.aux(b"Ma") {
+            Ok(bam::record::Aux::String(s)) => s.to_string(),
+            _ => panic!("{bam}: record without Ma tag"),
+        };
+        if rec.is_supplementary() {
+            let qname = String::from_utf8_lossy(rec.qname()).to_string();
+            let e = expected
+                .iter()
+                .find(|e| qname.starts_with(e.0) && rec.flags() == e.1)
+                .unwrap_or_else(|| panic!("{bam}: unexpected {qname}"));
+            assert_eq!(
+                ma.split(';').next().unwrap(),
+                e.2.to_string(),
+                "{bam} {qname}: Ma frame"
+            );
+            assert!(
+                ma.contains(";nuc") && ma.contains(";msp"),
+                "{bam} {qname}: nuc/msp lost: {ma}"
+            );
+            assert!(
+                !ma.contains(";fire"),
+                "{bam} {qname}: scored without m6A: {ma}"
+            );
+            assert!(
+                ma.contains("fiberseq_callable.:1-0"),
+                "{bam} {qname}: not NotCallable: {ma}"
+            );
+            for tag in [b"as", b"ns", b"MM", b"ML", b"MN"] {
+                assert!(
+                    rec.aux(tag).is_err(),
+                    "{bam} {qname}: {} survived",
+                    String::from_utf8_lossy(tag)
+                );
+            }
+            seen_full += 1;
+        } else {
+            assert!(
+                ma.contains("msp"),
+                "{bam}: scorable record missing msp in {ma}"
+            );
+            seen_scored += 1;
+        }
+    }
+    assert_eq!(
+        (seen_scored, seen_full),
+        (n_scored, expected.len()),
+        "{bam}"
+    );
+    // and the scored BAM counts them as NotCallable, never Untagged
+    let qc = run(&["qc", scored.path().to_str().unwrap()]);
+    let count = |state: &str| {
+        qc.lines()
+            .find(|l| l.starts_with(&format!("fiberseq_callable\t{state}\t")))
+            .unwrap()
+            .split('\t')
+            .nth(2)
+            .unwrap()
+            .parse::<usize>()
+            .unwrap()
+    };
+    assert_eq!(
+        (count("Callable"), count("NotCallable"), count("Untagged")),
+        (n_scored, expected.len(), 0),
+        "{bam}"
+    );
+}
+
 #[test]
-fn fire_cleans_hard_clipped_legacy_records() {
-    assert_fire_cleans_stale_records("ont_hardclip_supplementary.bam", 2, 2);
+fn fire_keeps_full_frame_legacy_records() {
+    assert_fire_keeps_full_frame_records(
+        "ont_hardclip_supplementary.bam",
+        2,
+        &[("8ac3be13", 2048, 29940), ("4bd15181", 2064, 33088)],
+    );
+}
+
+#[test]
+fn fire_keeps_full_frame_ma_records() {
+    assert_fire_keeps_full_frame_records(
+        "ont_hardclip_full_frame.bam",
+        2,
+        &[
+            ("f2009f4d", 2048, 5376),
+            ("f2009f4d", 2064, 5376),
+            ("7b40cfd0", 2048, 9693),
+        ],
+    );
+}
+
+// FireFeats::new slices SEQ by MSP coordinates: full-frame records must be
+// skipped before it runs (feats-to-text) and contribute no feature rows.
+#[test]
+fn fire_feats_to_text_skips_full_frame_records() {
+    let bam = fixture("ont_hardclip_full_frame.bam");
+    let all = run(&["fire", "--ont", "--feats-to-text", bam.to_str().unwrap()]);
+    let primaries = run(&[
+        "fire",
+        "--ont",
+        "--feats-to-text",
+        "-F",
+        "2048",
+        bam.to_str().unwrap(),
+    ]);
+    assert_eq!(
+        all, primaries,
+        "full-frame records must add no feature rows"
+    );
+    // must not panic
+    run(&["fire", "--ont", "--extract", bam.to_str().unwrap()]);
 }
 
 #[test]
@@ -270,5 +391,27 @@ fn fire_bam_mode_coverage_keeps_every_read_and_drop_removes() {
     assert!(
         n_drop < n_in,
         "--drop must remove uncallable reads ({n_drop} vs {n_in})"
+    );
+}
+
+// ft fire strips the copied MM/ML from full-frame records, so a second pass
+// over its own output has no m6A to drop and must stay quiet.
+#[test]
+fn full_frame_second_run_is_silent() {
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    let (_, first) = run_capture(&[
+        "fire",
+        "--ont",
+        fixture("ont_hardclip_full_frame.bam").to_str().unwrap(),
+        scored.path().to_str().unwrap(),
+    ]);
+    assert!(
+        first.contains("was dropped"),
+        "first run should warn: {first}"
+    );
+    let (_, second) = run_capture(&["extract", "--all", "-", scored.path().to_str().unwrap()]);
+    assert!(
+        !second.contains("was dropped") && !second.contains("hard-clipped"),
+        "second run warned again: {second}"
     );
 }

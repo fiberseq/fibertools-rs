@@ -675,3 +675,63 @@ fn callable_does_not_require_a_decodable_m6a_type() {
     let fiber = FiberseqData::new(nomm, None, &explicit_defaults);
     assert_eq!(fiber.callable_state().0, CallableState::Callable);
 }
+
+/// A hard-clipped copy of a tagged record whose tags describe the full read
+/// (#136). `set` keeps the aux tags, so the MA read length stays the full
+/// length: the full-read frame. MM/ML stay too and the reader must drop them.
+fn full_frame_copy(h: u32) -> (bam::Record, u32) {
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    use fibertools_rs::utils::ma_io::sync_fiberseq_callable;
+    use rust_htslib::bam::record::{Cigar, CigarString};
+    let record = read_records("msp_nuc.bam").into_iter().next().unwrap();
+    let mut annot = read_record(&record).unwrap();
+    sync_fiberseq_callable(&mut annot, &record, &FiberFilters::default());
+    let mut tagged = record.clone();
+    write_record(&mut tagged, &annot);
+    let len = tagged.seq_len() as u32;
+    let seq = tagged.seq().as_bytes()[h as usize..].to_vec();
+    let qual = tagged.qual()[h as usize..].to_vec();
+    let cigar = CigarString(vec![Cigar::HardClip(h), Cigar::Match(len - h)]);
+    let mut clipped = tagged.clone();
+    clipped.set(tagged.qname(), Some(&cigar), &seq, &qual);
+    (clipped, len)
+}
+
+#[test]
+fn full_frame_record_is_not_callable() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    let (clipped, len) = full_frame_copy(500);
+    for filters in [
+        FiberFilters::default(),
+        FiberFilters {
+            min_msp: Some(1),
+            min_ave_msp_size: Some(1),
+            ..FiberFilters::default()
+        },
+    ] {
+        let fiber = FiberseqData::new(clipped.clone(), None, &filters);
+        assert!(fiber.is_full_read_frame());
+        assert_eq!(fiber.callable_state(), (CallableState::NotCallable, 0, 0));
+        assert!(!fiber.is_callable());
+        assert!(fiber.callable_reference_range().is_none());
+        assert!(fiber.m6a().is_empty(), "m6A must be dropped");
+        assert!(!fiber.nuc().is_empty() && !fiber.msp().is_empty());
+        assert_eq!(fiber.frame_length(), (len - 500) as usize);
+        assert_eq!(fiber.annotations.query_offset(), 500);
+    }
+}
+
+#[test]
+fn full_frame_record_without_calls_stays_untagged() {
+    use fibertools_rs::fiber::{CallableState, FiberseqData};
+    use fibertools_rs::utils::input_bam::FiberFilters;
+    let (mut clipped, len) = full_frame_copy(500);
+    clipped.remove_aux(b"Ma").unwrap();
+    clipped
+        .push_aux(b"Ma", Aux::String(&len.to_string()))
+        .unwrap();
+    let fiber = FiberseqData::new(clipped, None, &FiberFilters::default());
+    assert!(fiber.is_full_read_frame());
+    assert_eq!(fiber.callable_state().0, CallableState::Untagged);
+}

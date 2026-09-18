@@ -60,6 +60,10 @@ impl MolecularAnnotations {
     /// from the record itself, so liftover-based getters (`ref_coords`, etc.)
     /// work without additional setup.
     ///
+    /// On a hard-clipped record whose MA read length spans the hard-clipped
+    /// bases, the aligned blocks carry the leading hard clip as query offset
+    /// and MM/ML are not parsed (see [`crate::full_read_query_offset`]).
+    ///
     /// **Idempotency:** this is the only public entry point that parses MM/ML.
     /// Each call constructs a fresh `MolecularAnnotations`; there is no API
     /// to re-parse into an existing object.
@@ -95,8 +99,23 @@ impl MolecularAnnotations {
             None => Self::new(record.seq_len() as u32),
         };
 
-        annot.aligned_blocks = Some(crate::AlignedBlocks::from_record(record));
+        // Annotation frame vs SEQ. Aligners that hard-clip (minimap2 and
+        // dorado aligner without -Y) copy the full-length read's tags onto
+        // the clipped supplementary record. The MA family is then still
+        // correct: its coordinates are molecular coordinates of the full
+        // read, and only the lift needs to know that SEQ starts H_lead
+        // bases into that frame. MM/ML are SEQ-relative deltas that cannot
+        // be recovered without the clipped bases, so in that frame they are
+        // not parsed (writers strip them).
+        let full_read_offset = crate::liftover::full_read_query_offset(annot.read_length, record);
+        annot.aligned_blocks = Some(
+            crate::AlignedBlocks::from_record(record)
+                .with_query_offset(full_read_offset.unwrap_or(0)),
+        );
         annot.is_reverse_aligned = record.is_reverse();
+        if full_read_offset.is_some() {
+            return annot;
+        }
 
         // Extract MM/ML and the forward-oriented sequence off the record, then
         // hand the raw slices to the htslib-free parser. MM is always written

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AlignedBlocks::with_query_offset` / `query_offset`, `MolecularAnnotations::query_offset` / `set_query_offset`, and `liftover::{hard_clips, query_span, full_read_query_offset}`: lift full-read MA annotations on hard-clipped records ([#136](https://github.com/fiberseq/fibertools-rs/issues/136)). `from_record` (Rust and pyMA) no longer parses MM/ML in that frame, and `project_query` is SEQ-relative. pyMA `set_aligned_blocks` gains a `query_offset` keyword.
+
 ## [0.0.3](https://github.com/fiberseq/fibertools-rs/compare/molecular-annotation-v0.0.2...molecular-annotation-v0.0.3) - 2026-08-13
 
 ### Fixed

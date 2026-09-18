@@ -59,6 +59,26 @@ impl MolecularAnnotations {
         self.aligned_blocks.as_ref()
     }
 
+    /// Where SEQ starts in the annotation frame (see
+    /// [`AlignedBlocks::query_offset`]); 0 without aligned blocks or when
+    /// the annotation frame is SEQ. BAM-orientation query coordinates from
+    /// `get_coords`, `get_ref_coords` and `iter_type` are in the annotation
+    /// frame: subtract this (checked) before indexing SEQ with them, and
+    /// bound the result by SEQ's length. `project_query` already subtracts
+    /// it.
+    pub fn query_offset(&self) -> u32 {
+        self.aligned_blocks.as_ref().map_or(0, |b| b.query_offset())
+    }
+
+    /// Set where SEQ starts in the annotation frame on the aligned blocks
+    /// (see [`query_offset`](Self::query_offset)). Call after the blocks are
+    /// set; without blocks there is nothing to lift and this is a no-op.
+    pub fn set_query_offset(&mut self, offset: u32) {
+        if let Some(b) = self.aligned_blocks.take() {
+            self.aligned_blocks = Some(b.with_query_offset(offset));
+        }
+    }
+
     /// Check if the read is reverse-aligned.
     pub fn is_reverse_aligned(&self) -> bool {
         self.is_reverse_aligned
@@ -89,8 +109,10 @@ impl MolecularAnnotations {
     /// Get coordinates for a specific annotation type in BAM orientation.
     ///
     /// Query coordinates are returned in **BAM orientation** (forward-oriented, matching
-    /// the sequence as stored in the BAM file). For reverse-aligned reads, this means
-    /// the coordinates are flipped from the original molecular orientation.
+    /// the sequence as stored in the BAM file, or, on a hard-clipped record whose
+    /// annotations describe the full read, that full read in BAM orientation: SEQ
+    /// starts at [`query_offset`](Self::query_offset)). For reverse-aligned reads,
+    /// this means the coordinates are flipped from the original molecular orientation.
     ///
     /// This is analogous to pysam's `modified_bases` which returns positions relative
     /// to the BAM sequence. For original molecular orientation, use

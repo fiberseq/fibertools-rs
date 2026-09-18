@@ -147,6 +147,7 @@ pub fn main() -> Result<(), Error> {
         None => {}
     };
     utils::ma_io::report_stale_frames();
+    utils::ma_io::report_full_frames();
     let duration = pg_start.elapsed();
     log::info!(
         "{} done! Time elapsed: {}",

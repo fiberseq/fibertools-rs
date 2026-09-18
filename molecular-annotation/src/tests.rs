@@ -607,6 +607,91 @@ fn test_get_ref_coords_reverse_outside_aligned_region() {
     assert_eq!(coords[0].3, None);
 }
 
+// A full-read annotation frame on a hard-clipped record (#136): query
+// coordinates stay in that frame, only the lift and project_query subtract
+// the leading hard clip.
+#[test]
+fn test_query_offset_forward_lifts_through_leading_hard_clip() {
+    // 150 bp read, CIGAR 50H100M: SEQ is molecular [50,150), ref [1000,1100)
+    let mut a = MolecularAnnotations::new(150);
+    a.add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma)
+        .add(60, 20, Strand::Unknown, vec![], None) // [60,80): inside SEQ
+        .add(10, 20, Strand::Unknown, vec![], None) // [10,30): entirely in the clip
+        .add(40, 20, Strand::Unknown, vec![], None); // [40,60): straddles the clip
+    a.set_aligned_blocks(vec![([0, 100], [1000, 1100])], false);
+    assert_eq!(a.query_offset(), 0);
+    a.set_query_offset(50);
+    assert_eq!(a.query_offset(), 50);
+    let c = a.get_ref_coords("nuc").unwrap();
+    assert_eq!(
+        c[0],
+        (60, 80, Some(1010), Some(1030)),
+        "query coords stay full-frame, ref uses the offset"
+    );
+    assert_eq!(
+        c[1],
+        (10, 30, None, None),
+        "annotation before SEQ does not lift and does not panic"
+    );
+    assert_eq!(
+        c[2],
+        (40, 60, Some(1000), Some(1010)),
+        "straddling annotation snaps like a soft clip"
+    );
+    let infos: Vec<_> = a.iter_type("nuc").unwrap().collect();
+    assert_eq!(
+        (
+            infos[0].query_start,
+            infos[0].query_end,
+            infos[0].ref_start,
+            infos[0].ref_end
+        ),
+        (60, 80, Some(1010), Some(1030))
+    );
+    let pq: Vec<(i64, i64)> = a
+        .project_query(0, false)
+        .map(|p| (p.start, p.end))
+        .collect();
+    assert_eq!(
+        pq,
+        vec![(10, 30), (-40, -20), (-10, 10)],
+        "project_query is SEQ-relative"
+    );
+    let pr: Vec<(i64, i64)> = a
+        .project_reference(1000, false)
+        .map(|p| (p.start, p.end))
+        .collect();
+    assert_eq!(pr, vec![(10, 30), (0, 10)]);
+    // the container's raw lift is in the annotation frame too
+    assert_eq!(a.lift_to_reference(60, 80), Some((Some(1010), Some(1030))));
+    assert_eq!(a.lift_to_query(1010, 1030), Some((Some(60), Some(80))));
+}
+
+#[test]
+fn test_query_offset_reverse_aligned() {
+    // molecular [60,80) of a 150 bp reverse read -> BAM [70,90)
+    let mut a = MolecularAnnotations::new(150);
+    a.add_annotation_type("nuc", QualitySpec::none(), Encoding::Ma)
+        .add(60, 20, Strand::Unknown, vec![], None);
+    a.set_aligned_blocks(vec![([0, 100], [1000, 1100])], true);
+    // CIGAR 100M50H (trailing clip): no offset, today's result
+    assert_eq!(
+        a.get_ref_coords("nuc").unwrap(),
+        vec![(70, 90, Some(1070), Some(1090))]
+    );
+    // CIGAR 50H100M on a reverse read: BAM [70,90) is SEQ [20,40)
+    a.set_query_offset(50);
+    assert_eq!(
+        a.get_ref_coords("nuc").unwrap(),
+        vec![(70, 90, Some(1020), Some(1040))]
+    );
+    let pq: Vec<(i64, i64)> = a
+        .project_query(0, false)
+        .map(|p| (p.start, p.end))
+        .collect();
+    assert_eq!(pq, vec![(20, 40)]);
+}
+
 #[test]
 fn test_flip_range() {
     let annotations = MolecularAnnotations::new(1000);
@@ -2267,4 +2352,135 @@ fn ma_family_tags_accept_both_spellings() {
         other => panic!("expected fresh canonical Aq after rewrite, got {other:?}"),
     }
     assert!(matches!(record.aux(b"Ma"), Ok(Aux::String(_))));
+}
+
+/// A mapped record at reference position 1000 with the given SEQ, CIGAR and
+/// flags, for the hard-clip frame tests below.
+#[cfg(feature = "htslib")]
+fn aligned_record(seq: &[u8], cigar: &str, flags: u16) -> rust_htslib::bam::Record {
+    use rust_htslib::bam::record::CigarString;
+    let mut r = rust_htslib::bam::Record::new();
+    let cigar = CigarString::try_from(cigar).unwrap();
+    r.set(b"read", Some(&cigar), seq, &vec![255u8; seq.len()]);
+    r.set_flags(flags);
+    r.set_tid(0);
+    r.set_pos(1000);
+    r
+}
+
+#[cfg(feature = "htslib")]
+fn with_ma_and_mm(seq: &[u8], cigar: &str, flags: u16, ma: &str) -> rust_htslib::bam::Record {
+    use rust_htslib::bam::record::Aux;
+    let mut r = aligned_record(seq, cigar, flags);
+    r.push_aux(b"Ma", Aux::String(ma)).unwrap();
+    r.push_aux(b"MM", Aux::String("A+a,0;")).unwrap();
+    r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+        .unwrap();
+    r
+}
+
+// MA read length == SEQ + hard clips: the tags describe the full read. The
+// lift carries the leading hard clip; MM/ML are not parsed.
+#[cfg(feature = "htslib")]
+#[test]
+fn from_record_full_read_frame_forward() {
+    let seq = vec![b'A'; 80];
+    // molecular [20,50) of a 100 bp read; SEQ is [10,90)
+    let r = with_ma_and_mm(&seq, "10H80M10H", 0, "100;msp.:21-30");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.read_length, 100);
+    assert_eq!(annot.query_offset(), 10);
+    assert_eq!(
+        annot.get_ref_coords("msp"),
+        Some(vec![(20, 50, Some(1010), Some(1040))])
+    );
+    assert!(annot.get_type("a").is_none(), "MM/ML must not be parsed");
+    assert!(annot.to_ma_string().starts_with("100;"), "frame kept as is");
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn from_record_full_read_frame_reverse() {
+    let seq = vec![b'A'; 80];
+    // molecular [20,50) -> flip with L=100 -> BAM [50,80) -> SEQ [45,75)
+    let r = with_ma_and_mm(&seq, "5H80M15H", 16, "100;msp.:21-30");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.query_offset(), 5);
+    assert_eq!(annot.get_coords("msp"), Some(vec![(50, 80)]));
+    assert_eq!(
+        annot.get_ref_coords("msp"),
+        Some(vec![(50, 80, Some(1045), Some(1075))])
+    );
+    // molecular [0,10) -> BAM [90,100) -> SEQ [85,95): past the 80 bp SEQ
+    let r = with_ma_and_mm(&seq, "5H80M15H", 16, "100;msp.:1-10");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.get_ref_coords("msp").unwrap()[0].2, None);
+    // trailing clip only: still the full-read frame, offset 0
+    let r = with_ma_and_mm(&seq, "80M20H", 16, "100;msp.:31-10");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.query_offset(), 0);
+    assert_eq!(
+        annot.get_ref_coords("msp"),
+        Some(vec![(60, 70, Some(1060), Some(1070))])
+    );
+    assert!(annot.get_type("a").is_none());
+}
+
+// Every other shape takes the old path: no offset, MM/ML parsed.
+#[cfg(feature = "htslib")]
+#[test]
+fn from_record_seq_frame_is_unchanged() {
+    use rust_htslib::bam::record::Aux;
+    let seq = vec![b'A'; 80];
+    // tags computed after clipping
+    let r = with_ma_and_mm(&seq, "10H80M10H", 0, "80;msp.:21-30");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.query_offset(), 0);
+    assert_eq!(
+        annot.get_ref_coords("msp"),
+        Some(vec![(20, 50, Some(1020), Some(1050))])
+    );
+    assert!(annot.get_type("a").is_some());
+    // soft clip
+    let r = with_ma_and_mm(&seq, "10S70M", 0, "80;msp.:21-30");
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!(annot.query_offset(), 0);
+    assert_eq!(
+        annot.get_ref_coords("msp"),
+        Some(vec![(20, 50, Some(1010), Some(1040))])
+    );
+    // no MA tag with hard clips
+    let mut r = aligned_record(&seq, "10H80M10H", 0);
+    r.push_aux(b"MM", Aux::String("A+a,0;")).unwrap();
+    r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+        .unwrap();
+    let annot = MolecularAnnotations::from_record(&r);
+    assert_eq!((annot.read_length, annot.query_offset()), (80, 0));
+    assert!(annot.get_type("a").is_some());
+    // a read length matching neither: the library leaves it to the caller
+    let r = with_ma_and_mm(&seq, "10H80M10H", 0, "90;msp.:21-30");
+    assert_eq!(MolecularAnnotations::from_record(&r).query_offset(), 0);
+}
+
+#[cfg(feature = "htslib")]
+#[test]
+fn hard_clip_frame_helpers() {
+    use crate::{full_read_query_offset, hard_clips, query_span};
+    use rust_htslib::bam::record::CigarString;
+    let seq = vec![b'A'; 80];
+    let r = aligned_record(&seq, "10H80M10H", 0);
+    assert_eq!(hard_clips(&r), (10, 10));
+    assert_eq!(query_span(&r), 80);
+    assert_eq!(full_read_query_offset(100, &r), Some(10));
+    assert_eq!(full_read_query_offset(80, &r), None);
+    assert_eq!(full_read_query_offset(90, &r), None);
+    // SEQ-less: the CIGAR query span stands in for SEQ
+    let mut seqless = rust_htslib::bam::Record::new();
+    let cigar = CigarString::try_from("10H70M10S10H").unwrap();
+    seqless.set(b"read", Some(&cigar), b"", &[]);
+    assert_eq!(query_span(&seqless), 80);
+    assert_eq!(full_read_query_offset(100, &seqless), Some(10));
+    let r = aligned_record(&seq, "80M", 0);
+    assert_eq!(hard_clips(&r), (0, 0));
+    assert_eq!(full_read_query_offset(80, &r), None);
 }

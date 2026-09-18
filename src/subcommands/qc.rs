@@ -121,6 +121,9 @@ pub struct QcStats<'a> {
     // reads whose tag was stale (read_length mismatch); folded into
     // Untagged, tracked for a distinct warning
     stale_tags: i64,
+    // hard-clipped reads whose tags are in the full-read frame: nuc/msp
+    // kept, m6A dropped, counted as NotCallable; tracked for a warning
+    full_frame_reads: i64,
     // phasing information
     phased_reads: HashMap<String, Counts>,
     phased_bp: HashMap<String, Counts>,
@@ -156,6 +159,7 @@ impl<'a> QcStats<'a> {
                 .map(|k| (k, Counts::default()))
                 .collect(),
             stale_tags: 0,
+            full_frame_reads: 0,
             qc_opts,
             phased_reads: HashMap::new(),
             phased_bp: HashMap::new(),
@@ -186,6 +190,9 @@ impl<'a> QcStats<'a> {
             && crate::utils::ma_io::record_frame_reason(&fiber.record).is_some()
         {
             self.stale_tags += 1;
+        }
+        if fiber.is_full_read_frame() {
+            self.full_frame_reads += 1;
         }
 
         // add auto-correlation of m6a
@@ -221,7 +228,9 @@ impl<'a> QcStats<'a> {
         // add the m6a to the working queue
         let mut m6a_vec: Vec<f64> = vec![0.0; fiber.record.seq_len()];
         for m6a in fiber.m6a().starts().iter() {
-            m6a_vec[*m6a as usize] = 1.0;
+            if let Some(v) = m6a_vec.get_mut(*m6a as usize) {
+                *v = 1.0;
+            }
         }
         let elem = AcfRead {
             m6a: m6a_vec,
@@ -264,7 +273,14 @@ impl<'a> QcStats<'a> {
         // have zero nucleosomes (the callable state needs m6A and MSPs, and the
         // nuc view is post-pruning), so the filtered side skips those
         // reads rather than admit an inf key.
-        let read_length = fiber.frame_length() as f32 / nuc.len() as f32;
+        // On a full-read-frame record the nucleosomes span the whole read,
+        // so divide that length, not SEQ.
+        let frame_len = if fiber.is_full_read_frame() {
+            fiber.annotations.read_length as f32
+        } else {
+            fiber.frame_length() as f32
+        };
+        let read_length = frame_len / nuc.len() as f32;
         bump(
             &mut self.read_length_per_nuc,
             ordered_float_10k_round(read_length),
@@ -548,6 +564,15 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
              (hard-clipped supplementary alignments); their calls were dropped. \
              See the warning above for how to realign.",
             stats.stale_tags
+        );
+    }
+    if stats.full_frame_reads > 0 {
+        log::warn!(
+            "{} reads are hard-clipped alignments whose nuc/msp tags are in the frame of the \
+             full-length read. Their nuc/msp are counted, but their m6A (MM/ML) was dropped, so \
+             they are NotCallable and never enter count_filtered. See the warning above \
+             for how to realign.",
+            stats.full_frame_reads
         );
     }
     let mut out = bio_io::writer(&opts.out)?;

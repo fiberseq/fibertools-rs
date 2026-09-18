@@ -327,16 +327,27 @@ fn qc_custom_minimums_reach_state_rows() {
     assert_eq!(filt, 0, "filtered column agrees with the statet rows");
 }
 
-// Records whose tags did not match SEQ count as Untagged in ft qc (#136).
+fn callable_counts(bam: &str) -> (i64, i64, i64) {
+    let out = run(&["qc", fixture(bam).to_str().unwrap()]);
+    let get = |state: &str| -> i64 {
+        out.lines()
+            .find(|l| l.starts_with(&format!("fiberseq_callable\t{state}\t")))
+            .unwrap_or_else(|| panic!("{bam}: no {state} row"))
+            .split('\t')
+            .nth(2)
+            .unwrap()
+            .parse()
+            .unwrap()
+    };
+    (get("Callable"), get("NotCallable"), get("Untagged"))
+}
+
+// Full-read-frame records have nuc/msp but no m6A: NotCallable, not Untagged
+// (#136). MM/ML copied verbatim with no MA and no legacy tags stay stale
+// (Untagged).
 #[test]
-fn qc_counts_hard_clipped_records_as_untagged() {
-    let out = run(&[
-        "qc",
-        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
-    ]);
-    let row = out
-        .lines()
-        .find(|l| l.starts_with("fiberseq_callable\tUntagged\t"))
-        .expect("Untagged row");
-    assert_eq!(row.split('\t').nth(2), Some("2"), "{row}");
+fn qc_counts_full_frame_records_as_not_callable() {
+    assert_eq!(callable_counts("ont_hardclip_supplementary.bam"), (2, 2, 0));
+    assert_eq!(callable_counts("ont_hardclip_full_frame.bam"), (2, 3, 0));
+    assert_eq!(callable_counts("ont_hardclip_mmml.bam"), (1, 0, 1));
 }

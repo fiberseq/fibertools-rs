@@ -71,6 +71,17 @@ pub fn ddda_to_m6a_record(record: &mut Record, opts: &DddaToM6aOptions) {
         );
         MolecularAnnotations::from_record(record)
     });
+    if ma_io::model_is_full_read_frame(&annot, record) {
+        // The Y/R calls below are positions in SEQ; the inherited nuc/msp
+        // live in the full read's frame and cannot share a tag with them.
+        // Restart from SEQ.
+        annot.annotation_types.clear();
+        annot.read_length = record.seq_len() as u32;
+        annot.set_aligned_blocks_raw(
+            molecular_annotation::AlignedBlocks::from_record(record),
+            record.is_reverse(),
+        );
+    }
     // Verdict from the calling-time set, before the m6A rebuild.
     ma_io::sync_fiberseq_callable(&mut annot, record, &opts.input.filters);
     annot
