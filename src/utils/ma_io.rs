@@ -78,7 +78,39 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
             merge_missing_types(&mut annot, read_legacy_fibertig(record)?);
         }
     }
+    drop_stale_frame(&mut annot, record);
     Ok(annot)
+}
+
+/// How many stale-frame records get a WARN before the rest drop to DEBUG.
+/// ONT BAMs can hold thousands of hard-clipped supplementary reads.
+const STALE_FRAME_WARN_LIMIT: usize = 10;
+
+/// Treat a record whose tags come from another frame as untagged (#136).
+/// Hard-clipped supplementary alignments keep the full-length read's tags,
+/// which would index past SEQ: consumers panic, or emit misplaced and
+/// u32-wrapped coordinates. Lives here so every path that parses a record
+/// (the fiber reader, convert-tags, strip-basemods, ddda-to-m6a, predict-m6a)
+/// sees the same thing.
+fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static SEEN: AtomicUsize = AtomicUsize::new(0);
+    let Some(why) = stale_frame_reason(annot, record) else {
+        return;
+    };
+    let n = SEEN.fetch_add(1, Ordering::Relaxed);
+    let qname = String::from_utf8_lossy(record.qname());
+    if n < STALE_FRAME_WARN_LIMIT {
+        log::warn!(
+            "dropping annotations for {qname}: {why} (hard-clipped supplementary alignment?)"
+        );
+        if n + 1 == STALE_FRAME_WARN_LIMIT {
+            log::warn!("further stale-frame records are logged at debug level");
+        }
+    } else {
+        log::debug!("dropping annotations for {qname}: {why}");
+    }
+    annot.annotation_types.clear();
 }
 
 /// Make the fiberseq_callable annotation agree with the CLI minimums.
@@ -976,7 +1008,9 @@ mod tests {
 
     #[test]
     fn rewrite_replaces_ma_tag_instead_of_appending() {
-        let mut record = synth_record(b"ATCGATCGAT");
+        // 300 bp so the msps below fit SEQ; read_record drops annotations
+        // that run past the sequence (#136).
+        let mut record = synth_record(&b"ATCGATCGAT".repeat(30));
         let qspec_q = "Q".parse::<QualitySpec>().unwrap();
 
         // First write: one msp at 100..150.

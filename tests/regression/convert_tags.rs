@@ -172,3 +172,24 @@ fn convert_tags_migrates_uppercase_to_canonical() {
         assert_eq!(ml(b), ml(a), "ML changed");
     }
 }
+
+// Hard-clipped supplementary reads keep the full-length read's legacy tags,
+// which run past SEQ (#136). read_record drops those annotations, so
+// convert-tags must not serialize the overrunning coordinates into an MA
+// tag. The two primaries in the fixture convert normally.
+#[test]
+fn convert_tags_drops_annotations_that_exceed_the_sequence() {
+    let out = NamedTempFile::with_suffix(".bam").unwrap();
+    convert(&fixture("ont_hardclip_supplementary.bam"), out.path());
+    let mut n_supp = 0;
+    for rec in records(out.path()) {
+        let tag = ma(&rec).unwrap_or_default();
+        // MA is "<read_length>;<type sections>": no sections means no annotations
+        let has_annotations = tag.trim_end_matches(';').contains(';');
+        assert_eq!(!has_annotations, rec.is_supplementary(), "Ma tag {tag:?}");
+        if rec.is_supplementary() {
+            n_supp += 1;
+        }
+    }
+    assert_eq!(n_supp, 2);
+}
