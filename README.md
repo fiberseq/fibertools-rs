@@ -38,7 +38,7 @@ ft --help
 Fiber-seq tags (`MM`/`ML`, `ns`/`nl`/`as`/`al`, `Ma`) describe the full read. Aligners that hard-clip supplementary alignments copy those tags unchanged onto the clipped record, where they no longer match `SEQ`. `ft` drops the tags on such records and warns. To keep calls on supplementary alignments, align with soft clipping:
 
 - PacBio: `pbmm2 align` (it never hard-clips).
-- ONT: `dorado aligner -Y ...`, or `samtools fastq -T '*' in.bam | minimap2 -Y -y -ax map-ont ref.fa -`.
+- ONT: `dorado aligner --mm2-opts "-Y" ...`, or `samtools fastq -T '*' in.bam | minimap2 -Y -y -ax map-ont ref.fa -`. minimap2 also writes SEQ-less secondary alignments by default; their tags are dropped too, so add `--secondary=no` or filter with `-F 256`.
 
 # Highlighted subcommands for `fibertools-rs`
 

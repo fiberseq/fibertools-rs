@@ -143,7 +143,7 @@ fn extract_drops_legacy_annotations_on_hard_clipped_reads() {
 
 // MM/ML/MN copied verbatim onto a 2376H hard-clipped supplementary (the
 // plain minimap2 shape): caught by MN != SEQ length. Until 0.14 this record
-// was silently removed from every output instead.
+// was deleted from every output with a per-record warning instead.
 #[test]
 fn extract_drops_mm_ml_on_hard_clipped_reads() {
     assert_supplementaries_untagged("ont_hardclip_mmml.bam", 1, 1);

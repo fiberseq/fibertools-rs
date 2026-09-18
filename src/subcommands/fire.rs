@@ -30,13 +30,11 @@ pub fn add_fire_to_rec(
     // and their paired precisions, keeping only entries with p > 0.
     let (fire_starts, fire_lens, fire_quals): (Vec<u32>, Vec<u32>, Vec<u8>) = {
         let Some(msp) = rec.annotations.get_type(ma_io::MSP_TYPE) else {
-            if ma_io::record_frame_reason(&rec.record).is_some() {
-                // The reader dropped this record's annotations: write it as an
-                // honest untagged read instead of passing the stale tags on.
-                rec.serialize_annotations();
-            } else {
-                log::debug!("FIRE: no msp annotations on record; skipping");
-            }
+            // Nothing to score. Still write the model back so a record whose
+            // stale tags were dropped by the reader leaves as an honest
+            // untagged read instead of passing those tags on.
+            log::debug!("FIRE: no msp annotations on record; writing it unscored");
+            rec.serialize_annotations();
             return;
         };
         if msp.annotations.len() != precisions.len() {

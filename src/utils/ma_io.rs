@@ -109,9 +109,9 @@ static STALE_FRAMES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicU
 /// supplementary alignments (minimap2 and dorado aligner without -Y) copy the
 /// full-length read's tags onto the clipped record; the tags cannot be
 /// recovered, only avoided.
-pub const HARD_CLIP_REMEDY: &str =
-    "Realign with soft clipping: pbmm2 align (PacBio, its default), \
-     dorado aligner -Y, or minimap2 -Y -y. Or drop supplementary alignments with -F 2048.";
+pub const HARD_CLIP_REMEDY: &str = "Realign with soft clipping: pbmm2 align (PacBio; it never \
+     hard-clips), dorado aligner --mm2-opts \"-Y\", or minimap2 -Y -y. Or drop supplementary \
+     alignments with -F 2048.";
 
 /// Treat a record whose tags come from another frame as untagged (#136, #31).
 /// Hard-clipped supplementary alignments keep the full-length read's tags,
@@ -130,13 +130,15 @@ fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record, why:
     let n = STALE_FRAMES.fetch_add(1, Ordering::Relaxed);
     let qname = String::from_utf8_lossy(record.qname());
     if n == 0 {
+        // One message, so the cause never prints after the symptom when
+        // several threads hit this at once.
         log::warn!(
             "some records carry Fiber-seq tags that describe the full-length read, not their SEQ \
              (hard-clipped supplementary alignments). Their annotations are dropped and they are \
-             written as untagged reads. {HARD_CLIP_REMEDY}"
+             treated as untagged reads. {HARD_CLIP_REMEDY}\n\
+             dropping annotations for {qname}: {why}"
         );
-    }
-    if n < STALE_FRAME_WARN_LIMIT {
+    } else if n < STALE_FRAME_WARN_LIMIT {
         log::warn!("dropping annotations for {qname}: {why}");
         if n + 1 == STALE_FRAME_WARN_LIMIT {
             log::warn!(
@@ -162,8 +164,9 @@ fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record, why:
 pub fn report_stale_frames() {
     let n = STALE_FRAMES.load(std::sync::atomic::Ordering::Relaxed);
     if n > 0 {
+        let records = if n == 1 { "record" } else { "records" };
         log::warn!(
-            "dropped annotations on {n} records whose Fiber-seq tags did not match their SEQ \
+            "dropped annotations on {n} {records} whose Fiber-seq tags did not match their SEQ \
              (hard-clipped supplementary alignments). {HARD_CLIP_REMEDY}"
         );
     }
@@ -218,6 +221,10 @@ pub(crate) fn record_frame_reason(record: &bam::Record) -> Option<String> {
                     "MA read length {read_length} does not match the {seq_len} bp sequence"
                 ));
             }
+            // The MA tag was written for this SEQ, so it vouches for the
+            // MM/ML next to it too: fibertools' own writers emit MA and
+            // MM/ML together, and a hard-clipped record it produced is fine.
+            return None;
         }
     } else if has_legacy_nuc_msp(record) || has_legacy_fibertig(record) {
         if hard_clipped {
@@ -228,6 +235,11 @@ pub(crate) fn record_frame_reason(record: &bam::Record) -> Option<String> {
         }
     }
     if matches!(record.aux(b"MM"), Ok(Aux::String(_))) {
+        if seq_len == 0 {
+            // Positions are implicit in SEQ; without it there is nothing to
+            // decode against (minimap2 -y writes SEQ-less secondaries).
+            return Some("MM/ML on a record without SEQ".to_string());
+        }
         match record.aux(b"MN").ok().and_then(aux_as_usize) {
             Some(mn) => {
                 if seq_len > 0 && mn != seq_len {
@@ -555,6 +567,14 @@ fn has_legacy_fibertig(record: &bam::Record) -> bool {
 pub fn write_record_with_basemods(record: &mut bam::Record, annot: &MolecularAnnotations) {
     write_record(record, annot);
     annot.write_mm_ml(record);
+    // MN is the SAM spec's frame for MM/ML: the SEQ length they were written
+    // against. With it, any consumer (samtools, modkit, this reader) can tell
+    // when a later hard clip has made them stale.
+    record.remove_aux(b"MN").ok();
+    let seq_len = record.seq_len();
+    if seq_len > 0 && matches!(record.aux(b"MM"), Ok(Aux::String(_))) {
+        record.push_aux(b"MN", Aux::I32(seq_len as i32)).ok();
+    }
 }
 
 /// Read annotations from a BAM record.
@@ -1329,6 +1349,46 @@ mod tests {
         let mut no_mn_soft = synth_aligned(&seq, "50S150M", 2048);
         mm(&mut no_mn_soft);
         assert!(record_frame_reason(&no_mn_soft).is_none());
+
+        // An MA tag written for this SEQ vouches for the MM/ML next to it:
+        // that is the shape fibertools' own writers produce.
+        let mut ma_vouches = synth_aligned(&seq, "50H200M", 2048);
+        mm(&mut ma_vouches);
+        ma_vouches
+            .push_aux(b"Ma", Aux::String("200;nuc.:10-40"))
+            .unwrap();
+        assert!(record_frame_reason(&ma_vouches).is_none());
+        let annot = read_record(&ma_vouches).unwrap();
+        assert!(annot.get_type(NUC_TYPE).is_some());
+        assert!(annot.get_type(crate::utils::basemods::M6A_TYPE).is_some());
+
+        let mut seqless = synth_aligned(b"", "200M", 256);
+        mm(&mut seqless);
+        assert!(record_frame_reason(&seqless).is_some());
+    }
+
+    // fibertools' own base-mod writer records the frame (MN) so its output
+    // survives a later hard clip check, including on a hard-clipped record.
+    #[test]
+    fn write_record_with_basemods_writes_mn_and_reads_back() {
+        use crate::utils::basemods::{canonical_header, M6A_TYPE};
+        let seq = b"ACGT".repeat(50);
+        let mut r = synth_aligned(&seq, "50H200M", 2048);
+        let mut annot = read_record(&r).unwrap();
+        let qspec = "Q".parse::<QualitySpec>().unwrap();
+        let header = canonical_header(M6A_TYPE, b'A').unwrap().to_string();
+        annot
+            .add_annotation_type(M6A_TYPE, qspec, Encoding::mm_ml())
+            .add(0, 1, Strand::Forward, vec![200], Some(header));
+        write_record_with_basemods(&mut r, &annot);
+        assert!(
+            matches!(r.aux(b"MN"), Ok(Aux::I32(200))),
+            "MN = {:?}",
+            r.aux(b"MN")
+        );
+        assert!(record_frame_reason(&r).is_none());
+        let back = read_record(&r).unwrap();
+        assert!(back.get_type(M6A_TYPE).is_some(), "m6a lost on re-read");
     }
 
     // A stale record leaves the writer as an honest untagged read: no legacy

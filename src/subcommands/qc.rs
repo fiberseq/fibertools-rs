@@ -545,9 +545,9 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     if stats.stale_tags > 0 {
         log::warn!(
             "{} of them carry Fiber-seq tags from a longer read than their SEQ \
-             (hard-clipped supplementary alignments); their calls were dropped. {}",
-            stats.stale_tags,
-            crate::utils::ma_io::HARD_CLIP_REMEDY
+             (hard-clipped supplementary alignments); their calls were dropped. \
+             See the warning above for how to realign.",
+            stats.stale_tags
         );
     }
     let mut out = bio_io::writer(&opts.out)?;
