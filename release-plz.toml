@@ -16,7 +16,9 @@ release_commits = "^(feat|fix)[(:!]"
 # from a fresh registry resolution without any Cargo.lock. The baseline is
 # immutable, and the 0.13.0 crate no longer resolves to a buildable set (vergen
 # 9.1.0 vs vergen-git2 1.x), so the check can never pass again for that
-# baseline. Conventional-commit bumping is what we rely on.
+# baseline. Once 0.13.1 is the newest published version, the baseline resolves
+# fresh again and this can be turned back on. Conventional-commit bumping is
+# what we rely on meanwhile.
 semver_check = false
 
 [[package]]
