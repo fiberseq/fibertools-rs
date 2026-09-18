@@ -50,6 +50,18 @@ impl FiberseqData {
             MolecularAnnotations::from_record(&record)
         });
 
+        // Tags from another frame (hard-clipped supplementary alignments keep
+        // the full-length read's tags, #136) would index past SEQ. Treat the
+        // record as untagged instead of emitting misplaced or wrapped
+        // coordinates, or panicking in a consumer.
+        if let Some(why) = crate::utils::ma_io::stale_frame_reason(&annotations, &record) {
+            log::warn!(
+                "dropping annotations for {}: {why} (hard-clipped supplementary alignment?)",
+                String::from_utf8_lossy(record.qname())
+            );
+            annotations.annotation_types.clear();
+        }
+
         // Backfill or recalculate the callable state per the CLI minimums,
         // before any consumer-side pruning; see sync_fiberseq_callable.
         crate::utils::ma_io::sync_fiberseq_callable(&mut annotations, &record, filters);

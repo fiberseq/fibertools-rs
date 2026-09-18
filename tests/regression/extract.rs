@@ -101,3 +101,41 @@ fn extract_reads_ma_spelled_fixture() {
     let out = std::fs::read_to_string(tmp.path()).unwrap();
     insta::assert_snapshot!(select_bed12_cols(&out, BED12_COLS));
 }
+
+// The reader drops annotations that do not fit SEQ (hard-clipped supplementary
+// reads keep the full-length read's tags, #136). Before this, extract printed
+// misplaced coordinates for the forward read and u32-wrapped ones for the
+// reverse read.
+#[test]
+fn extract_drops_annotations_that_exceed_the_sequence() {
+    let out = run(&[
+        "extract",
+        "--all",
+        "-",
+        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
+    ]);
+    let mut lines = out.lines();
+    let header: Vec<&str> = lines.next().unwrap().split('\t').collect();
+    let col = |name: &str| header.iter().position(|h| *h == name).unwrap();
+    let (flag, nuc, msp, m6a) = (
+        col("sam_flag"),
+        col("nuc_starts"),
+        col("msp_starts"),
+        col("m6a"),
+    );
+    let mut n_primary = 0;
+    let mut n_supp = 0;
+    for line in lines {
+        let f: Vec<&str> = line.split('\t').collect();
+        let supplementary = f[flag].parse::<u16>().unwrap() & 2048 != 0;
+        for c in [nuc, msp, m6a] {
+            assert_eq!(f[c] == ".", supplementary, "{}: {}", header[c], f[c]);
+        }
+        if supplementary {
+            n_supp += 1;
+        } else {
+            n_primary += 1;
+        }
+    }
+    assert_eq!((n_primary, n_supp), (2, 2));
+}

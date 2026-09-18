@@ -105,6 +105,41 @@ pub(crate) fn read_length_is_stale(read_length: u32, seq_len: usize) -> bool {
     seq_len > 0 && read_length as usize != seq_len
 }
 
+/// Why a record's annotations do not fit its SEQ, or `None` when they do.
+/// Hard-clipped supplementary alignments keep the full-length read's tags
+/// (MA or legacy), so coordinates run past the clipped SEQ and, once flipped
+/// for a reverse strand, wrap below zero (#136). SEQ-less records are never
+/// stale: the MA read length is the frame.
+pub(crate) fn stale_frame_reason(
+    annot: &MolecularAnnotations,
+    record: &bam::Record,
+) -> Option<String> {
+    let seq_len = record.seq_len();
+    if seq_len == 0 {
+        return None;
+    }
+    if read_length_is_stale(annot.read_length, seq_len) {
+        return Some(format!(
+            "MA read length {} does not match the {seq_len} bp sequence",
+            annot.read_length
+        ));
+    }
+    annot
+        .annotation_types
+        .iter()
+        .find(|t| {
+            t.annotations
+                .iter()
+                .any(|a| a.start as usize + a.length as usize > seq_len)
+        })
+        .map(|t| {
+            format!(
+                "{} coordinates extend past the {seq_len} bp sequence",
+                t.name
+            )
+        })
+}
+
 /// True when the callable state can be derived: calling ran (nuc or msp
 /// present) and the frame is not stale. Derivation is pure MA-tag
 /// arithmetic, so SEQ-less records derive fine.
