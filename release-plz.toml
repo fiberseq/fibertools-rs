@@ -10,6 +10,11 @@
 # releases on ANY commit (chore/docs/ci included, as a patch); this restricts it
 # to meaningful changes. Breaking changes use feat!/fix!, which still match.
 release_commits = "^(feat|fix)[(:!]"
+# The release-plz action installs cargo-semver-checks, so the check runs by
+# default. It builds the crate from a fresh registry resolution without our
+# Cargo.lock, and since vergen-lib 9.x that pulls two vergen-lib versions into
+# the build script and fails to compile. Conventional-commit bumping is enough.
+semver_check = false
 
 [[package]]
 name = "fibertools-rs"
@@ -38,9 +43,6 @@ git_tag_name = "molecular-annotation-v{{ version }}"
 #   (it ships no binaries, so nothing would un-draft it).
 # features_always_increment_minor defaults false -> keeps MA low (feat -> patch).
 
-# semver_check is left off for now: it needs cargo-semver-checks installed in CI,
-# and conventional-commit bumping is sufficient. To enable later, add a
-# cargo-semver-checks install step to the workflow and set `semver_check = true`.
 
 [changelog]
 # Link each entry to its pull request, or to its commit when no PR is
