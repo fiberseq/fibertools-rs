@@ -657,7 +657,7 @@ pub fn call_peaks(
                 track_fire_elements: true, // Enable FIRE element tracking for peak calling
             },
             rolling_max: Some(opts.window_size),
-            haps: false,
+            haps: opts.haps,
             per_base: false,
             keep_zeros: false,
             min_fire_coverage: Some(opts.min_fire_coverage),
