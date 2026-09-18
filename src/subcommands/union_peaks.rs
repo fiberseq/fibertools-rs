@@ -254,6 +254,7 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
         max_fdr: 1.0,
         min_fire_frac: Some(0.0),
         min_fire_frac_filter: 0.0,
+        haps: false, // BED intervals carry no HP tag
     };
 
     let mut writer = bio_io::writer(&opts.out)?;
