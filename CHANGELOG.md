@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.1](https://github.com/fiberseq/fibertools-rs/compare/v0.13.0...v0.13.1) - 2026-09-18
+
+### Fixed
+
+- pin hts-sys 2.2.0 and turn off the release-plz semver check ([#148](https://github.com/fiberseq/fibertools-rs/pull/148))
+- bump vergen-git2 to 9.1 so a fresh resolution builds again ([#146](https://github.com/fiberseq/fibertools-rs/pull/146))
+- ft call-peaks --haps fills the H1/H2 columns ([#142](https://github.com/fiberseq/fibertools-rs/pull/142))
+
+### Other
+
+- put semver_check = false in the [workspace] table ([#150](https://github.com/fiberseq/fibertools-rs/pull/150))
+- support patch releases from release/** branches ([#143](https://github.com/fiberseq/fibertools-rs/pull/143))
+
 ## [0.13.0](https://github.com/fiberseq/fibertools-rs/compare/v0.12.1...v0.13.0) - 2026-08-13
 
 ### Fixed
