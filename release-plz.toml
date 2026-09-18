@@ -32,6 +32,9 @@ semver_check = false
 name = "fibertools-rs"
 git_tag_name = "v{{ version }}"          # keep v0.X.Y (matches existing tags + cargo-dist)
 git_release_draft = true                 # draft so cargo-dist attaches binaries, then un-drafts
+# A 0.13.x patch cut after 0.14.0 exists must not become GitHub's "latest":
+# the cargo-dist updater and releases/latest/download URLs follow that flag.
+git_release_latest = false
 features_always_increment_minor = true   # feat -> minor even on 0.x
 # Prepend an install section (the cargo-dist shell installer) to the changelog
 # in the GitHub release body. {{ version }} is the release version; the tag is
