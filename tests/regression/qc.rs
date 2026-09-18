@@ -326,3 +326,17 @@ fn qc_custom_minimums_reach_state_rows() {
     let filt: i64 = rows_for(&out, "phased_reads").iter().map(|r| r.2).sum();
     assert_eq!(filt, 0, "filtered column agrees with the statet rows");
 }
+
+// Records whose tags did not match SEQ count as Untagged in ft qc (#136).
+#[test]
+fn qc_counts_hard_clipped_records_as_untagged() {
+    let out = run(&[
+        "qc",
+        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
+    ]);
+    let row = out
+        .lines()
+        .find(|l| l.starts_with("fiberseq_callable\tUntagged\t"))
+        .expect("Untagged row");
+    assert_eq!(row.split('\t').nth(2), Some("2"), "{row}");
+}

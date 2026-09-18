@@ -53,6 +53,17 @@ type MspInput<'a> = (&'a [u32], &'a [u32], Option<&'a [u8]>);
 /// Tolerant of malformed MM/ML — the library handles those internally
 /// without panicking.
 pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
+    // A record whose tags describe another read is untagged, and parsing
+    // its MM/ML would only produce truncation noise: decide before parsing.
+    if let Some(why) = record_frame_reason(record) {
+        let mut annot = MolecularAnnotations::new(0);
+        annot.set_aligned_blocks_raw(
+            molecular_annotation::AlignedBlocks::from_record(record),
+            record.is_reverse(),
+        );
+        drop_stale_frame(&mut annot, record, why);
+        return Ok(annot);
+    }
     let mut annot = MolecularAnnotations::from_record(record);
     // If MA tag is absent, also ingest legacy nuc/msp tags. The library
     // already populates basemod types (m6a/cpg) from MM/ML, so we merge
@@ -78,56 +89,101 @@ pub fn read_record(record: &bam::Record) -> Result<MolecularAnnotations> {
             merge_missing_types(&mut annot, read_legacy_fibertig(record)?);
         }
     }
-    drop_stale_frame(&mut annot, record);
+    // Backstop on the parsed model: a read length that disagrees with SEQ,
+    // or any annotation ending past it.
+    if let Some(why) = model_frame_reason(&annot, record) {
+        drop_stale_frame(&mut annot, record, why);
+    }
     Ok(annot)
 }
 
 /// How many stale-frame records get a WARN before the rest drop to DEBUG.
-/// ONT BAMs can hold thousands of hard-clipped supplementary reads.
+/// ONT BAMs can hold thousands of hard-clipped supplementary reads. A total
+/// is printed at exit by [`report_stale_frames`].
 const STALE_FRAME_WARN_LIMIT: usize = 10;
 
-/// Treat a record whose tags come from another frame as untagged (#136).
+/// Records whose annotations were dropped because their tags did not fit SEQ.
+static STALE_FRAMES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What to tell a user who hit a stale frame. Aligners that hard-clip
+/// supplementary alignments (minimap2 and dorado aligner without -Y) copy the
+/// full-length read's tags onto the clipped record; the tags cannot be
+/// recovered, only avoided.
+pub const HARD_CLIP_REMEDY: &str =
+    "Realign with soft clipping: pbmm2 align (PacBio, its default), \
+     dorado aligner -Y, or minimap2 -Y -y. Or drop supplementary alignments with -F 2048.";
+
+/// Treat a record whose tags come from another frame as untagged (#136, #31).
 /// Hard-clipped supplementary alignments keep the full-length read's tags,
 /// which would index past SEQ: consumers panic, or emit misplaced and
 /// u32-wrapped coordinates. Lives here so every path that parses a record
-/// (the fiber reader, convert-tags, strip-basemods, ddda-to-m6a, predict-m6a)
-/// sees the same thing.
-fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record) {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    static SEEN: AtomicUsize = AtomicUsize::new(0);
-    let Some(why) = stale_frame_reason(annot, record) else {
-        return;
-    };
-    let n = SEEN.fetch_add(1, Ordering::Relaxed);
+/// (the fiber reader, convert-tags, strip-basemods, ddda-to-m6a, predict-m6a,
+/// fibertig) sees the same thing, and [`write_record`] strips the stale tags
+/// on the way out so nothing downstream trusts them.
+///
+/// Not reframed on purpose: nuc/msp could be shifted by the hard clip, but
+/// MM/ML cannot be recovered without the clipped bases, and half a record
+/// (nucleosomes, no m6A) is worse than an honest untagged one. The spec's
+/// answer is soft clipping (`HARD_CLIP_REMEDY`).
+fn drop_stale_frame(annot: &mut MolecularAnnotations, record: &bam::Record, why: String) {
+    use std::sync::atomic::Ordering;
+    let n = STALE_FRAMES.fetch_add(1, Ordering::Relaxed);
     let qname = String::from_utf8_lossy(record.qname());
-    if n < STALE_FRAME_WARN_LIMIT {
+    if n == 0 {
         log::warn!(
-            "dropping annotations for {qname}: {why} (hard-clipped supplementary alignment?)"
+            "some records carry Fiber-seq tags that describe the full-length read, not their SEQ \
+             (hard-clipped supplementary alignments). Their annotations are dropped and they are \
+             written as untagged reads. {HARD_CLIP_REMEDY}"
         );
+    }
+    if n < STALE_FRAME_WARN_LIMIT {
+        log::warn!("dropping annotations for {qname}: {why}");
         if n + 1 == STALE_FRAME_WARN_LIMIT {
-            log::warn!("further stale-frame records are logged at debug level");
+            log::warn!(
+                "further such records are logged at debug level; a total is printed at exit"
+            );
         }
     } else {
         log::debug!("dropping annotations for {qname}: {why}");
     }
     annot.annotation_types.clear();
+    // An untagged read's frame is its SEQ, or its CIGAR query span without SEQ,
+    // so the writers persist a clean `Ma:Z:<len>` instead of the stale length.
+    let seq_len = record.seq_len();
+    annot.read_length = if seq_len > 0 {
+        seq_len as u32
+    } else {
+        cigar_query_len(record)
+    };
 }
 
-/// Make the fiberseq_callable annotation agree with the CLI minimums.
-/// Runs right after parsing, before any consumer-side pruning. Derives
-/// when the tag is absent (backfill) or the minimums are non-default
-/// (recalculation); otherwise the on-disk tag stands.
-pub fn sync_fiberseq_callable(
-    annot: &mut MolecularAnnotations,
-    record: &bam::Record,
-    filters: &crate::utils::input_bam::FiberFilters,
-) {
-    let needed =
-        filters.callable_minimums_are_custom() || annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none();
-    if needed && can_derive_callable(annot, record) {
-        let (min_msp, min_ave) = filters.callable_minimums();
-        derive_fiberseq_callable(annot, min_msp, min_ave);
+/// Log the number of records whose annotations were dropped for a stale
+/// frame. Called once at exit by `main`.
+pub fn report_stale_frames() {
+    let n = STALE_FRAMES.load(std::sync::atomic::Ordering::Relaxed);
+    if n > 0 {
+        log::warn!(
+            "dropped annotations on {n} records whose Fiber-seq tags did not match their SEQ \
+             (hard-clipped supplementary alignments). {HARD_CLIP_REMEDY}"
+        );
     }
+}
+
+/// Query bases the CIGAR consumes, hard clips excluded.
+fn cigar_query_len(record: &bam::Record) -> u32 {
+    use rust_htslib::bam::record::Cigar;
+    record
+        .cigar()
+        .iter()
+        .map(|c| match c {
+            Cigar::Match(l)
+            | Cigar::Ins(l)
+            | Cigar::SoftClip(l)
+            | Cigar::Equal(l)
+            | Cigar::Diff(l) => *l,
+            _ => 0,
+        })
+        .sum()
 }
 
 /// True when a present SEQ disagrees with the recorded read length
@@ -137,15 +193,73 @@ pub(crate) fn read_length_is_stale(read_length: u32, seq_len: usize) -> bool {
     seq_len > 0 && read_length as usize != seq_len
 }
 
-/// Why a record's annotations do not fit its SEQ, or `None` when they do.
-/// Hard-clipped supplementary alignments keep the full-length read's tags
-/// (MA or legacy), so coordinates run past the clipped SEQ and, once flipped
-/// for a reverse strand, wrap below zero (#136). SEQ-less records are never
-/// stale: the MA read length is the frame.
-pub(crate) fn stale_frame_reason(
-    annot: &MolecularAnnotations,
-    record: &bam::Record,
-) -> Option<String> {
+/// Signals, read straight off the record, that its Fiber-seq tags describe a
+/// different read than its SEQ. Each tag family has its own frame signal:
+/// - MA: the tag's own read length. A hard-clipped record whose tags were
+///   computed after clipping has `read_length == seq_len` and is fine.
+/// - legacy `ns`/`nl`/`as`/`al` and `fs`/`fl`: no frame is recorded and no
+///   producer writes them after clipping, so any hard clip means stale; so
+///   does a missing SEQ, since nothing then anchors them.
+/// - MM/ML: the SAM `MN` tag when present (the spec's frame for exactly this
+///   case), else hard clips.
+///
+/// SEQ-less MA records are never stale: the MA read length is the frame.
+/// Both the reader ([`read_record`]) and the writer ([`write_record`]) use
+/// this, so a stale record is cleared on the way in and cleaned on the way
+/// out.
+pub(crate) fn record_frame_reason(record: &bam::Record) -> Option<String> {
+    let seq_len = record.seq_len();
+    let cigar = record.cigar();
+    let hard_clipped = cigar.leading_hardclips() > 0 || cigar.trailing_hardclips() > 0;
+    if let Some((ma, _, _)) = ma_family_tags(record) {
+        if let Some(read_length) = ma.split(';').next().and_then(|s| s.parse::<usize>().ok()) {
+            if seq_len > 0 && read_length != seq_len {
+                return Some(format!(
+                    "MA read length {read_length} does not match the {seq_len} bp sequence"
+                ));
+            }
+        }
+    } else if has_legacy_nuc_msp(record) || has_legacy_fibertig(record) {
+        if hard_clipped {
+            return Some("legacy nuc/msp tags on a hard-clipped alignment".to_string());
+        }
+        if seq_len == 0 {
+            return Some("legacy nuc/msp tags on a record without SEQ".to_string());
+        }
+    }
+    if matches!(record.aux(b"MM"), Ok(Aux::String(_))) {
+        match record.aux(b"MN").ok().and_then(aux_as_usize) {
+            Some(mn) => {
+                if seq_len > 0 && mn != seq_len {
+                    return Some(format!("MN {mn} does not match the {seq_len} bp sequence"));
+                }
+            }
+            None => {
+                if hard_clipped {
+                    return Some("MM/ML on a hard-clipped alignment without an MN tag".to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn aux_as_usize(aux: Aux) -> Option<usize> {
+    match aux {
+        Aux::I8(v) => usize::try_from(v).ok(),
+        Aux::U8(v) => Some(v as usize),
+        Aux::I16(v) => usize::try_from(v).ok(),
+        Aux::U16(v) => Some(v as usize),
+        Aux::I32(v) => usize::try_from(v).ok(),
+        Aux::U32(v) => Some(v as usize),
+        _ => None,
+    }
+}
+
+/// The parsed model disagrees with SEQ: a read length that does not match,
+/// or an annotation ending past it. Backstop behind [`record_frame_reason`]
+/// for tags that carry no frame signal of their own.
+fn model_frame_reason(annot: &MolecularAnnotations, record: &bam::Record) -> Option<String> {
     let seq_len = record.seq_len();
     if seq_len == 0 {
         return None;
@@ -170,6 +284,33 @@ pub(crate) fn stale_frame_reason(
                 t.name
             )
         })
+}
+
+/// Why a record's annotations do not fit its SEQ, or `None` when they do:
+/// the record-level signals first, then the parsed model as a backstop.
+#[cfg(test)]
+pub(crate) fn stale_frame_reason(
+    annot: &MolecularAnnotations,
+    record: &bam::Record,
+) -> Option<String> {
+    record_frame_reason(record).or_else(|| model_frame_reason(annot, record))
+}
+
+/// Make the fiberseq_callable annotation agree with the CLI minimums.
+/// Runs right after parsing, before any consumer-side pruning. Derives
+/// when the tag is absent (backfill) or the minimums are non-default
+/// (recalculation); otherwise the on-disk tag stands.
+pub fn sync_fiberseq_callable(
+    annot: &mut MolecularAnnotations,
+    record: &bam::Record,
+    filters: &crate::utils::input_bam::FiberFilters,
+) {
+    let needed =
+        filters.callable_minimums_are_custom() || annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none();
+    if needed && can_derive_callable(annot, record) {
+        let (min_msp, min_ave) = filters.callable_minimums();
+        derive_fiberseq_callable(annot, min_msp, min_ave);
+    }
 }
 
 /// True when the callable state can be derived: calling ran (nuc or msp
@@ -305,8 +446,27 @@ fn merge_missing_types(dst: &mut MolecularAnnotations, src: MolecularAnnotations
 /// Producers that create or modify base mods must instead call
 /// [`write_record_with_basemods`], which canonically re-emits MM/ML.
 pub fn write_record(record: &mut bam::Record, annot: &MolecularAnnotations) {
-    strip_consumed_legacy_tags(record);
+    if record_frame_reason(record).is_some() {
+        // The reader cleared this record's annotations (drop_stale_frame);
+        // leave no stale tag behind for another tool to trust.
+        strip_all_fiber_tags(record);
+    } else {
+        strip_consumed_legacy_tags(record);
+    }
     annot.to_record(record);
+}
+
+/// Every Fiber-seq tag fibertools knows how to read: legacy nuc/msp/fibertig
+/// arrays, MM/ML/MN base mods, and both spellings of the MA family. Used only
+/// for records whose frame is stale (`record_frame_reason`), where none of
+/// them describe this SEQ.
+fn strip_all_fiber_tags(record: &mut bam::Record) {
+    for tag in [
+        b"ns", b"nl", b"as", b"al", b"aq", b"fs", b"fl", b"fa", b"MM", b"ML", b"MN", b"Ma", b"Aq",
+        b"An", b"MA", b"AQ", b"AN",
+    ] {
+        record.remove_aux(tag).ok();
+    }
 }
 
 /// Provenance rule shared by every MA write: strip exactly the legacy tags
@@ -1048,5 +1208,153 @@ mod tests {
             .expect("msp present");
         assert_eq!(msp.annotations.len(), 1);
         assert_eq!(msp.annotations[0].start, 200, "read back stale MA tag");
+    }
+
+    /// A mapped synthetic record with the given SEQ, CIGAR and flags.
+    fn synth_aligned(seq: &[u8], cigar: &str, flags: u16) -> bam::Record {
+        use rust_htslib::bam::record::CigarString;
+        let mut record = bam::Record::new();
+        let qual = vec![60u8; seq.len()];
+        let cigar = CigarString::try_from(cigar).expect("cigar parses");
+        record.set(b"frame_test", Some(&cigar), seq, &qual);
+        record.set_flags(flags);
+        record.set_tid(0);
+        record.set_pos(0);
+        record
+    }
+
+    fn legacy(record: &mut bam::Record, starts: &[u32], lens: &[u32]) {
+        record
+            .push_aux(b"ns", Aux::ArrayU32(starts.into()))
+            .unwrap();
+        record.push_aux(b"nl", Aux::ArrayU32(lens.into())).unwrap();
+    }
+
+    fn nuc_starts(record: &bam::Record) -> Vec<u32> {
+        let annot = read_record(record).expect("read_record");
+        annot
+            .get_type(NUC_TYPE)
+            .map(|t| t.annotations.iter().map(|a| a.start).collect())
+            .unwrap_or_default()
+    }
+
+    // MA carries its own frame: a mismatch is stale on either strand, a
+    // match is fine even with hard clips (tags computed after clipping).
+    #[test]
+    fn stale_frame_ma_read_length() {
+        let seq = b"ACGT".repeat(50); // 200 bp
+        for flags in [0u16, 16] {
+            let mut r = synth_aligned(&seq, "200M", flags);
+            r.push_aux(b"Ma", Aux::String("300;nuc.:10-40")).unwrap();
+            assert!(record_frame_reason(&r).is_some(), "flags {flags}");
+            assert!(nuc_starts(&r).is_empty());
+            assert_eq!(
+                read_record(&r).unwrap().read_length,
+                200,
+                "frame reset to SEQ"
+            );
+        }
+        let mut r = synth_aligned(&seq, "50H200M", 2048);
+        r.push_aux(b"Ma", Aux::String("200;nuc.:10-40")).unwrap();
+        assert!(record_frame_reason(&r).is_none());
+        assert_eq!(nuc_starts(&r), vec![9], "MA text is 1-based");
+    }
+
+    // Legacy tags carry no frame: any hard clip is stale even when every
+    // coordinate fits, a soft clip is not, and no SEQ is.
+    #[test]
+    fn stale_frame_legacy_uses_hard_clips() {
+        let seq = b"ACGT".repeat(50);
+        let mut fits = synth_aligned(&seq, "30H200M", 2048);
+        legacy(&mut fits, &[10, 100], &[20, 20]);
+        assert!(record_frame_reason(&fits).is_some());
+        assert!(nuc_starts(&fits).is_empty());
+
+        let mut soft = synth_aligned(&seq, "30S170M", 2048);
+        legacy(&mut soft, &[10, 100], &[20, 20]);
+        assert!(record_frame_reason(&soft).is_none());
+        assert_eq!(nuc_starts(&soft), vec![10, 100]);
+
+        let mut exact = synth_aligned(&seq, "200M", 0);
+        legacy(&mut exact, &[180], &[20]);
+        assert!(stale_frame_reason(&read_record(&exact).unwrap(), &exact).is_none());
+        assert_eq!(nuc_starts(&exact), vec![180]);
+
+        let mut past = synth_aligned(&seq, "200M", 0);
+        legacy(&mut past, &[180], &[21]);
+        assert!(nuc_starts(&past).is_empty());
+
+        let mut seqless = synth_aligned(b"", "200M", 256);
+        legacy(&mut seqless, &[10], &[20]);
+        assert!(record_frame_reason(&seqless).is_some());
+        let annot = read_record(&seqless).unwrap();
+        assert!(annot.annotation_types.is_empty());
+        assert_eq!(
+            annot.read_length, 200,
+            "frame from the CIGAR when SEQ is absent"
+        );
+    }
+
+    // MM/ML: MN is the frame when present, hard clips otherwise.
+    #[test]
+    fn stale_frame_mm_ml_uses_mn_then_hard_clips() {
+        let seq = b"ACGT".repeat(50);
+        let mm = |r: &mut bam::Record| {
+            r.push_aux(b"MM", Aux::String("A+a.,0;")).unwrap();
+            r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+                .unwrap();
+        };
+        let mut mn_mismatch = synth_aligned(&seq, "200M", 0);
+        mm(&mut mn_mismatch);
+        mn_mismatch.push_aux(b"MN", Aux::I32(500)).unwrap();
+        assert!(record_frame_reason(&mn_mismatch).is_some());
+        assert!(read_record(&mn_mismatch)
+            .unwrap()
+            .annotation_types
+            .is_empty());
+
+        let mut mn_ok_clipped = synth_aligned(&seq, "50H200M", 2048);
+        mm(&mut mn_ok_clipped);
+        mn_ok_clipped.push_aux(b"MN", Aux::I32(200)).unwrap();
+        assert!(record_frame_reason(&mn_ok_clipped).is_none());
+        assert!(!read_record(&mn_ok_clipped)
+            .unwrap()
+            .annotation_types
+            .is_empty());
+
+        let mut no_mn_clipped = synth_aligned(&seq, "50H200M", 2048);
+        mm(&mut no_mn_clipped);
+        assert!(record_frame_reason(&no_mn_clipped).is_some());
+
+        let mut no_mn_soft = synth_aligned(&seq, "50S150M", 2048);
+        mm(&mut no_mn_soft);
+        assert!(record_frame_reason(&no_mn_soft).is_none());
+    }
+
+    // A stale record leaves the writer as an honest untagged read: no legacy
+    // arrays, no MM/ML/MN, and an MA tag whose frame is SEQ.
+    #[test]
+    fn write_record_strips_every_tag_of_a_stale_record() {
+        let seq = b"ACGT".repeat(50);
+        let mut r = synth_aligned(&seq, "30H200M", 2048);
+        legacy(&mut r, &[10], &[20]);
+        r.push_aux(b"MM", Aux::String("A+a.,0;")).unwrap();
+        r.push_aux(b"ML", Aux::ArrayU8((&[200u8][..]).into()))
+            .unwrap();
+        let annot = read_record(&r).unwrap();
+        assert!(annot.annotation_types.is_empty());
+        write_record(&mut r, &annot);
+        for tag in [b"ns", b"nl", b"MM", b"ML"] {
+            assert!(
+                r.aux(tag).is_err(),
+                "{} survived",
+                String::from_utf8_lossy(tag)
+            );
+        }
+        let ma = r.aux(b"Ma");
+        assert!(
+            matches!(ma, Ok(Aux::String(s)) if s.split(';').next() == Some("200")),
+            "Ma = {ma:?}"
+        );
     }
 }

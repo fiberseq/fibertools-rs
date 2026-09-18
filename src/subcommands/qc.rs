@@ -183,10 +183,7 @@ impl<'a> QcStats<'a> {
         };
         bump(&mut self.fiberseq_callable, state_key, 1, f.inc());
         if state == fiber::CallableState::Untagged
-            && crate::utils::ma_io::read_length_is_stale(
-                fiber.annotations.read_length,
-                fiber.record.seq_len(),
-            )
+            && crate::utils::ma_io::record_frame_reason(&fiber.record).is_some()
         {
             self.stale_tags += 1;
         }
@@ -540,16 +537,17 @@ pub fn run_qc(opts: &mut QcOpts) -> Result<(), anyhow::Error> {
     if untagged > 0 {
         log::warn!(
             "{untagged} reads have no fiberseq_callable state (no nuc/msp \
-             calls, no SEQ to derive from, or a stale tag). These reads never enter \
-             count_filtered. Run ft add-nucleosomes or ft predict-m6a to \
-             call them."
+             calls, no SEQ to derive from, or tags from a hard-clipped alignment). \
+             These reads never enter count_filtered. Reads that were never called: \
+             run ft add-nucleosomes or ft predict-m6a."
         );
     }
     if stats.stale_tags > 0 {
         log::warn!(
-            "{} reads carry a stale fiberseq_callable tag: the recorded read \
-             length does not match the record. These reads count as Untagged.",
-            stats.stale_tags
+            "{} of them carry Fiber-seq tags from a longer read than their SEQ \
+             (hard-clipped supplementary alignments); their calls were dropped. {}",
+            stats.stale_tags,
+            crate::utils::ma_io::HARD_CLIP_REMEDY
         );
     }
     let mut out = bio_io::writer(&opts.out)?;

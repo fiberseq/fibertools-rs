@@ -33,6 +33,13 @@ ft --help
 
 [Help page for fibertools](https://fiberseq.github.io/fibertools/help.html#ft)
 
+## Input BAM requirements
+
+Fiber-seq tags (`MM`/`ML`, `ns`/`nl`/`as`/`al`, `Ma`) describe the full read. Aligners that hard-clip supplementary alignments copy those tags unchanged onto the clipped record, where they no longer match `SEQ`. `ft` drops the tags on such records and warns. To keep calls on supplementary alignments, align with soft clipping:
+
+- PacBio: `pbmm2 align` (it never hard-clips).
+- ONT: `dorado aligner -Y ...`, or `samtools fastq -T '*' in.bam | minimap2 -Y -y -ax map-ont ref.fa -`.
+
 # Highlighted subcommands for `fibertools-rs`
 
 ### `ft predict-m6a`

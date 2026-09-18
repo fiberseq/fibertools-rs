@@ -272,6 +272,8 @@ impl FiberFilters {
 #[derive(Debug, Args)]
 pub struct InputBam<C: CallableArgs = NoCallableArgs> {
     /// Input BAM file. If no path is provided stdin is used. For m6A prediction, this should be a HiFi bam file with kinetics data. For other commands, this should be a bam file with m6A calls.
+    ///
+    /// Fiber-seq tags describe the full read, so aligned input must be soft-clipped: pbmm2 never hard-clips; for ONT use `dorado aligner -Y` or `minimap2 -Y -y`. Tags on hard-clipped records are dropped with a warning.
     #[clap(default_value = "-", value_hint = ValueHint::AnyPath)]
     pub bam: String,
     #[clap(flatten)]

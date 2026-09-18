@@ -105,15 +105,10 @@ fn extract_reads_ma_spelled_fixture() {
 // The reader drops annotations that do not fit SEQ (hard-clipped supplementary
 // reads keep the full-length read's tags, #136). Before this, extract printed
 // misplaced coordinates for the forward read and u32-wrapped ones for the
-// reverse read.
-#[test]
-fn extract_drops_annotations_that_exceed_the_sequence() {
-    let out = run(&[
-        "extract",
-        "--all",
-        "-",
-        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
-    ]);
+// reverse read. Supplementaries must report `.` for nuc, msp and m6a; the
+// primaries must not.
+fn assert_supplementaries_untagged(bam: &str, n_primary: usize, n_supp: usize) {
+    let out = run(&["extract", "--all", "-", fixture(bam).to_str().unwrap()]);
     let mut lines = out.lines();
     let header: Vec<&str> = lines.next().unwrap().split('\t').collect();
     let col = |name: &str| header.iter().position(|h| *h == name).unwrap();
@@ -123,19 +118,33 @@ fn extract_drops_annotations_that_exceed_the_sequence() {
         col("msp_starts"),
         col("m6a"),
     );
-    let mut n_primary = 0;
-    let mut n_supp = 0;
+    let (mut seen_primary, mut seen_supp) = (0, 0);
     for line in lines {
         let f: Vec<&str> = line.split('\t').collect();
         let supplementary = f[flag].parse::<u16>().unwrap() & 2048 != 0;
         for c in [nuc, msp, m6a] {
-            assert_eq!(f[c] == ".", supplementary, "{}: {}", header[c], f[c]);
+            assert_eq!(f[c] == ".", supplementary, "{bam} {}: {}", header[c], f[c]);
         }
         if supplementary {
-            n_supp += 1;
+            seen_supp += 1;
         } else {
-            n_primary += 1;
+            seen_primary += 1;
         }
     }
-    assert_eq!((n_primary, n_supp), (2, 2));
+    assert_eq!((seen_primary, seen_supp), (n_primary, n_supp), "{bam}");
+}
+
+// Legacy ns/nl/as/al tags, no MM/ML (dorado aligner strips them): caught by
+// the hard-clip rule for legacy tags.
+#[test]
+fn extract_drops_legacy_annotations_on_hard_clipped_reads() {
+    assert_supplementaries_untagged("ont_hardclip_supplementary.bam", 2, 2);
+}
+
+// MM/ML/MN copied verbatim onto a 2376H hard-clipped supplementary (the
+// plain minimap2 shape): caught by MN != SEQ length. Until 0.14 this record
+// was silently removed from every output instead.
+#[test]
+fn extract_drops_mm_ml_on_hard_clipped_reads() {
+    assert_supplementaries_untagged("ont_hardclip_mmml.bam", 1, 1);
 }

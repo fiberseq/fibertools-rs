@@ -173,23 +173,48 @@ fn convert_tags_migrates_uppercase_to_canonical() {
     }
 }
 
-// Hard-clipped supplementary reads keep the full-length read's legacy tags,
-// which run past SEQ (#136). read_record drops those annotations, so
-// convert-tags must not serialize the overrunning coordinates into an MA
-// tag. The two primaries in the fixture convert normally.
-#[test]
-fn convert_tags_drops_annotations_that_exceed_the_sequence() {
+// Hard-clipped supplementary reads keep the full-length read's tags, which do
+// not match SEQ (#136). read_record drops those annotations and write_record
+// strips every stale tag, so convert-tags writes an honest untagged record: an
+// MA tag with no sections and no legacy arrays or MM/ML/MN. Primaries convert
+// normally and keep their MM/ML.
+fn assert_stale_records_cleaned(bam: &str, n_supp: usize) {
     let out = NamedTempFile::with_suffix(".bam").unwrap();
-    convert(&fixture("ont_hardclip_supplementary.bam"), out.path());
-    let mut n_supp = 0;
+    convert(&fixture(bam), out.path());
+    let mut seen_supp = 0;
     for rec in records(out.path()) {
-        let tag = ma(&rec).unwrap_or_default();
+        let tag = ma(&rec).expect("every record gets an MA tag");
         // MA is "<read_length>;<type sections>": no sections means no annotations
         let has_annotations = tag.trim_end_matches(';').contains(';');
-        assert_eq!(!has_annotations, rec.is_supplementary(), "Ma tag {tag:?}");
+        assert_eq!(!has_annotations, rec.is_supplementary(), "{bam} Ma {tag:?}");
+        assert_eq!(
+            tag.split(';').next().unwrap(),
+            rec.seq_len().to_string(),
+            "{bam}: MA frame must be SEQ"
+        );
+        for legacy in LEGACY_TAGS {
+            assert!(rec.aux(legacy).is_err(), "{bam}: legacy tag survived");
+        }
+        let has_mm = rec.aux(b"MM").is_ok();
+        assert_eq!(
+            has_mm,
+            !rec.is_supplementary(),
+            "{bam}: MM/ML on a stale record"
+        );
         if rec.is_supplementary() {
-            n_supp += 1;
+            assert!(rec.aux(b"MN").is_err(), "{bam}: MN on a stale record");
+            seen_supp += 1;
         }
     }
-    assert_eq!(n_supp, 2);
+    assert_eq!(seen_supp, n_supp, "{bam}");
+}
+
+#[test]
+fn convert_tags_cleans_hard_clipped_legacy_records() {
+    assert_stale_records_cleaned("ont_hardclip_supplementary.bam", 2);
+}
+
+#[test]
+fn convert_tags_cleans_hard_clipped_mm_ml_records() {
+    assert_stale_records_cleaned("ont_hardclip_mmml.bam", 1);
 }

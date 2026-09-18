@@ -27,41 +27,61 @@ fn fire_on_legacy_input_strips_consumed_legacy_tags() {
     }
 }
 
-// Hard-clipped supplementary alignments can keep nuc/msp tag coordinates
-// from the full-length read, so positions run past the clipped SEQ (and wrap
-// below zero when flipped on reverse-strand records). The reader drops those
-// annotations, so `ft fire` has nothing to score and writes the records to
-// the output unchanged instead of panicking (#136). The fixture holds two
-// scorable primary reads plus a forward and a reverse hard-clipped
-// supplementary read from TEnCATS ONT data.
-#[test]
-fn fire_skips_records_whose_coords_exceed_the_sequence() {
+// Hard-clipped supplementary alignments keep the full-length read's tags
+// (#136). The reader drops those annotations, so `ft fire` has nothing to
+// score; it writes the record as an untagged read (MA tag with no sections,
+// stale legacy arrays and MM/ML stripped) instead of panicking or passing the
+// stale tags on. The fixtures hold scorable primary reads plus hard-clipped
+// supplementaries from TEnCATS ONT data: one with legacy tags only, one with
+// MM/ML/MN copied verbatim.
+fn assert_fire_cleans_stale_records(bam: &str, n_scored: usize, n_cleaned: usize) {
     let scored = NamedTempFile::with_suffix(".bam").unwrap();
     run(&[
         "fire",
         "--ont",
-        fixture("ont_hardclip_supplementary.bam").to_str().unwrap(),
+        fixture(bam).to_str().unwrap(),
         scored.path().to_str().unwrap(),
     ]);
     let mut reader = bam::Reader::from_path(scored.path()).unwrap();
-    let mut n_scored = 0;
-    let mut n_skipped = 0;
+    let (mut seen_scored, mut seen_cleaned) = (0, 0);
     for rec in reader.records() {
         let rec = rec.unwrap();
+        let ma = match rec.aux(b"Ma") {
+            Ok(bam::record::Aux::String(s)) => s.to_string(),
+            _ => panic!("{bam}: record without Ma tag"),
+        };
         if rec.is_supplementary() {
-            assert!(rec.aux(b"Ma").is_err(), "unscorable record got a Ma tag");
             assert!(
-                rec.aux(b"as").is_ok(),
-                "skipped record lost its original tags"
+                !ma.trim_end_matches(';').contains(';'),
+                "{bam}: stale record kept annotations: {ma}"
             );
-            n_skipped += 1;
+            for tag in [b"as", b"ns", b"MM", b"ML", b"MN"] {
+                assert!(
+                    rec.aux(tag).is_err(),
+                    "{bam}: stale {} survived",
+                    String::from_utf8_lossy(tag)
+                );
+            }
+            seen_cleaned += 1;
         } else {
-            assert!(rec.aux(b"Ma").is_ok(), "scorable record missing Ma tag");
-            n_scored += 1;
+            assert!(
+                ma.contains("msp"),
+                "{bam}: scorable record missing msp in {ma}"
+            );
+            seen_scored += 1;
         }
     }
-    assert_eq!(n_scored, 2);
-    assert_eq!(n_skipped, 2);
+    assert_eq!((seen_scored, seen_cleaned), (n_scored, n_cleaned), "{bam}");
+}
+
+#[test]
+fn fire_cleans_hard_clipped_legacy_records() {
+    assert_fire_cleans_stale_records("ont_hardclip_supplementary.bam", 2, 2);
+}
+
+#[test]
+fn fire_cleans_hard_clipped_mm_ml_records() {
+    assert_fire_cleans_stale_records("ont_hardclip_mmml.bam", 1, 1);
 }
 
 fn extract_fdrs(out: &str) -> Vec<f64> {
