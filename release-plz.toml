@@ -38,6 +38,8 @@ git_tag_name = "molecular-annotation-v{{ version }}"
 #   (it ships no binaries, so nothing would un-draft it).
 # features_always_increment_minor defaults false -> keeps MA low (feat -> patch).
 
-# semver_check is left off for now: it needs cargo-semver-checks installed in CI,
-# and conventional-commit bumping is sufficient. To enable later, add a
-# cargo-semver-checks install step to the workflow and set `semver_check = true`.
+# semver_check is on (the default): the release-plz action installs
+# cargo-semver-checks. It builds the crate from a fresh registry resolution, not
+# Cargo.lock, so a dependency range that no longer resolves to a buildable set
+# fails here first and blocks the release PR. `cargo install` without --locked
+# would fail the same way, so fix the dependency rather than turn this off.
