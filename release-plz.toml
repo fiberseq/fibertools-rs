@@ -10,6 +10,13 @@
 # releases on ANY commit (chore/docs/ci included, as a patch); this restricts it
 # to meaningful changes. Breaking changes use feat!/fix!, which still match.
 release_commits = "^(feat|fix)[(:!]"
+# release-plz finds "its" open release PR by head-branch prefix only, with no
+# base-branch filter (opened_prs in release_plz_core). main uses the default
+# "release-plz-", so a run on this branch would grab main's 0.14.x release PR
+# and force-push 0.13.x content onto it (that happened to #132 on 2026-09-18).
+# A prefix that does not start with "release-plz-" or "release-plz/" keeps the
+# two branches' release PRs apart in both directions.
+pr_branch_prefix = "release-v0.13-"
 # The release-plz action installs cargo-semver-checks, so the check runs unless
 # turned off here, and it must be set in this [workspace] table to apply to
 # every package. It builds both the current source and the published baseline
