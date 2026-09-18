@@ -185,26 +185,41 @@ impl FiberseqData {
     pub fn callable_state(&self) -> (CallableState, i64, i64) {
         // A tag whose recorded read length no longer matches the record is
         // stale: something rewrote the read after tagging. Treat as Untagged.
-        // A SEQ-less record (seq_len 0, SEQ dropped to save space) is NOT
-        // stale: the MA read length is the source of truth there.
-        if crate::utils::ma_io::read_length_is_stale(
-            self.annotations.read_length,
-            self.record.seq_len(),
-        ) {
+        // The frame is SEQ, or SEQ plus the hard clips for a full-read-frame
+        // record. A SEQ-less record (seq_len 0, SEQ dropped to save space)
+        // is NOT stale: the MA read length is the source of truth there.
+        if crate::utils::ma_io::frame_is_stale(&self.annotations, &self.record) {
             return (CallableState::Untagged, 0, 0);
+        }
+        // Decide the 1-0 NotCallable marker on the raw model, before any
+        // liftover: the marker carries no position, and on a full-read-frame
+        // record position 0 sits inside the leading hard clip.
+        let Some(t) = self.annotations.get_type(FIBERSEQ_CALLABLE_TYPE) else {
+            return (CallableState::Untagged, 0, 0);
+        };
+        let Some(raw) = t.annotations.first() else {
+            return (CallableState::Untagged, 0, 0);
+        };
+        if raw.length == 0 {
+            return (CallableState::NotCallable, 0, 0);
+        }
+        // A hard-clipped part of a tagged read has no m6A (MM/ML were
+        // dropped), so it is never callable, whatever its inherited tag says.
+        if self.is_full_read_frame() {
+            return (CallableState::NotCallable, 0, 0);
         }
         let view = self.fiberseq_callable();
         let infos = view.infos();
         let Some(a) = infos.first() else {
-            return (CallableState::Untagged, 0, 0);
+            return (CallableState::NotCallable, 0, 0);
         };
         let len = self.frame_length() as i64;
         let (cs, ce) = (
             (a.query_start as i64).clamp(0, len),
             (a.query_end as i64).clamp(0, len),
         );
-        // Empty after clamping covers both the 1-0 NotCallable marker and
-        // a corrupt foreign span lying outside the frame.
+        // Empty after clamping covers a corrupt foreign span lying outside
+        // the frame.
         if ce <= cs {
             return (CallableState::NotCallable, cs, cs);
         }
@@ -222,6 +237,14 @@ impl FiberseqData {
         } else {
             self.annotations.read_length as usize
         }
+    }
+
+    /// True when the annotations describe the full-length read of which
+    /// this record's SEQ is a hard-clipped part (#136). Query coordinates
+    /// from the views are then in that frame, SEQ starts
+    /// `annotations.query_offset()` bases in, and the read has no m6A.
+    pub fn is_full_read_frame(&self) -> bool {
+        crate::utils::ma_io::model_is_full_read_frame(&self.annotations, &self.record)
     }
 
     /// True when the read carries a non-empty `fiberseq_callable` span.
@@ -386,7 +409,13 @@ impl FiberseqData {
         } else {
             ct = &name;
             start = 0;
-            end = self.record.seq_len() as i64;
+            // The blocks are in the annotation frame: SEQ, or the full read
+            // this record was hard-clipped from.
+            end = if self.is_full_read_frame() {
+                self.annotations.read_length as i64
+            } else {
+                self.record.seq_len() as i64
+            };
         }
         let score = self.ec.round() as i64;
         let strand = if self.record.is_reverse() { '-' } else { '+' };
@@ -489,7 +518,13 @@ impl FiberseqData {
         // PB features
         let name = std::str::from_utf8(self.record.qname()).unwrap();
         let score = self.ec.round() as i64;
-        let q_len = self.record.seq_len() as i64;
+        // The molecular columns are in the annotation frame, which on a
+        // hard-clipped full-read-frame record is the whole read, not SEQ.
+        let q_len = if self.is_full_read_frame() {
+            self.annotations.read_length as i64
+        } else {
+            self.record.seq_len() as i64
+        };
         let rq = match self.get_rq() {
             Some(x) => format!("{x}"),
             None => ".".to_string(),

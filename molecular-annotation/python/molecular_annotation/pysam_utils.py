@@ -99,6 +99,38 @@ def _parse_mm_ml_into(
     annot.parse_mm_ml(mm, ml, forward_seq)
 
 
+_BAM_CHARD_CLIP = 5
+
+
+def _hard_clips(record: "pysam.AlignedSegment") -> tuple[int, int]:
+    """(leading, trailing) hard clip lengths, in BAM/CIGAR orientation.
+
+    The CIGAR is in reference orientation, so "leading" is the same end on
+    both strands: the bases before the first base of SEQ.
+    """
+    ct = record.cigartuples or []
+    lead = ct[0][1] if ct and ct[0][0] == _BAM_CHARD_CLIP else 0
+    trail = ct[-1][1] if len(ct) > 1 and ct[-1][0] == _BAM_CHARD_CLIP else 0
+    return lead, trail
+
+
+def _query_span(record: "pysam.AlignedSegment") -> int:
+    """Query bases the record holds: len(SEQ), or the CIGAR query span
+    (hard clips excluded) when SEQ is absent."""
+    if record.query_sequence is not None:
+        return len(record.query_sequence)
+    return record.infer_query_length() or 0
+
+
+def _full_read_query_offset(read_length: int, record: "pysam.AlignedSegment"):
+    """Mirror of the Rust `full_read_query_offset`: the leading hard clip
+    when `read_length` spans the record's hard-clipped bases, else None."""
+    lead, trail = _hard_clips(record)
+    if lead + trail > 0 and read_length == _query_span(record) + lead + trail:
+        return lead
+    return None
+
+
 def from_record(
     record: "pysam.AlignedSegment", parse_tags: bool = True
 ) -> MolecularAnnotations:
@@ -117,12 +149,18 @@ def from_record(
 
     Returns:
         MolecularAnnotations object with aligned blocks set for liftover support.
+        On a hard-clipped record whose MA read length spans the hard-clipped
+        bases (an aligner copied the full read's tags onto the clipped
+        record), the MA annotations are kept in the full read's frame, the
+        liftover carries the leading hard clip as `query_offset`, and MM/ML
+        are not parsed (they are SEQ-relative and cannot be recovered).
 
     Raises:
         KeyError: If parse_tags=True and MA tag is missing
         ValueError: If tag format is invalid
     """
     is_reverse = record.is_reverse
+    query_offset = 0
 
     if parse_tags:
         # Resolve the Ma/Aq/An family atomically (required when parsing
@@ -135,8 +173,17 @@ def from_record(
         annot = MolecularAnnotations.from_tags(ma, aq=aq, an=an)
         annot.is_reverse_aligned = is_reverse
 
-        # Base modifications (m6A/5mC/…) live in MM/ML, not the MA tag set.
-        _parse_mm_ml_into(annot, record, is_reverse)
+        # A hard-clipping aligner copies the full read's tags onto the
+        # clipped record. The MA family is then still correct (molecular
+        # coordinates of the full read); only the lift needs to know SEQ
+        # starts H_lead bases in. MM/ML are SEQ-relative and cannot be
+        # recovered, so they are not parsed in that frame.
+        offset = _full_read_query_offset(annot.read_length, record)
+        if offset is not None:
+            query_offset = offset
+        else:
+            # Base modifications (m6A/5mC/…) live in MM/ML, not the MA tag set.
+            _parse_mm_ml_into(annot, record, is_reverse)
     else:
         # Create empty annotations with just read length
         annot = MolecularAnnotations(record.query_length)
@@ -148,7 +195,9 @@ def from_record(
     if not record.is_unmapped and record.cigartuples:
         aligned_blocks = _extract_aligned_blocks(record)
         if aligned_blocks:
-            annot.set_aligned_blocks(aligned_blocks, is_reverse=is_reverse)
+            annot.set_aligned_blocks(
+                aligned_blocks, is_reverse=is_reverse, query_offset=query_offset
+            )
 
     return annot
 

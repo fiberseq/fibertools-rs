@@ -888,3 +888,86 @@ class TestRealFixtures:
         assert len(annot2.iter_type("nuc")) == nuc_before
         # ...and the MM/ML base mods are still intact.
         assert len(annot2.iter_type("a")) == 1541
+
+
+class TestFullReadFrame:
+    """A hard-clipped record whose MA read length spans the hard-clipped
+    bases keeps its full-read annotations; only the lift carries the
+    leading hard clip (#136)."""
+
+    def _rec(self, pysam, cigar, seq_len, ma, flag=0, mm=False):
+        r = TestAlignedBlocks()._record(pysam, cigar, seq_len)  # ref_start 1000
+        r.flag = flag
+        r.set_tag("Ma", ma)
+        if mm:
+            r.set_tag("MM", "A+a,0;")
+            r.set_tag("ML", [200])
+        return r
+
+    def test_hard_clips(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import _hard_clips
+
+        rec = TestAlignedBlocks()._record
+        assert _hard_clips(rec(pysam, "5H10S40M2D40M10S5H", 100)) == (5, 5)
+        assert _hard_clips(rec(pysam, "100M", 100)) == (0, 0)
+        assert _hard_clips(rec(pysam, "80M20H", 80)) == (0, 20)
+
+    def test_forward_leading_hard_clip(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        # molecular [60,80) of a 150 bp read; SEQ is [50,150)
+        annot = from_record(self._rec(pysam, "50H100M", 100, "150;nuc.:61-20", mm=True))
+        assert annot.read_length == 150
+        assert annot.query_offset == 50
+        assert annot.get_ref_coords("nuc") == [(60, 80, 1010, 1030)]
+        assert "a" not in annot.annotation_type_names(), "MM/ML must not be parsed"
+
+    def test_reverse_trailing_hard_clip(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        annot = from_record(self._rec(pysam, "100M50H", 100, "150;nuc.:61-20", flag=16))
+        assert annot.query_offset == 0
+        assert annot.get_ref_coords("nuc") == [(70, 90, 1070, 1090)]
+
+    def test_reverse_leading_hard_clip(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        annot = from_record(self._rec(pysam, "50H100M", 100, "150;nuc.:61-20", flag=16))
+        assert annot.query_offset == 50
+        assert annot.get_ref_coords("nuc") == [(70, 90, 1020, 1040)]
+
+    def test_clipped_frame_has_no_offset(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        annot = from_record(self._rec(pysam, "50H100M", 100, "100;nuc.:11-20", mm=True))
+        assert annot.query_offset == 0
+        assert annot.get_ref_coords("nuc") == [(10, 30, 1010, 1030)]
+        assert "a" in annot.annotation_type_names(), "MA vouches for MM/ML"
+
+    def test_before_seq_does_not_lift(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record
+
+        annot = from_record(self._rec(pysam, "50H100M", 100, "150;nuc.:11-20"))
+        assert annot.get_ref_coords("nuc") == [(10, 30, None, None)]
+
+    def test_set_aligned_blocks_default_offset(self):
+        annot = MolecularAnnotations(80)
+        annot.set_aligned_blocks([((0, 80), (1000, 1080))], is_reverse=False)
+        assert annot.query_offset == 0
+        annot.set_aligned_blocks([((0, 80), (1000, 1080))], query_offset=10)
+        assert annot.query_offset == 10
+
+    def test_round_trip_keeps_full_read_frame(self):
+        pysam = pytest.importorskip("pysam")
+        from molecular_annotation.pysam_utils import from_record, to_record
+
+        r = self._rec(pysam, "50H100M", 100, "150;nuc.:61-20")
+        annot = from_record(r)
+        to_record(annot, r)
+        assert from_record(r).to_ma_string().startswith("150;")

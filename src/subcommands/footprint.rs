@@ -127,8 +127,12 @@ impl<'a> Footprint<'a> {
     pub fn new(motif: &'a ReferenceMotif, in_fibers: &'a Vec<FiberseqData>) -> Self {
         let mut fibers = vec![];
         for fiber in in_fibers {
-            // add if fiber spans the footprint
-            if motif.spans(fiber.record.reference_start(), fiber.record.reference_end()) {
+            // add if fiber spans the footprint; a full-read-frame record has
+            // no m6A, so it was never measured and must not count as a
+            // fully footprinted fiber
+            if !fiber.is_full_read_frame()
+                && motif.spans(fiber.record.reference_start(), fiber.record.reference_end())
+            {
                 fibers.push(fiber);
             }
         }

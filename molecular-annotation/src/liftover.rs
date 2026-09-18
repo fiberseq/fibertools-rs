@@ -108,6 +108,14 @@ pub struct AlignedBlocks {
     blocks: Vec<AlignedBlock>,
     /// Length of the query sequence
     pub query_len: u32,
+    /// Where SEQ starts in the annotation frame. Block query coordinates
+    /// are always SEQ-relative (from the CIGAR). Callers pass query
+    /// coordinates in the frame the annotations were made in; when that
+    /// frame is the full read and this record holds a hard-clipped part of
+    /// it, SEQ starts `query_offset` bases in (the leading hard clip, in
+    /// BAM/CIGAR orientation). `lift_to_reference` subtracts it and
+    /// `lift_to_query` adds it. 0 when the annotation frame is SEQ.
+    query_offset: u32,
 }
 
 impl AlignedBlocks {
@@ -132,7 +140,11 @@ impl AlignedBlocks {
             .into_iter()
             .map(|([q_st, q_en], [r_st, r_en])| AlignedBlock::new(q_st, q_en, r_st, r_en))
             .collect();
-        Self { blocks, query_len }
+        Self {
+            blocks,
+            query_len,
+            query_offset: 0,
+        }
     }
 
     /// Create `AlignedBlocks` from an iterator of block pairs.
@@ -146,7 +158,26 @@ impl AlignedBlocks {
         let blocks = iter
             .map(|([q_st, q_en], [r_st, r_en])| AlignedBlock::new(q_st, q_en, r_st, r_en))
             .collect();
-        Self { blocks, query_len }
+        Self {
+            blocks,
+            query_len,
+            query_offset: 0,
+        }
+    }
+
+    /// Set where SEQ starts in the annotation frame (see `query_offset`).
+    /// Use the leading hard clip when the annotations describe the full
+    /// read and this record is a hard-clipped part of it.
+    pub fn with_query_offset(mut self, query_offset: u32) -> Self {
+        self.query_offset = query_offset;
+        self
+    }
+
+    /// Where SEQ starts in the annotation frame; 0 unless the annotations
+    /// describe the full read and SEQ is a hard-clipped part of it.
+    #[inline]
+    pub fn query_offset(&self) -> u32 {
+        self.query_offset
     }
 
     /// Check if there are any aligned blocks.
@@ -167,7 +198,8 @@ impl AlignedBlocks {
     /// Lift a range from query to reference coordinates.
     ///
     /// # Arguments
-    /// * `start` - 0-based query start position (inclusive)
+    /// * `start` - 0-based query start position (inclusive), in the
+    ///   annotation frame (see `query_offset`)
     /// * `end` - 0-based query end position (exclusive)
     ///
     /// # Returns
@@ -194,6 +226,13 @@ impl AlignedBlocks {
     /// assert_eq!(re, Some(1050));
     /// ```
     pub fn lift_to_reference(&self, start: u32, end: u32) -> (Option<u32>, Option<u32>) {
+        // Annotation frame -> SEQ-relative. Bases before SEQ (inside the
+        // leading hard clip) clamp to 0: a range that straddles the clip
+        // snaps forward into the first aligned base, exactly as it would
+        // across a soft clip; a range that ends before SEQ collapses to
+        // `start >= end` and lifts to nothing.
+        let start = start.saturating_sub(self.query_offset);
+        let end = end.saturating_sub(self.query_offset);
         if self.blocks.is_empty() || start >= end {
             return (None, None);
         }
@@ -233,7 +272,8 @@ impl AlignedBlocks {
     /// * `end` - 0-based reference end position (exclusive)
     ///
     /// # Returns
-    /// Tuple of `(query_start, query_end)` as 0-based half-open interval.
+    /// Tuple of `(query_start, query_end)` as 0-based half-open interval, in
+    /// the annotation frame (see `query_offset`).
     /// Returns `(None, None)` if the range cannot be lifted.
     ///
     /// # Behavior
@@ -250,6 +290,7 @@ impl AlignedBlocks {
         if range_len == 1 {
             // 1bp interval: require exact match
             if let Some(query_pos) = self.lift_exact_to_query(start) {
+                let query_pos = query_pos + self.query_offset;
                 return (Some(query_pos), Some(query_pos + 1));
             }
             return (None, None);
@@ -267,7 +308,9 @@ impl AlignedBlocks {
         let query_end = self.lift_end_to_query(start, end);
 
         match (query_start, query_end) {
-            (Some(qs), Some(qe)) if qs < qe => (Some(qs), Some(qe)),
+            (Some(qs), Some(qe)) if qs < qe => {
+                (Some(qs + self.query_offset), Some(qe + self.query_offset))
+            }
             _ => (None, None),
         }
     }
@@ -435,6 +478,62 @@ impl AlignedBlocks {
             })
             .collect();
         Self::new(blocks, record.seq_len() as u32)
+    }
+}
+
+/// Leading and trailing hard clips of a record, in BAM/CIGAR orientation.
+/// The CIGAR is written in reference orientation, so "leading" is the same
+/// end on both strands: the bases before the first base of SEQ.
+#[cfg(feature = "htslib")]
+pub fn hard_clips(record: &rust_htslib::bam::Record) -> (u32, u32) {
+    // A record with no CIGAR (unmapped, or a bare `Record::new()`) has no
+    // data to read; `cigar()` on it trips a debug assertion.
+    if record.cigar_len() == 0 {
+        return (0, 0);
+    }
+    let cigar = record.cigar();
+    (
+        cigar.leading_hardclips() as u32,
+        cigar.trailing_hardclips() as u32,
+    )
+}
+
+/// Query bases the record holds: the SEQ length, or, when SEQ is absent
+/// (`*`), the CIGAR's query span (M/I/S/=/X; hard clips excluded).
+#[cfg(feature = "htslib")]
+pub fn query_span(record: &rust_htslib::bam::Record) -> u32 {
+    use rust_htslib::bam::record::Cigar;
+    let seq_len = record.seq_len() as u32;
+    if seq_len > 0 || record.cigar_len() == 0 {
+        return seq_len;
+    }
+    record
+        .cigar()
+        .iter()
+        .map(|c| match c {
+            Cigar::Match(l)
+            | Cigar::Ins(l)
+            | Cigar::SoftClip(l)
+            | Cigar::Equal(l)
+            | Cigar::Diff(l) => *l,
+            _ => 0,
+        })
+        .sum()
+}
+
+/// The query offset to lift with when `read_length` (the frame the
+/// annotations were made in) is the full read and `record` is a
+/// hard-clipped part of it: `Some(H_lead)` iff the record has a hard clip
+/// and `read_length == query_span + H_lead + H_trail`. `None` when the
+/// frame is SEQ (no hard clips, or tags computed after clipping) or when
+/// it matches neither (the caller decides what to do with those).
+#[cfg(feature = "htslib")]
+pub fn full_read_query_offset(read_length: u32, record: &rust_htslib::bam::Record) -> Option<u32> {
+    let (lead, trail) = hard_clips(record);
+    if lead + trail > 0 && read_length == query_span(record) + lead + trail {
+        Some(lead)
+    } else {
+        None
     }
 }
 
@@ -842,5 +941,36 @@ mod tests {
         // Result: query [5,7)
         let b = test_blocks();
         assert_eq!(b.lift_to_query(103, 108), (Some(5), Some(7)));
+    }
+
+    // A full-read annotation frame on a hard-clipped record: SEQ starts
+    // `query_offset` bases in. Lifts subtract it, reverse lifts add it.
+    #[test]
+    fn test_query_offset_forward() {
+        let b = AlignedBlocks::new(vec![([0, 80], [1000, 1080])], 80).with_query_offset(10);
+        assert_eq!(b.query_offset(), 10);
+        assert_eq!(b.lift_to_reference(20, 50), (Some(1010), Some(1040)));
+        // straddling the clip snaps into the first aligned base
+        assert_eq!(b.lift_to_reference(5, 30), (Some(1000), Some(1020)));
+        // entirely inside the clip lifts to nothing, no underflow
+        assert_eq!(b.lift_to_reference(0, 10), (None, None));
+        assert_eq!(b.lift_to_reference(7, 8), (None, None));
+        assert_eq!(b.lift_to_query(1010, 1040), (Some(20), Some(50)));
+        assert_eq!(b.lift_to_query(1000, 1001), (Some(10), Some(11)));
+        assert_eq!(
+            AlignedBlocks::new(vec![([0, 80], [1000, 1080])], 80).query_offset(),
+            0
+        );
+        assert_eq!(AlignedBlocks::default().query_offset(), 0);
+    }
+
+    #[test]
+    fn test_query_offset_with_gaps() {
+        let b = test_blocks().with_query_offset(3);
+        // same as the unshifted [0,2)
+        assert_eq!(b.lift_to_reference(3, 5), (Some(100), Some(102)));
+        // unshifted [2,3): the insertion gap
+        assert_eq!(b.lift_to_reference(5, 6), (None, None));
+        assert_eq!(b.lift_to_query(107, 111), (Some(9), Some(13)));
     }
 }

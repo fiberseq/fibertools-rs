@@ -191,3 +191,61 @@ fn pileup_callable_fibers_shrinks_and_intersects() {
     assert_eq!(callable, fire, "--fire-coverage is the same flag");
     assert_eq!(callable, fire_filter, "--fire-filter is the same flag");
 }
+
+/// Weighted column sums of a pileup: (coverage, fire_coverage, nuc_coverage) bp.
+fn pileup_sums(args: &[&str]) -> (i64, i64, i64) {
+    let tmp = NamedTempFile::new().unwrap();
+    let mut a = vec!["pileup"];
+    a.extend_from_slice(args);
+    a.extend_from_slice(&["-o", tmp.path().to_str().unwrap()]);
+    run(&a);
+    let out = std::fs::read_to_string(tmp.path()).unwrap();
+    let mut lines = out.lines();
+    let header: Vec<&str> = lines.next().unwrap().split('\t').collect();
+    let col = |n: &str| header.iter().position(|h| *h == n).unwrap();
+    let (s, e, cov, fire, nuc) = (
+        col("start"),
+        col("end"),
+        col("coverage"),
+        col("fire_coverage"),
+        col("nuc_coverage"),
+    );
+    lines.fold((0, 0, 0), |acc, l| {
+        let f: Vec<i64> = l.split('\t').map(|x| x.parse().unwrap_or(0)).collect();
+        let w = f[e] - f[s];
+        (acc.0 + f[cov] * w, acc.1 + f[fire] * w, acc.2 + f[nuc] * w)
+    })
+}
+
+// Full-read-frame supplementaries add their lifted nucleosomes to the
+// nucleosome track (1737 + 1737 + 867 bp on top of the primaries' 8579) but
+// never FIRE coverage, and --callable-fibers drops them from the denominator
+// entirely (#136).
+#[test]
+fn pileup_full_frame_nucleosomes_count_fire_does_not() {
+    let bam = fixture("ont_hardclip_full_frame.bam");
+    let bam = bam.to_str().unwrap();
+    assert_eq!(
+        pileup_sums(&[bam, "-F", "2048"]),
+        (14257, 0, 8579),
+        "primaries alone"
+    );
+    assert_eq!(pileup_sums(&[bam]), (20337, 0, 8579 + 1737 + 1737 + 867));
+    assert_eq!(
+        pileup_sums(&[bam, "--callable-fibers"]),
+        (14069, 0, 8579),
+        "NotCallable reads leave the FIRE denominator"
+    );
+    let scored = NamedTempFile::with_suffix(".bam").unwrap();
+    run(&["fire", "--ont", bam, scored.path().to_str().unwrap()]);
+    index(scored.path());
+    let s = scored.path().to_str().unwrap();
+    let (_, fire_all, nuc_all) = pileup_sums(&[s]);
+    let (_, fire_prim, _) = pileup_sums(&[s, "-F", "2048"]);
+    assert!(fire_prim > 0, "primaries score some FIRE (615 bp today)");
+    assert_eq!(
+        fire_all, fire_prim,
+        "fire coverage must not change when full-frame records are removed"
+    );
+    assert_eq!(nuc_all, 12920);
+}

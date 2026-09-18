@@ -26,6 +26,10 @@
 //! | `get_coords()` | BAM | Coordinates as stored in BAM (flipped for reverse reads) |
 //! | `get_forward_coords()` | Molecular | Original read orientation (never flipped) |
 //!
+//! Query coordinates are in the annotation frame. On a hard-clipped record
+//! whose annotations describe the full read, SEQ starts `query_offset()`
+//! bases into that frame; only the liftover applies the offset.
+//!
 //! # Module layout
 //!
 //! The public surface lives behind re-exports from this crate root. Internally
@@ -131,6 +135,8 @@ mod basemods;
 
 #[cfg(feature = "htslib")]
 pub use decode::ma_family_tags;
+#[cfg(feature = "htslib")]
+pub use liftover::{full_read_query_offset, hard_clips, query_span};
 pub use liftover::{AlignedBlock, AlignedBlocks};
 pub use types::{
     Annotation, AnnotationInfo, AnnotationType, Encoding, LiftedCoords, MaParts, MmGroup,

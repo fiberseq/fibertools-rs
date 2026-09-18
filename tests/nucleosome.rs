@@ -189,3 +189,29 @@ fn seqless_record_passes_through_untouched() {
     assert_eq!(t.annotations[0].start, 100);
     assert_eq!(t.annotations[0].length, 400);
 }
+
+/// A hard-clipped record whose tags are in the full-read frame has no m6A
+/// to call from: the producer leaves it alone instead of erasing its
+/// full-read msp and rewriting the read length to SEQ (#136).
+#[test]
+fn add_nucleosomes_skips_full_frame_records() {
+    use fibertools_rs::utils::ma_io::{self, MSP_TYPE};
+    use rust_htslib::bam::record::{Cigar, CigarString};
+    let o = fibertools_rs::cli::NucleosomeParameters::default();
+    let mut r = rec(1000);
+    let cigar = CigarString(vec![Cigar::HardClip(200), Cigar::Match(1000)]);
+    r.set(b"test", Some(&cigar), &vec![b'A'; 1000], &vec![255u8; 1000]);
+    r.set_tid(0);
+    r.set_pos(0);
+    let mut annot = MolecularAnnotations::new(1200);
+    ma_io::add_msp_annotations(&mut annot, &[300], &[50], None);
+    ma_io::write_record(&mut r, &annot);
+    let mut annot = ma_io::read_record(&r).unwrap();
+    assert_eq!((annot.read_length, annot.query_offset()), (1200, 200));
+    add_nucleosomes_to_annotations(&r, &mut annot, &[], &o, (10, 10));
+    assert_eq!(annot.read_length, 1200);
+    let msp = annot.get_type(MSP_TYPE).expect("msp kept");
+    assert_eq!(msp.annotations.len(), 1);
+    assert_eq!(msp.annotations[0].start, 300);
+    assert!(annot.get_type(FIBERSEQ_CALLABLE_TYPE).is_none());
+}

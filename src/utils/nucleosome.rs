@@ -201,6 +201,20 @@ pub fn add_nucleosomes_to_annotations(
     if record.seq_len() == 0 {
         return;
     }
+    // A full-read-frame record (hard clips, tags from the full read) has no
+    // m6A to call from; re-calling would erase its full-read nuc/msp and
+    // rewrite the read length to SEQ. Keep the record as it is; it is
+    // NotCallable (sync_fiberseq_callable) and cannot be scored by FIRE.
+    if ma_io::model_is_full_read_frame(annot, record) {
+        static FULL_FRAME_LOG: std::sync::Once = std::sync::Once::new();
+        FULL_FRAME_LOG.call_once(|| {
+            log::warn!(
+                "add-nucleosomes skips hard-clipped reads whose tags are in the frame of the \
+                 full-length read (no m6A to call from); their nuc/msp are kept as is"
+            );
+        });
+        return;
+    }
     // The annotations must describe THIS record. An inherited MA field 0
     // from a differently-sized input would make the tag we are about to
     // write read back as stale (Untagged) forever.

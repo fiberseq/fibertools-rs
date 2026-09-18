@@ -95,6 +95,24 @@ pub fn run(args: &[&str]) -> String {
     String::from_utf8(out.stdout).expect("non-UTF8 stdout")
 }
 
+/// Run ft; return (stdout, stderr). Panics on non-zero exit.
+pub fn run_capture(args: &[&str]) -> (String, String) {
+    let out = Command::new(ft())
+        .args(args)
+        .output()
+        .expect("failed to spawn ft");
+    assert!(
+        out.status.success(),
+        "ft exited {}\nstderr: {}",
+        out.status,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    (
+        String::from_utf8(out.stdout).expect("non-UTF8 stdout"),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
+}
+
 /// Run `ft add-nucleosomes` on a fixture into a temp BAM, so tests get a
 /// BAM with the fiberseq_callable tag on disk.
 pub fn tagged_bam(name: &str) -> tempfile::NamedTempFile {

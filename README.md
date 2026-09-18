@@ -33,6 +33,13 @@ ft --help
 
 [Help page for fibertools](https://fiberseq.github.io/fibertools/help.html#ft)
 
+## Input BAM requirements
+
+Fiber-seq tags (`MM`/`ML`, `ns`/`nl`/`as`/`al`, `Ma`) describe the full read. Aligners that hard-clip supplementary alignments copy those tags unchanged onto the clipped record. When the copied `Ma` or legacy `ns`/`nl`/`as`/`al` tags describe the full read, `ft` keeps the nucleosome, MSP and FIRE calls and lifts them with the hard-clip offset, but the `MM`/`ML` m6A cannot be recovered and is dropped, so those reads count as NotCallable. Tags that match neither the record nor the full read are dropped. `ft` warns in both cases. To keep m6A on supplementary alignments, align with soft clipping:
+
+- PacBio: `pbmm2 align` (it never hard-clips).
+- ONT: `dorado aligner --mm2-opts "-Y" ...`, or `samtools fastq -T '*' in.bam | minimap2 -Y -y -ax map-ont ref.fa -`. minimap2 also writes SEQ-less secondary alignments by default; their tags are dropped too, so add `--secondary=no` or filter with `-F 256`.
+
 # Highlighted subcommands for `fibertools-rs`
 
 ### `ft predict-m6a`

@@ -295,16 +295,9 @@ where
             for r in self.bam.by_ref().take(self.chunk_size) {
                 pulled += 1;
                 let r = r.unwrap();
-                let has_mm_and_ml = r.aux(b"MM").is_ok() && r.aux(b"ML").is_ok();
-                if has_mm_and_ml
-                    && (r.cigar().leading_hardclips() > 0 || r.cigar().trailing_hardclips() > 0)
-                {
-                    log::warn!(
-                        "Skipping read ({}) because it has been hard clipped and has ML and MM tags. This read will be excluded from calculations and any output.",
-                        String::from_utf8_lossy(r.qname())
-                    );
-                    continue;
-                }
+                // Hard-clipped records with stale tags are not skipped here:
+                // ma_io::read_record clears their annotations and the
+                // writers strip the tags, so every command sees one policy.
                 // filter by bit flag
                 if r.flags() & self.bit_flag_filter != 0 {
                     continue;

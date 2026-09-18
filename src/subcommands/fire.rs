@@ -9,12 +9,31 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use utils::fire::*;
 
+/// True when the record carries at least one m6A call in memory. A record
+/// with msp but no m6A (a hard-clipped full-read-frame record whose MM/ML
+/// were dropped, or one stripped on purpose) cannot be scored: FireFeats
+/// indexes SEQ by m6A and MSP coordinates and needs both.
+fn has_m6a(rec: &FiberseqData) -> bool {
+    rec.annotations
+        .get_type(crate::utils::basemods::M6A_TYPE)
+        .is_some_and(|t| !t.annotations.is_empty())
+}
+
 pub fn add_fire_to_rec(
     rec: &mut FiberseqData,
     fire_opts: &FireOptions,
     model: &GBDT,
     precision_table: &MapPrecisionValues,
 ) {
+    if !has_m6a(rec) {
+        // No m6A, so no FIRE features. Write the model back unchanged:
+        // nuc/msp (and any fire calls made while the read still had m6A)
+        // are kept; the callable state synced at read time (NotCallable
+        // for a full-read-frame record) is written with them.
+        log::debug!("FIRE: no m6A on {}; writing it unscored", rec.get_qname());
+        rec.serialize_annotations();
+        return;
+    }
     let fire_feats = FireFeats::new(rec, fire_opts);
     let mut precisions = fire_feats.predict_with_xgb(model, precision_table);
     // FIRE produces precisions in MSP-iteration (BAM) order. Convert to
@@ -30,7 +49,11 @@ pub fn add_fire_to_rec(
     // and their paired precisions, keeping only entries with p > 0.
     let (fire_starts, fire_lens, fire_quals): (Vec<u32>, Vec<u32>, Vec<u8>) = {
         let Some(msp) = rec.annotations.get_type(ma_io::MSP_TYPE) else {
-            log::warn!("FIRE: no msp annotations on record; skipping");
+            // Nothing to score. Still write the model back so a record whose
+            // stale tags were dropped by the reader leaves as an honest
+            // untagged read instead of passing those tags on.
+            log::debug!("FIRE: no msp annotations on record; writing it unscored");
+            rec.serialize_annotations();
             return;
         };
         if msp.annotations.len() != precisions.len() {
@@ -98,6 +121,7 @@ pub fn add_fire_to_bam(fire_opts: &mut FireOptions) -> Result<(), anyhow::Error>
             let chunk: Vec<FiberseqData> = chunk.collect();
             let feats: Vec<FireFeats> = chunk
                 .par_iter()
+                .filter(|r| has_m6a(r))
                 .map(|r| FireFeats::new(r, fire_opts))
                 .collect();
             feats.iter().for_each(|f| {

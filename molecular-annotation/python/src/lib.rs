@@ -40,6 +40,7 @@ use pyo3::prelude::*;
 
 // Use fully qualified path to avoid name collision with the pymodule
 use ::molecular_annotation::{
+    AlignedBlocks as RustAlignedBlocks,
     Annotation as RustAnnotation,
     Encoding as RustEncoding,
     MolecularAnnotations as RustMolecularAnnotations,
@@ -590,26 +591,42 @@ impl MolecularAnnotations {
 
     /// Set aligned blocks for liftover calculations.
     ///
-    /// Accepts 0-based half-open [start, end) intervals.
+    /// Accepts 0-based half-open [start, end) intervals. Block query
+    /// coordinates are SEQ-relative (as pysam reports them).
     ///
     /// Args:
     ///     blocks: List of ((query_start, query_end), (ref_start, ref_end)) tuples.
     ///     is_reverse: Whether the read is reverse-aligned.
+    ///     query_offset: Where SEQ starts in the annotation frame. Pass the
+    ///         leading hard clip when the annotations describe the full
+    ///         read and this record is a hard-clipped part of it; 0 otherwise.
     ///
     /// Example:
     ///     >>> # Query [0, 500) aligns to reference [1000, 1500)
     ///     >>> annot.set_aligned_blocks([((0, 500), (1000, 1500))], is_reverse=False)
-    #[pyo3(signature = (blocks, is_reverse=false))]
+    #[pyo3(signature = (blocks, is_reverse=false, query_offset=0))]
     pub fn set_aligned_blocks(
         &mut self,
         blocks: Vec<((u32, u32), (u32, u32))>,
         is_reverse: bool,
+        query_offset: u32,
     ) {
         let block_pairs: Vec<([u32; 2], [u32; 2])> = blocks
             .into_iter()
             .map(|((qs, qe), (rs, re))| ([qs, qe], [rs, re]))
             .collect();
-        self.inner.set_aligned_blocks(block_pairs, is_reverse);
+        let blocks = RustAlignedBlocks::new(block_pairs, self.inner.read_length)
+            .with_query_offset(query_offset);
+        self.inner.set_aligned_blocks_raw(blocks, is_reverse);
+    }
+
+    /// Where SEQ starts in the annotation frame: 0 unless the annotations
+    /// describe the full read and this record is a hard-clipped part of it.
+    /// Query coordinates from get_coords / get_ref_coords / iter_type are in
+    /// the annotation frame; subtract this before indexing the sequence.
+    #[getter]
+    pub fn query_offset(&self) -> u32 {
+        self.inner.query_offset()
     }
 
     /// Check if aligned blocks are set.

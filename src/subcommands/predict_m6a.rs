@@ -250,6 +250,15 @@ where
                         && t.name != ma_io::MSP_TYPE
                         && t.name != ma_io::FIRE_TYPE
                 });
+                if ma_io::model_is_full_read_frame(&annot, record) {
+                    // Full-read tags cannot be re-derived without kinetics:
+                    // leave an honest NotCallable record in the SEQ frame.
+                    annot.annotation_types.clear();
+                    annot.set_aligned_blocks_raw(
+                        molecular_annotation::AlignedBlocks::from_record(record),
+                        record.is_reverse(),
+                    );
+                }
                 // Sync the frame or the marker reads back as Untagged.
                 annot.read_length = record.seq_len() as u32;
                 ma_io::set_fiberseq_callable(
