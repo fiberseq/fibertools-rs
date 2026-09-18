@@ -85,7 +85,7 @@ molecular-annotation = { workspace = true, features = ["htslib"] }
 burn-import = { version = "0.18.0", default-features = false, features = [
     "onnx",
 ] }
-vergen-git2 = { version = "1.0.2", features = [
+vergen-git2 = { version = "9.1.0", features = [
     "build",
     "cargo",
     "rustc",
