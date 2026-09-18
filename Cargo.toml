@@ -20,6 +20,10 @@ exclude = ["py-ft", "molecular-annotation/python"]
 
 [workspace.dependencies]
 rust-htslib = "0.46"
+# hts-sys 2.2.1 changed bindings that rust-htslib 0.46 relies on (bam1_core_t
+# isize, bgzf write length), so a fresh resolution fails to compile. Pin until
+# rust-htslib is bumped. Cargo.lock already held 2.2.0.
+hts-sys = "=2.2.0"
 # molecular-annotation is versioned independently of fibertools-rs and kept at
 # a low 0.0.x "internal crate" version (bump only when its code changes). The
 # `path` builds against local source; the `version` is written into the
@@ -61,6 +65,7 @@ rayon = "1.10"
 linear-map = "1.2.0"
 regex = "1.9.1"
 rust-htslib = { workspace = true }
+hts-sys = { workspace = true }
 
 
 serde = { version = "1.0.104", features = ["derive"], optional = false }
