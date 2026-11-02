@@ -348,6 +348,12 @@ impl FiberTig {
                     a.start = a.start.saturating_sub(start_pos as u32);
                 }
             }
+            // The MA read length is the frame the coordinates are flipped
+            // against on reverse-aligned records (`read_length - end`). The
+            // split annotations still carry the full contig length, so set it
+            // to this chunk's length or every reverse-strand peak lands
+            // outside the record after surjection and is dropped.
+            annotations.read_length = chunk_len as u32;
 
             crate::utils::ma_io::write_record_with_basemods(&mut record, annotations);
 
