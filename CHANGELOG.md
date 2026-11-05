@@ -1,6 +1,30 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.14.0](https://github.com/fiberseq/fibertools-rs/compare/v0.13.0...v0.14.0) - 2026-11-05
+
+### Added
+
+- add `ft union-peaks` to merge peak calls from many BED files ([#129](https://github.com/fiberseq/fibertools-rs/pull/129)) ([#129](https://github.com/fiberseq/fibertools-rs/pull/129))
+- [**breaking**] ft qc unfiltered/filtered columns (count, count_filtered) ([#130](https://github.com/fiberseq/fibertools-rs/pull/130))
+- [**breaking**] callable-fibers filter model, scoped per command ([#130](https://github.com/fiberseq/fibertools-rs/pull/130))
+- fiberseq_callable per-read tag with frame and SEQ-less semantics ([#130](https://github.com/fiberseq/fibertools-rs/pull/130))
+
+### Fixed
+
+- correctly set MA read length when making fibertig ([#156](https://github.com/fiberseq/fibertools-rs/pull/156)) ([#156](https://github.com/fiberseq/fibertools-rs/pull/156))
+- ft call-peaks --haps fills the H1/H2 columns ([#141](https://github.com/fiberseq/fibertools-rs/pull/141)) ([#141](https://github.com/fiberseq/fibertools-rs/pull/141))
+- pin hts-sys 2.2.0 and turn off the release-plz semver check ([#149](https://github.com/fiberseq/fibertools-rs/pull/149)) ([#149](https://github.com/fiberseq/fibertools-rs/pull/149))
+- true median for peak consensus boundaries ([#135](https://github.com/fiberseq/fibertools-rs/pull/135)) ([#135](https://github.com/fiberseq/fibertools-rs/pull/135))
+- a fully-filtered chunk no longer ends the fiber stream ([#131](https://github.com/fiberseq/fibertools-rs/pull/131)) ([#131](https://github.com/fiberseq/fibertools-rs/pull/131))
+- harden edges found in backup review of fiber.rs and qc.rs ([#130](https://github.com/fiberseq/fibertools-rs/pull/130))
+
+### Other
+
+- fix clippy warnings from Rust 1.98 ([#157](https://github.com/fiberseq/fibertools-rs/pull/157)) ([#157](https://github.com/fiberseq/fibertools-rs/pull/157))
+- allow manual release-plz runs via workflow_dispatch ([#134](https://github.com/fiberseq/fibertools-rs/pull/134)) ([#134](https://github.com/fiberseq/fibertools-rs/pull/134))
+- link changelog entries to pull requests ([#133](https://github.com/fiberseq/fibertools-rs/pull/133)) ([#133](https://github.com/fiberseq/fibertools-rs/pull/133))
+- [**breaking**] remove the never-implemented ft fiber-hmm stub ([#130](https://github.com/fiberseq/fibertools-rs/pull/130))
 
 ## [0.13.0](https://github.com/fiberseq/fibertools-rs/compare/v0.12.1...v0.13.0) - 2026-08-13
 
