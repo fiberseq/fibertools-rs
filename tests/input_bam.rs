@@ -41,8 +41,10 @@ fn make_fsd(msp_lengths: &[i64], m6a_count: usize, filters: &FiberFilters) -> Fi
 
 #[test]
 fn minimums_never_drop_without_the_flag() {
-    let mut f = FiberFilters::default();
-    f.min_msp = Some(100);
+    let f = FiberFilters {
+        min_msp: Some(100),
+        ..Default::default()
+    };
     assert!(!f.drop_uncallable_fibers, "the minimums only mark callable");
 }
 
@@ -69,9 +71,11 @@ fn msp_presence_is_required_even_at_zero_minimums() {
     // fiber is uncallable. An m6A-less fiber has no MSPs by
     // construction (the caller emits none without m6A), which is why
     // --skip-no-m6a is gone.
-    let mut f = FiberFilters::default();
-    f.min_msp = Some(0);
-    f.min_ave_msp_size = Some(0);
+    let f = FiberFilters {
+        min_msp: Some(0),
+        min_ave_msp_size: Some(0),
+        ..Default::default()
+    };
     assert!(!make_fsd(&[], 5, &f).is_callable(), "no MSPs");
     assert!(
         make_fsd(&[100], 1, &f).is_callable(),
@@ -81,8 +85,10 @@ fn msp_presence_is_required_even_at_zero_minimums() {
 
 #[test]
 fn custom_minimums_change_the_callable_state() {
-    let mut f = FiberFilters::default();
-    f.min_msp = Some(5);
+    let f = FiberFilters {
+        min_msp: Some(5),
+        ..Default::default()
+    };
     assert!(f.callable_minimums_are_custom());
     assert_eq!(f.callable_minimums(), (5, 10));
     let five_long: Vec<i64> = vec![100; 5];

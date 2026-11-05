@@ -36,7 +36,7 @@ fn qc_m6a_per_msp_sees_fire_elements() {
 }
 
 /// Parse "stat\tvalue\tcount\tcount_filtered" rows for one statistic.
-fn rows_for<'a>(out: &'a str, stat: &str) -> Vec<(f64, i64, i64)> {
+fn rows_for(out: &str, stat: &str) -> Vec<(f64, i64, i64)> {
     out.lines()
         .filter(|l| l.split('\t').next() == Some(stat))
         .map(|l| {

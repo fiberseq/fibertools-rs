@@ -369,7 +369,7 @@ impl<'a> QcStats<'a> {
         // FIRE quals live on the `fire` annotation type, not the MSPs —
         // msp_fire_quals() overlays them (both are BAM-orient ascending).
         let quals = fiber.msp_fire_quals();
-        for (annotation, qual) in msp.infos().iter().zip(quals.into_iter()) {
+        for (annotation, qual) in msp.infos().iter().zip(quals) {
             let st = annotation.query_start as i64;
             let en = annotation.query_end as i64;
             let is_fire = qual >= 230;

@@ -146,8 +146,8 @@ pub fn set_fiberseq_callable(
 
 /// Derive the callable span and state from the nuc/MSP annotations; the
 /// single source of truth for every writer. The span is the extent of the
-/// surviving calls; callable requires >= `min_msp` MSPs with mean length
-/// >= `min_ave_msp_size`. m6A is never inspected: the caller emits no MSP
+/// surviving calls; callable requires at least `min_msp` MSPs with a mean
+/// length of at least `min_ave_msp_size`. m6A is never inspected: the caller emits no MSP
 /// without m6A, and MA-only derivation is what lets SEQ-less records
 /// derive.
 pub fn derive_fiberseq_callable(

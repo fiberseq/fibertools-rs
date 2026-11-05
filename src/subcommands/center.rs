@@ -513,7 +513,7 @@ pub fn center_fiberdata(center_opts: &mut CenterOptions) -> anyhow::Result<()> {
             .unwrap_or_else(|_| {
                 panic!(
                     "Failed to fetch region: {}:{}-{}",
-                    &center_position.chrom,
+                    center_position.chrom,
                     center_position.position,
                     center_position.position + 1
                 )

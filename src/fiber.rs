@@ -374,20 +374,17 @@ impl FiberseqData {
             return "".to_string();
         }
 
-        let ct;
-        let start;
-        let end;
         let name = String::from_utf8_lossy(self.record.qname()).to_string();
         let mut rtn: String = String::with_capacity(0);
-        if reference {
-            ct = &self.target_name;
-            start = self.record.reference_start();
-            end = self.record.reference_end();
+        let (ct, start, end) = if reference {
+            (
+                &self.target_name,
+                self.record.reference_start(),
+                self.record.reference_end(),
+            )
         } else {
-            ct = &name;
-            start = 0;
-            end = self.record.seq_len() as i64;
-        }
+            (&name, 0, self.record.seq_len() as i64)
+        };
         let score = self.ec.round() as i64;
         let strand = if self.record.is_reverse() { '-' } else { '+' };
         // filter out positions that do not have an exact liftover
@@ -495,21 +492,16 @@ impl FiberseqData {
             None => ".".to_string(),
         };
         // reference features
-        let ct;
-        let start;
-        let end;
-        let strand;
-        if self.record.is_unmapped() {
-            ct = ".";
-            start = 0;
-            end = 0;
-            strand = '.';
+        let (ct, start, end, strand) = if self.record.is_unmapped() {
+            (".", 0, 0, '.')
         } else {
-            ct = &self.target_name;
-            start = self.record.reference_start();
-            end = self.record.reference_end();
-            strand = if self.record.is_reverse() { '-' } else { '+' };
-        }
+            (
+                self.target_name.as_str(),
+                self.record.reference_start(),
+                self.record.reference_end(),
+                if self.record.is_reverse() { '-' } else { '+' },
+            )
+        };
         let sam_flag = self.record.flags();
         let hp = self.get_hp();
 
@@ -673,15 +665,10 @@ where
         loop {
             // if we are out of data check for another chunk in the bam
             if self.cur_chunk.is_empty() {
-                match self.bam_chunk.next() {
-                    Some(recs) => {
-                        self.cur_chunk =
-                            FiberseqData::from_records(recs, &self.header, &self.filters);
-                        // we will be popping from this list so we want to remove the first element first, not the last
-                        self.cur_chunk.reverse();
-                    }
-                    None => return None,
-                }
+                let recs = self.bam_chunk.next()?;
+                self.cur_chunk = FiberseqData::from_records(recs, &self.header, &self.filters);
+                // we will be popping from this list so we want to remove the first element first, not the last
+                self.cur_chunk.reverse();
             }
             let rec = self.cur_chunk.pop()?;
             // The stream implements both callable filters: --drop removes
