@@ -540,7 +540,7 @@ fn build_tagged_record(
     );
     {
         let t = annot.add_annotation_type(FIBERTIG_TYPE, QualitySpec::none(), Encoding::Ma);
-        for ((s, l), name) in fs.iter().zip(fl.iter()).zip(names.into_iter()) {
+        for ((s, l), name) in fs.iter().zip(fl.iter()).zip(names) {
             t.add(*s, *l, Strand::Forward, vec![], name);
         }
     }

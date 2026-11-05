@@ -136,7 +136,7 @@ fn ma_write_then_read_roundtrips() {
             // read side depending on which tags exist on the record).
             // Per-type content equality is what we actually want to verify.
             let sort_by_name = |types: &[molecular_annotation::AnnotationType]| {
-                let mut sorted: Vec<_> = types.iter().cloned().collect();
+                let mut sorted: Vec<_> = types.to_vec();
                 sorted.sort_by(|a, b| a.name.cmp(&b.name));
                 sorted
             };

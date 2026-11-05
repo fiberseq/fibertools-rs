@@ -1,6 +1,6 @@
 use fibertools_rs::fiber::FiberseqRecords;
 use fibertools_rs::utils::input_bam::FiberFilters;
-use rust_htslib::bam::{self, Read};
+use rust_htslib::bam::{self};
 
 /// A chunk whose records are all filtered out must not terminate the
 /// stream. Regression test: BamChunk::next used to return None (meaning
