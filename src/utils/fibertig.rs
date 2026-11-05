@@ -302,11 +302,23 @@ impl FiberTig {
             // Create CIGAR with hard clipping and matches
             let mut cigar_data = Vec::new();
             if left_clip > 0 && use_hard_clipping {
-                cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
+                crate::utils::bio_io::push_cigar_op(
+                    &mut cigar_data,
+                    rust_htslib::bam::record::Cigar::HardClip,
+                    left_clip,
+                );
             }
-            cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
+            crate::utils::bio_io::push_cigar_op(
+                &mut cigar_data,
+                rust_htslib::bam::record::Cigar::Equal,
+                chunk_len,
+            );
             if right_clip > 0 && use_hard_clipping {
-                cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(right_clip as u32));
+                crate::utils::bio_io::push_cigar_op(
+                    &mut cigar_data,
+                    rust_htslib::bam::record::Cigar::HardClip,
+                    right_clip,
+                );
             }
             let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
 
@@ -396,11 +408,23 @@ impl FiberTig {
                 // Create CIGAR with hard clipping and matches
                 let mut cigar_data = Vec::new();
                 if left_clip > 0 && use_hard_clipping {
-                    cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(left_clip as u32));
+                    crate::utils::bio_io::push_cigar_op(
+                        &mut cigar_data,
+                        rust_htslib::bam::record::Cigar::HardClip,
+                        left_clip,
+                    );
                 }
-                cigar_data.push(rust_htslib::bam::record::Cigar::Equal(chunk_len as u32));
+                crate::utils::bio_io::push_cigar_op(
+                    &mut cigar_data,
+                    rust_htslib::bam::record::Cigar::Equal,
+                    chunk_len,
+                );
                 if right_clip > 0 && use_hard_clipping {
-                    cigar_data.push(rust_htslib::bam::record::Cigar::HardClip(right_clip as u32));
+                    crate::utils::bio_io::push_cigar_op(
+                        &mut cigar_data,
+                        rust_htslib::bam::record::Cigar::HardClip,
+                        right_clip,
+                    );
                 }
                 let cigar_string = rust_htslib::bam::record::CigarString(cigar_data);
 

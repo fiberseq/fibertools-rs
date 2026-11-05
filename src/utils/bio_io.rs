@@ -102,6 +102,25 @@ pub fn write_to_file(out: &str, buffer: &mut Box<dyn Write>) {
 }
 
 /// write a BAM record, but don't error on broken pipes
+/// Longest single CIGAR operation BAM can store: the length is packed into 28 bits.
+pub const MAX_CIGAR_OP_LEN: usize = (1 << 28) - 1;
+
+/// Push `len` bp of one CIGAR operation, split into pieces BAM can store.
+///
+/// A longer operation does not error in htslib; its length silently wraps and the
+/// record no longer matches its SEQ (issue #155).
+pub fn push_cigar_op(
+    cigar: &mut Vec<bam::record::Cigar>,
+    op: fn(u32) -> bam::record::Cigar,
+    mut len: usize,
+) {
+    while len > 0 {
+        let n = len.min(MAX_CIGAR_OP_LEN);
+        cigar.push(op(n as u32));
+        len -= n;
+    }
+}
+
 pub fn write_record(writer: &mut bam::Writer, record: &bam::Record) -> anyhow::Result<()> {
     match writer.write(record) {
         Ok(_) => Ok(()),
@@ -640,4 +659,30 @@ pub fn read_bed_regions(bed_path: &str) -> Result<Vec<BedRecord>> {
 
     log::debug!("Read {} regions from BED file: {}", regions.len(), bed_path);
     Ok(regions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_htslib::bam::record::Cigar;
+
+    #[test]
+    fn push_cigar_op_splits_at_the_bam_limit() {
+        let mut cigar = vec![];
+        push_cigar_op(&mut cigar, Cigar::Equal, 0);
+        assert!(cigar.is_empty());
+        push_cigar_op(&mut cigar, Cigar::Equal, MAX_CIGAR_OP_LEN);
+        assert_eq!(cigar, vec![Cigar::Equal(MAX_CIGAR_OP_LEN as u32)]);
+        cigar.clear();
+        push_cigar_op(&mut cigar, Cigar::HardClip, 2 * MAX_CIGAR_OP_LEN + 5);
+        let max = MAX_CIGAR_OP_LEN as u32;
+        assert_eq!(
+            cigar,
+            vec![
+                Cigar::HardClip(max),
+                Cigar::HardClip(max),
+                Cigar::HardClip(5)
+            ]
+        );
+    }
 }

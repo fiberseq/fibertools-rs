@@ -101,7 +101,9 @@ pub(crate) fn create_mock_fire_record(
     let qual = vec![255u8; seq_len];
 
     // Create CIGAR - simple match for the entire read
-    let cigar = CigarString(vec![Cigar::Equal(seq_len as u32)]);
+    let mut cigar = Vec::new();
+    bio_io::push_cigar_op(&mut cigar, Cigar::Equal, seq_len);
+    let cigar = CigarString(cigar);
 
     // Create the BAM record
     let mut record = Record::new();

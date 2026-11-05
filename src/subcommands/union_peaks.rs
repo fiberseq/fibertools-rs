@@ -27,10 +27,6 @@ const ISLAND_PAD: i64 = 1000;
 /// coordinates so the mock header (max end + 10000) and every position stay in range.
 const MAX_COORD: i64 = i32::MAX as i64 - 10_000;
 
-/// Longest island we will build a mock fiber for. `Cigar::Equal(len)` packs the length
-/// into 28 bits and wraps silently past that.
-const MAX_ISLAND_LEN: i64 = 1 << 28;
-
 /// One input BED, collapsed to non-overlapping intervals per chromosome.
 struct Sample {
     name: String,
@@ -297,11 +293,6 @@ pub fn run_union_peaks(opts: &UnionPeaksOptions) -> Result<()> {
                         (island_end - island_start) / 1_000_000
                     );
                 });
-            }
-            if island_end - island_start >= MAX_ISLAND_LEN {
-                bail!(
-                    "intervals at {chrom}:{island_start}-{island_end} span more than {MAX_ISLAND_LEN} bp, which is too long for a mock fiber"
-                );
             }
             // Every interval falls wholly inside one island, so this is a select, not a
             // clip. Intervals are merged and sorted, so their ends rise with their starts:
